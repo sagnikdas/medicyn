@@ -6,6 +6,7 @@ import '../../data/local/database.dart';
 import '../../data/local/tables.dart';
 import '../../data/remote/medicine_parser.dart';
 import '../../data/remote/sync_service.dart';
+import '../history/dose_history_screen.dart';
 import '../notification_engine/notification_service.dart';
 import 'parsed_medicine.dart';
 
@@ -129,6 +130,14 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
   }
 
   void _continueManually() => setState(() => _loadState = _LoadState.ready);
+
+  void _viewHistory() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => DoseHistoryScreen(scheduleId: widget.existing!.schedule.id, db: widget.db),
+      ),
+    );
+  }
 
   Future<void> _addTime() async {
     final picked = await showTimePicker(context: context, initialTime: TimeOfDay.now());
@@ -349,6 +358,19 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
           maxLines: 2,
           decoration: const InputDecoration(labelText: 'Notes (optional)'),
         ),
+        if (_isEditing) ...[
+          const SizedBox(height: 20),
+          const Divider(),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: _viewHistory,
+            icon: const Icon(Icons.history),
+            label: const Text('View history'),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size.fromHeight(48),
+            ),
+          ),
+        ],
         const SizedBox(height: 28),
         FilledButton(
           onPressed: _canSave && !_saving ? _save : null,
