@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
 /// Step 2 of the capture flow: speak the dosage/schedule instructions
@@ -20,6 +21,7 @@ class _VoiceCaptureScreenState extends State<VoiceCaptureScreen> {
   final _speech = SpeechToText();
   _Status _status = _Status.idle;
   String _transcript = '';
+  String? _errorMessage;
 
   @override
   void dispose() {
@@ -28,17 +30,37 @@ class _VoiceCaptureScreenState extends State<VoiceCaptureScreen> {
   }
 
   Future<void> _startListening() async {
-    setState(() => _status = _Status.initializing);
+    setState(() {
+      _status = _Status.initializing;
+      _errorMessage = null;
+    });
     final available = await _speech.initialize(
       onStatus: (status) {
         if (status == 'done' || status == 'notListening') {
           setState(() => _status = _Status.idle);
         }
       },
-      onError: (_) => setState(() => _status = _Status.idle),
+      // `error.errorMsg` is a code, not user-facing text (see package docs) —
+      // a permanent error almost always means the mic permission was denied,
+      // so check that directly rather than showing the raw code.
+      onError: (error) async {
+        final micDenied = await Permission.microphone.isPermanentlyDenied;
+        setState(() {
+          _status = _Status.idle;
+          _errorMessage = error.permanent && micDenied
+              ? 'Microphone access is off — turn it on in your phone\'s Settings to use voice input.'
+              : 'Didn\'t catch that — tap the mic and try again.';
+        });
+      },
     );
     if (!available) {
-      setState(() => _status = _Status.unavailable);
+      final micDenied = await Permission.microphone.isPermanentlyDenied;
+      setState(() {
+        _status = _Status.unavailable;
+        _errorMessage = micDenied
+            ? 'Microphone access is off — turn it on in your phone\'s Settings to use voice input.'
+            : 'Speech recognition isn\'t available on this device.';
+      });
       return;
     }
     setState(() => _status = _Status.listening);
@@ -86,11 +108,18 @@ class _VoiceCaptureScreenState extends State<VoiceCaptureScreen> {
                 ),
               ),
               const SizedBox(height: 28),
-              if (_status == _Status.unavailable)
+              if (_errorMessage != null) ...[
                 Text(
-                  'Speech recognition isn\'t available on this device.',
+                  _errorMessage!,
                   textAlign: TextAlign.center,
                   style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+                const SizedBox(height: 16),
+              ],
+              if (_status == _Status.unavailable)
+                OutlinedButton(
+                  onPressed: () => openAppSettings(),
+                  child: const Text('Open Settings'),
                 )
               else
                 Center(

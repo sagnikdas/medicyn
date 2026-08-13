@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' show AuthException, AuthRetryableFetchException;
 
 import 'auth_service.dart';
 
@@ -60,7 +61,21 @@ class _SignInScreenState extends State<SignInScreen> {
       await AuthService.instance.sendSignInCode(email);
       setState(() => _step = _Step.code);
     } catch (e) {
-      setState(() => _error = 'Could not send a code. Check your connection and try again.');
+      // Distinguish the cases that actually confused us while building this
+      // screen: a rate limit was previously swallowed into this same
+      // "check your connection" message, which sent us hunting for a
+      // network problem that didn't exist.
+      String message;
+      if (e is AuthRetryableFetchException) {
+        message = 'Could not send a code. Check your connection and try again.';
+      } else if (e is AuthException && e.code == 'over_email_send_rate_limit') {
+        message = "You've requested a few too many codes — wait a few minutes and try again.";
+      } else if (e is AuthException) {
+        message = 'Could not send a code right now — try again in a moment.';
+      } else {
+        message = 'Could not send a code. Check your connection and try again.';
+      }
+      setState(() => _error = message);
     } finally {
       setState(() => _busy = false);
     }
