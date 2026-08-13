@@ -85,11 +85,17 @@ reminder, and for camera/microphone permission when you use those steps.
 ## Auth
 
 Ships with **email magic-link** sign-in (fully working, no setup beyond the
-above). **Google Sign-In is wired in code but disabled** — it needs a
-Google Cloud OAuth client registered to this app's package name
-(`com.sagnikdas.dosely`) and release signing SHA-1, which is a manual
-one-time step in Google Cloud Console I can't do from here. To enable it
-later:
+above) as the primary method. **Google Sign-In is implemented as a second,
+faster option** — `AuthService.signInWithGoogle()` in
+`lib/features/auth/auth_service.dart` drives the native `google_sign_in`
+flow and exchanges the resulting ID token for a Supabase session via
+`GoTrueClient.signInWithIdToken`, and `sign_in_screen.dart` shows a
+"Continue with Google" button above the email field. It isn't usable yet,
+though — no Google Cloud OAuth client has been registered for this app,
+which is a manual one-time step in Google Cloud Console I can't do from
+here. Until that's done, tapping the button fails fast and shows "Google
+Sign-In isn't set up yet — please use email instead"; email + code is
+unaffected and remains fully working. To enable Google Sign-In for real:
 
 1. Google Cloud Console → your project → Credentials → Create OAuth client
    ID → Android, using `com.sagnikdas.dosely` and your signing key's SHA-1.
@@ -97,7 +103,9 @@ later:
    needed) — this is the `serverClientId` `google_sign_in` needs.
 3. Supabase Dashboard → Authentication → Providers → Google → paste that
    Web client's ID and secret, enable the provider.
-4. Wire `google_sign_in` into `lib/features/auth/` using that Web client ID.
+4. Paste that Web client's ID into `_googleServerClientId` in
+   `auth_service.dart` (currently left blank on purpose, which is what
+   makes the button fail fast instead of hitting an unconfigured SDK).
 
 ## Reliability notes
 

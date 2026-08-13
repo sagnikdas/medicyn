@@ -28,6 +28,24 @@ class _SignInScreenState extends State<SignInScreen> {
     super.dispose();
   }
 
+  Future<void> _signInWithGoogle() async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await AuthService.instance.signInWithGoogle();
+      // Success moves the app on via the auth-state stream in main.dart.
+    } catch (e) {
+      // Most likely cause right now: no Google Cloud OAuth client has been
+      // registered for this app yet (see AuthService.signInWithGoogle doc).
+      // Email + code below always works regardless, so fail quietly here.
+      setState(() => _error = "Google Sign-In isn't set up yet — please use email instead.");
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _sendCode() async {
     final email = _emailController.text.trim();
     if (email.isEmpty || !email.contains('@')) {
@@ -96,6 +114,17 @@ class _SignInScreenState extends State<SignInScreen> {
 
   List<Widget> _emailStep() {
     return [
+      OutlinedButton(
+        onPressed: _busy ? null : _signInWithGoogle,
+        child: const Text('Continue with Google'),
+      ),
+      const SizedBox(height: 16),
+      Text(
+        'or sign in with email',
+        textAlign: TextAlign.center,
+        style: Theme.of(context).textTheme.bodySmall,
+      ),
+      const SizedBox(height: 16),
       TextField(
         controller: _emailController,
         keyboardType: TextInputType.emailAddress,
