@@ -32,6 +32,12 @@ void handleNotificationResponse(NotificationResponse response) async {
   final payload = jsonDecode(payloadRaw) as Map<String, dynamic>;
   final scheduleId = payload['scheduleId'] as String?;
   if (scheduleId == null) return;
+  // The dose was due whenever the alarm was set for — not whenever the user
+  // got around to tapping the action, which can be minutes (or longer)
+  // later. `timeLabel` carries the real "HH:mm" for daily/specific-days
+  // reminders; snoozed and every-X-hours notifications don't carry a
+  // meaningful clock time here, so those fall back to now.
+  final scheduledAt = _scheduledAtFromTimeLabel(payload['timeLabel'] as String?) ?? DateTime.now();
 
   final db = AppDatabase();
   try {
@@ -39,7 +45,7 @@ void handleNotificationResponse(NotificationResponse response) async {
       await db.recordDoseAction(
         id: newUuid(),
         scheduleId: scheduleId,
-        scheduledAt: DateTime.now(),
+        scheduledAt: scheduledAt,
         action: DoseAction.taken,
       );
       return;
@@ -49,7 +55,7 @@ void handleNotificationResponse(NotificationResponse response) async {
     await db.recordDoseAction(
       id: newUuid(),
       scheduleId: scheduleId,
-      scheduledAt: DateTime.now(),
+      scheduledAt: scheduledAt,
       action: DoseAction.snoozed,
     );
     final schedule = await db.scheduleById(scheduleId);
@@ -66,4 +72,20 @@ void handleNotificationResponse(NotificationResponse response) async {
   } finally {
     await db.close();
   }
+}
+
+/// Parses a "HH:mm" time label into today's occurrence of that clock time.
+/// Returns null for anything that isn't a plain "HH:mm" — notably the
+/// literal string `'snooze'` used by [NotificationService.scheduleSnooze],
+/// and the every-X-hours anchor time, which doesn't represent this specific
+/// occurrence's actual fire time.
+DateTime? _scheduledAtFromTimeLabel(String? timeLabel) {
+  if (timeLabel == null) return null;
+  final match = RegExp(r'^([0-2][0-9]):([0-5][0-9])$').firstMatch(timeLabel);
+  if (match == null) return null;
+  final hour = int.parse(match.group(1)!);
+  final minute = int.parse(match.group(2)!);
+  if (hour > 23) return null;
+  final now = DateTime.now();
+  return DateTime(now.year, now.month, now.day, hour, minute);
 }
