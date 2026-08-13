@@ -24,9 +24,13 @@ class AppSettings extends ChangeNotifier {
   static final AppSettings instance = AppSettings._();
 
   static const _textSizeKey = 'text_size';
+  static const _hasSeenOnboardingKey = 'has_seen_onboarding';
 
   TextSize _textSize = TextSize.standard;
   TextSize get textSize => _textSize;
+
+  bool _hasSeenOnboarding = false;
+  bool get hasSeenOnboarding => _hasSeenOnboarding;
 
   bool _loaded = false;
 
@@ -38,6 +42,7 @@ class AppSettings extends ChangeNotifier {
       (t) => t.name == stored,
       orElse: () => TextSize.standard,
     );
+    _hasSeenOnboarding = prefs.getBool(_hasSeenOnboardingKey) ?? false;
     _loaded = true;
   }
 
@@ -46,5 +51,12 @@ class AppSettings extends ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_textSizeKey, size.name);
+  }
+
+  Future<void> setHasSeenOnboarding() async {
+    _hasSeenOnboarding = true;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_hasSeenOnboardingKey, true);
   }
 }

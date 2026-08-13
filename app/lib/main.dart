@@ -8,6 +8,7 @@ import 'core/supabase_config.dart';
 import 'core/theme.dart';
 import 'data/local/database.dart';
 import 'features/auth/sign_in_screen.dart';
+import 'features/onboarding/onboarding_screen.dart';
 import 'features/reminders_home/home_screen.dart';
 
 final appDatabase = AppDatabase();
@@ -54,7 +55,31 @@ class DoselyApp extends StatelessWidget {
           child: child!,
         ),
       ),
-      home: const _AuthGate(),
+      home: const _OnboardingGate(),
+    );
+  }
+}
+
+/// Shows onboarding once, on first launch only, before anything else —
+/// including sign-in. Once the user finishes or skips it, the persisted
+/// flag (see AppSettings.hasSeenOnboarding) means this gate goes straight
+/// to `_AuthGate` on every later launch.
+class _OnboardingGate extends StatelessWidget {
+  const _OnboardingGate();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: AppSettings.instance,
+      builder: (context, _) {
+        if (AppSettings.instance.hasSeenOnboarding) {
+          return const _AuthGate();
+        }
+        // No navigation needed here: OnboardingScreen already persists the
+        // flag via AppSettings before calling this back, and that change
+        // alone triggers this ListenableBuilder to rebuild into _AuthGate.
+        return OnboardingScreen(onFinished: () {});
+      },
     );
   }
 }

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io' show Platform;
 
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
@@ -45,7 +46,15 @@ class NotificationService {
     tz.setLocalLocation(tz.getLocation(deviceTz.identifier));
 
     const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const settings = InitializationSettings(android: androidSettings);
+    // Permissions are requested explicitly via requestPermissions() (called
+    // from HomeScreen on init/resume) rather than at plugin-init time, to
+    // mirror the Android side which never asks at init either.
+    const iosSettings = DarwinInitializationSettings(
+      requestAlertPermission: false,
+      requestBadgePermission: false,
+      requestSoundPermission: false,
+    );
+    const settings = InitializationSettings(android: androidSettings, iOS: iosSettings);
 
     await _plugin.initialize(
       settings: settings,
@@ -56,6 +65,12 @@ class NotificationService {
   }
 
   Future<bool> requestPermissions() async {
+    if (Platform.isIOS) {
+      final ios = _plugin.resolvePlatformSpecificImplementation<
+          IOSFlutterLocalNotificationsPlugin>();
+      final granted = await ios?.requestPermissions(alert: true, badge: true, sound: true);
+      return granted ?? false;
+    }
     final android = _plugin.resolvePlatformSpecificImplementation<
         AndroidFlutterLocalNotificationsPlugin>();
     if (android == null) return true;
@@ -65,11 +80,21 @@ class NotificationService {
   }
 
   Future<bool> hasExactAlarmPermission() async {
+    // iOS has no separate "exact alarm" permission concept the way Android
+    // does — notification delivery timing is handled by the OS once
+    // notification permission itself is granted, so there's nothing extra
+    // to check here.
+    if (Platform.isIOS) return true;
     final android = _plugin.resolvePlatformSpecificImplementation<
         AndroidFlutterLocalNotificationsPlugin>();
     return await android?.canScheduleExactNotifications() ?? true;
   }
 
+  // iOS has no equivalent to Android's exact-alarm scheduling or its
+  // dedicated notification channel — this is stub-level parity, just
+  // enough for the plugin to deliver a basic alert/sound/badge on iOS
+  // without crashing. Full iOS-native features (action buttons, etc.)
+  // are not implemented here.
   NotificationDetails _details() => const NotificationDetails(
         android: AndroidNotificationDetails(
           reminderChannelId,
@@ -82,6 +107,11 @@ class NotificationService {
             AndroidNotificationAction(actionTaken, 'Taken'),
             AndroidNotificationAction(actionSnooze, 'Snooze 10m'),
           ],
+        ),
+        iOS: DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: true,
+          presentSound: true,
         ),
       );
 
