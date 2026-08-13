@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/app_settings.dart';
+import 'core/sentry_config.dart';
 import 'core/supabase_config.dart';
 import 'core/theme.dart';
 import 'data/local/database.dart';
@@ -11,13 +13,25 @@ import 'features/reminders_home/home_screen.dart';
 final appDatabase = AppDatabase();
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await Supabase.initialize(
-    url: SupabaseConfig.url,
-    publishableKey: SupabaseConfig.publishableKey,
+  // With SentryConfig.dsn empty (the default), SentryFlutter.init disables
+  // the SDK entirely — no crash capture, no network calls — so this is a
+  // no-op wrapper until a real DSN is configured. The existing init order
+  // (Supabase, then AppSettings, then runApp) is preserved unchanged inside
+  // the `appRunner`.
+  await SentryFlutter.init(
+    (options) {
+      options.dsn = SentryConfig.dsn;
+    },
+    appRunner: () async {
+      WidgetsFlutterBinding.ensureInitialized();
+      await Supabase.initialize(
+        url: SupabaseConfig.url,
+        publishableKey: SupabaseConfig.publishableKey,
+      );
+      await AppSettings.instance.init();
+      runApp(const DoselyApp());
+    },
   );
-  await AppSettings.instance.init();
-  runApp(const DoselyApp());
 }
 
 class DoselyApp extends StatelessWidget {

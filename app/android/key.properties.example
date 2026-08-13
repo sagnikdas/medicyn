@@ -1,0 +1,8 @@
+# Template for app/android/key.properties (git-ignored — never commit the
+# real file). Copy this to `key.properties` in the same directory and fill
+# in your own values. See the "Release signing" section of app/README.md
+# for how to generate a keystore.
+storeFile=/absolute/path/to/upload-keystore.jks
+storePassword=REPLACE_ME
+keyAlias=upload
+keyPassword=REPLACE_ME

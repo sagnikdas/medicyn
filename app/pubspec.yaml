@@ -19,6 +19,7 @@ dependencies:
   path: ^1.9.1
   path_provider: ^2.1.6
   permission_handler: ^13.0.1
+  sentry_flutter: ^9.26.0
   shared_preferences: ^2.5.5
   speech_to_text: ^7.4.0
   supabase_flutter: ^2.17.1
