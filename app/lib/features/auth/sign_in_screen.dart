@@ -102,25 +102,28 @@ class _SignInScreenState extends State<SignInScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
-        child: Padding(
+        // A plain Center+Column here overflows once the keyboard shrinks the
+        // available height — this screen has grown too tall to always fit
+        // above it (Google button + divider + field + button), especially
+        // at larger text-size settings. Scrolling is what actually keeps
+        // every field reachable no matter how much room the keyboard leaves.
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(28),
-          child: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text('Dosely', style: Theme.of(context).textTheme.headlineMedium),
-                const SizedBox(height: 8),
-                Text(
-                  _step == _Step.email
-                      ? 'Enter your email to get a sign-in code — no password needed.'
-                      : 'Enter the code we sent to ${_emailController.text.trim()}.',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-                const SizedBox(height: 24),
-                if (_step == _Step.email) ..._emailStep() else ..._codeStep(),
-              ],
-            ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('Dosely', style: Theme.of(context).textTheme.headlineMedium),
+              const SizedBox(height: 8),
+              Text(
+                _step == _Step.email
+                    ? 'Enter your email to get a sign-in code — no password needed.'
+                    : 'Enter the code we sent to ${_emailController.text.trim()}.',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 24),
+              if (_step == _Step.email) ..._emailStep() else ..._codeStep(),
+            ],
           ),
         ),
       ),
