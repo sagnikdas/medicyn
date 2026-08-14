@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../data/local/database.dart';
@@ -42,8 +44,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Future<void> _bootstrap() async {
     await NotificationService.instance.init();
     await NotificationService.instance.requestPermissions();
+    final sync = SyncService(widget.db);
+    // Pull before reconcile: a fresh install/new device has no local
+    // schedules yet, so restoring them from Supabase first means reconcile
+    // arms their alarms in this same pass instead of waiting for the next
+    // resume.
+    await sync.pullAll();
     await NotificationService.instance.reconcile(widget.db);
-    await SyncService(widget.db).syncAll();
+    await sync.syncAll();
   }
 
   Future<void> _startCapture() async {
@@ -120,6 +128,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               final item = items[i];
               return _ReminderCard(
                 item: item,
+                db: widget.db,
                 onTap: () => _edit(item),
                 onDelete: () => _delete(item.schedule),
               );
@@ -164,8 +173,9 @@ class _EmptyState extends StatelessWidget {
 }
 
 class _ReminderCard extends StatelessWidget {
-  const _ReminderCard({required this.item, required this.onTap, required this.onDelete});
+  const _ReminderCard({required this.item, required this.db, required this.onTap, required this.onDelete});
   final ScheduleWithMedicine item;
+  final AppDatabase db;
   final VoidCallback onTap;
   final VoidCallback onDelete;
 
@@ -208,6 +218,7 @@ class _ReminderCard extends StatelessWidget {
                       Text(medicine.doseAmount, style: Theme.of(context).textTheme.bodyMedium),
                     const SizedBox(height: 4),
                     Text(_describe(), style: Theme.of(context).textTheme.bodySmall),
+                    _SnoozeStatus(db: db, scheduleId: item.schedule.id),
                   ],
                 ),
               ),
@@ -219,6 +230,75 @@ class _ReminderCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Shows "Snoozed until HH:mm" under a reminder while its most recent dose
+/// log is an active (< 10 minutes old) snooze, then disappears on its own.
+///
+/// Polls rather than watches: the notification engine records Taken/Snooze
+/// through its own `AppDatabase` instance — often from a background isolate
+/// when the user snoozes straight from the notification tray — and those
+/// writes don't push to a `.watch()` stream on a different instance. See
+/// [AppDatabase.latestDoseLogOnce].
+class _SnoozeStatus extends StatefulWidget {
+  const _SnoozeStatus({required this.db, required this.scheduleId});
+  final AppDatabase db;
+  final String scheduleId;
+
+  @override
+  State<_SnoozeStatus> createState() => _SnoozeStatusState();
+}
+
+class _SnoozeStatusState extends State<_SnoozeStatus> {
+  static const _pollInterval = Duration(seconds: 15);
+
+  Timer? _poll;
+  DateTime? _snoozedUntil;
+
+  @override
+  void initState() {
+    super.initState();
+    _refresh();
+    _poll = Timer.periodic(_pollInterval, (_) => _refresh());
+  }
+
+  @override
+  void dispose() {
+    _poll?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _refresh() async {
+    final log = await widget.db.latestDoseLogOnce(widget.scheduleId);
+    if (!mounted) return;
+    DateTime? until;
+    if (log != null && log.action == DoseAction.snoozed.name) {
+      final candidate = log.loggedAt.add(const Duration(minutes: 10));
+      if (candidate.isAfter(DateTime.now())) until = candidate;
+    }
+    if (until != _snoozedUntil) setState(() => _snoozedUntil = until);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final until = _snoozedUntil;
+    if (until == null) return const SizedBox.shrink();
+    final local = until.toLocal();
+    final label =
+        'Snoozed until ${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
+    final color = Theme.of(context).colorScheme.tertiary;
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.snooze, size: 15, color: color),
+          const SizedBox(width: 4),
+          Text(label, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: color)),
+        ],
       ),
     );
   }

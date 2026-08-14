@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:drift/drift.dart' hide Column;
 import 'package:flutter/material.dart';
 
@@ -162,57 +164,89 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
   }
 
   Future<void> _save() async {
+    debugPrint('[SAVE-TRACE] _save() start');
     setState(() => _saving = true);
-    final medicineId = _isEditing ? widget.existing!.medicine.id : newUuid();
-    final scheduleId = _isEditing ? widget.existing!.schedule.id : newUuid();
+    try {
+      final medicineId = _isEditing ? widget.existing!.medicine.id : newUuid();
+      final scheduleId = _isEditing ? widget.existing!.schedule.id : newUuid();
 
-    await widget.db.upsertMedicine(MedicinesCompanion.insert(
-      id: medicineId,
-      drugName: _drugNameController.text.trim(),
-      strength: Value(_strengthController.text.trim()),
-      form: Value(_formController.text.trim()),
-      doseAmount: Value(_doseAmountController.text.trim()),
-      notes: Value(_notesController.text.trim()),
-      // insertOnConflictUpdate only touches columns present here — without
-      // this, editing an already-synced medicine would silently leave
-      // pendingSync at its old (false) value and the edit would never sync.
-      pendingSync: const Value(true),
-    ));
+      debugPrint('[SAVE-TRACE] before upsertMedicine');
+      await widget.db.upsertMedicine(MedicinesCompanion.insert(
+        id: medicineId,
+        drugName: _drugNameController.text.trim(),
+        strength: Value(_strengthController.text.trim()),
+        form: Value(_formController.text.trim()),
+        doseAmount: Value(_doseAmountController.text.trim()),
+        notes: Value(_notesController.text.trim()),
+        // insertOnConflictUpdate only touches columns present here — without
+        // this, editing an already-synced medicine would silently leave
+        // pendingSync at its old (false) value and the edit would never sync.
+        pendingSync: const Value(true),
+      ));
+      debugPrint('[SAVE-TRACE] after upsertMedicine');
 
-    final schedule = Schedule(
-      id: scheduleId,
-      medicineId: medicineId,
-      frequencyType: _frequency.name,
-      times: _times,
-      daysOfWeek: _frequency == FrequencyType.specificDays ? (_daysOfWeek.toList()..sort()) : const [],
-      intervalHours: _frequency == FrequencyType.everyXHours ? int.tryParse(_intervalController.text) : null,
-      active: true,
-      createdAt: DateTime.now(),
-      pendingSync: true,
-      deleted: false,
-    );
-    await widget.db.upsertSchedule(SchedulesCompanion.insert(
-      id: scheduleId,
-      medicineId: medicineId,
-      frequencyType: _frequency.name,
-      times: _times,
-      daysOfWeek: Value(schedule.daysOfWeek),
-      intervalHours: Value(schedule.intervalHours),
-      // Same reasoning as the medicine upsert above — force it dirty so an
-      // edit to an already-synced schedule actually gets pushed.
-      pendingSync: const Value(true),
-    ));
+      final schedule = Schedule(
+        id: scheduleId,
+        medicineId: medicineId,
+        frequencyType: _frequency.name,
+        times: _times,
+        daysOfWeek: _frequency == FrequencyType.specificDays ? (_daysOfWeek.toList()..sort()) : const [],
+        intervalHours: _frequency == FrequencyType.everyXHours ? int.tryParse(_intervalController.text) : null,
+        active: true,
+        createdAt: DateTime.now(),
+        pendingSync: true,
+        deleted: false,
+      );
+      await widget.db.upsertSchedule(SchedulesCompanion.insert(
+        id: scheduleId,
+        medicineId: medicineId,
+        frequencyType: _frequency.name,
+        times: _times,
+        daysOfWeek: Value(schedule.daysOfWeek),
+        intervalHours: Value(schedule.intervalHours),
+        // Same reasoning as the medicine upsert above — force it dirty so an
+        // edit to an already-synced schedule actually gets pushed.
+        pendingSync: const Value(true),
+      ));
+      debugPrint('[SAVE-TRACE] after upsertSchedule');
 
-    final medicine = await widget.db.medicineById(medicineId);
-    if (medicine != null) {
-      await NotificationService.instance.scheduleForScheduleWithMedicine(
-        ScheduleWithMedicine(schedule, medicine),
+      final medicine = await widget.db.medicineById(medicineId);
+      debugPrint('[SAVE-TRACE] after medicineById, medicine=${medicine?.id}');
+      if (medicine != null) {
+        try {
+          debugPrint('[SAVE-TRACE] before scheduleForScheduleWithMedicine');
+          await NotificationService.instance.scheduleForScheduleWithMedicine(
+            ScheduleWithMedicine(schedule, medicine),
+          );
+          debugPrint('[SAVE-TRACE] after scheduleForScheduleWithMedicine');
+        } catch (e) {
+          debugPrint('[SAVE-TRACE] scheduleForScheduleWithMedicine threw: $e');
+          // The reminder is saved either way; a scheduling failure (e.g. the
+          // Android 12+ exact-alarm permission was revoked) shouldn't block
+          // the save or strand the spinner — surface it and move on.
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Saved, but the alarm could not be scheduled: $e')),
+            );
+          }
+        }
+      }
+      // Fire-and-forget: sync is backup/multi-device only, never the source
+      // of truth for the reminder itself (see SyncService's docs), so it
+      // must not hold the Save button hostage to network conditions —
+      // retries with backoff inside the client can otherwise take upwards
+      // of 10+ seconds per row before this UI-blocking await gives up.
+      unawaited(SyncService(widget.db).syncAll());
+
+      if (!mounted) return;
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not save: $e')),
       );
     }
-    await SyncService(widget.db).syncAll();
-
-    if (!mounted) return;
-    Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
   @override

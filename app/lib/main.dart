@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'core/app_navigation.dart';
 import 'core/app_settings.dart';
 import 'core/sentry_config.dart';
 import 'core/supabase_config.dart';
 import 'core/theme.dart';
 import 'data/local/database.dart';
 import 'features/auth/sign_in_screen.dart';
+import 'features/notification_engine/notification_actions.dart';
+import 'features/notification_engine/notification_service.dart';
 import 'features/onboarding/onboarding_screen.dart';
 import 'features/reminders_home/home_screen.dart';
 
@@ -30,17 +34,43 @@ void main() async {
         publishableKey: SupabaseConfig.publishableKey,
       );
       await AppSettings.instance.init();
-      runApp(const DoselyApp());
+      // Must happen before checking the launch response below — the plugin
+      // has to be initialized first to answer getNotificationAppLaunchDetails.
+      await NotificationService.instance.init();
+      final launchResponse = await NotificationService.instance.consumeLaunchNotificationResponse();
+      runApp(DoselyApp(launchNotificationResponse: launchResponse));
     },
   );
 }
 
-class DoselyApp extends StatelessWidget {
-  const DoselyApp({super.key});
+class DoselyApp extends StatefulWidget {
+  const DoselyApp({super.key, this.launchNotificationResponse});
+
+  /// Set when the app was launched (cold start) by a notification tap —
+  /// see [NotificationService.consumeLaunchNotificationResponse].
+  final NotificationResponse? launchNotificationResponse;
+
+  @override
+  State<DoselyApp> createState() => _DoselyAppState();
+}
+
+class _DoselyAppState extends State<DoselyApp> {
+  @override
+  void initState() {
+    super.initState();
+    final response = widget.launchNotificationResponse;
+    if (response != null) {
+      // The navigator isn't attached yet during this build, so defer until
+      // after the first frame — by then navigatorKey.currentState is live.
+      WidgetsBinding.instance.addPostFrameCallback((_) => handleNotificationResponse(response));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: navigatorKey,
+      debugShowCheckedModeBanner: false,
       title: 'Dosely',
       theme: DoselyTheme.light(),
       darkTheme: DoselyTheme.dark(),

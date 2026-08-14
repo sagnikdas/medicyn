@@ -1,11 +1,13 @@
 import 'dart:convert';
 
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
+import '../../core/app_navigation.dart';
 import '../../core/ids.dart';
 import '../../data/local/database.dart';
 import '../../data/local/tables.dart';
+import '../dose_confirm/dose_confirm_screen.dart';
 import 'notification_service.dart';
 
 /// Runs in a separate background isolate when the user taps a notification
@@ -18,14 +20,13 @@ void notificationTapBackground(NotificationResponse response) {
   handleNotificationResponse(response);
 }
 
-/// Shared by both the foreground and background entry points. Opens its own
-/// short-lived database connection rather than relying on an app-wide
-/// singleton, since a background isolate has none of the app's state.
+/// Shared by both the foreground and background entry points. For action
+/// buttons (Taken/Snooze), opens its own short-lived database connection
+/// rather than relying on an app-wide singleton, since a background isolate
+/// has none of the app's state. For a plain tap on the notification body,
+/// pushes [DoseConfirmScreen] instead — which does the same on its own.
 void handleNotificationResponse(NotificationResponse response) async {
   final actionId = response.actionId;
-  if (actionId != actionTaken && actionId != actionSnooze) {
-    return; // Plain notification tap (no action button) — nothing to record.
-  }
 
   final payloadRaw = response.payload;
   if (payloadRaw == null || payloadRaw.isEmpty) return;
@@ -33,45 +34,79 @@ void handleNotificationResponse(NotificationResponse response) async {
   final scheduleId = payload['scheduleId'] as String?;
   if (scheduleId == null) return;
   // The dose was due whenever the alarm was set for — not whenever the user
-  // got around to tapping the action, which can be minutes (or longer)
-  // later. `timeLabel` carries the real "HH:mm" for daily/specific-days
-  // reminders; snoozed and every-X-hours notifications don't carry a
-  // meaningful clock time here, so those fall back to now.
+  // got around to responding, which can be minutes (or longer) later.
+  // `timeLabel` carries the real "HH:mm" for daily/specific-days reminders;
+  // snoozed and every-X-hours notifications don't carry a meaningful clock
+  // time here, so those fall back to now.
   final scheduledAt = _scheduledAtFromTimeLabel(payload['timeLabel'] as String?) ?? DateTime.now();
+
+  if (actionId != actionTaken && actionId != actionSnooze) {
+    // Plain tap on the notification body (not an action button) — bring up
+    // the Taken/Snooze prompt. Only reachable with a live widget tree
+    // (foreground, or backgrounded-but-alive): a cold start's launch tap is
+    // handled separately via NotificationService.consumeLaunchNotificationResponse,
+    // since no navigator exists yet when this fires on a background isolate.
+    navigatorKey.currentState?.push(
+      MaterialPageRoute(
+        builder: (_) => DoseConfirmScreen(
+          scheduleId: scheduleId,
+          scheduledAt: scheduledAt,
+          db: AppDatabase(),
+        ),
+      ),
+    );
+    return;
+  }
 
   final db = AppDatabase();
   try {
     if (actionId == actionTaken) {
-      await db.recordDoseAction(
-        id: newUuid(),
-        scheduleId: scheduleId,
-        scheduledAt: scheduledAt,
-        action: DoseAction.taken,
-      );
+      await recordDoseTaken(db, scheduleId: scheduleId, scheduledAt: scheduledAt);
       return;
     }
-
-    // Snooze: log it, then arm a one-off reminder 10 minutes out.
-    await db.recordDoseAction(
-      id: newUuid(),
-      scheduleId: scheduleId,
-      scheduledAt: scheduledAt,
-      action: DoseAction.snoozed,
-    );
-    final schedule = await db.scheduleById(scheduleId);
-    if (schedule == null) return;
-    final medicine = await db.medicineById(schedule.medicineId);
-    if (medicine == null) return;
-
-    await NotificationService.instance.scheduleSnooze(
-      scheduleId: scheduleId,
-      title: medicine.strength.isEmpty ? medicine.drugName : '${medicine.drugName} ${medicine.strength}',
-      body: medicine.doseAmount.isEmpty ? 'Time for your dose' : 'Take ${medicine.doseAmount}',
-      delay: const Duration(minutes: 10),
-    );
+    await recordDoseSnoozed(db, scheduleId: scheduleId, scheduledAt: scheduledAt);
   } finally {
     await db.close();
   }
+}
+
+Future<void> recordDoseTaken(
+  AppDatabase db, {
+  required String scheduleId,
+  required DateTime scheduledAt,
+}) {
+  return db.recordDoseAction(
+    id: newUuid(),
+    scheduleId: scheduleId,
+    scheduledAt: scheduledAt,
+    action: DoseAction.taken,
+  );
+}
+
+/// Logs the snooze, then arms a one-off reminder [delay] out.
+Future<void> recordDoseSnoozed(
+  AppDatabase db, {
+  required String scheduleId,
+  required DateTime scheduledAt,
+  Duration delay = const Duration(minutes: 10),
+}) async {
+  await db.recordDoseAction(
+    id: newUuid(),
+    scheduleId: scheduleId,
+    scheduledAt: scheduledAt,
+    action: DoseAction.snoozed,
+  );
+  final schedule = await db.scheduleById(scheduleId);
+  if (schedule == null) return;
+  final medicine = await db.medicineById(schedule.medicineId);
+  if (medicine == null) return;
+
+  await NotificationService.instance.scheduleSnooze(
+    scheduleId: scheduleId,
+    title: medicine.strength.isEmpty ? medicine.drugName : '${medicine.drugName} ${medicine.strength}',
+    body: medicine.doseAmount.isEmpty ? 'Time for your dose' : 'Take ${medicine.doseAmount}',
+    delay: delay,
+  );
 }
 
 /// Parses a "HH:mm" time label into today's occurrence of that clock time.

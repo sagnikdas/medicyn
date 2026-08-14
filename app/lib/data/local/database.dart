@@ -100,6 +100,17 @@ class AppDatabase extends _$AppDatabase {
   Future<List<DoseLog>> doseLogsForScheduleOnce(String scheduleId) =>
       (select(doseLogs)..where((t) => t.scheduleId.equals(scheduleId))).get();
 
+  /// Most recent dose log for a schedule, if any. One-shot for the same
+  /// cross-instance reason as [doseLogsForScheduleOnce] — the notification
+  /// engine records Taken/Snooze from its own `AppDatabase` instance (often
+  /// a different isolate entirely), so callers that need this to stay fresh
+  /// should re-poll rather than `.watch()` it.
+  Future<DoseLog?> latestDoseLogOnce(String scheduleId) => (select(doseLogs)
+        ..where((t) => t.scheduleId.equals(scheduleId))
+        ..orderBy([(t) => OrderingTerm.desc(t.loggedAt)])
+        ..limit(1))
+      .getSingleOrNull();
+
   // --- Sync helpers ----------------------------------------------------
 
   Future<List<Medicine>> unsyncedMedicines() =>
@@ -122,4 +133,23 @@ class AppDatabase extends _$AppDatabase {
   Future<void> markDoseLogSynced(String id) =>
       (update(doseLogs)..where((t) => t.id.equals(id)))
           .write(const DoseLogsCompanion(pendingSync: Value(false)));
+
+  // --- Pull/restore helpers ------------------------------------------------
+  //
+  // Used only by SyncService.pullAll() to hydrate rows that exist on
+  // Supabase but not yet on this device (fresh install, new device, or a
+  // row created elsewhere). Insert-or-ignore rather than upsert on purpose:
+  // if a row with this id already exists locally, this device's copy — even
+  // if it's mid-edit and still `pendingSync` — always wins, so a pull can
+  // never clobber in-flight local work. See that method's doc comment for
+  // what this does and doesn't solve.
+
+  Future<void> insertMedicineIfAbsent(MedicinesCompanion row) =>
+      into(medicines).insert(row, mode: InsertMode.insertOrIgnore);
+
+  Future<void> insertScheduleIfAbsent(SchedulesCompanion row) =>
+      into(schedules).insert(row, mode: InsertMode.insertOrIgnore);
+
+  Future<void> insertDoseLogIfAbsent(DoseLogsCompanion row) =>
+      into(doseLogs).insert(row, mode: InsertMode.insertOrIgnore);
 }
