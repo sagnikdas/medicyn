@@ -6,10 +6,12 @@ import '../auth/auth_service.dart';
 
 /// Deliberately sparse — there's almost nothing to configure by design.
 /// Notification sound/vibration follow the OS channel settings (opened via
-/// the system link below) rather than a duplicate in-app setting. The one
-/// real control is text size — the single highest-impact accessibility
+/// the system link below) rather than a duplicate in-app setting. The two
+/// real controls are text size — the single highest-impact accessibility
 /// lever for elderly users, and it needs no extra "large touch targets"
-/// toggle alongside it since buttons/fields size around their text.
+/// toggle alongside it since buttons/fields size around their text — and
+/// theme, which stays on the device's own light/dark setting unless the
+/// user overrides it here.
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
@@ -44,6 +46,27 @@ class SettingsScreen extends StatelessWidget {
                 ],
                 selected: {AppSettings.instance.textSize},
                 onSelectionChanged: (s) => AppSettings.instance.setTextSize(s.first),
+                showSelectedIcon: false,
+              ),
+            ),
+            const SizedBox(height: 28),
+            Text('Theme', style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 4),
+            Text(
+              'Follows your device by default. Choose Light or Dark to keep '
+              'the app on one of them.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 12),
+            ListenableBuilder(
+              listenable: AppSettings.instance,
+              builder: (context, _) => SegmentedButton<ThemeMode>(
+                segments: [
+                  for (final mode in ThemeMode.values)
+                    ButtonSegment(value: mode, label: Text(mode.label)),
+                ],
+                selected: {AppSettings.instance.themeMode},
+                onSelectionChanged: (s) => AppSettings.instance.setThemeMode(s.first),
                 showSelectedIcon: false,
               ),
             ),
