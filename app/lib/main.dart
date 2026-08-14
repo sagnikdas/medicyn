@@ -86,7 +86,7 @@ class _DoselyAppState extends State<DoselyApp> {
         // scales text and, with it, most touch targets.
         builder: (context, child) => MediaQuery(
           data: MediaQuery.of(context).copyWith(
-            textScaler: TextScaler.linear(AppSettings.instance.textSize.scaleFactor),
+            textScaler: TextScaler.linear(AppSettings.instance.textScale),
           ),
           child: child!,
         ),

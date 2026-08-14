@@ -36,20 +36,37 @@ class SettingsScreen extends StatelessWidget {
               'Makes text and buttons throughout the app larger and easier to read.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 4),
+            // Nothing previews the setting better than the screen you're on:
+            // the slider rescales the whole app live as it's dragged, this
+            // row included.
             ListenableBuilder(
               listenable: AppSettings.instance,
-              builder: (context, _) => SegmentedButton<TextSize>(
-                segments: [
-                  for (final size in TextSize.values)
-                    ButtonSegment(value: size, label: Text(size.label)),
-                ],
-                selected: {AppSettings.instance.textSize},
-                onSelectionChanged: (s) => AppSettings.instance.setTextSize(s.first),
-                showSelectedIcon: false,
-              ),
+              builder: (context, _) {
+                final scale = AppSettings.instance.textScale;
+                return Row(
+                  children: [
+                    Expanded(
+                      child: Slider(
+                        value: scale,
+                        min: AppSettings.minTextScale,
+                        max: AppSettings.maxTextScale,
+                        divisions: AppSettings.textScaleDivisions,
+                        label: AppSettings.textScaleLabel(scale),
+                        semanticFormatterCallback: (v) => 'Text size ${AppSettings.textScaleLabel(v)}',
+                        onChanged: (v) => AppSettings.instance.setTextScale(v),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      AppSettings.textScaleLabel(scale),
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                  ],
+                );
+              },
             ),
-            const SizedBox(height: 28),
+            const SizedBox(height: 20),
             Text('Theme', style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 4),
             Text(
