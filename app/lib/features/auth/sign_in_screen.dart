@@ -70,16 +70,40 @@ class _SignInScreenState extends State<SignInScreen> {
         message = 'Could not send a code. Check your connection and try again.';
       } else if (e is AuthException && e.code == 'over_email_send_rate_limit') {
         message = "You've requested a few too many codes — wait a few minutes and try again.";
+      } else if (e is AuthException && _isEmailDeliveryFailure(e)) {
+        // GoTrue reports "the SMTP provider refused this send" as a plain
+        // 500/unexpected_failure, which used to land in the generic branch
+        // below and read as a transient glitch. It usually isn't: the most
+        // likely cause is the sender being a sandbox address that can only
+        // deliver to the project owner (see README's "Sign-in codes only
+        // arrive for one address" section), which no amount of retrying
+        // fixes.
+        message = "We couldn't email a code to that address. The app's email "
+            'sender is rejecting it — this is a setup problem on our side, '
+            'not a typo on yours.';
       } else if (e is AuthException) {
         message = 'Could not send a code right now — try again in a moment.';
       } else {
         message = 'Could not send a code. Check your connection and try again.';
       }
+      // The on-screen text is deliberately non-technical, which makes this
+      // the only place the underlying cause survives. Worth a log line —
+      // "no code arrived" is otherwise indistinguishable from a silent drop.
+      debugPrint('sendSignInCode failed for "$email": $e');
       setState(() => _error = message);
     } finally {
       setState(() => _busy = false);
     }
   }
+
+  /// True when GoTrue accepted the request but its mailer refused to send.
+  /// There's no dedicated error code for it — the server surfaces a 500 with
+  /// `unexpected_failure` and a message naming the email it tried to send,
+  /// so both shapes are matched rather than relying on either alone.
+  static bool _isEmailDeliveryFailure(AuthException e) =>
+      e.code == 'unexpected_failure' ||
+      e.statusCode == '500' ||
+      e.message.toLowerCase().contains('error sending');
 
   Future<void> _verifyCode() async {
     final code = _codeController.text.trim();

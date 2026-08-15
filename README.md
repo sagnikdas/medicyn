@@ -107,6 +107,38 @@ unaffected and remains fully working. To enable Google Sign-In for real:
    `auth_service.dart` (currently left blank on purpose, which is what
    makes the button fail fast instead of hitting an unconfigured SDK).
 
+### Sign-in codes only arrive for one address
+
+**Symptom:** requesting a code works for the project owner's own email, and
+silently does nothing for everybody else — so no new user can sign in.
+
+**Cause:** it isn't the app, and it isn't the address. `supabase/config.toml`
+sends auth email through Resend using the shared sandbox sender
+`onboarding@resend.dev`. Until a domain is verified, Resend only delivers to
+the email address the Resend account itself was registered with, and rejects
+every other recipient. Supabase turns that rejection into a generic 500, which
+is why the sign-in screen used to say "try again in a moment" — retrying never
+helps.
+
+**Fix** (one-time, needs a domain and DNS access — can't be done from the
+repo):
+
+1. Resend → Domains → add your domain, and add the TXT/MX records it gives you
+   at your DNS provider. Verification usually completes within minutes.
+2. Change `admin_email` under `[auth.email.smtp]` in `supabase/config.toml`
+   from `onboarding@resend.dev` to a sender on that domain, e.g.
+   `no-reply@yourdomain.com`.
+3. Push the config so the hosted project picks it up:
+   `supabase config push` (with `RESEND_API_KEY` set in the environment).
+4. Verify with an address unrelated to the Resend account — that's the case
+   that currently fails, so testing with the owner's own email proves nothing.
+
+Until step 1 is done, the only address that can receive a code is the Resend
+account owner's. Note that `supabase/config.toml` only reaches the hosted
+project via `supabase config push`; if auth email was last configured by hand
+in the Supabase Dashboard, check there too, since whatever was set there is
+what's actually sending today.
+
 ## Reliability notes
 
 - Notifications are the whole point of this app, so they've been tested

@@ -230,9 +230,14 @@ content_path = "./supabase/templates/confirmation.html"
 # Custom SMTP — required to unlock email template customization on the free
 # tier (Supabase's built-in sender doesn't allow it). Using Resend's free
 # tier; RESEND_API_KEY is read from the environment at push time, never
-# stored in this file. Swap `onboarding@resend.dev` for a verified domain
-# sender before sending to real users — it's a shared sandbox address, fine
-# for development but not for production delivery.
+# stored in this file.
+#
+# !! `onboarding@resend.dev` below is Resend's shared sandbox sender, and it
+# only delivers to the address the Resend account was registered with. Every
+# other recipient is rejected, which means NO NEW USER CAN SIGN IN while this
+# is the sender — the one symptom that looks like an app bug but isn't. Verify
+# a domain in Resend and put a sender from it here. See the README section
+# "Sign-in codes only arrive for one address".
 [auth.email.smtp]
 enabled = true
 host = "smtp.resend.com"
