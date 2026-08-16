@@ -68,24 +68,30 @@ class _DoselyAppState extends State<DoselyApp> {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      navigatorKey: navigatorKey,
-      debugShowCheckedModeBanner: false,
-      title: 'Dosely',
-      theme: DoselyTheme.light(),
-      darkTheme: DoselyTheme.dark(),
-      // Applies the user's chosen text size (Settings) to every screen —
-      // scales text and, with it, most touch targets.
-      builder: (context, child) => ListenableBuilder(
-        listenable: AppSettings.instance,
-        builder: (context, _) => MediaQuery(
+    // The listener wraps MaterialApp rather than sitting inside `builder`,
+    // because themeMode is a property of MaterialApp itself — the whole app
+    // widget has to rebuild for a theme change to take effect. Text size
+    // rides along on the same rebuild.
+    return ListenableBuilder(
+      listenable: AppSettings.instance,
+      builder: (context, _) => MaterialApp(
+        navigatorKey: navigatorKey,
+        debugShowCheckedModeBanner: false,
+        title: 'Dosely',
+        theme: DoselyTheme.light(),
+        darkTheme: DoselyTheme.dark(),
+        // Light/dark/system, as chosen in Settings; system by default.
+        themeMode: AppSettings.instance.themeMode,
+        // Applies the user's chosen text size (Settings) to every screen —
+        // scales text and, with it, most touch targets.
+        builder: (context, child) => MediaQuery(
           data: MediaQuery.of(context).copyWith(
-            textScaler: TextScaler.linear(AppSettings.instance.textSize.scaleFactor),
+            textScaler: TextScaler.linear(AppSettings.instance.textScale),
           ),
           child: child!,
         ),
+        home: const _OnboardingGate(),
       ),
-      home: const _OnboardingGate(),
     );
   }
 }

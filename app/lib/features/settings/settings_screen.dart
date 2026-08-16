@@ -6,10 +6,12 @@ import '../auth/auth_service.dart';
 
 /// Deliberately sparse — there's almost nothing to configure by design.
 /// Notification sound/vibration follow the OS channel settings (opened via
-/// the system link below) rather than a duplicate in-app setting. The one
-/// real control is text size — the single highest-impact accessibility
+/// the system link below) rather than a duplicate in-app setting. The two
+/// real controls are text size — the single highest-impact accessibility
 /// lever for elderly users, and it needs no extra "large touch targets"
-/// toggle alongside it since buttons/fields size around their text.
+/// toggle alongside it since buttons/fields size around their text — and
+/// theme, which stays on the device's own light/dark setting unless the
+/// user overrides it here.
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
@@ -34,16 +36,54 @@ class SettingsScreen extends StatelessWidget {
               'Makes text and buttons throughout the app larger and easier to read.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
+            const SizedBox(height: 4),
+            // Nothing previews the setting better than the screen you're on:
+            // the slider rescales the whole app live as it's dragged, this
+            // row included.
+            ListenableBuilder(
+              listenable: AppSettings.instance,
+              builder: (context, _) {
+                final scale = AppSettings.instance.textScale;
+                return Row(
+                  children: [
+                    Expanded(
+                      child: Slider(
+                        value: scale,
+                        min: AppSettings.minTextScale,
+                        max: AppSettings.maxTextScale,
+                        divisions: AppSettings.textScaleDivisions,
+                        label: AppSettings.textScaleLabel(scale),
+                        semanticFormatterCallback: (v) => 'Text size ${AppSettings.textScaleLabel(v)}',
+                        onChanged: (v) => AppSettings.instance.setTextScale(v),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      AppSettings.textScaleLabel(scale),
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                  ],
+                );
+              },
+            ),
+            const SizedBox(height: 20),
+            Text('Theme', style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 4),
+            Text(
+              'Follows your device by default. Choose Light or Dark to keep '
+              'the app on one of them.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
             const SizedBox(height: 12),
             ListenableBuilder(
               listenable: AppSettings.instance,
-              builder: (context, _) => SegmentedButton<TextSize>(
+              builder: (context, _) => SegmentedButton<ThemeMode>(
                 segments: [
-                  for (final size in TextSize.values)
-                    ButtonSegment(value: size, label: Text(size.label)),
+                  for (final mode in ThemeMode.values)
+                    ButtonSegment(value: mode, label: Text(mode.label)),
                 ],
-                selected: {AppSettings.instance.textSize},
-                onSelectionChanged: (s) => AppSettings.instance.setTextSize(s.first),
+                selected: {AppSettings.instance.themeMode},
+                onSelectionChanged: (s) => AppSettings.instance.setThemeMode(s.first),
                 showSelectedIcon: false,
               ),
             ),
