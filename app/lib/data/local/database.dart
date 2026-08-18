@@ -94,17 +94,11 @@ class AppDatabase extends _$AppDatabase {
   Stream<List<DoseLog>> watchDoseLogsForSchedule(String scheduleId) =>
       (select(doseLogs)..where((t) => t.scheduleId.equals(scheduleId))).watch();
 
-  /// One-shot (not reactive) read — safe to call after a write made by a
-  /// different `AppDatabase` instance/isolate (e.g. the notification action
-  /// handler), whose writes a `.watch()` stream on this instance won't push.
-  Future<List<DoseLog>> doseLogsForScheduleOnce(String scheduleId) =>
-      (select(doseLogs)..where((t) => t.scheduleId.equals(scheduleId))).get();
-
-  /// Most recent dose log for a schedule, if any. One-shot for the same
-  /// cross-instance reason as [doseLogsForScheduleOnce] — the notification
-  /// engine records Taken/Snooze from its own `AppDatabase` instance (often
-  /// a different isolate entirely), so callers that need this to stay fresh
-  /// should re-poll rather than `.watch()` it.
+  /// Most recent dose log for a schedule, if any. One-shot rather than
+  /// reactive: the notification engine records Taken/Snooze from its own
+  /// `AppDatabase` instance (often a different isolate entirely), and those
+  /// writes don't push to a `.watch()` stream opened on this one — so
+  /// callers that need this fresh must re-poll.
   Future<DoseLog?> latestDoseLogOnce(String scheduleId) => (select(doseLogs)
         ..where((t) => t.scheduleId.equals(scheduleId))
         ..orderBy([(t) => OrderingTerm.desc(t.loggedAt)])

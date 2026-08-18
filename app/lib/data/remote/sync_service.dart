@@ -52,63 +52,86 @@ class SyncService {
   // path (see review_edit_screen.dart, home_screen.dart).
   static const _networkTimeout = Duration(seconds: 8);
 
+  // Each table pushes in one request rather than one per row. The previous
+  // row-at-a-time loop cost a full round-trip each, and every one of them
+  // could burn the 8s timeout above — so a device coming back online with a
+  // backlog of 20 rows could sit in syncAll() for minutes. Postgres upserts
+  // the whole batch atomically, so the all-or-nothing failure mode is also
+  // simpler than a half-marked one: nothing is marked synced unless the
+  // batch landed.
+
   Future<void> _syncMedicines(String userId) async {
-    for (final m in await _db.unsyncedMedicines()) {
-      try {
-        await _client.from('medicines').upsert({
-          'id': m.id,
-          'user_id': userId,
-          'drug_name': m.drugName,
-          'strength': m.strength,
-          'form': m.form,
-          'dose_amount': m.doseAmount,
-          'notes': m.notes,
-          'created_at': m.createdAt.toIso8601String(),
-        }).timeout(_networkTimeout);
+    final rows = await _db.unsyncedMedicines();
+    if (rows.isEmpty) return;
+    try {
+      await _client.from('medicines').upsert([
+        for (final m in rows)
+          {
+            'id': m.id,
+            'user_id': userId,
+            'drug_name': m.drugName,
+            'strength': m.strength,
+            'form': m.form,
+            'dose_amount': m.doseAmount,
+            'notes': m.notes,
+            'created_at': m.createdAt.toIso8601String(),
+          },
+      ]).timeout(_networkTimeout);
+      for (final m in rows) {
         await _db.markMedicineSynced(m.id);
-      } catch (_) {
-        // Leave pendingSync=true; retried on the next syncAll() call.
       }
+    } catch (_) {
+      // Leave pendingSync=true; retried on the next syncAll() call.
     }
   }
 
   Future<void> _syncSchedules(String userId) async {
-    for (final s in await _db.unsyncedSchedules()) {
-      try {
-        await _client.from('schedules').upsert({
-          'id': s.id,
-          'medicine_id': s.medicineId,
-          'user_id': userId,
-          'frequency_type': s.frequencyType,
-          'times': s.times,
-          'days_of_week': s.daysOfWeek,
-          'interval_hours': s.intervalHours,
-          'active': s.active,
-          'created_at': s.createdAt.toIso8601String(),
-        }).timeout(_networkTimeout);
+    final rows = await _db.unsyncedSchedules();
+    if (rows.isEmpty) return;
+    try {
+      await _client.from('schedules').upsert([
+        for (final s in rows)
+          {
+            'id': s.id,
+            'medicine_id': s.medicineId,
+            'user_id': userId,
+            'frequency_type': s.frequencyType,
+            'times': s.times,
+            'days_of_week': s.daysOfWeek,
+            'interval_hours': s.intervalHours,
+            'active': s.active,
+            'created_at': s.createdAt.toIso8601String(),
+          },
+      ]).timeout(_networkTimeout);
+      for (final s in rows) {
         await _db.markScheduleSynced(s.id);
-      } catch (_) {
-        // Retried next call.
       }
+    } catch (_) {
+      // Retried next call.
     }
   }
 
   Future<void> _syncDoseLogs(String userId) async {
-    for (final log in await _db.unsyncedDoseLogs()) {
-      try {
-        await _client.from('dose_logs').upsert({
-          'id': log.id,
-          'schedule_id': log.scheduleId,
-          'user_id': userId,
-          'scheduled_at': log.scheduledAt.toIso8601String(),
-          'action': log.action,
-          'logged_at': log.loggedAt.toIso8601String(),
-          'source': log.source,
-        }).timeout(_networkTimeout);
+    final rows = await _db.unsyncedDoseLogs();
+    if (rows.isEmpty) return;
+    try {
+      await _client.from('dose_logs').upsert([
+        for (final log in rows)
+          {
+            'id': log.id,
+            'schedule_id': log.scheduleId,
+            'user_id': userId,
+            'scheduled_at': log.scheduledAt.toIso8601String(),
+            'action': log.action,
+            'logged_at': log.loggedAt.toIso8601String(),
+            'source': log.source,
+          },
+      ]).timeout(_networkTimeout);
+      for (final log in rows) {
         await _db.markDoseLogSynced(log.id);
-      } catch (_) {
-        // Retried next call.
       }
+    } catch (_) {
+      // Retried next call.
     }
   }
 

@@ -111,10 +111,10 @@ class _OnboardingGate extends StatelessWidget {
         if (AppSettings.instance.hasSeenOnboarding) {
           return const _AuthGate();
         }
-        // No navigation needed here: OnboardingScreen already persists the
-        // flag via AppSettings before calling this back, and that change
-        // alone triggers this ListenableBuilder to rebuild into _AuthGate.
-        return OnboardingScreen(onFinished: () {});
+        // No navigation needed here: OnboardingScreen persists the flag via
+        // AppSettings, and that change alone triggers this ListenableBuilder
+        // to rebuild into _AuthGate.
+        return const OnboardingScreen();
       },
     );
   }
@@ -123,7 +123,7 @@ class _OnboardingGate extends StatelessWidget {
 /// Shows the sign-in screen until there's a session, then the app itself.
 /// `currentSession` is checked on every rebuild (including the initial
 /// build), and `onAuthStateChange` triggers rebuilds as sign-in/sign-out
-/// happen — including the magic-link deep link completing.
+/// happen.
 class _AuthGate extends StatelessWidget {
   const _AuthGate();
 

@@ -38,6 +38,10 @@ class ParsedMedicine {
       frequencyType: _parseFrequency(json['frequencyType'] as String?),
       times: (json['times'] as List?)?.map((e) => e as String).toList() ?? const [],
       daysOfWeek: (json['daysOfWeek'] as List?)?.map((e) => e as int).toList() ?? const [],
+      // Was missing, so an "every 8 hours" extraction always arrived with a
+      // null interval and the review form silently fell back to its default
+      // of 8 — right by luck for 8-hourly doses, wrong for every other one.
+      intervalHours: (json['intervalHours'] as num?)?.toInt(),
       notes: json['notes'] as String? ?? '',
       confidence: (json['confidence'] as num?)?.toDouble() ?? 0,
     );
