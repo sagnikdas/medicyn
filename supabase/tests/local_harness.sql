@@ -1,0 +1,50 @@
+-- Enough of Supabase's own plumbing to run the RLS test on a plain Postgres,
+-- for when Docker (and so `supabase start`) isn't available.
+--
+--   createdb dosely_rls_test
+--   psql -d dosely_rls_test -v ON_ERROR_STOP=1 \
+--     -f supabase/tests/local_harness.sql \
+--     -f supabase/migrations/20260812121223_init.sql \
+--     -f supabase/migrations/20260812122500_schedule_interval_hours.sql \
+--     -f supabase/migrations/20260818143000_row_versioning.sql \
+--     -f supabase/migrations/20260818161500_care_links.sql \
+--     -f supabase/tests/care_links_rls_test.sql
+--
+-- This stubs the parts of the platform the policies depend on. It is a
+-- convenience for testing policy *logic*; it is not a claim that the local
+-- database behaves like the hosted one in every respect.
+
+create extension if not exists pgcrypto;
+
+create schema if not exists auth;
+
+-- Only the columns the app's foreign keys actually reference.
+create table if not exists auth.users (
+  id uuid primary key,
+  email text
+);
+
+-- The real one reads the verified JWT the API gateway attached. Same source
+-- of truth here: whatever the session has been told it is.
+create or replace function auth.uid() returns uuid
+language sql stable as $$
+  select nullif(current_setting('request.jwt.claims', true)::json ->> 'sub', '')::uuid;
+$$;
+
+do $$
+begin
+  if not exists (select 1 from pg_roles where rolname = 'authenticated') then
+    create role authenticated nologin;
+  end if;
+end;
+$$;
+
+grant usage on schema public, auth to authenticated;
+
+-- Row-level security only *filters* rows a role is otherwise allowed to
+-- touch. Without these grants the test would fail with permission errors and
+-- prove nothing about the policies.
+alter default privileges in schema public
+  grant select, insert, update, delete on tables to authenticated;
+alter default privileges in schema public
+  grant execute on functions to authenticated;
