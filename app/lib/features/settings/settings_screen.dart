@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/app_settings.dart';
 import '../auth/auth_service.dart';
+import '../care/care_screen.dart';
 
 /// Deliberately sparse — there's almost nothing to configure by design.
 /// Notification sound/vibration follow the OS channel settings (opened via
@@ -30,6 +31,22 @@ class SettingsScreen extends StatelessWidget {
               Text(email, style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 24),
             ],
+            Text('Family', style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 4),
+            Text(
+              'Let one person help you keep track of your medicines — or help '
+              'someone else with theirs.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const CareScreen()),
+              ),
+              icon: const Icon(Icons.people_outline),
+              label: const Text('Connect with family'),
+            ),
+            const SizedBox(height: 24),
             Text('Text size', style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 4),
             Text(
