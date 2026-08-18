@@ -17,6 +17,13 @@ class Medicines extends Table {
   TextColumn get doseAmount => text().withDefault(const Constant(''))();
   TextColumn get notes => text().withDefault(const Constant(''))();
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+  // Client-stamped, and compared against the server's copy to decide which
+  // version of a row wins. See the row_versioning migration for why this is
+  // the client's clock and not the server's.
+  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+  // Null for rows that predate versioning — their author is genuinely
+  // unknown, and the UI should say so rather than guess.
+  TextColumn get updatedBy => text().nullable()();
   BoolColumn get pendingSync => boolean().withDefault(const Constant(true))();
   BoolColumn get deleted => boolean().withDefault(const Constant(false))();
 
@@ -37,6 +44,8 @@ class Schedules extends Table {
   IntColumn get intervalHours => integer().nullable()();
   BoolColumn get active => boolean().withDefault(const Constant(true))();
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+  TextColumn get updatedBy => text().nullable()();
   BoolColumn get pendingSync => boolean().withDefault(const Constant(true))();
   BoolColumn get deleted => boolean().withDefault(const Constant(false))();
 

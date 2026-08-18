@@ -85,6 +85,29 @@ class $MedicinesTable extends Medicines
     requiredDuringInsert: false,
     defaultValue: currentDateAndTime,
   );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  static const VerificationMeta _updatedByMeta = const VerificationMeta(
+    'updatedBy',
+  );
+  @override
+  late final GeneratedColumn<String> updatedBy = GeneratedColumn<String>(
+    'updated_by',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _pendingSyncMeta = const VerificationMeta(
     'pendingSync',
   );
@@ -124,6 +147,8 @@ class $MedicinesTable extends Medicines
     doseAmount,
     notes,
     createdAt,
+    updatedAt,
+    updatedBy,
     pendingSync,
     deleted,
   ];
@@ -182,6 +207,18 @@ class $MedicinesTable extends Medicines
         createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
       );
     }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    if (data.containsKey('updated_by')) {
+      context.handle(
+        _updatedByMeta,
+        updatedBy.isAcceptableOrUnknown(data['updated_by']!, _updatedByMeta),
+      );
+    }
     if (data.containsKey('pending_sync')) {
       context.handle(
         _pendingSyncMeta,
@@ -234,6 +271,14 @@ class $MedicinesTable extends Medicines
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
       )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      updatedBy: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}updated_by'],
+      ),
       pendingSync: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}pending_sync'],
@@ -259,6 +304,8 @@ class Medicine extends DataClass implements Insertable<Medicine> {
   final String doseAmount;
   final String notes;
   final DateTime createdAt;
+  final DateTime updatedAt;
+  final String? updatedBy;
   final bool pendingSync;
   final bool deleted;
   const Medicine({
@@ -269,6 +316,8 @@ class Medicine extends DataClass implements Insertable<Medicine> {
     required this.doseAmount,
     required this.notes,
     required this.createdAt,
+    required this.updatedAt,
+    this.updatedBy,
     required this.pendingSync,
     required this.deleted,
   });
@@ -282,6 +331,10 @@ class Medicine extends DataClass implements Insertable<Medicine> {
     map['dose_amount'] = Variable<String>(doseAmount);
     map['notes'] = Variable<String>(notes);
     map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    if (!nullToAbsent || updatedBy != null) {
+      map['updated_by'] = Variable<String>(updatedBy);
+    }
     map['pending_sync'] = Variable<bool>(pendingSync);
     map['deleted'] = Variable<bool>(deleted);
     return map;
@@ -296,6 +349,10 @@ class Medicine extends DataClass implements Insertable<Medicine> {
       doseAmount: Value(doseAmount),
       notes: Value(notes),
       createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+      updatedBy: updatedBy == null && nullToAbsent
+          ? const Value.absent()
+          : Value(updatedBy),
       pendingSync: Value(pendingSync),
       deleted: Value(deleted),
     );
@@ -314,6 +371,8 @@ class Medicine extends DataClass implements Insertable<Medicine> {
       doseAmount: serializer.fromJson<String>(json['doseAmount']),
       notes: serializer.fromJson<String>(json['notes']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      updatedBy: serializer.fromJson<String?>(json['updatedBy']),
       pendingSync: serializer.fromJson<bool>(json['pendingSync']),
       deleted: serializer.fromJson<bool>(json['deleted']),
     );
@@ -329,6 +388,8 @@ class Medicine extends DataClass implements Insertable<Medicine> {
       'doseAmount': serializer.toJson<String>(doseAmount),
       'notes': serializer.toJson<String>(notes),
       'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'updatedBy': serializer.toJson<String?>(updatedBy),
       'pendingSync': serializer.toJson<bool>(pendingSync),
       'deleted': serializer.toJson<bool>(deleted),
     };
@@ -342,6 +403,8 @@ class Medicine extends DataClass implements Insertable<Medicine> {
     String? doseAmount,
     String? notes,
     DateTime? createdAt,
+    DateTime? updatedAt,
+    Value<String?> updatedBy = const Value.absent(),
     bool? pendingSync,
     bool? deleted,
   }) => Medicine(
@@ -352,6 +415,8 @@ class Medicine extends DataClass implements Insertable<Medicine> {
     doseAmount: doseAmount ?? this.doseAmount,
     notes: notes ?? this.notes,
     createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+    updatedBy: updatedBy.present ? updatedBy.value : this.updatedBy,
     pendingSync: pendingSync ?? this.pendingSync,
     deleted: deleted ?? this.deleted,
   );
@@ -366,6 +431,8 @@ class Medicine extends DataClass implements Insertable<Medicine> {
           : this.doseAmount,
       notes: data.notes.present ? data.notes.value : this.notes,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      updatedBy: data.updatedBy.present ? data.updatedBy.value : this.updatedBy,
       pendingSync: data.pendingSync.present
           ? data.pendingSync.value
           : this.pendingSync,
@@ -383,6 +450,8 @@ class Medicine extends DataClass implements Insertable<Medicine> {
           ..write('doseAmount: $doseAmount, ')
           ..write('notes: $notes, ')
           ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('updatedBy: $updatedBy, ')
           ..write('pendingSync: $pendingSync, ')
           ..write('deleted: $deleted')
           ..write(')'))
@@ -398,6 +467,8 @@ class Medicine extends DataClass implements Insertable<Medicine> {
     doseAmount,
     notes,
     createdAt,
+    updatedAt,
+    updatedBy,
     pendingSync,
     deleted,
   );
@@ -412,6 +483,8 @@ class Medicine extends DataClass implements Insertable<Medicine> {
           other.doseAmount == this.doseAmount &&
           other.notes == this.notes &&
           other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt &&
+          other.updatedBy == this.updatedBy &&
           other.pendingSync == this.pendingSync &&
           other.deleted == this.deleted);
 }
@@ -424,6 +497,8 @@ class MedicinesCompanion extends UpdateCompanion<Medicine> {
   final Value<String> doseAmount;
   final Value<String> notes;
   final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<String?> updatedBy;
   final Value<bool> pendingSync;
   final Value<bool> deleted;
   final Value<int> rowid;
@@ -435,6 +510,8 @@ class MedicinesCompanion extends UpdateCompanion<Medicine> {
     this.doseAmount = const Value.absent(),
     this.notes = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.updatedBy = const Value.absent(),
     this.pendingSync = const Value.absent(),
     this.deleted = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -447,6 +524,8 @@ class MedicinesCompanion extends UpdateCompanion<Medicine> {
     this.doseAmount = const Value.absent(),
     this.notes = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.updatedBy = const Value.absent(),
     this.pendingSync = const Value.absent(),
     this.deleted = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -460,6 +539,8 @@ class MedicinesCompanion extends UpdateCompanion<Medicine> {
     Expression<String>? doseAmount,
     Expression<String>? notes,
     Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<String>? updatedBy,
     Expression<bool>? pendingSync,
     Expression<bool>? deleted,
     Expression<int>? rowid,
@@ -472,6 +553,8 @@ class MedicinesCompanion extends UpdateCompanion<Medicine> {
       if (doseAmount != null) 'dose_amount': doseAmount,
       if (notes != null) 'notes': notes,
       if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (updatedBy != null) 'updated_by': updatedBy,
       if (pendingSync != null) 'pending_sync': pendingSync,
       if (deleted != null) 'deleted': deleted,
       if (rowid != null) 'rowid': rowid,
@@ -486,6 +569,8 @@ class MedicinesCompanion extends UpdateCompanion<Medicine> {
     Value<String>? doseAmount,
     Value<String>? notes,
     Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<String?>? updatedBy,
     Value<bool>? pendingSync,
     Value<bool>? deleted,
     Value<int>? rowid,
@@ -498,6 +583,8 @@ class MedicinesCompanion extends UpdateCompanion<Medicine> {
       doseAmount: doseAmount ?? this.doseAmount,
       notes: notes ?? this.notes,
       createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      updatedBy: updatedBy ?? this.updatedBy,
       pendingSync: pendingSync ?? this.pendingSync,
       deleted: deleted ?? this.deleted,
       rowid: rowid ?? this.rowid,
@@ -528,6 +615,12 @@ class MedicinesCompanion extends UpdateCompanion<Medicine> {
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (updatedBy.present) {
+      map['updated_by'] = Variable<String>(updatedBy.value);
+    }
     if (pendingSync.present) {
       map['pending_sync'] = Variable<bool>(pendingSync.value);
     }
@@ -550,6 +643,8 @@ class MedicinesCompanion extends UpdateCompanion<Medicine> {
           ..write('doseAmount: $doseAmount, ')
           ..write('notes: $notes, ')
           ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('updatedBy: $updatedBy, ')
           ..write('pendingSync: $pendingSync, ')
           ..write('deleted: $deleted, ')
           ..write('rowid: $rowid')
@@ -653,6 +748,29 @@ class $SchedulesTable extends Schedules
     requiredDuringInsert: false,
     defaultValue: currentDateAndTime,
   );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  static const VerificationMeta _updatedByMeta = const VerificationMeta(
+    'updatedBy',
+  );
+  @override
+  late final GeneratedColumn<String> updatedBy = GeneratedColumn<String>(
+    'updated_by',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _pendingSyncMeta = const VerificationMeta(
     'pendingSync',
   );
@@ -693,6 +811,8 @@ class $SchedulesTable extends Schedules
     intervalHours,
     active,
     createdAt,
+    updatedAt,
+    updatedBy,
     pendingSync,
     deleted,
   ];
@@ -751,6 +871,18 @@ class $SchedulesTable extends Schedules
       context.handle(
         _createdAtMeta,
         createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    if (data.containsKey('updated_by')) {
+      context.handle(
+        _updatedByMeta,
+        updatedBy.isAcceptableOrUnknown(data['updated_by']!, _updatedByMeta),
       );
     }
     if (data.containsKey('pending_sync')) {
@@ -813,6 +945,14 @@ class $SchedulesTable extends Schedules
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
       )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      updatedBy: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}updated_by'],
+      ),
       pendingSync: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}pending_sync'],
@@ -844,6 +984,8 @@ class Schedule extends DataClass implements Insertable<Schedule> {
   final int? intervalHours;
   final bool active;
   final DateTime createdAt;
+  final DateTime updatedAt;
+  final String? updatedBy;
   final bool pendingSync;
   final bool deleted;
   const Schedule({
@@ -855,6 +997,8 @@ class Schedule extends DataClass implements Insertable<Schedule> {
     this.intervalHours,
     required this.active,
     required this.createdAt,
+    required this.updatedAt,
+    this.updatedBy,
     required this.pendingSync,
     required this.deleted,
   });
@@ -879,6 +1023,10 @@ class Schedule extends DataClass implements Insertable<Schedule> {
     }
     map['active'] = Variable<bool>(active);
     map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    if (!nullToAbsent || updatedBy != null) {
+      map['updated_by'] = Variable<String>(updatedBy);
+    }
     map['pending_sync'] = Variable<bool>(pendingSync);
     map['deleted'] = Variable<bool>(deleted);
     return map;
@@ -896,6 +1044,10 @@ class Schedule extends DataClass implements Insertable<Schedule> {
           : Value(intervalHours),
       active: Value(active),
       createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+      updatedBy: updatedBy == null && nullToAbsent
+          ? const Value.absent()
+          : Value(updatedBy),
       pendingSync: Value(pendingSync),
       deleted: Value(deleted),
     );
@@ -919,6 +1071,8 @@ class Schedule extends DataClass implements Insertable<Schedule> {
       intervalHours: serializer.fromJson<int?>(json['intervalHours']),
       active: serializer.fromJson<bool>(json['active']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      updatedBy: serializer.fromJson<String?>(json['updatedBy']),
       pendingSync: serializer.fromJson<bool>(json['pendingSync']),
       deleted: serializer.fromJson<bool>(json['deleted']),
     );
@@ -939,6 +1093,8 @@ class Schedule extends DataClass implements Insertable<Schedule> {
       'intervalHours': serializer.toJson<int?>(intervalHours),
       'active': serializer.toJson<bool>(active),
       'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'updatedBy': serializer.toJson<String?>(updatedBy),
       'pendingSync': serializer.toJson<bool>(pendingSync),
       'deleted': serializer.toJson<bool>(deleted),
     };
@@ -953,6 +1109,8 @@ class Schedule extends DataClass implements Insertable<Schedule> {
     Value<int?> intervalHours = const Value.absent(),
     bool? active,
     DateTime? createdAt,
+    DateTime? updatedAt,
+    Value<String?> updatedBy = const Value.absent(),
     bool? pendingSync,
     bool? deleted,
   }) => Schedule(
@@ -966,6 +1124,8 @@ class Schedule extends DataClass implements Insertable<Schedule> {
         : this.intervalHours,
     active: active ?? this.active,
     createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+    updatedBy: updatedBy.present ? updatedBy.value : this.updatedBy,
     pendingSync: pendingSync ?? this.pendingSync,
     deleted: deleted ?? this.deleted,
   );
@@ -987,6 +1147,8 @@ class Schedule extends DataClass implements Insertable<Schedule> {
           : this.intervalHours,
       active: data.active.present ? data.active.value : this.active,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      updatedBy: data.updatedBy.present ? data.updatedBy.value : this.updatedBy,
       pendingSync: data.pendingSync.present
           ? data.pendingSync.value
           : this.pendingSync,
@@ -1005,6 +1167,8 @@ class Schedule extends DataClass implements Insertable<Schedule> {
           ..write('intervalHours: $intervalHours, ')
           ..write('active: $active, ')
           ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('updatedBy: $updatedBy, ')
           ..write('pendingSync: $pendingSync, ')
           ..write('deleted: $deleted')
           ..write(')'))
@@ -1021,6 +1185,8 @@ class Schedule extends DataClass implements Insertable<Schedule> {
     intervalHours,
     active,
     createdAt,
+    updatedAt,
+    updatedBy,
     pendingSync,
     deleted,
   );
@@ -1036,6 +1202,8 @@ class Schedule extends DataClass implements Insertable<Schedule> {
           other.intervalHours == this.intervalHours &&
           other.active == this.active &&
           other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt &&
+          other.updatedBy == this.updatedBy &&
           other.pendingSync == this.pendingSync &&
           other.deleted == this.deleted);
 }
@@ -1049,6 +1217,8 @@ class SchedulesCompanion extends UpdateCompanion<Schedule> {
   final Value<int?> intervalHours;
   final Value<bool> active;
   final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<String?> updatedBy;
   final Value<bool> pendingSync;
   final Value<bool> deleted;
   final Value<int> rowid;
@@ -1061,6 +1231,8 @@ class SchedulesCompanion extends UpdateCompanion<Schedule> {
     this.intervalHours = const Value.absent(),
     this.active = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.updatedBy = const Value.absent(),
     this.pendingSync = const Value.absent(),
     this.deleted = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -1074,6 +1246,8 @@ class SchedulesCompanion extends UpdateCompanion<Schedule> {
     this.intervalHours = const Value.absent(),
     this.active = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.updatedBy = const Value.absent(),
     this.pendingSync = const Value.absent(),
     this.deleted = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -1090,6 +1264,8 @@ class SchedulesCompanion extends UpdateCompanion<Schedule> {
     Expression<int>? intervalHours,
     Expression<bool>? active,
     Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<String>? updatedBy,
     Expression<bool>? pendingSync,
     Expression<bool>? deleted,
     Expression<int>? rowid,
@@ -1103,6 +1279,8 @@ class SchedulesCompanion extends UpdateCompanion<Schedule> {
       if (intervalHours != null) 'interval_hours': intervalHours,
       if (active != null) 'active': active,
       if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (updatedBy != null) 'updated_by': updatedBy,
       if (pendingSync != null) 'pending_sync': pendingSync,
       if (deleted != null) 'deleted': deleted,
       if (rowid != null) 'rowid': rowid,
@@ -1118,6 +1296,8 @@ class SchedulesCompanion extends UpdateCompanion<Schedule> {
     Value<int?>? intervalHours,
     Value<bool>? active,
     Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<String?>? updatedBy,
     Value<bool>? pendingSync,
     Value<bool>? deleted,
     Value<int>? rowid,
@@ -1131,6 +1311,8 @@ class SchedulesCompanion extends UpdateCompanion<Schedule> {
       intervalHours: intervalHours ?? this.intervalHours,
       active: active ?? this.active,
       createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      updatedBy: updatedBy ?? this.updatedBy,
       pendingSync: pendingSync ?? this.pendingSync,
       deleted: deleted ?? this.deleted,
       rowid: rowid ?? this.rowid,
@@ -1168,6 +1350,12 @@ class SchedulesCompanion extends UpdateCompanion<Schedule> {
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (updatedBy.present) {
+      map['updated_by'] = Variable<String>(updatedBy.value);
+    }
     if (pendingSync.present) {
       map['pending_sync'] = Variable<bool>(pendingSync.value);
     }
@@ -1191,6 +1379,8 @@ class SchedulesCompanion extends UpdateCompanion<Schedule> {
           ..write('intervalHours: $intervalHours, ')
           ..write('active: $active, ')
           ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('updatedBy: $updatedBy, ')
           ..write('pendingSync: $pendingSync, ')
           ..write('deleted: $deleted, ')
           ..write('rowid: $rowid')
@@ -1713,6 +1903,8 @@ typedef $$MedicinesTableCreateCompanionBuilder =
       Value<String> doseAmount,
       Value<String> notes,
       Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<String?> updatedBy,
       Value<bool> pendingSync,
       Value<bool> deleted,
       Value<int> rowid,
@@ -1726,6 +1918,8 @@ typedef $$MedicinesTableUpdateCompanionBuilder =
       Value<String> doseAmount,
       Value<String> notes,
       Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<String?> updatedBy,
       Value<bool> pendingSync,
       Value<bool> deleted,
       Value<int> rowid,
@@ -1795,6 +1989,16 @@ class $$MedicinesTableFilterComposer
 
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get updatedBy => $composableBuilder(
+    column: $table.updatedBy,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -1878,6 +2082,16 @@ class $$MedicinesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get updatedBy => $composableBuilder(
+    column: $table.updatedBy,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get pendingSync => $composableBuilder(
     column: $table.pendingSync,
     builder: (column) => ColumnOrderings(column),
@@ -1920,6 +2134,12 @@ class $$MedicinesTableAnnotationComposer
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get updatedBy =>
+      $composableBuilder(column: $table.updatedBy, builder: (column) => column);
 
   GeneratedColumn<bool> get pendingSync => $composableBuilder(
     column: $table.pendingSync,
@@ -1990,6 +2210,8 @@ class $$MedicinesTableTableManager
                 Value<String> doseAmount = const Value.absent(),
                 Value<String> notes = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<String?> updatedBy = const Value.absent(),
                 Value<bool> pendingSync = const Value.absent(),
                 Value<bool> deleted = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -2001,6 +2223,8 @@ class $$MedicinesTableTableManager
                 doseAmount: doseAmount,
                 notes: notes,
                 createdAt: createdAt,
+                updatedAt: updatedAt,
+                updatedBy: updatedBy,
                 pendingSync: pendingSync,
                 deleted: deleted,
                 rowid: rowid,
@@ -2014,6 +2238,8 @@ class $$MedicinesTableTableManager
                 Value<String> doseAmount = const Value.absent(),
                 Value<String> notes = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<String?> updatedBy = const Value.absent(),
                 Value<bool> pendingSync = const Value.absent(),
                 Value<bool> deleted = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -2025,6 +2251,8 @@ class $$MedicinesTableTableManager
                 doseAmount: doseAmount,
                 notes: notes,
                 createdAt: createdAt,
+                updatedAt: updatedAt,
+                updatedBy: updatedBy,
                 pendingSync: pendingSync,
                 deleted: deleted,
                 rowid: rowid,
@@ -2095,6 +2323,8 @@ typedef $$SchedulesTableCreateCompanionBuilder =
       Value<int?> intervalHours,
       Value<bool> active,
       Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<String?> updatedBy,
       Value<bool> pendingSync,
       Value<bool> deleted,
       Value<int> rowid,
@@ -2109,6 +2339,8 @@ typedef $$SchedulesTableUpdateCompanionBuilder =
       Value<int?> intervalHours,
       Value<bool> active,
       Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<String?> updatedBy,
       Value<bool> pendingSync,
       Value<bool> deleted,
       Value<int> rowid,
@@ -2198,6 +2430,16 @@ class $$SchedulesTableFilterComposer
 
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get updatedBy => $composableBuilder(
+    column: $table.updatedBy,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -2304,6 +2546,16 @@ class $$SchedulesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get updatedBy => $composableBuilder(
+    column: $table.updatedBy,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get pendingSync => $composableBuilder(
     column: $table.pendingSync,
     builder: (column) => ColumnOrderings(column),
@@ -2374,6 +2626,12 @@ class $$SchedulesTableAnnotationComposer
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get updatedBy =>
+      $composableBuilder(column: $table.updatedBy, builder: (column) => column);
 
   GeneratedColumn<bool> get pendingSync => $composableBuilder(
     column: $table.pendingSync,
@@ -2468,6 +2726,8 @@ class $$SchedulesTableTableManager
                 Value<int?> intervalHours = const Value.absent(),
                 Value<bool> active = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<String?> updatedBy = const Value.absent(),
                 Value<bool> pendingSync = const Value.absent(),
                 Value<bool> deleted = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -2480,6 +2740,8 @@ class $$SchedulesTableTableManager
                 intervalHours: intervalHours,
                 active: active,
                 createdAt: createdAt,
+                updatedAt: updatedAt,
+                updatedBy: updatedBy,
                 pendingSync: pendingSync,
                 deleted: deleted,
                 rowid: rowid,
@@ -2494,6 +2756,8 @@ class $$SchedulesTableTableManager
                 Value<int?> intervalHours = const Value.absent(),
                 Value<bool> active = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<String?> updatedBy = const Value.absent(),
                 Value<bool> pendingSync = const Value.absent(),
                 Value<bool> deleted = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -2506,6 +2770,8 @@ class $$SchedulesTableTableManager
                 intervalHours: intervalHours,
                 active: active,
                 createdAt: createdAt,
+                updatedAt: updatedAt,
+                updatedBy: updatedBy,
                 pendingSync: pendingSync,
                 deleted: deleted,
                 rowid: rowid,
