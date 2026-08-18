@@ -89,15 +89,53 @@ class SettingsScreen extends StatelessWidget {
             ),
             const SizedBox(height: 28),
             OutlinedButton(
-              onPressed: () async {
-                await AuthService.instance.signOut();
-                if (context.mounted) Navigator.of(context).popUntil((r) => r.isFirst);
-              },
+              onPressed: () => _confirmSignOut(context),
               child: const Text('Sign out'),
             ),
           ],
         ),
       ),
     );
+  }
+
+  /// Signing out is a one-tap action sitting at the end of a screen people
+  /// scroll through for the text size control, and getting back in means a
+  /// round-trip through Google's account picker — enough friction that a
+  /// mis-tap is worth a confirm step.
+  Future<void> _confirmSignOut(BuildContext context) async {
+    // Captured before the await so the dialog's result doesn't have to be
+    // paired with a `context.mounted` check afterwards.
+    final navigator = Navigator.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Sign out?'),
+        content: const Text(
+          "You'll need to sign in with Google again to get back in. "
+          'Your reminders stay on this device either way.',
+        ),
+        actions: [
+          // Plain TextButtons on purpose: the app theme stretches
+          // Filled/OutlinedButton to full width, which a dialog's action
+          // row can't lay out.
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(dialogContext).colorScheme.error,
+            ),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Sign out'),
+          ),
+        ],
+      ),
+    );
+    // Null when the dialog is dismissed by tapping outside or the back
+    // button — both mean "no".
+    if (confirmed != true) return;
+    await AuthService.instance.signOut();
+    navigator.popUntil((r) => r.isFirst);
   }
 }

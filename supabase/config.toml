@@ -149,7 +149,9 @@ enabled = true
 # in emails.
 site_url = "http://localhost:3000"
 # A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
-additional_redirect_urls = ["dosely://login-callback"]
+# Empty on purpose: sign-in is native Google (ID token exchanged directly
+# for a session), so no provider ever redirects back into the app.
+additional_redirect_urls = []
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600
 # JWT issuer URL. If not set, defaults to the local API URL (http://127.0.0.1:<port>/auth/v1).
@@ -196,8 +198,10 @@ web3 = 30
 # secret = ""
 
 [auth.email]
-# Allow/disallow new user signups via email to your project.
-enable_signup = true
+# Off: Google is the only sign-in method. The email one-time-code flow and
+# the custom Resend SMTP sender it needed were both removed — see README's
+# "Auth" section.
+enable_signup = false
 # If enabled, a user will be required to confirm any email change on both the old, and new email
 # addresses. If disabled, only the new email is required to confirm.
 double_confirm_changes = true
@@ -212,35 +216,10 @@ otp_length = 6
 # Number of seconds before the email OTP expires (defaults to 1 hour).
 otp_expiry = 3600
 
-# Code-only sign-in email (no clickable link) — see README for why: a magic
-# link only completes if opened on the same device the app is installed on,
-# which breaks as soon as someone checks mail elsewhere. A typed code has no
-# such requirement.
-[auth.email.template.magic_link]
-subject = "Your Dosely sign-in code"
-content_path = "./supabase/templates/magic_link.html"
-
-# `enable_confirmations = true` routes first-time (unconfirmed) sign-ins
-# through Supabase's separate "confirmation" email type, not "magic_link" —
-# without this override that email reverts to a default link-based template.
-[auth.email.template.confirmation]
-subject = "Your Dosely sign-in code"
-content_path = "./supabase/templates/confirmation.html"
-
-# Custom SMTP — required to unlock email template customization on the free
-# tier (Supabase's built-in sender doesn't allow it). Using Resend's free
-# tier; RESEND_API_KEY is read from the environment at push time, never
-# stored in this file. Swap `onboarding@resend.dev` for a verified domain
-# sender before sending to real users — it's a shared sandbox address, fine
-# for development but not for production delivery.
-[auth.email.smtp]
-enabled = true
-host = "smtp.resend.com"
-port = 465
-user = "resend"
-pass = "env(RESEND_API_KEY)"
-admin_email = "onboarding@resend.dev"
-sender_name = "Dosely"
+# No [auth.email.smtp] block and no email templates: the app sends no auth
+# email at all now. If this project's hosted settings still have a custom
+# SMTP sender configured from the old code-based sign-in, clearing it is a
+# dashboard action — `supabase config push` does not remove it.
 
 # Uncomment to customize email template
 # [auth.email.template.invite]
@@ -318,6 +297,31 @@ max_frequency = "5s"
 # Use an external OAuth provider. The full list of providers are: `apple`, `azure`, `bitbucket`,
 # `discord`, `facebook`, `github`, `gitlab`, `google`, `keycloak`, `linkedin_oidc`, `notion`, `twitch`,
 # `twitter`, `x`, `slack`, `spotify`, `workos`, `zoom`.
+# The app's only sign-in method. The app signs in natively and posts the
+# resulting ID token, so no redirect_uri is involved.
+#
+# `client_id` must list BOTH the Web client (whose ID the app passes as
+# `serverClientId`, and whose secret is below) AND the Android/iOS client
+# IDs, comma-separated — a natively-issued ID token carries the *mobile*
+# client as its audience, and Supabase rejects any audience not listed here.
+# Missing the mobile client ID is the classic "works in theory, 'Unverified
+# audience' in practice" failure.
+#
+# Both values come from the environment so no OAuth secret lands in git:
+#   export SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID="<web>,<android>"
+#   export SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET="<web client secret>"
+#   supabase config push
+[auth.external.google]
+enabled = true
+client_id = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID)"
+secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET)"
+redirect_uri = ""
+url = ""
+# Only needed against a local `supabase start` stack; the app doesn't send a
+# nonce, and the hosted project doesn't require one.
+skip_nonce_check = false
+email_optional = false
+
 [auth.external.apple]
 enabled = false
 client_id = ""
