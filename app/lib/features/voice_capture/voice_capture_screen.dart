@@ -4,8 +4,14 @@ import 'package:speech_to_text/speech_to_text.dart';
 
 /// Step 2 of the capture flow: speak the dosage/schedule instructions
 /// ("one tablet twice a day, morning and night") and get a transcript.
-/// On-device speech recognition — nothing is sent anywhere until the AI
-/// structuring step, which the review screen triggers explicitly.
+///
+/// Transcription goes through the *platform's* speech recogniser, not an
+/// on-device one: `SpeechListenOptions.onDevice` is left at its default of
+/// false, so on most Android devices the audio is handled by Google's speech
+/// service. Dosely neither stores nor uploads the audio itself, but "nothing
+/// leaves the phone" would be untrue — see PRIVACY.md, which says so plainly.
+/// Only the resulting text is sent onward, and only at the AI structuring
+/// step the review screen triggers explicitly.
 ///
 /// Pops with the transcript (possibly empty if skipped) — never null.
 class VoiceCaptureScreen extends StatefulWidget {
