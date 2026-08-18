@@ -1,3 +1,4 @@
+import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Where a link is in its life. Mirrors the `care_link_status` enum in
@@ -67,6 +68,92 @@ class CareLink {
       );
 }
 
+/// Who someone is, as far as the other side of a link can see.
+class CareProfile {
+  const CareProfile({required this.userId, this.displayName, this.timezone});
+
+  final String userId;
+  final String? displayName;
+
+  /// IANA identifier, e.g. "Asia/Kolkata". Null on a profile written before
+  /// this was captured, or where the device wouldn't say.
+  final String? timezone;
+}
+
+/// One recorded response to a dose reminder.
+class DoseEvent {
+  const DoseEvent({
+    required this.id,
+    required this.scheduledAt,
+    required this.loggedAt,
+    required this.action,
+    required this.drugName,
+    required this.strength,
+    required this.doseAmount,
+  });
+
+  final String id;
+
+  /// When the dose was due, and when the person actually answered. Both are
+  /// absolute instants, so the gap between them means the same thing from any
+  /// timezone — which is why the feed leads with it.
+  final DateTime scheduledAt;
+  final DateTime loggedAt;
+
+  /// 'taken', 'snoozed' or 'missed'.
+  final String action;
+
+  final String drugName;
+  final String strength;
+  final String doseAmount;
+
+  /// How late the response was. Negative when answered early, which happens
+  /// often and legitimately — people take a tablet when they remember it.
+  Duration get lateness => loggedAt.difference(scheduledAt);
+
+  String get title => strength.isEmpty ? drugName : '$drugName $strength';
+
+  /// Punctuality in words, or null when the event isn't one that has any —
+  /// a snoozed or missed dose was never "on time".
+  ///
+  /// A few minutes either way is reported as on time. Nobody takes a tablet
+  /// the second an alarm sounds, and saying "3 minutes late" about every
+  /// single dose would train someone to ignore the line that eventually says
+  /// something worth reading.
+  String? get punctuality {
+    if (action != 'taken') return null;
+    final minutes = lateness.inMinutes;
+    if (minutes.abs() < 5) return 'On time';
+    if (minutes < 0) return '${_span(-minutes)} early';
+    return '${_span(minutes)} late';
+  }
+
+  static String _span(int minutes) {
+    if (minutes < 60) return '$minutes minutes';
+    final hours = minutes ~/ 60;
+    if (hours < 24) return hours == 1 ? '1 hour' : '$hours hours';
+    final days = hours ~/ 24;
+    return days == 1 ? '1 day' : '$days days';
+  }
+
+  static DoseEvent fromRow(Map<String, dynamic> row) {
+    // PostgREST nests the embedded rows; a dose log cannot exist without its
+    // schedule and medicine, and the query inner-joins both, so anything
+    // missing here is a malformed response rather than a normal absence.
+    final schedule = (row['schedules'] as Map?)?.cast<String, dynamic>();
+    final medicine = (schedule?['medicines'] as Map?)?.cast<String, dynamic>();
+    return DoseEvent(
+      id: row['id'] as String,
+      scheduledAt: DateTime.parse(row['scheduled_at'] as String),
+      loggedAt: DateTime.parse(row['logged_at'] as String),
+      action: row['action'] as String,
+      drugName: (medicine?['drug_name'] as String?) ?? 'Medicine',
+      strength: (medicine?['strength'] as String?) ?? '',
+      doseAmount: (medicine?['dose_amount'] as String?) ?? '',
+    );
+  }
+}
+
 /// The care link and the profile behind it.
 ///
 /// Every state change goes through a Postgres function rather than a direct
@@ -83,23 +170,81 @@ class CareService {
   String? get _userId => _client.auth.currentUser?.id;
 
   /// Records the signed-in user's name and timezone, so the other side has
-  /// something to show besides an opaque id, and so times in a shared view
-  /// can be rendered in the right zone. Safe to call on every launch.
+  /// something to show besides an opaque id, and so a shared view can render
+  /// times in the zone the person actually lives in. Safe to call on every
+  /// launch.
+  ///
+  /// The timezone is the IANA identifier ("Asia/Kolkata"), not
+  /// `DateTime.timeZoneName`. The latter yields an abbreviation like "IST",
+  /// which is ambiguous — India and Ireland both claim it — and cannot be
+  /// converted with. Whole-country offsets are exactly what a family split
+  /// across cities needs to get right.
   Future<void> upsertOwnProfile() async {
     final user = _client.auth.currentUser;
     if (user == null) return;
     final metadata = user.userMetadata ?? const {};
     final name = (metadata['full_name'] ?? metadata['name']) as String?;
+    String? timezone;
+    try {
+      timezone = (await FlutterTimezone.getLocalTimezone()).identifier;
+    } catch (_) {
+      // Leave it null rather than storing something unusable.
+    }
     try {
       await _client.from('profiles').upsert({
         'user_id': user.id,
         'display_name': name?.trim().isNotEmpty == true ? name!.trim() : user.email,
-        'timezone': DateTime.now().timeZoneName,
+        'timezone': ?timezone,
         'last_seen_at': DateTime.now().toUtc().toIso8601String(),
       });
     } catch (_) {
       // Never block sign-in on this. A missing profile costs a display name,
       // not a working app.
+    }
+  }
+
+  /// Name and timezone for someone the caller is allowed to see. Null when
+  /// there is no profile row rather than a guessed one.
+  Future<CareProfile?> profile(String userId) async {
+    try {
+      final rows = await _client
+          .from('profiles')
+          .select('user_id, display_name, timezone')
+          .eq('user_id', userId)
+          .limit(1);
+      if (rows.isEmpty) return null;
+      final row = rows.first;
+      return CareProfile(
+        userId: row['user_id'] as String,
+        displayName: row['display_name'] as String?,
+        timezone: row['timezone'] as String?,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Dose activity for [userId], newest first — the other half of a link's
+  /// point.
+  ///
+  /// Read straight from Supabase rather than the local Drift database: this
+  /// is deliberately *someone else's* data, and the local database holds only
+  /// the signed-in person's own reminders. Row-level security is what decides
+  /// whether this returns anything.
+  Future<List<DoseEvent>> doseFeed(String userId, {int limit = 200}) async {
+    try {
+      final rows = await _client
+          .from('dose_logs')
+          .select(
+            'id, scheduled_at, logged_at, action, source, '
+            'schedules!inner(medicines!inner(drug_name, strength, dose_amount))',
+          )
+          .eq('user_id', userId)
+          .order('scheduled_at', ascending: false)
+          .limit(limit);
+      return rows.map(DoseEvent.fromRow).toList();
+    } catch (e) {
+      throw CareLinkFailure(_describe(e));
     }
   }
 

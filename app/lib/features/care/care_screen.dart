@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import '../auth/auth_service.dart';
 import 'care_service.dart';
+import 'dose_feed_screen.dart';
 
 /// Connecting one person who takes medicines with one person who helps them.
 ///
@@ -381,7 +382,23 @@ class _CareScreenState extends State<CareScreen> {
               : '$who sees everything you see, including any change you make.',
           style: text.bodySmall,
         ),
-        const SizedBox(height: 32),
+        const SizedBox(height: 28),
+        FilledButton.icon(
+          onPressed: () => Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => DoseFeedScreen(
+                // The patient's record either way — the caregiver has no dose
+                // history of their own to show here, and the patient seeing
+                // the identical screen is the point.
+                patientId: _link!.patientId,
+                viewingOwnData: amPatient,
+              ),
+            ),
+          ),
+          icon: const Icon(Icons.checklist),
+          label: Text(amPatient ? 'See what they see' : 'See their doses'),
+        ),
+        const SizedBox(height: 12),
         OutlinedButton(
           onPressed: _disconnect,
           child: const Text('Disconnect'),
