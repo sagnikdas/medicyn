@@ -7,11 +7,7 @@ import '../../core/app_settings.dart';
 /// what the app does — no fine print, no jargon, large icon + headline +
 /// one short sentence per page, matching the tone of the capture screens.
 class OnboardingScreen extends StatefulWidget {
-  const OnboardingScreen({super.key, required this.onFinished});
-
-  /// Called once the user finishes or skips onboarding, after the
-  /// "seen onboarding" flag has already been persisted.
-  final VoidCallback onFinished;
+  const OnboardingScreen({super.key});
 
   @override
   State<OnboardingScreen> createState() => _OnboardingScreenState();
@@ -52,10 +48,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     super.dispose();
   }
 
-  Future<void> _finish() async {
-    await AppSettings.instance.setHasSeenOnboarding();
-    widget.onFinished();
-  }
+  /// Nothing to call back to: persisting the flag notifies `AppSettings`,
+  /// and the gate in main.dart rebuilds itself off that.
+  Future<void> _finish() => AppSettings.instance.setHasSeenOnboarding();
 
   void _next() {
     if (_page == _pages.length - 1) {

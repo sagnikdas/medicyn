@@ -30,7 +30,18 @@ void handleNotificationResponse(NotificationResponse response) async {
 
   final payloadRaw = response.payload;
   if (payloadRaw == null || payloadRaw.isEmpty) return;
-  final payload = jsonDecode(payloadRaw) as Map<String, dynamic>;
+  // This runs from a plugin callback, often on a background isolate with no
+  // error reporting attached, so a malformed payload must not throw: an
+  // uncaught exception here is invisible and takes the Taken/Snooze action
+  // with it. The payloads we write are always well-formed JSON, but a
+  // notification left over from an older build (or one the plugin surfaces
+  // itself) needn't be.
+  final Map<String, dynamic> payload;
+  try {
+    payload = jsonDecode(payloadRaw) as Map<String, dynamic>;
+  } catch (_) {
+    return;
+  }
   final scheduleId = payload['scheduleId'] as String?;
   if (scheduleId == null) return;
   // The dose was due whenever the alarm was set for — not whenever the user

@@ -106,13 +106,6 @@ class NotificationService {
     return notifGranted && exactGranted;
   }
 
-  Future<bool> hasExactAlarmPermission() async {
-    if (Platform.isIOS) return true;
-    final android = _plugin.resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin>();
-    return await android?.canScheduleExactNotifications() ?? true;
-  }
-
   NotificationDetails _details() => NotificationDetails(
         android: AndroidNotificationDetails(
           reminderChannelId,
@@ -169,13 +162,21 @@ class NotificationService {
   String _payload(String scheduleId, String timeLabel) =>
       jsonEncode({'scheduleId': scheduleId, 'timeLabel': timeLabel});
 
-  Future<void> scheduleForScheduleWithMedicine(ScheduleWithMedicine sm) async {
+  /// [skipCancel] is for callers that have already cleared this schedule's
+  /// alarms in a wider sweep — see [reconcile]. Cancelling costs a full
+  /// `pendingNotificationRequests()` round-trip over the platform channel,
+  /// which returns *every* armed alarm in the app, so repeating it per
+  /// schedule is the difference between one such call and N+1 of them.
+  Future<void> scheduleForScheduleWithMedicine(
+    ScheduleWithMedicine sm, {
+    bool skipCancel = false,
+  }) async {
     await init();
     final schedule = sm.schedule;
     final medicine = sm.medicine;
     final frequency = FrequencyType.values.byName(schedule.frequencyType);
 
-    await cancelForSchedule(schedule);
+    if (!skipCancel) await cancelForSchedule(schedule);
 
     if (!schedule.active || frequency == FrequencyType.asNeeded) return;
 
@@ -322,10 +323,13 @@ class NotificationService {
   Future<void> reconcile(AppDatabase db) async {
     await init();
     final active = await db.activeSchedulesOnce();
-    final activeIds = active.map((sm) => sm.schedule.id).toSet();
-    await _cancelWhere((scheduleId) => !activeIds.contains(scheduleId));
+    // One sweep clears everything: alarms belonging to no active schedule
+    // (orphans) and alarms belonging to one that's about to be re-armed
+    // below. Doing both here is what lets the per-schedule calls skip their
+    // own cancel pass — see [scheduleForScheduleWithMedicine].
+    await _cancelWhere((_) => true);
     for (final sm in active) {
-      await scheduleForScheduleWithMedicine(sm);
+      await scheduleForScheduleWithMedicine(sm, skipCancel: true);
     }
   }
 }

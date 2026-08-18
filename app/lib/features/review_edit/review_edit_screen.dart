@@ -57,6 +57,7 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
   List<String> _times = [];
   final Set<int> _daysOfWeek = {};
   bool _saving = false;
+  bool _drugNameFilled = false;
 
   static const _dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -65,11 +66,27 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
   @override
   void initState() {
     super.initState();
+    // _canSave reads the medicine-name field directly, but a TextField's own
+    // keystrokes don't rebuild anything. Without this the Save button stays
+    // disabled after the user types the one required field, until some other
+    // control happens to call setState — which is exactly the path someone
+    // takes after "Fill in manually".
+    _drugNameController.addListener(_onDrugNameChanged);
     _load();
+  }
+
+  /// Rebuilds only when the field crosses between empty and non-empty, which
+  /// is the only transition [_canSave] cares about — not on every keystroke.
+  void _onDrugNameChanged() {
+    final filled = _drugNameController.text.trim().isNotEmpty;
+    if (filled == _drugNameFilled) return;
+    _drugNameFilled = filled;
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
+    _drugNameController.removeListener(_onDrugNameChanged);
     _drugNameController.dispose();
     _strengthController.dispose();
     _formController.dispose();
@@ -164,13 +181,11 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
   }
 
   Future<void> _save() async {
-    debugPrint('[SAVE-TRACE] _save() start');
     setState(() => _saving = true);
     try {
       final medicineId = _isEditing ? widget.existing!.medicine.id : newUuid();
       final scheduleId = _isEditing ? widget.existing!.schedule.id : newUuid();
 
-      debugPrint('[SAVE-TRACE] before upsertMedicine');
       await widget.db.upsertMedicine(MedicinesCompanion.insert(
         id: medicineId,
         drugName: _drugNameController.text.trim(),
@@ -183,7 +198,6 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
         // pendingSync at its old (false) value and the edit would never sync.
         pendingSync: const Value(true),
       ));
-      debugPrint('[SAVE-TRACE] after upsertMedicine');
 
       final schedule = Schedule(
         id: scheduleId,
@@ -208,19 +222,14 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
         // edit to an already-synced schedule actually gets pushed.
         pendingSync: const Value(true),
       ));
-      debugPrint('[SAVE-TRACE] after upsertSchedule');
 
       final medicine = await widget.db.medicineById(medicineId);
-      debugPrint('[SAVE-TRACE] after medicineById, medicine=${medicine?.id}');
       if (medicine != null) {
         try {
-          debugPrint('[SAVE-TRACE] before scheduleForScheduleWithMedicine');
           await NotificationService.instance.scheduleForScheduleWithMedicine(
             ScheduleWithMedicine(schedule, medicine),
           );
-          debugPrint('[SAVE-TRACE] after scheduleForScheduleWithMedicine');
         } catch (e) {
-          debugPrint('[SAVE-TRACE] scheduleForScheduleWithMedicine threw: $e');
           // The reminder is saved either way; a scheduling failure (e.g. the
           // Android 12+ exact-alarm permission was revoked) shouldn't block
           // the save or strand the spinner — surface it and move on.

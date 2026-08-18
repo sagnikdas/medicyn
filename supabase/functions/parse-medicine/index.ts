@@ -6,6 +6,12 @@
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
 const ANTHROPIC_MODEL = "claude-haiku-4-5";
 const REQUEST_TIMEOUT_MS = 10_000;
+const MAX_FIELD_CHARS = 4_000;
+const MAX_ATTEMPTS = 2;
+
+type ClaudeResult =
+  | { ok: true; data: unknown }
+  | { ok: false; error: string; status?: number };
 
 const EXTRACT_TOOL = {
   name: "extract_medicine_schedule",
@@ -32,6 +38,13 @@ const EXTRACT_TOOL = {
         type: "array",
         items: { type: "integer", minimum: 0, maximum: 6 },
         description: "0=Sunday..6=Saturday. Only set when frequencyType is 'specific_days'.",
+      },
+      intervalHours: {
+        type: "integer",
+        minimum: 1,
+        maximum: 24,
+        description:
+          "Hours between doses. Only set when frequencyType is 'every_x_hours'; times[0] is then the first dose of the day.",
       },
       notes: { type: "string", description: "Any other relevant instructions, e.g. 'take with food'." },
       confidence: {
@@ -67,8 +80,12 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({ success: false, data: null, error: "invalid_json_body" }, 400);
   }
 
-  const ocrText = (body.ocrText ?? "").trim();
-  const transcript = (body.transcript ?? "").trim();
+  // Both fields are free text from a device (OCR output and a speech
+  // transcript) and go straight into a billed model call, so they're capped
+  // rather than trusted. A real medicine label plus a spoken sentence is
+  // comfortably under this; anything longer is a bug or an abuse attempt.
+  const ocrText = (body.ocrText ?? "").trim().slice(0, MAX_FIELD_CHARS);
+  const transcript = (body.transcript ?? "").trim().slice(0, MAX_FIELD_CHARS);
   if (!ocrText && !transcript) {
     return jsonResponse({ success: false, data: null, error: "empty_input" }, 400);
   }
@@ -78,19 +95,27 @@ Deno.serve(async (req: Request) => {
     transcript ? `SPOKEN TRANSCRIPT:\n${transcript}` : "SPOKEN TRANSCRIPT: (none captured)",
   ].join("\n\n");
 
-  const attempt = async () => callClaude(userMessage);
+  // Two attempts. A thrown error (timeout, connection reset) and a 429/5xx
+  // from Anthropic are both retried: the retryable classification in
+  // callClaude already existed, but nothing acted on it, so a rate-limited
+  // call was handed straight back to the app as a permanent failure.
+  let result: ClaudeResult | null = null;
+  let thrownError = "upstream_failed";
 
-  let result;
-  try {
-    result = await withTimeout(attempt(), REQUEST_TIMEOUT_MS);
-  } catch (_err) {
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
-      result = await withTimeout(attempt(), REQUEST_TIMEOUT_MS);
+      result = await callClaude(userMessage, REQUEST_TIMEOUT_MS);
     } catch (err) {
-      return jsonResponse({ success: false, data: null, error: `upstream_failed: ${String(err)}` }, 502);
+      thrownError = `upstream_failed: ${String(err)}`;
+      result = null;
     }
+    if (result?.ok) break;
+    if (result && !result.error.startsWith("retryable_status_")) break;
   }
 
+  if (result === null) {
+    return jsonResponse({ success: false, data: null, error: thrownError }, 502);
+  }
   if (!result.ok) {
     return jsonResponse({ success: false, data: null, error: result.error }, result.status ?? 502);
   }
@@ -98,11 +123,24 @@ Deno.serve(async (req: Request) => {
   return jsonResponse({ success: true, data: result.data, error: null });
 });
 
-async function callClaude(
-  userMessage: string,
-): Promise<{ ok: true; data: unknown } | { ok: false; error: string; status?: number }> {
+/// Timing out is enforced with an AbortController rather than by racing a
+/// timer: the old approach left the losing request in flight, so a timeout
+/// followed by a retry meant two concurrent billed calls, and the first one's
+/// response was read by nobody.
+async function callClaude(userMessage: string, timeoutMs: number): Promise<ClaudeResult> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await requestClaude(userMessage, controller.signal);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function requestClaude(userMessage: string, signal: AbortSignal): Promise<ClaudeResult> {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
+    signal,
     headers: {
       "content-type": "application/json",
       "x-api-key": ANTHROPIC_API_KEY!,
@@ -122,8 +160,12 @@ async function callClaude(
     return { ok: false, error: `retryable_status_${res.status}`, status: res.status };
   }
   if (!res.ok) {
+    // Logged server-side, but not returned: the upstream body can carry
+    // request details the client has no business seeing, and the status
+    // alone is all it can act on.
     const text = await res.text().catch(() => "");
-    return { ok: false, error: `anthropic_error_${res.status}: ${text.slice(0, 300)}`, status: 502 };
+    console.error(`anthropic_error_${res.status}: ${text.slice(0, 300)}`);
+    return { ok: false, error: `anthropic_error_${res.status}`, status: 502 };
   }
 
   const payload = await res.json();
@@ -132,19 +174,6 @@ async function callClaude(
     return { ok: false, error: "no_tool_use_in_response" };
   }
   return { ok: true, data: toolUse.input };
-}
-
-function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error("timeout")), ms);
-    promise.then((v) => {
-      clearTimeout(timer);
-      resolve(v);
-    }, (e) => {
-      clearTimeout(timer);
-      reject(e);
-    });
-  });
 }
 
 function jsonResponse(body: unknown, status = 200): Response {

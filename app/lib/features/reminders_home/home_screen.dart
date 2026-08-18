@@ -24,7 +24,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _bootstrap();
+    _bootstrap(requestPermissions: true);
   }
 
   @override
@@ -41,15 +41,27 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) _bootstrap();
   }
 
-  Future<void> _bootstrap() async {
+  /// [requestPermissions] only on the first run, from `initState`. Asking on
+  /// every resume meant that anyone who declined the battery-optimisation
+  /// exemption got the system dialog thrown at them again every single time
+  /// they returned to the app — the permission requests are one-time asks,
+  /// while the re-arming below is what actually needs to happen on resume.
+  ///
+  /// The same flag gates the Supabase pull, for the same reason: restoring
+  /// remote rows matters on a fresh install or a new device, not on every
+  /// foreground. It reads all three tables in full, including every dose log
+  /// ever written, which only grows.
+  Future<void> _bootstrap({bool requestPermissions = false}) async {
     await NotificationService.instance.init();
-    await NotificationService.instance.requestPermissions();
+    if (requestPermissions) {
+      await NotificationService.instance.requestPermissions();
+    }
     final sync = SyncService(widget.db);
     // Pull before reconcile: a fresh install/new device has no local
     // schedules yet, so restoring them from Supabase first means reconcile
     // arms their alarms in this same pass instead of waiting for the next
     // resume.
-    await sync.pullAll();
+    if (requestPermissions) await sync.pullAll();
     await NotificationService.instance.reconcile(widget.db);
     await sync.syncAll();
   }
@@ -253,7 +265,14 @@ class _SnoozeStatus extends StatefulWidget {
 }
 
 class _SnoozeStatusState extends State<_SnoozeStatus> {
-  static const _pollInterval = Duration(seconds: 15);
+  /// While a snooze is on screen the countdown has to expire promptly, so it
+  /// is checked often. The rest of the time — which is almost all of the
+  /// time, for almost every card — a slower beat is enough to notice a
+  /// snooze made from the notification tray. The old fixed 15s ran per
+  /// visible card for as long as the app was open, so a list of eight
+  /// reminders meant ~32 database reads a minute to display nothing.
+  static const _activePollInterval = Duration(seconds: 15);
+  static const _idlePollInterval = Duration(minutes: 1);
 
   Timer? _poll;
   DateTime? _snoozedUntil;
@@ -261,14 +280,22 @@ class _SnoozeStatusState extends State<_SnoozeStatus> {
   @override
   void initState() {
     super.initState();
-    _refresh();
-    _poll = Timer.periodic(_pollInterval, (_) => _refresh());
+    _tick();
   }
 
   @override
   void dispose() {
     _poll?.cancel();
     super.dispose();
+  }
+
+  Future<void> _tick() async {
+    await _refresh();
+    if (!mounted) return;
+    _poll = Timer(
+      _snoozedUntil == null ? _idlePollInterval : _activePollInterval,
+      _tick,
+    );
   }
 
   Future<void> _refresh() async {
