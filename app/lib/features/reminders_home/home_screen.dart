@@ -7,6 +7,7 @@ import '../../data/local/tables.dart';
 import '../../data/remote/sync_service.dart';
 import '../auth/auth_service.dart';
 import '../capture_ocr/ocr_capture_screen.dart';
+import '../care/care_service.dart';
 import '../notification_engine/notification_service.dart';
 import '../review_edit/review_edit_screen.dart';
 import '../settings/settings_screen.dart';
@@ -56,6 +57,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     await NotificationService.instance.init();
     if (requestPermissions) {
       await NotificationService.instance.requestPermissions();
+    }
+    if (requestPermissions) {
+      // Also backfills a profile for anyone who signed in before profiles
+      // existed — without it their name never appears on the other side of a
+      // link, and nothing would ever create the row.
+      unawaited(CareService.instance.upsertOwnProfile());
     }
     final sync = SyncService(widget.db);
     // Pull before reconcile: a fresh install/new device has no local

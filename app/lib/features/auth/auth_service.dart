@@ -4,6 +4,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/google_auth_config.dart';
+import '../care/care_service.dart';
 
 /// Raised when Google sign-in doesn't produce a session. [message] is
 /// written to be shown to the user as-is; [isCancellation] is true when the
@@ -82,6 +83,10 @@ class AuthService {
         provider: OAuthProvider.google,
         idToken: idToken,
       );
+      // Best-effort, and awaited only so the name is present by the time the
+      // first screen renders. A failure here costs a display name, not a
+      // session, so it never throws.
+      await CareService.instance.upsertOwnProfile();
     } on GoogleSignInFailure {
       rethrow;
     } on GoogleSignInException catch (e) {
