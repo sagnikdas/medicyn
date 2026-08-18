@@ -14,8 +14,11 @@
 -- convenience for testing policy *logic*; it is not a claim that the local
 -- database behaves like the hosted one in every respect.
 
-create extension if not exists pgcrypto;
-
+-- Deliberately no `create extension pgcrypto` in `public`. Supabase installs
+-- extensions into an `extensions` schema, so a function that pins its
+-- search_path cannot reach them. Creating pgcrypto here would hide that
+-- difference and let a migration pass locally then fail on the hosted
+-- project — which is exactly what happened once.
 create schema if not exists auth;
 
 -- Only the columns the app's foreign keys actually reference.

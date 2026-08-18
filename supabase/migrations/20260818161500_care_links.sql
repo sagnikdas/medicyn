@@ -166,18 +166,26 @@ create policy "care_links_read_own" on care_links
 -- link lifecycle
 -- ---------------------------------------------------------------------------
 
--- Six digits, drawn from pgcrypto rather than random(). The code is not the
--- security boundary — the parent's confirmation is — but it should not be
--- predictable from another code issued moments earlier.
+-- Six digits, derived from `gen_random_uuid()`. The code is not the security
+-- boundary — the parent's confirmation is — but it should not be predictable
+-- from another code issued moments earlier, so this uses the same
+-- cryptographically strong source as a v4 UUID rather than `random()`.
+--
+-- Deliberately not pgcrypto's `gen_random_bytes`: Supabase installs pgcrypto
+-- into the `extensions` schema, which the pinned `search_path` below rightly
+-- excludes, so that version failed on the hosted project while passing
+-- locally. `gen_random_uuid()` has been core Postgres since 13 and needs no
+-- extension at all.
 create or replace function public.generate_invite_code()
 returns text
 language sql
 volatile
+set search_path = pg_catalog, pg_temp
 as $$
   select lpad((
-    (get_byte(b, 0)::int * 65536 + get_byte(b, 1)::int * 256 + get_byte(b, 2)::int) % 1000000
-  )::text, 6, '0')
-  from (select gen_random_bytes(3) as b) s;
+    abs(('x' || substr(replace(gen_random_uuid()::text, '-', ''), 1, 8))::bit(32)::int::bigint)
+      % 1000000
+  )::text, 6, '0');
 $$;
 
 -- Issues an invite for the caller as patient. Replaces any invite they have
