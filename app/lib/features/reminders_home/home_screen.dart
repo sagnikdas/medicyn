@@ -8,6 +8,7 @@ import '../../data/remote/sync_service.dart';
 import '../auth/auth_service.dart';
 import '../capture_ocr/ocr_capture_screen.dart';
 import '../care/care_service.dart';
+import '../notification_engine/missed_doses.dart';
 import '../notification_engine/notification_service.dart';
 import '../review_edit/review_edit_screen.dart';
 import '../settings/settings_screen.dart';
@@ -71,6 +72,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     // resume.
     if (requestPermissions) await sync.pullAll();
     await NotificationService.instance.reconcile(widget.db);
+    // Before the push, so a dose recorded as missed goes up in the same pass
+    // and reaches the other side without waiting for another foreground.
+    await const MissedDoseDetector().sweep(widget.db);
     await sync.syncAll();
   }
 

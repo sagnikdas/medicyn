@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 import 'package:drift_flutter/drift_flutter.dart';
+import 'package:flutter/foundation.dart';
 
 import 'converters.dart';
 import 'tables.dart';
@@ -17,6 +18,11 @@ class ScheduleWithMedicine {
 @DriftDatabase(tables: [Medicines, Schedules, DoseLogs])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(driftDatabase(name: 'dosely'));
+
+  /// For tests: an isolated database with no file behind it, so logic that
+  /// spans several tables can be exercised without a device.
+  @visibleForTesting
+  AppDatabase.forTesting(super.executor);
 
   @override
   int get schemaVersion => 2;
@@ -102,12 +108,17 @@ class AppDatabase extends _$AppDatabase {
 
   // --- Dose logs -----------------------------------------------------------
 
+  /// [loggedAt] defaults to now, which is right for a live response. It is
+  /// accepted so a caller that already knows when the action happened — a
+  /// backfill, or a test simulating a particular day — can say so instead of
+  /// having the column's default overwrite it.
   Future<void> recordDoseAction({
     required String id,
     required String scheduleId,
     required DateTime scheduledAt,
     required DoseAction action,
     String source = 'notification',
+    DateTime? loggedAt,
   }) {
     return into(doseLogs).insertOnConflictUpdate(
       DoseLogsCompanion.insert(
@@ -116,6 +127,7 @@ class AppDatabase extends _$AppDatabase {
         scheduledAt: scheduledAt,
         action: action.name,
         source: Value(source),
+        loggedAt: loggedAt == null ? const Value.absent() : Value(loggedAt),
       ),
     );
   }
@@ -133,6 +145,19 @@ class AppDatabase extends _$AppDatabase {
         ..orderBy([(t) => OrderingTerm.desc(t.loggedAt)])
         ..limit(1))
       .getSingleOrNull();
+
+  /// Every dose log written since [since], across all schedules — one query
+  /// for a missed-dose sweep rather than one per reminder.
+  Future<List<DoseLog>> doseLogsSince(DateTime since) =>
+      (select(doseLogs)..where((t) => t.loggedAt.isBiggerOrEqualValue(since))).get();
+
+  /// Insert-or-ignore, because missed doses carry deterministic ids: a sweep
+  /// that runs twice, or on a second device, must converge on the same row
+  /// rather than filling the feed with duplicates of the same skipped dose.
+  Future<void> recordMissedDoses(List<DoseLogsCompanion> rows) async {
+    if (rows.isEmpty) return;
+    await batch((b) => b.insertAll(doseLogs, rows, mode: InsertMode.insertOrIgnore));
+  }
 
   // --- Sync helpers ----------------------------------------------------
 
