@@ -199,8 +199,8 @@ web3 = 30
 
 [auth.email]
 # Off: Google is the only sign-in method. The email one-time-code flow and
-# the custom Resend SMTP sender it needed were both removed — see README's
-# "Auth" section.
+# the custom SMTP sender it needed were both removed — see README's "Auth"
+# section.
 enable_signup = false
 # If enabled, a user will be required to confirm any email change on both the old, and new email
 # addresses. If disabled, only the new email is required to confirm.
@@ -217,9 +217,9 @@ otp_length = 6
 otp_expiry = 3600
 
 # No [auth.email.smtp] block and no email templates: the app sends no auth
-# email at all now. If this project's hosted settings still have a custom
-# SMTP sender configured from the old code-based sign-in, clearing it is a
-# dashboard action — `supabase config push` does not remove it.
+# email at all now. The hosted project's custom SMTP sender has been cleared
+# too — that was a dashboard action, since `supabase config push` does not
+# remove one.
 
 # Uncomment to customize email template
 # [auth.email.template.invite]

@@ -36,6 +36,11 @@ To set up real release signing:
 3. Build a signed release as usual, e.g. `flutter build apk --release` or
    `flutter build appbundle --release`.
 
+A release build also needs its signing certificate registered for Google
+Sign-In, or sign-in fails on exactly the build you distribute — and under
+Play App Signing the certificate that matters is Google's, not this
+keystore's. See "Before shipping a release build" in the root `README.md`.
+
 ## Crash reporting (Sentry)
 
 Crash reporting uses `sentry_flutter`, configured via

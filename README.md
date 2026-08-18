@@ -90,8 +90,9 @@ reminder, and for camera/microphone permission when you use those steps.
 ## Auth
 
 **Google Sign-In is the only sign-in method.** The previous email
-one-time-code flow, its custom Resend SMTP sender, its email templates, and
-the `dosely://login-callback` deep link have all been removed.
+one-time-code flow, its custom SMTP sender, its email templates, and the
+`dosely://login-callback` deep link have all been removed — from the repo
+and from the hosted Supabase project alike.
 
 The flow is native, not web-based: `AuthService.signInWithGoogle()`
 (`app/lib/features/auth/auth_service.dart`) shows the on-device account
@@ -213,21 +214,19 @@ Leave **Skip nonce checks** and **Allow users without an email** off, and
 ignore **Callback URL** — that belongs to the browser OAuth flow, which
 this app never uses.
 
-While you're in the dashboard, finish removing the old email sign-in from
-the *server* side — the repo changes below don't do it on their own:
+The old email sign-in is already off on the server side: the Email
+provider is disabled and no custom SMTP sender is configured. Nothing to do
+here — worth knowing only if you ever recreate the project, since the repo
+changes don't achieve either on their own.
 
-- **Authentication → Sign In / Providers → Email**: turn off.
-- **Project Settings → Authentication → SMTP Settings**: clear the custom
-  Resend sender if it's still there, and revoke that API key in Resend
-  while you're at it.
-
-> **You do not need `supabase config push`.** Doing the above by hand
-> achieves the same result with no risk. The `[auth.external.google]` block
-> in `supabase/config.toml` exists so the repo describes reality and so a
-> local `supabase start` stack works; pushing it is optional and, if
-> pushed *before* Google is verified working, it disables email sign-in
-> server-side and can leave you unable to sign in at all. Confirm sign-in
-> works first, then push if you want the config tracked. Should you push:
+> **You do not need `supabase config push`.** Configuring the provider by
+> hand in the dashboard, as above, achieves the same result with no risk.
+> The `[auth.external.google]` block in `supabase/config.toml` exists so
+> the repo describes reality and so a local `supabase start` stack works;
+> pushing it is optional. Push only once Google sign-in is confirmed
+> working — pushing beforehand also disables email sign-in server-side,
+> which on a project that still depended on it would leave you unable to
+> sign in at all. Should you push:
 >
 > ```
 > export SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID="<web-id>,<android-id>"
@@ -274,22 +273,87 @@ signed-in Google address then shows at the top of Settings.
 
 ### Before shipping a release build
 
-A release APK is signed by a different key than debug, so Google won't
-recognise it and sign-in fails on exactly the build you hand to other
-people. Two extra pieces:
+Google recognises an Android app by package name **plus signing
+certificate**, and a release build is signed by a different key than debug.
+So sign-in fails on exactly the build you hand to other people unless that
+certificate is registered too. Nothing in the app changes for any of this —
+`serverClientId` stays the Web client ID throughout.
 
-1. Generate a release keystore and an `app/android/key.properties` (neither
-   exists in this repo yet — until they do, `flutter build apk --release`
-   falls back to debug signing). Copy `app/android/key.properties.example`
-   and follow "Release signing" in `app/README.md`.
-2. Register a **second Android OAuth client** with that keystore's SHA-1,
-   and append its client ID to Supabase's *Client IDs* list alongside the
-   debug one. If you distribute through Play, use the SHA-1 from
-   **Play Console → Release → Setup → App signing** instead, since Google
-   re-signs your upload.
+**1. Generate an upload keystore.** Run this in your own terminal (it
+prompts for passwords) and keep the file outside the repo:
 
-Also remember to **Publish app** on the consent screen (step 1a) — the test
-user allow-list applies to release builds just as much as debug ones.
+```
+keytool -genkeypair -v \
+  -keystore ~/dosely-upload-keystore.jks \
+  -keyalg RSA -keysize 2048 -validity 10000 \
+  -alias upload
+```
+
+Back it up somewhere durable. If you publish to Play and lose this key,
+shipping an update needs a Google-assisted key reset.
+
+**2. Point the build at it.** Copy `app/android/key.properties.example` to
+`app/android/key.properties` and fill in `storeFile` (absolute path),
+`storePassword`, `keyAlias`, `keyPassword`. That file and `*.jks`/
+`*.keystore` are all git-ignored; none of them ever gets committed.
+
+> Create `key.properties` only once the keystore actually exists.
+> `android/app/build.gradle.kts` switches to release signing the moment the
+> file is present, so a placeholder `storeFile` path fails the build rather
+> than falling back to debug signing.
+
+**3. Find the SHA-1 that ends up on users' devices.** Which certificate
+that is depends on how you distribute.
+
+*Direct APK.* It's your upload keystore's:
+
+```
+keytool -list -v -keystore ~/dosely-upload-keystore.jks -alias upload
+```
+
+*Google Play.* It is **not** your keystore's. Play App Signing re-signs
+your upload, so Google's own certificate is what reaches devices — and it
+doesn't exist until you've uploaded something. Build a bundle (Play takes
+an AAB, not an APK):
+
+```
+flutter build appbundle --release
+```
+
+Upload it to an Internal testing release, then open **Play Console →
+Release → Setup → App signing**, which lists two certificates:
+
+| Certificate | Signs | Register it so that |
+|---|---|---|
+| **App signing key** | what users install from Play | sign-in works for testers and real users |
+| **Upload key** | what you build locally | sign-in works in a locally-built release APK |
+
+Register both if you test locally-built release APKs alongside Play
+installs.
+
+**4. Register one Android OAuth client per SHA-1.** Google Cloud Console →
+**Credentials → Create Credentials → OAuth client ID → Android**, package
+name `com.sagnikdas.dosely`, one client per certificate. A client holds
+exactly one package + SHA-1 pair, so they can't be combined into one. Name
+them so they're tellable apart — "Dosely Android — Play app signing",
+"Dosely Android — upload key".
+
+**5. Append each new client ID** to Supabase's *Client IDs* list (step 2
+above), Web first:
+
+```
+<web>,<android-debug>,<android-play-app-signing>,<android-upload>
+```
+
+**6. Test from the Play internal-testing link**, not a sideloaded APK. Only
+the Play install carries the app signing certificate, so it's the only
+build that proves step 4 worked. Expect sign-in to fail in that first
+internal-testing build: the SHA-1 can't be registered until Play has issued
+it, which happens only after the upload.
+
+If the consent screen is ever back in publishing status **Testing**, its
+test-user allow-list applies to release builds exactly as it does to debug
+ones (step 1a).
 
 ### iOS
 
