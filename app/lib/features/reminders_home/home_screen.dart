@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../data/local/database.dart';
 import '../../data/local/tables.dart';
 import '../../data/remote/sync_service.dart';
+import '../auth/auth_service.dart';
 import '../capture_ocr/ocr_capture_screen.dart';
 import '../notification_engine/notification_service.dart';
 import '../review_edit/review_edit_screen.dart';
@@ -103,7 +104,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
     if (confirmed != true) return;
     await NotificationService.instance.cancelForSchedule(schedule);
-    await widget.db.deactivateSchedule(schedule.id);
+    await widget.db.deactivateSchedule(
+      schedule.id,
+      by: AuthService.instance.currentUser?.id,
+    );
   }
 
   @override

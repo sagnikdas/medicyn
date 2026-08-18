@@ -19,7 +19,27 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(driftDatabase(name: 'dosely'));
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
+
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+        onUpgrade: (m, from, to) async {
+          if (from < 2) {
+            // Row versioning, so a pull can overwrite an older local copy
+            // instead of only inserting rows it has never seen.
+            await m.addColumn(medicines, medicines.updatedAt);
+            await m.addColumn(medicines, medicines.updatedBy);
+            await m.addColumn(schedules, schedules.updatedAt);
+            await m.addColumn(schedules, schedules.updatedBy);
+            // Existing rows have never been edited, so their last change was
+            // their creation. The column default would otherwise stamp them
+            // all with the moment of upgrade, letting them beat genuinely
+            // newer edits waiting on the server.
+            await customStatement('UPDATE medicines SET updated_at = created_at');
+            await customStatement('UPDATE schedules SET updated_at = created_at');
+          }
+        },
+      );
 
   // --- Medicines ---------------------------------------------------------
 
@@ -66,9 +86,18 @@ class AppDatabase extends _$AppDatabase {
         .toList();
   }
 
-  Future<void> deactivateSchedule(String id) =>
+  /// Turning a reminder off is an edit like any other, so it has to carry a
+  /// fresh [Schedules.updatedAt]. Without one it loses every version
+  /// comparison against the server's still-active copy, and the reminder
+  /// reappears on the next pull.
+  Future<void> deactivateSchedule(String id, {String? by}) =>
       (update(schedules)..where((t) => t.id.equals(id))).write(
-        SchedulesCompanion(active: const Value(false), pendingSync: const Value(true)),
+        SchedulesCompanion(
+          active: const Value(false),
+          pendingSync: const Value(true),
+          updatedAt: Value(DateTime.now()),
+          updatedBy: Value(by),
+        ),
       );
 
   // --- Dose logs -----------------------------------------------------------
@@ -130,20 +159,43 @@ class AppDatabase extends _$AppDatabase {
 
   // --- Pull/restore helpers ------------------------------------------------
   //
-  // Used only by SyncService.pullAll() to hydrate rows that exist on
-  // Supabase but not yet on this device (fresh install, new device, or a
-  // row created elsewhere). Insert-or-ignore rather than upsert on purpose:
-  // if a row with this id already exists locally, this device's copy — even
-  // if it's mid-edit and still `pendingSync` — always wins, so a pull can
-  // never clobber in-flight local work. See that method's doc comment for
-  // what this does and doesn't solve.
+  // Used by SyncService.pullAll(). Medicines and schedules resolve by
+  // last-write-wins on `updatedAt`; dose logs are append-only facts and stay
+  // insert-or-ignore, since nothing ever edits one.
 
-  Future<void> insertMedicineIfAbsent(MedicinesCompanion row) =>
-      into(medicines).insert(row, mode: InsertMode.insertOrIgnore);
+  /// `id -> updatedAt` for every local medicine, so a pull can decide which
+  /// rows it needs to overwrite without a query per remote row.
+  Future<Map<String, DateTime>> medicineVersions() async {
+    final rows = await select(medicines).get();
+    return {for (final r in rows) r.id: r.updatedAt};
+  }
 
-  Future<void> insertScheduleIfAbsent(SchedulesCompanion row) =>
-      into(schedules).insert(row, mode: InsertMode.insertOrIgnore);
+  /// `id -> updatedAt` for every local schedule. See [medicineVersions].
+  Future<Map<String, DateTime>> scheduleVersions() async {
+    final rows = await select(schedules).get();
+    return {for (final r in rows) r.id: r.updatedAt};
+  }
 
-  Future<void> insertDoseLogIfAbsent(DoseLogsCompanion row) =>
-      into(doseLogs).insert(row, mode: InsertMode.insertOrIgnore);
+  /// Ids of every local dose log, so a pull can skip the ones it already has.
+  Future<Set<String>> doseLogIds() async {
+    final rows = await select(doseLogs).get();
+    return {for (final r in rows) r.id};
+  }
+
+  /// Writes remote rows that won the version comparison, in one batch rather
+  /// than a statement per row.
+  Future<void> applyRemoteMedicines(List<MedicinesCompanion> rows) async {
+    if (rows.isEmpty) return;
+    await batch((b) => b.insertAllOnConflictUpdate(medicines, rows));
+  }
+
+  Future<void> applyRemoteSchedules(List<SchedulesCompanion> rows) async {
+    if (rows.isEmpty) return;
+    await batch((b) => b.insertAllOnConflictUpdate(schedules, rows));
+  }
+
+  Future<void> applyRemoteDoseLogs(List<DoseLogsCompanion> rows) async {
+    if (rows.isEmpty) return;
+    await batch((b) => b.insertAll(doseLogs, rows, mode: InsertMode.insertOrIgnore));
+  }
 }

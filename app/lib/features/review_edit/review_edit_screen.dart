@@ -8,6 +8,7 @@ import '../../data/local/database.dart';
 import '../../data/local/tables.dart';
 import '../../data/remote/medicine_parser.dart';
 import '../../data/remote/sync_service.dart';
+import '../auth/auth_service.dart';
 import '../history/dose_history_screen.dart';
 import '../notification_engine/notification_service.dart';
 import 'parsed_medicine.dart';
@@ -185,6 +186,10 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
     try {
       final medicineId = _isEditing ? widget.existing!.medicine.id : newUuid();
       final scheduleId = _isEditing ? widget.existing!.schedule.id : newUuid();
+      // One timestamp for both rows, so a medicine and its schedule saved
+      // together can never end up on opposite sides of a version comparison.
+      final savedAt = DateTime.now();
+      final savedBy = AuthService.instance.currentUser?.id;
 
       await widget.db.upsertMedicine(MedicinesCompanion.insert(
         id: medicineId,
@@ -197,6 +202,8 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
         // this, editing an already-synced medicine would silently leave
         // pendingSync at its old (false) value and the edit would never sync.
         pendingSync: const Value(true),
+        updatedAt: Value(savedAt),
+        updatedBy: Value(savedBy),
       ));
 
       final schedule = Schedule(
@@ -208,6 +215,8 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
         intervalHours: _frequency == FrequencyType.everyXHours ? int.tryParse(_intervalController.text) : null,
         active: true,
         createdAt: DateTime.now(),
+        updatedAt: savedAt,
+        updatedBy: savedBy,
         pendingSync: true,
         deleted: false,
       );
@@ -221,6 +230,8 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
         // Same reasoning as the medicine upsert above — force it dirty so an
         // edit to an already-synced schedule actually gets pushed.
         pendingSync: const Value(true),
+        updatedAt: Value(savedAt),
+        updatedBy: Value(savedBy),
       ));
 
       final medicine = await widget.db.medicineById(medicineId);
