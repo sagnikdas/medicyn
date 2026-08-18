@@ -1,31 +1,36 @@
+import 'dart:io' show Platform;
+
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-/// Thin wrapper around Supabase Auth — a typed 6-digit email code, not a
-/// clickable magic link. A link only completes if opened on the same
-/// device the app is installed on; a code has no such requirement, so it
-/// works however/wherever the user checks their email.
+import '../../core/google_auth_config.dart';
+
+/// Raised when Google sign-in doesn't produce a session. [message] is
+/// written to be shown to the user as-is; [isCancellation] is true when the
+/// user simply backed out of the account picker, which the UI should treat
+/// as a non-event rather than an error.
+class GoogleSignInFailure implements Exception {
+  const GoogleSignInFailure(this.message, {this.isCancellation = false});
+  final String message;
+  final bool isCancellation;
+
+  @override
+  String toString() => message;
+}
+
+/// Thin wrapper around Supabase Auth. Google is the only sign-in method —
+/// the previous email one-time-code flow was removed deliberately, along
+/// with the custom SMTP sender it depended on.
 ///
-/// Until custom SMTP + the code-only email template are live (blocked on
-/// Supabase's free-tier default mailer not allowing template customization
-/// — see supabase/config.toml), the email Supabase actually sends still
-/// contains the old clickable link. `emailRedirectTo` keeps that link
-/// working (deep-links into the app) as a fallback in the meantime; it's
-/// harmless to leave once the code-only template goes live, since that
-/// template won't render a link at all.
-///
-/// Google Sign-In (see [signInWithGoogle]) is a second, faster path for
-/// users who already have a Google account on their phone — it needs a
-/// Google Cloud OAuth client tied to this app's package name + signing
-/// SHA-1, which is a manual one-time console step. Until that's done,
-/// calling it throws; callers should show a friendly message rather than
-/// surface the raw error. The email+code flow above is unaffected either
-/// way and remains the primary, always-working method.
+/// The flow is native, not web-based: [GoogleSignIn] shows the on-device
+/// account picker, and the resulting ID token is exchanged for a Supabase
+/// session via `GoTrueClient.signInWithIdToken` (gotrue 2.27.1, as pulled
+/// in by supabase_flutter 2.17.1). Nothing opens a browser and no
+/// deep-link/redirect URL is involved, which is why the app no longer
+/// registers a `dosely://` scheme.
 class AuthService {
   AuthService._();
   static final AuthService instance = AuthService._();
-
-  static const _fallbackRedirectUrl = 'dosely://login-callback';
 
   SupabaseClient get _client => Supabase.instance.client;
 
@@ -33,55 +38,100 @@ class AuthService {
   bool get isSignedIn => currentUser != null;
   Stream<AuthState> get onAuthStateChange => _client.auth.onAuthStateChange;
 
-  Future<void> sendSignInCode(String email) => _client.auth.signInWithOtp(
-        email: email,
-        emailRedirectTo: _fallbackRedirectUrl,
-      );
-
-  Future<void> verifyCode({required String email, required String code}) => _client.auth.verifyOTP(
-        email: email,
-        token: code,
-        type: OtpType.email,
-      );
-
-  /// The Web OAuth client ID from Google Cloud Console (see README's Auth
-  /// section) — `google_sign_in` needs this as `serverClientId` so the ID
-  /// token's audience matches what Supabase's Google provider verifies
-  /// against. Left blank until that manual Console step is done.
-  static const _googleServerClientId = '';
-
   bool _googleSignInInitialized = false;
 
-  /// Triggers the native Google sign-in flow and exchanges the resulting
-  /// ID token for a Supabase session via `GoTrueClient.signInWithIdToken`
-  /// (gotrue 2.27.1, as pulled in by supabase_flutter 2.17.1).
-  ///
   /// `GoogleSignIn.initialize` must run exactly once before any other call
   /// on the instance, hence the guard flag.
-  ///
-  /// iOS note: once the iOS platform folder exists, it will additionally
-  /// need a `GIDClientID` entry + URL scheme registered in Info.plist.
-  Future<void> signInWithGoogle() async {
-    if (_googleServerClientId.isEmpty) {
-      // No Google Cloud OAuth client has been registered yet — fail fast
-      // with a clear cause instead of letting the native SDK throw an
-      // opaque platform error. See the class doc and README's Auth section.
-      throw StateError('Google Sign-In is not configured yet.');
-    }
-    if (!_googleSignInInitialized) {
-      await GoogleSignIn.instance.initialize(serverClientId: _googleServerClientId);
-      _googleSignInInitialized = true;
-    }
-    final account = await GoogleSignIn.instance.authenticate();
-    final idToken = account.authentication.idToken;
-    if (idToken == null) {
-      throw const AuthException('Google did not return an ID token.');
-    }
-    await _client.auth.signInWithIdToken(
-      provider: OAuthProvider.google,
-      idToken: idToken,
+  Future<void> _ensureGoogleInitialized() async {
+    if (_googleSignInInitialized) return;
+    await GoogleSignIn.instance.initialize(
+      serverClientId: GoogleAuthConfig.serverClientId,
+      // Android identifies the app by package name + signing SHA-1 rather
+      // than a client ID, so this is iOS-only. Passing an empty string
+      // would be treated as a real (invalid) client ID, hence the null.
+      clientId: Platform.isIOS && GoogleAuthConfig.iosClientId.isNotEmpty
+          ? GoogleAuthConfig.iosClientId
+          : null,
     );
+    _googleSignInInitialized = true;
   }
 
-  Future<void> signOut() => _client.auth.signOut();
+  /// Runs the native account picker and exchanges the resulting ID token
+  /// for a Supabase session. Throws [GoogleSignInFailure] on every failure
+  /// path, with a message already fit to show the user.
+  Future<void> signInWithGoogle() async {
+    if (!GoogleAuthConfig.isConfigured) {
+      throw const GoogleSignInFailure(
+        "Sign-in isn't configured in this build. See the Auth section of the README.",
+      );
+    }
+    try {
+      await _ensureGoogleInitialized();
+      final account = await GoogleSignIn.instance.authenticate();
+      final idToken = account.authentication.idToken;
+      if (idToken == null) {
+        // Practically always a console misconfiguration rather than a
+        // transient fault: the native SDK only omits the ID token when the
+        // serverClientId it was given isn't a valid Web client for this
+        // project.
+        throw const GoogleSignInFailure(
+          "Google didn't return a sign-in token. The app's Google configuration looks incomplete.",
+        );
+      }
+      await _client.auth.signInWithIdToken(
+        provider: OAuthProvider.google,
+        idToken: idToken,
+      );
+    } on GoogleSignInFailure {
+      rethrow;
+    } on GoogleSignInException catch (e) {
+      throw GoogleSignInFailure(_describe(e), isCancellation: e.code == GoogleSignInExceptionCode.canceled);
+    } on AuthException catch (e) {
+      // The token was fine but Supabase rejected it. Overwhelmingly this is
+      // the Android OAuth client ID missing from the provider's authorized
+      // client list, which surfaces as an audience/issuer complaint.
+      throw GoogleSignInFailure(
+        'Google signed you in, but this app could not complete sign-in. (${e.message})',
+      );
+    } catch (e) {
+      throw GoogleSignInFailure('Could not sign in with Google. Check your connection and try again. ($e)');
+    }
+  }
+
+  /// Maps the native SDK's failure codes onto messages that say something
+  /// actionable. The configuration cases are called out separately because
+  /// they're permanent — retrying, which is what a generic "try again"
+  /// message invites, can never fix them.
+  static String _describe(GoogleSignInException e) {
+    switch (e.code) {
+      case GoogleSignInExceptionCode.canceled:
+        return 'Sign-in cancelled.';
+      case GoogleSignInExceptionCode.interrupted:
+      case GoogleSignInExceptionCode.uiUnavailable:
+        return 'Sign-in was interrupted. Please try again.';
+      case GoogleSignInExceptionCode.clientConfigurationError:
+      case GoogleSignInExceptionCode.providerConfigurationError:
+        return "This app's Google sign-in setup is incomplete — it needs the release signing "
+            'certificate registered in Google Cloud Console. (${e.description ?? e.code.name})';
+      case GoogleSignInExceptionCode.userMismatch:
+      case GoogleSignInExceptionCode.unknownError:
+        return 'Could not sign in with Google. (${e.description ?? e.code.name})';
+    }
+  }
+
+  /// Clears the Supabase session *and* the cached Google account, so the
+  /// next sign-in shows the account picker rather than silently reusing
+  /// whoever signed in last — otherwise "sign out" looks broken to anyone
+  /// switching accounts.
+  Future<void> signOut() async {
+    if (_googleSignInInitialized) {
+      try {
+        await GoogleSignIn.instance.signOut();
+      } catch (_) {
+        // Best-effort: never let the Google SDK block the Supabase sign-out
+        // below, which is the part that actually ends the session.
+      }
+    }
+    await _client.auth.signOut();
+  }
 }

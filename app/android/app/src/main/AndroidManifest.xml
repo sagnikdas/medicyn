@@ -40,13 +40,9 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
-            <!-- Supabase magic-link callback: dosely://login-callback -->
-            <intent-filter android:autoVerify="false">
-                <action android:name="android.intent.action.VIEW"/>
-                <category android:name="android.intent.category.DEFAULT"/>
-                <category android:name="android.intent.category.BROWSABLE"/>
-                <data android:scheme="dosely" android:host="login-callback"/>
-            </intent-filter>
+            <!-- No auth deep-link filter here on purpose: Google sign-in is
+                 native (ID token exchanged in-process), so nothing ever
+                 redirects back into the app. -->
         </activity>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->

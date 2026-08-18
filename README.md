@@ -37,7 +37,7 @@ dosely/
         review_edit/    AI-structured, user-editable confirmation screen
         notification_engine/  exact-alarm scheduling, action handling
         reminders_home/ the main list
-        auth/           email magic-link sign-in
+        auth/           Google Sign-In
         settings/
   supabase/
     migrations/         schema (medicines, schedules, dose_logs) + RLS
@@ -70,6 +70,11 @@ cd ~/research/dosely/app
 flutter pub get
 ```
 
+**3. Register Google Sign-In.** Required — it's the only way into the app,
+so nothing past the sign-in screen is reachable until it's done. It's a
+browser-only job across the Google Cloud and Supabase consoles; the full
+walkthrough is under [Auth](#auth) below.
+
 ## Running it
 
 ```
@@ -84,60 +89,234 @@ reminder, and for camera/microphone permission when you use those steps.
 
 ## Auth
 
-Ships with **email magic-link** sign-in (fully working, no setup beyond the
-above) as the primary method. **Google Sign-In is implemented as a second,
-faster option** — `AuthService.signInWithGoogle()` in
-`lib/features/auth/auth_service.dart` drives the native `google_sign_in`
-flow and exchanges the resulting ID token for a Supabase session via
-`GoTrueClient.signInWithIdToken`, and `sign_in_screen.dart` shows a
-"Continue with Google" button above the email field. It isn't usable yet,
-though — no Google Cloud OAuth client has been registered for this app,
-which is a manual one-time step in Google Cloud Console I can't do from
-here. Until that's done, tapping the button fails fast and shows "Google
-Sign-In isn't set up yet — please use email instead"; email + code is
-unaffected and remains fully working. To enable Google Sign-In for real:
+**Google Sign-In is the only sign-in method.** The previous email
+one-time-code flow, its custom Resend SMTP sender, its email templates, and
+the `dosely://login-callback` deep link have all been removed.
 
-1. Google Cloud Console → your project → Credentials → Create OAuth client
-   ID → Android, using `com.sagnikdas.dosely` and your signing key's SHA-1.
-2. Create a second OAuth client ID → Web application (no redirect URIs
-   needed) — this is the `serverClientId` `google_sign_in` needs.
-3. Supabase Dashboard → Authentication → Providers → Google → paste that
-   Web client's ID and secret, enable the provider.
-4. Paste that Web client's ID into `_googleServerClientId` in
-   `auth_service.dart` (currently left blank on purpose, which is what
-   makes the button fail fast instead of hitting an unconfigured SDK).
+The flow is native, not web-based: `AuthService.signInWithGoogle()`
+(`app/lib/features/auth/auth_service.dart`) shows the on-device account
+picker via `google_sign_in`, then exchanges the returned ID token for a
+Supabase session with `GoTrueClient.signInWithIdToken`. No browser opens
+and nothing redirects back into the app.
 
-### Sign-in codes only arrive for one address
+### Enabling it (one-time, manual)
 
-**Symptom:** requesting a code works for the project owner's own email, and
-silently does nothing for everybody else — so no new user can sign in.
+> **Status: done for this project (2026-08-18).** The OAuth clients are
+> registered in Google Cloud project `decent-digit-135023`, the Supabase
+> Google provider is configured, and `serverClientId` in
+> `app/lib/core/google_auth_config.dart` holds the Web client ID. Debug
+> sign-in works end to end. The walkthrough below is kept for setting up a
+> new environment, a release client (see [Before shipping a release
+> build](#before-shipping-a-release-build)), or iOS.
 
-**Cause:** it isn't the app, and it isn't the address. `supabase/config.toml`
-sends auth email through Resend using the shared sandbox sender
-`onboarding@resend.dev`. Until a domain is verified, Resend only delivers to
-the email address the Resend account itself was registered with, and rejects
-every other recipient. Supabase turns that rejection into a generic 500, which
-is why the sign-in screen used to say "try again in a moment" — retrying never
-helps.
+The OAuth registration exists only in two web consoles — Google Cloud and
+Supabase — and can't be done from this repo. Until it is done, the sign-in
+button reports that the build isn't configured.
 
-**Fix** (one-time, needs a domain and DNS access — can't be done from the
-repo):
+Budget about 15 minutes. Steps 1 and 2 are browser work (bar one `keytool`
+command), steps 3 and 4 are local. Do them in order — step 2 and step 3
+both consume IDs that step 1 issues.
 
-1. Resend → Domains → add your domain, and add the TXT/MX records it gives you
-   at your DNS provider. Verification usually completes within minutes.
-2. Change `admin_email` under `[auth.email.smtp]` in `supabase/config.toml`
-   from `onboarding@resend.dev` to a sender on that domain, e.g.
-   `no-reply@yourdomain.com`.
-3. Push the config so the hosted project picks it up:
-   `supabase config push` (with `RESEND_API_KEY` set in the environment).
-4. Verify with an address unrelated to the Resend account — that's the case
-   that currently fails, so testing with the owner's own email proves nothing.
+Values you'll need throughout:
 
-Until step 1 is done, the only address that can receive a code is the Resend
-account owner's. Note that `supabase/config.toml` only reaches the hosted
-project via `supabase config push`; if auth email was last configured by hand
-in the Supabase Dashboard, check there too, since whatever was set there is
-what's actually sending today.
+| Thing | Value |
+|---|---|
+| Android package name | `com.sagnikdas.dosely` |
+| Debug signing SHA-1 | see step 1b |
+| Supabase project ref | `twybepxnqayypzljhcnx` |
+
+#### 1. Google Cloud Console — register the app
+
+**1a. Pick a project and configure the consent screen.** At
+<https://console.cloud.google.com>, select an existing project or create
+one, then go to **Google Auth Platform** (what used to be *APIs & Services
+→ OAuth consent screen*, which now redirects there). Under **Branding**,
+fill in app name, user support email, and developer contact email; under
+**Audience**, set User type **External**. Nothing else on those forms
+matters for this app — no scopes beyond the default profile/email, no
+domain verification.
+
+> **The test-user trap.** A freshly configured consent screen sits in
+> publishing status **Testing**, and in that state *only* Google accounts
+> listed under **Google Auth Platform → Audience → Test users** can sign in
+> — everyone else is refused with "access blocked", which looks exactly
+> like a broken app. Either add your own account there before testing, or
+> press **Publish app** on the same page to open it to anyone. This limit
+> is invisible from the app side; nothing in the error text points at it.
+> If Audience already reads **In production**, there is no test-user list
+> and nothing to do here.
+
+**1b. Get the SHA-1 of the key that signs your build.** For debug builds
+(`flutter run`, `flutter build apk --debug`) that's the shared Android
+debug keystore:
+
+```
+keytool -list -v -keystore ~/.android/debug.keystore \
+  -alias androiddebugkey -storepass android -keypass android
+```
+
+Copy the `SHA1:` line — the colon-separated hex, e.g.
+`40:2D:37:...:76:6B`. Ignore SHA-256, it isn't used here.
+
+**1c. Create the Android OAuth client.** **Credentials → Create
+Credentials → OAuth client ID → Application type: Android.** Enter the
+package name and the SHA-1 from above. Give it a name you'll recognise
+("Dosely Android debug"). Save, and copy the **Android client ID** it
+issues — you'll need it in step 3, and Google won't prominently show it
+again.
+
+**1d. Create the Web OAuth client.** Same menu, **Application type: Web
+application**. Leave both "Authorised JavaScript origins" and "Authorised
+redirect URIs" completely empty — this client never handles a browser
+redirect; it exists purely as the identity Supabase validates tokens
+against. Copy both the **Web client ID** and the **Web client secret**.
+
+> Yes, a phone app needs a *Web* client. The Android client is how Google
+> recognises your specific build; the Web client is what makes Google issue
+> an ID token that a backend is able to verify. Supabase is that backend.
+> Using the Android client ID where the Web one is asked for (or vice
+> versa) is the single most common way this setup fails.
+
+You should now have three values: an Android client ID, a Web client ID,
+and a Web client secret.
+
+#### 2. Supabase Dashboard — enable the provider
+
+Open
+<https://supabase.com/dashboard/project/twybepxnqayypzljhcnx/auth/providers>
+→ **Google** → **Enable Sign in with Google**, and fill in exactly this:
+
+| Field | Value |
+|---|---|
+| Client IDs | the **Web** client ID *and* the **Android** client ID |
+| Client Secret (for OAuth) | the **Web** client secret |
+
+**Client IDs is a single comma-separated list**, not one ID — Web first,
+Android second, no spaces:
+
+```
+<web-client-id>,<android-client-id>
+```
+
+(Older dashboards split this into a `Client ID` field plus a separate
+`Authorized Client IDs` field. Same thing: the Web ID went in the first,
+the Android ID in the second.)
+
+Listing the Android ID is the part that gets skipped, and skipping it fails
+every sign-in with an audience complaint. The reason: a token minted by the
+native SDK on the phone is stamped with the *Android* client as its
+audience, not the Web one, and Supabase rejects any audience it wasn't told
+to expect. Append further IDs to the same list as you add release and iOS
+clients later.
+
+Leave **Skip nonce checks** and **Allow users without an email** off, and
+ignore **Callback URL** — that belongs to the browser OAuth flow, which
+this app never uses.
+
+While you're in the dashboard, finish removing the old email sign-in from
+the *server* side — the repo changes below don't do it on their own:
+
+- **Authentication → Sign In / Providers → Email**: turn off.
+- **Project Settings → Authentication → SMTP Settings**: clear the custom
+  Resend sender if it's still there, and revoke that API key in Resend
+  while you're at it.
+
+> **You do not need `supabase config push`.** Doing the above by hand
+> achieves the same result with no risk. The `[auth.external.google]` block
+> in `supabase/config.toml` exists so the repo describes reality and so a
+> local `supabase start` stack works; pushing it is optional and, if
+> pushed *before* Google is verified working, it disables email sign-in
+> server-side and can leave you unable to sign in at all. Confirm sign-in
+> works first, then push if you want the config tracked. Should you push:
+>
+> ```
+> export SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID="<web-id>,<android-id>"
+> export SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET="<web-client-secret>"
+> supabase config push
+> ```
+
+#### 3. Give the app the Web client ID
+
+Already done for this project — `serverClientId` in
+`app/lib/core/google_auth_config.dart` holds the Web client ID. Repeat this
+only for a new project or a different Google client.
+
+Two equivalent options. Permanent, and what you probably want:
+
+```
+# app/lib/core/google_auth_config.dart — put it in serverClientId's defaultValue
+static const serverClientId = String.fromEnvironment(
+  'GOOGLE_SERVER_CLIENT_ID',
+  defaultValue: '123456789-abcdef.apps.googleusercontent.com',
+);
+```
+
+Or per-build, leaving the source untouched:
+
+```
+flutter run --dart-define=GOOGLE_SERVER_CLIENT_ID=<web-client-id>
+```
+
+Committing the client ID is fine: OAuth client IDs are public by design and
+ship inside every APK regardless. The client **secret** is the sensitive
+half, and it belongs only in the Supabase dashboard from step 2 — it must
+never appear in this repo or in the app.
+
+#### 4. Test it
+
+```
+cd ~/research/dosely/app
+flutter run
+```
+
+Tap **Continue with Google**. Success lands you on the reminders list; the
+signed-in Google address then shows at the top of Settings.
+
+### Before shipping a release build
+
+A release APK is signed by a different key than debug, so Google won't
+recognise it and sign-in fails on exactly the build you hand to other
+people. Two extra pieces:
+
+1. Generate a release keystore and an `app/android/key.properties` (neither
+   exists in this repo yet — until they do, `flutter build apk --release`
+   falls back to debug signing). Copy `app/android/key.properties.example`
+   and follow "Release signing" in `app/README.md`.
+2. Register a **second Android OAuth client** with that keystore's SHA-1,
+   and append its client ID to Supabase's *Client IDs* list alongside the
+   debug one. If you distribute through Play, use the SHA-1 from
+   **Play Console → Release → Setup → App signing** instead, since Google
+   re-signs your upload.
+
+Also remember to **Publish app** on the consent screen (step 1a) — the test
+user allow-list applies to release builds just as much as debug ones.
+
+### iOS
+
+Not set up. It needs its own **iOS** OAuth client (bundle ID, no SHA-1),
+plus a `GIDClientID` key and a reversed-client-ID URL scheme in
+`ios/Runner/Info.plist` — the exact keys and format are written out in a
+comment in that file. The `GOOGLE_IOS_CLIENT_ID` define in
+`google_auth_config.dart` covers `GIDClientID`, but the URL scheme has to
+live in the plist. Android is unaffected by any of this.
+
+### If sign-in fails
+
+The sign-in screen reports the three real causes distinctly, so read the
+message before changing anything — retrying is only ever useful for the
+third:
+
+| What you see | What it means |
+|---|---|
+| Nothing — the screen just returns | You dismissed the account picker. Not an error. |
+| "access blocked" / "app not verified" from Google itself | Consent screen is in Testing and your account isn't a test user (step 1a). |
+| A message naming the **audience** or "could not complete sign-in" | The Android client ID is missing from Supabase's Client IDs list (step 2). |
+| A message naming the **signing certificate** | SHA-1 mismatch — wrong keystore registered, or a release build against a debug-only client (step 1c). |
+| "Sign-in isn't configured in this build" | `serverClientId` is still empty (step 3). |
+| "Check your connection and try again" | Genuinely transient. Retry. |
+
+None of the configuration cases resolve by retrying, and none of them mean
+the account or the code is wrong.
 
 ## Reliability notes
 

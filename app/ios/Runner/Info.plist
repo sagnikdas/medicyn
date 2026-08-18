@@ -26,6 +26,28 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<!-- Google Sign-In on iOS additionally needs the two entries below, which
+	     are left out until an iOS OAuth client exists in Google Cloud Console
+	     (Android is unaffected and works without them). Real values, not
+	     placeholders, or the native SDK fails at launch:
+
+	     <key>GIDClientID</key>
+	     <string>NNN-xxxx.apps.googleusercontent.com</string>
+	     <key>CFBundleURLTypes</key>
+	     <array>
+	       <dict>
+	         <key>CFBundleURLSchemes</key>
+	         <array>
+	           <string>com.googleusercontent.apps.NNN-xxxx</string>
+	         </array>
+	       </dict>
+	     </array>
+
+	     The scheme is the client ID reversed. Alternatively pass the same ID
+	     as --dart-define=GOOGLE_IOS_CLIENT_ID=... (see GoogleAuthConfig),
+	     which covers GIDClientID but NOT the URL scheme — that one has to
+	     live here. -->
+
 	<key>NSCameraUsageDescription</key>
 	<string>Dosely uses the camera to photograph your medicine label so it can read the drug name and strength. The photo stays on your device and is discarded right after it's read.</string>
 	<key>NSMicrophoneUsageDescription</key>

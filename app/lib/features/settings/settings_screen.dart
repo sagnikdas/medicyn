@@ -59,9 +59,9 @@ class SettingsScreen extends StatelessWidget {
   }
 
   /// Signing out is a one-tap action sitting at the end of a screen people
-  /// scroll through for the text size control, and getting back in means
-  /// waiting on an emailed code — enough friction that a mis-tap is worth
-  /// a confirm step.
+  /// scroll through for the text size control, and getting back in means a
+  /// round-trip through Google's account picker — enough friction that a
+  /// mis-tap is worth a confirm step.
   Future<void> _confirmSignOut(BuildContext context) async {
     // Captured before the await so the dialog's result doesn't have to be
     // paired with a `context.mounted` check afterwards.
@@ -71,7 +71,7 @@ class SettingsScreen extends StatelessWidget {
       builder: (dialogContext) => AlertDialog(
         title: const Text('Sign out?'),
         content: const Text(
-          "You'll need a new sign-in code emailed to you to get back in. "
+          "You'll need to sign in with Google again to get back in. "
           'Your reminders stay on this device either way.',
         ),
         actions: [
