@@ -24,11 +24,12 @@ if (googleServicesFile.exists()) {
     )
 }
 
-// Release signing is optional and machine-local: `key.properties` is
-// git-ignored (see .gitignore) and absent by default, so a fresh checkout
-// still builds. When present, it points at a keystore for release signing;
-// see README.md for how to generate one. When absent, the release build
-// type falls back to debug signing further down.
+// Release signing is machine-local: `key.properties` is git-ignored (see
+// .gitignore) and absent by default. When present, it points at a keystore
+// for release signing; see README.md for how to generate one. Debug and
+// profile keep the default debug keystore so a fresh checkout still runs.
+// A release build without this file fails rather than shipping an APK
+// signed with the world-shared debug key.
 val keystorePropertiesFile = rootProject.file("key.properties")
 val keystoreProperties = Properties()
 val hasKeystoreProperties = keystorePropertiesFile.exists()
@@ -75,16 +76,25 @@ android {
 
     buildTypes {
         release {
-            // Uses the real release keystore when app/android/key.properties
-            // exists (see README.md to generate one); otherwise falls back to
-            // debug signing so `flutter build apk`/`flutter run --release`
-            // keep working out of the box on a fresh checkout.
-            signingConfig =
-                if (hasKeystoreProperties) {
-                    signingConfigs.getByName("release")
-                } else {
-                    signingConfigs.getByName("debug")
+            // Requires app/android/key.properties (see README.md). AGP
+            // still evaluates this block when assembling debug, so we only
+            // throw if a Release task was actually requested; otherwise
+            // debug/profile keep the default debug signing.
+            if (!hasKeystoreProperties) {
+                val assemblingRelease =
+                    gradle.startParameter.taskNames.any { it.contains("Release") }
+                if (assemblingRelease) {
+                    throw GradleException(
+                        "Missing app/android/key.properties: a release " +
+                            "build refuses to sign with the debug keystore. " +
+                            "Copy app/android/key.properties.example to " +
+                            "app/android/key.properties and fill in the " +
+                            "upload keystore values. See app/README.md.",
+                    )
                 }
+            } else {
+                signingConfig = signingConfigs.getByName("release")
+            }
             // Minify only in release so the Kotlin/Java surface is not shipped
             // readable. Debug and profile stay unminified so iteration and
             // attached-device debugging stay fast.
