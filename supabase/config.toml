@@ -417,3 +417,13 @@ entrypoint = "./functions/parse-medicine/index.ts"
 # Specifies static files to be bundled with the function. Supports glob patterns.
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/parse-medicine/*.html" ]
+
+# Pushes to the other side of a care link — the missed-dose alert to the
+# caregiver, and the silent re-arm message to the parent. `verify_jwt` is
+# belt-and-braces: the function validates the caller against the auth server
+# itself, because its whole job is to ring a specific other person's phone.
+[functions.notify-care]
+enabled = true
+verify_jwt = true
+import_map = "./functions/notify-care/deno.json"
+entrypoint = "./functions/notify-care/index.ts"

@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../local/database.dart';
+import '../local/tables.dart';
 
 /// Syncs local-first Drift rows with Supabase. Never in the reminder-firing
 /// path — the device's own alarms are always the source of truth for *when*
@@ -19,6 +20,8 @@ class SyncService {
   Future<void> syncAll() async {
     final user = _client.auth.currentUser;
     if (user == null) return;
+    _pushedEdits = false;
+    _pushedMissedDoseIds = const [];
     await _syncMedicines(user.id);
     await _syncSchedules(user.id);
     await _syncDoseLogs(user.id);
@@ -62,6 +65,37 @@ class SyncService {
   /// armed alarms no longer match the database and it should reconcile.
   bool _schedulesChanged = false;
   bool get schedulesChanged => _schedulesChanged;
+
+  /// Set when [syncAll] pushed a medicine or schedule edit — i.e. a change to
+  /// *what* is meant to fire, as opposed to a record of what happened. The
+  /// caller uses it to decide whether the other side of a care link needs the
+  /// silent re-arm push; see CareNotifier.dataChanged.
+  bool _pushedEdits = false;
+  bool get pushedEdits => _pushedEdits;
+
+  /// Ids of the missed-dose logs [syncAll] just pushed. These, and only these,
+  /// are what the caregiver's alert is raised about.
+  ///
+  /// Reported rather than announced from inside this class on purpose: sync is
+  /// documented as never being in the reminder-firing path, and giving it a
+  /// second responsibility — deciding who to tell — would make that harder to
+  /// keep true.
+  List<String> _pushedMissedDoseIds = const [];
+  List<String> get pushedMissedDoseIds => _pushedMissedDoseIds;
+
+  /// The ids in [logs] that a caregiver should hear about: the missed ones, and
+  /// nothing else.
+  ///
+  /// Its own function because the mistake it prevents is not a crash. A `taken`
+  /// or `snoozed` log slipping through would ring someone's phone in another
+  /// city to tell them their mother *did* take her tablet, at whatever hour she
+  /// took it — the fastest way to teach a family to mute the app that is
+  /// supposed to be watching.
+  @visibleForTesting
+  static List<String> missedDoseIdsIn(List<DoseLog> logs) => [
+        for (final log in logs)
+          if (log.action == DoseAction.missed.name) log.id,
+      ];
 
   /// Missing means the row predates versioning on a server that has since
   /// been migrated — treat it as the beginning of time so any local copy
@@ -111,6 +145,7 @@ class SyncService {
             'updated_by': m.updatedBy,
           },
       ]).timeout(_networkTimeout);
+      _pushedEdits = true;
       for (final m in rows) {
         await _db.markMedicineSynced(m.id);
       }
@@ -139,6 +174,7 @@ class SyncService {
             'updated_by': s.updatedBy,
           },
       ]).timeout(_networkTimeout);
+      _pushedEdits = true;
       for (final s in rows) {
         await _db.markScheduleSynced(s.id);
       }
@@ -163,6 +199,10 @@ class SyncService {
             'source': log.source,
           },
       ]).timeout(_networkTimeout);
+      // Only what landed on this call. A dose already marked synced was
+      // announced (or de-duplicated away) on whichever earlier call pushed it,
+      // so re-listing it here would be the app asking to be told to shut up.
+      _pushedMissedDoseIds = missedDoseIdsIn(rows);
       for (final log in rows) {
         await _db.markDoseLogSynced(log.id);
       }

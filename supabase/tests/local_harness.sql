@@ -8,7 +8,17 @@
 --     -f supabase/migrations/20260812122500_schedule_interval_hours.sql \
 --     -f supabase/migrations/20260818143000_row_versioning.sql \
 --     -f supabase/migrations/20260818161500_care_links.sql \
+--     -f supabase/migrations/20260819110000_push_notifications.sql \
 --     -f supabase/tests/care_links_rls_test.sql
+--
+-- and the push tables' own assertions, which need a fresh database because
+-- both tests set up the same three users:
+--
+--   dropdb --if-exists dosely_rls_test && createdb dosely_rls_test
+--   psql -d dosely_rls_test -v ON_ERROR_STOP=1 \
+--     -f supabase/tests/local_harness.sql \
+--     -f supabase/migrations/*.sql (in the order above) \
+--     -f supabase/tests/push_rls_test.sql
 --
 -- This stubs the parts of the platform the policies depend on. It is a
 -- convenience for testing policy *logic*; it is not a claim that the local

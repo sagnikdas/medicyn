@@ -38,10 +38,14 @@ dosely/
         notification_engine/  exact-alarm scheduling, action handling
         reminders_home/ the main list
         auth/           Google Sign-In
+        push/           FCM registration + inbound message handling
+        care/           care links, and a linked person's dose feed
         settings/
   supabase/
     migrations/         schema (medicines, schedules, dose_logs) + RLS
     functions/parse-medicine/   edge function that calls Claude
+    functions/notify-care/      edge function that sends FCM pushes
+    tests/              adversarial SQL assertions against the RLS policies
 ```
 
 Backend: Supabase project `dosely` (ref `twybepxnqayypzljhcnx`, org
@@ -74,6 +78,11 @@ flutter pub get
 so nothing past the sign-in screen is reachable until it's done. It's a
 browser-only job across the Google Cloud and Supabase consoles; the full
 walkthrough is under [Auth](#auth) below.
+
+**4. Set up push.** Optional for a single user, required for a care link to
+be worth anything — see [Push](#push). Without it the app builds, runs, and
+fires local alarms exactly as before; only the alerts between two phones are
+missing.
 
 ## Running it
 
@@ -382,6 +391,124 @@ third:
 None of the configuration cases resolve by retrying, and none of them mean
 the account or the code is wrong.
 
+## Push
+
+Two notifications travel between a linked pair, and they are not variants of
+one thing:
+
+| Direction | What it is | Why it exists |
+|---|---|---|
+| Parent → caregiver | **Visible** alert: "Amma missed a dose" | The alert the care link is for. Arrives while someone can still act on it. |
+| Caregiver → parent | **Silent** data message | Wakes the parent's app to pull and re-arm its alarms after the caregiver changed a schedule. |
+
+The silent direction is the one that's easy to forget and expensive to omit:
+without it, a schedule the caregiver changed doesn't reach the parent's alarms
+until they next open the app — which could be a week — while the caregiver
+believes the change is live.
+
+Both go through the `notify-care` edge function. The **device** calls it
+rather than a Postgres trigger firing on the insert: a trigger needs `pg_net`
+(which Supabase keeps in the `extensions` schema that every security-definer
+function here deliberately excludes from its `search_path`) plus a service key
+stored in the database, and it would catch nothing extra — missed doses are
+only ever produced by the parent's own device.
+
+### Enabling push (one-time, manual)
+
+Like Google Sign-In, this is mostly a browser job. Until it's done, the app
+builds and runs with push disabled — `PushService` reports Firebase as
+unconfigured and every local alarm keeps working.
+
+**1. Create a Firebase project** at https://console.firebase.google.com. Use
+the **same Google Cloud project** the OAuth clients live in ("Add Firebase to
+an existing Google Cloud project"), so there's one project to reason about
+rather than two.
+
+**2. Register the Android app** in it with package name
+`com.sagnikdas.dosely`, download `google-services.json`, and put it at:
+
+```
+app/android/app/google-services.json
+```
+
+That path is git-ignored on purpose. The file isn't secret — every installed
+APK contains it — but it names one specific Firebase project, and a checkout
+picking up someone else's would register its devices in the wrong one. The
+Gradle build applies the `google-services` plugin only when the file is
+present, so a fresh checkout without it still builds.
+
+**3. Give the edge function a service account.** FCM's HTTP v1 API is
+authorised by a service-account JWT, not an API key. In the Firebase console:
+**Project settings → Service accounts → Generate new private key**. Then run
+this yourself, so the key never lands in any chat or session log:
+
+```
+cd ~/research/dosely
+supabase secrets set FCM_SERVICE_ACCOUNT="$(cat ~/Downloads/dosely-firebase-adminsdk-xxxxx.json)"
+```
+
+The function reads `project_id`, `client_email` and `private_key` out of it and
+mints its own access tokens. `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`
+are injected by the platform — don't set those.
+
+**4. Apply the migration and deploy the function**, in that order (a function
+that writes to a table the database doesn't have yet fails every call):
+
+```
+supabase db push
+supabase functions deploy notify-care
+```
+
+**5. Reinstall the app.** A build made before `google-services.json` existed
+has no Firebase configuration compiled into it, so `flutter run` again rather
+than hot-reloading.
+
+### Checking it works
+
+Nothing about push is visible in the UI, which is exactly the problem with it.
+Three things to look at, in order:
+
+1. **`device_tokens`** should hold one row per phone that has signed in. Empty
+   means registration is failing — no Play services, no
+   `google-services.json` in the build, or no notification permission.
+2. **`care_alerts`** records every push the server sent. `delivered_count = 0`
+   is the interesting value: the alert was raised and reached nobody, which
+   means the recipient's token is stale or their phone is unreachable.
+3. **The function logs**, in the Supabase dashboard. `push_not_configured`
+   means the service account is missing or malformed; `push_failed` lines
+   carry FCM's own reason per token.
+
+### Stale tokens
+
+An FCM token dies when the app is uninstalled, its data is cleared, or FCM
+simply reissues it. The function deletes a token when — and only when — FCM
+says it's dead: a 404, or a 400 whose body names the token. Everything else
+(429, 500, 503, a timeout) leaves the row alone, because deleting a working
+token silences a family permanently while the app goes on looking healthy.
+That classification is the one destructive decision in the push path, so it
+has its own tests:
+
+```
+deno test --config supabase/functions/notify-care/deno.json \
+  supabase/functions/notify-care/
+```
+
+### A token belongs to a phone, not an account
+
+Sign out of one Google account on a phone and into another, and the FCM token
+doesn't change. So `device_tokens` is keyed by the token itself, and
+registering an existing one **moves** the row to whoever registered it — which
+is what stops a handed-back phone from still receiving the previous person's
+alerts.
+
+Row-level security can't express that: the update arm of an upsert is checked
+against the row being *replaced*, which belongs to whoever signed out, so the
+registration would just fail. Hence `register_device_token`, a
+security-definer function, and no insert/update policy on the table at all —
+the same shape the care-link lifecycle uses. `supabase/tests/push_rls_test.sql`
+asserts it, along with the rule that a device token is never readable by
+anyone but its owner, not even by a confirmed caregiver.
+
 ## Reliability notes
 
 - Notifications are the whole point of this app, so they've been tested
@@ -399,6 +526,11 @@ the account or the code is wrong.
 - Local Drift SQLite is the source of truth for *when* things fire.
   Supabase is backup/sync only — reminders keep working with zero
   connectivity.
+- **Push is never in the firing path either.** A reminder is armed by the
+  device's own exact alarms and fires whether or not FCM, Supabase, or the
+  network exist. Push only carries news *between* two phones: a missed dose to
+  the caregiver, and a schedule change back to the parent. Losing it degrades
+  the care link; it cannot stop a reminder.
 
 ## Test data
 

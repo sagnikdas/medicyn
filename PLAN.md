@@ -5,7 +5,7 @@ something an elderly parent and one adult child in another city use together.
 Updated as work lands; the design rationale behind these choices lives in the
 Care Link spec artifact.
 
-**Last updated:** 2026-08-18 · `main` @ `18dfdf3`
+**Last updated:** 2026-08-19 · `main` @ `da2488d`, plus the Phase 1 push branch
 
 ---
 
@@ -35,50 +35,86 @@ These are settled. Revisit them deliberately, not incidentally.
 - Missed-dose detection, written on the device that owns the reminders
 - A privacy policy draft, and the app name capitalised
 
-**Live on the hosted Supabase project** (`twybepxnqayypzljhcnx`): all four
-migrations applied; Google provider configured with the Web and Android client
-IDs; email sign-in and the custom SMTP sender both disabled.
+**On the Phase 1 branch, not yet merged:** push in both directions —
+`device_tokens` + `care_alerts`, the `notify-care` edge function, FCM
+registration and refresh on the client, and the inbound silent message that
+pulls and re-arms.
 
-**Verification:** `flutter analyze` clean, `flutter test` 52/52, and 16
-adversarial RLS assertions passing against a scratch Postgres. **None of it
-has run on a phone.**
+**Live on the hosted Supabase project** (`twybepxnqayypzljhcnx`): the first four
+migrations applied; Google provider configured with the Web and Android client
+IDs; email sign-in and the custom SMTP sender both disabled. The push migration
+and `notify-care` are **not** deployed yet, and neither is the Firebase project
+they need.
+
+**Verification:** `flutter analyze` clean, `flutter test` 64/64, 34 adversarial
+RLS assertions against a scratch Postgres (16 care-link, 18 push), and 6 Deno
+tests over the stale-token rule. Phase 0's device testing is done — see below.
 
 ---
 
-## Phase 0 — Prove it on real devices
+## Phase 0 — Prove it on real devices — **done**
 
-Nothing new gets built until this passes. Around two thousand lines have
-merged without ever running on hardware, and every later phase compounds that
-risk.
+Passed on two physical phones, 2026-08-19. Around two thousand lines had
+merged without ever running on hardware; all of it behaves as specified.
 
-- [ ] Two Google accounts on two physical phones
-- [ ] Full link: invite → read code aloud → claim → confirm → connected
-- [ ] Feed shows real dose logs, and both sides see the identical screen
-- [ ] Leave a reminder unanswered overnight; confirm it appears as **Missed**
-- [ ] Install the new build **over** an existing one — the on-device schema
+- [x] Two Google accounts on two physical phones
+- [x] Full link: invite → read code aloud → claim → confirm → connected
+- [x] Feed shows real dose logs, and both sides see the identical screen
+- [x] Leave a reminder unanswered overnight; confirm it appears as **Missed**
+- [x] Install the new build **over** an existing one — the on-device schema
       goes v1 → v2 and that migration has never run on real data
-- [ ] Confirm alarms still fire after the `reconcile` change (one blanket
+- [x] Confirm alarms still fire after the `reconcile` change (one blanket
       cancel replaced per-schedule cancels)
 
-Every item here either confirms the last five merges or finds what is wrong
-while it is still cheap to fix.
-
-## Phase 1 — Push
+## Phase 1 — Push — **built, awaiting device verification**
 
 The binding constraint. Three later items are worth little without it, and
 one existing feature is quietly dishonest until it exists.
 
-- [ ] FCM project setup; `google-services.json`
-- [ ] `device_tokens` table, with registration and refresh on the client
-- [ ] **Outbound:** edge function on a missed-dose insert → alert the caregiver
-- [ ] **Inbound:** silent data message to the parent's device on a schedule
+- [ ] FCM project setup; `google-services.json` — **the one item only you can
+      do.** Browser work in the Firebase console plus one `supabase secrets
+      set`; the walkthrough is README → Push → "Enabling push"
+- [x] `device_tokens` table, with registration and refresh on the client
+- [x] **Outbound:** the parent's device calls `notify-care` after pushing a
+      missed dose → the caregiver gets a visible alert
+- [x] **Inbound:** silent data message to the parent's device on a schedule
       change → pull → re-arm alarms
-- [ ] Handle a token that has gone stale (app uninstalled, notifications off)
+- [x] Handle a token that has gone stale (app uninstalled, notifications off)
 
 The inbound direction is the one that is easy to forget. Without it, a
 schedule changed on the caregiver's phone does not reach the parent's alarms
 until they next open the app — which could be a week, while the caregiver
 believes the change is live.
+
+**Two decisions worth recording.** First, the *device* calls the edge function
+rather than a Postgres trigger firing on the insert: a trigger needs `pg_net`,
+which lives in the `extensions` schema every security-definer function here
+deliberately excludes, plus a service key stored in the database — and it would
+catch nothing extra, since missed doses are only ever produced by the parent's
+own device. Second, `device_tokens` is keyed by the FCM token itself, because a
+token belongs to an app *install* and not an account; registering an existing
+one moves the row, which is what stops a handed-back phone receiving the
+previous person's alerts. RLS cannot express that move, so registration goes
+through a security-definer function — the same shape as the link lifecycle.
+
+**Still to verify on hardware**, once Firebase is set up:
+
+- [ ] A missed dose on the parent's phone reaches the caregiver's phone,
+      locked, within a minute or two
+- [ ] The alert lands in the *care* channel, not the alarm channel — it must
+      not loop its sound until dismissed
+- [ ] Tapping it opens the parent's feed, from both a cold start and a
+      backgrounded app
+- [ ] Two devices signed into one account announce a missed dose **once**
+      (`care_alerts` is the de-duplication; check for a single row)
+- [ ] Sign out on one phone, sign in as the other account, confirm the first
+      account's alerts stop arriving there
+- [ ] Uninstall the caregiver's app, raise an alert, confirm the token is
+      pruned rather than retried forever
+
+The inbound direction cannot be verified end-to-end until Phase 2, because
+nothing yet produces a caregiver-side edit to push. The receiving half is
+testable now by inserting a `data_changed` push by hand.
 
 ## Phase 2 — What push makes honest
 
@@ -86,7 +122,11 @@ believes the change is live.
       no screen does it. Needs the review/edit form to write under the
       patient's `user_id`, and attribution — "changed by Priya, Tuesday" — on
       both phones
-- [ ] Notify the other side on a change, using the same silent push
+- [ ] Notify the other side on a change — the silent push already exists
+      (`CareNotifier.dataChanged`, wired into sync and inert until an edit
+      belongs to someone other than the caller). Phase 2 widens the server's
+      rule so the *caregiver* is told about the parent's changes too, which is
+      what attribution needs
 - [ ] Per-medicine change history
 - [ ] **Setup health.** Whether the parent's phone can actually ring:
       notifications allowed, exact alarms permitted, battery exemption
@@ -164,8 +204,22 @@ worth remembering.
   armed would tell a family their parent skipped medication that was never
   asked for. Silence beats a false alarm.
 - **A caregiver's edit does not re-arm the parent's alarms** until they open
-  the app. Phase 1 closes this. Until then, do not tell anyone that remote
-  editing works.
+  the app. The push that fixes this is built (Phase 1) and inert, because no
+  screen produces a caregiver-side edit yet. Still do not tell anyone that
+  remote editing works — Phase 2 is what makes it true.
+- **A missed dose is only noticed while the parent's app runs.** The sweep is
+  device-side, on foreground, so a parent who does not open the app for two
+  days generates no missed doses and therefore no alerts. This is the gap
+  Phase 3's silent-device detection covers, and it is the reason a caregiver
+  should never read "no alerts" as "all is well".
+- **A missed-dose alert is announced by whichever device pushed the log.** If
+  the parent's phone has no network when the sweep runs, the alert waits for
+  the next foreground with connectivity — it is not late by minutes, it is late
+  by however long the phone stays offline.
+- **The parent is told nothing when an alert fires.** Deliberate, and
+  deliberately unresolved: see the open question below. `care_alerts` is
+  readable by both sides, so whatever gets decided is implementable without a
+  migration.
 - **Sibling sharing is impossible** by design — one caregiver per parent.
   Widening from one to many later is a far easier migration than narrowing.
 - **Nobody can be both** a parent and a caregiver, in different pairs.
