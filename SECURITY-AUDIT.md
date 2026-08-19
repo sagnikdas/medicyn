@@ -8,6 +8,8 @@ physical device.
 **Device:** Samsung SM-M336BU (Galaxy M33 5G), Android 15, API 35, security
 patch 2025-05-01, unrooted retail handset, debug build installed
 **Date:** 2026-08-19
+**Status reconciled:** `main` @ `99cf8f4` — see the status table and
+*What has changed since this audit*
 
 ---
 
@@ -32,19 +34,26 @@ silently destroy every medication alarm on their own phone by typing `0` into a
 form field**, and gives a caregiver a remote trigger for the same thing. For a
 medicine reminder app, that is the worst available outcome.
 
+*Of those two places, the scheduling code has since been fixed and the device
+has not.* One conclusion in this report was also wrong in the direction that
+mattered — F-14 originally recorded that `parse-medicine` could not be called
+anonymously, and it could. Both are covered below.
+
 Ordered by severity; ids are stable and not sequential. **Status** is
 maintained after the fact — the findings themselves describe the codebase as
-audited on 2026-08-19 and are not rewritten as they are fixed.
+audited on 2026-08-19 and are not rewritten as they are fixed, so each section
+below still reads as the defect it was. Last reconciled against `main` @
+`99cf8f4`.
 
 | # | Finding | Severity | Safety | Status |
 |---|---|---|---|---|
-| F-1 | `reconcile()` cancels all alarms, then re-arms through non-terminating loops | **Critical** | **Critical** | Fixed — #15 |
-| F-2 | LLM and sync output drive the scheduler with no validation | High | **High** | Fixed — #18 |
+| F-1 | `reconcile()` cancels all alarms, then re-arms through non-terminating loops | **Critical** | **Critical** | **Fixed** — #15, verified on device. One remediation item deliberately not taken; see below |
+| F-2 | LLM and sync output drive the scheduler with no validation | High | **High** | **Fixed** — #18 (client + server), #17 (database) |
 | F-3 | Supabase refresh token in plaintext SharedPreferences | High | — | Open |
 | F-4 | Local medical database unencrypted | High | — | Open |
 | F-5 | `android:allowBackup` unset — F-3 and F-4 leave the device | High | — | Open |
 | F-6 | Care Link confirm prompt cannot name the claimant, and the code is unthrottled | High | — | Open |
-| F-14 | `parse-medicine` answered anyone holding the publishable key | **High** | — | Caller check fixed; quota open |
+| F-14 | `parse-medicine` answered anyone holding the publishable key | **High** | — | **Mostly fixed** — #20 closed the auth hole, verified live. Per-user quota still open |
 | F-7 | Release builds silently fall back to the debug signing key | Medium | — | Open |
 | F-8 | Drug name and strength rendered on the lock screen | Medium | — | Open |
 | F-9 | A caregiver can fabricate adherence history untraceably | Medium | Low | Open |
@@ -53,26 +62,65 @@ audited on 2026-08-19 and are not rewritten as they are fixed.
 | F-11 | R8 disabled in release builds | Low | — | Open |
 | F-12 | Dependency hygiene — an EOL package and a pinned override | Low | — | Open |
 | F-15 | `confirm_care_link` never re-checks `expires_at` | Low | — | Open |
-| F-16 | RLS test coverage gaps that let F-13 and F-15 ship | Info | — | Open |
+| F-16 | RLS test coverage gaps that let F-13 and F-15 ship | Info | — | Partly closed — #20 added the first edge-function authorization test; the RLS gaps remain |
+
+**Two fixed, one mostly fixed, one partly closed, twelve open.** Nothing on the
+device side has been touched: F-3, F-4, F-5 and F-8 are all still exactly as
+found, and F-5 remains the one-line change with the largest effect.
 
 ### What has changed since this audit
 
-- **F-1** fixed in #15: the re-arm loop is bounded and each schedule is
-  isolated, so one unschedulable row can no longer cost the device every
-  other alarm.
-- **F-2** fixed in #18: the model's output, the review form and the sync pull
-  are all validated, and three read paths that threw on an already-stored row
-  are guarded.
-- **A layer this audit did not ask for**, added in #17 and applied to the
-  hosted project: CHECK constraints on `frequency_type`, `times`,
-  `days_of_week` and `interval_hours`. The audit noted the client and the
-  scheduler were unprotected; it did not check whether the *database* would
-  accept a value neither could use. It would, and it no longer does.
-- **F-14 corrected upward** to High, and its caller check fixed. Redeploying
-  for F-2 was what exposed it: a probe of the live endpoint showed the
-  publishable key alone was enough to run a billed model call. The finding as
-  originally written recorded the opposite, reasoned from config rather than
-  tested. Its per-user quota remains open.
+Every merged change, in order.
+
+**#15 — F-1 fixed.** The re-arm loop is bounded and each schedule is isolated in
+its own try/catch, so one unschedulable row can no longer cost the device every
+other alarm. Verified on the same handset with the poisoned row ordered first:
+before, 65.9% CPU with **zero** alarms armed; after, 0.0% and the healthy
+reminder armed.
+
+*Not taken:* remediation item 2, re-arming before cancelling or diffing the
+target id-set. The blanket cancel still runs before anything is re-armed, so a
+process killed mid-`reconcile` still leaves a window with no alarms. Bounded
+loops and per-schedule isolation mean `reconcile` now always completes, which
+makes that window short rather than permanent — but it is not closed.
+
+**#17 — a layer this audit did not ask for.** CHECK constraints on
+`frequency_type`, `times`, `days_of_week` and `interval_hours`, applied to the
+hosted project. The audit established that neither the client nor the scheduler
+validated these fields; it never asked whether *Postgres* would accept a value
+neither could use. It would — the poisoned rows written during F-1 testing were
+all accepted — and it no longer does. This matters most for the caregiver write
+path, which reaches the database directly.
+
+A second migration in the same PR removes a duplicate CHECK it had just added to
+`dose_logs.action`, on the mistaken belief that column was unconstrained. It was
+constrained in `init.sql` from the first migration; the survey behind it queried
+`schedules` only.
+
+**#18 — F-2 fixed.** The model's output, the review form and the sync pull are
+all validated, `parse-medicine` validates server-side before returning, and three
+read paths that threw on an already-stored row are guarded. Verified on device:
+on #15 alone the app logs `No enum value with that name: "hourly"`; with #18 it
+logs nothing and arms the healthy reminder.
+
+*Process note:* this landed twice. #16 carried the same commit but was based on
+`fix/reconcile-alarm-loss` and merged into that already-merged branch rather than
+`main`, so it never reached `main` — the exact failure `PLAN.md` records under
+*Conventions worth keeping*. #18 is the re-land.
+
+**#19 — this document gained a status column**, and `COMPLIANCE.md` recorded the
+Supabase region as `ap-southeast-1` rather than leaving it an open question.
+
+**#20 — F-14's auth hole fixed, and the finding corrected upward to High.**
+Redeploying for F-2 is what exposed it: a probe of the live endpoint showed the
+publishable key alone was enough to run a billed model call. The finding as
+originally written recorded the opposite. `caller.ts` now resolves the bearer
+token against the auth server before anything billable runs. Verified live —
+publishable key alone returns 401 where it previously returned 200 and a full
+extraction — and the positive path confirmed by a real scan on the device.
+
+**Deployment state.** Both migrations and both edge-function changes are live on
+the hosted project; `parse-medicine` is at version 7 and matches `main`.
 
 Everything else stands as written.
 
@@ -81,6 +129,14 @@ Everything else stands as written.
 ## F-1 — `reconcile()` cancels every alarm, then re-arms through loops that can never terminate
 
 **Severity: Critical · Safety impact: Critical**
+
+> **Status: fixed in #15.** Remediation items 1, 3 and 4 below are done — the
+> per-schedule try/catch, the loop bounds, and (via #18) validation at every
+> boundary. **Item 2 was not taken:** the blanket cancel still precedes the
+> re-arm, so a process killed mid-`reconcile` still leaves a window with no
+> alarms armed. That window is now short rather than permanent, because nothing
+> can make the re-arm hang. Reproduced and re-verified on the handset — see
+> *What has changed since this audit*.
 
 ### The mechanism
 
@@ -177,6 +233,12 @@ casts and stores.
 ## F-2 — The model's output and the sync payload drive the scheduler unvalidated
 
 **Severity: High · Safety impact: High**
+
+> **Status: fixed in #18**, with a third layer added in #17. All three entry
+> points named in the remediation now validate, `parse-medicine` mirrors it
+> server-side, and the database refuses what neither would catch. The
+> invisible-day-chip gap is closed: the review form filters its own state, so a
+> day it cannot draw a chip for can never be held.
 
 `supabase/functions/parse-medicine/index.ts` declares a careful tool schema —
 `times` with `pattern: "^[0-2][0-9]:[0-5][0-9]$"`, `daysOfWeek` bounded 0..6,
@@ -622,11 +684,19 @@ nothing once the app is distributed.
 
 ### Remediation
 
-**Done** — `caller.ts` resolves the bearer token against `/auth/v1/user` before
-anything billable runs, and refuses anything that does not name a real user.
-It fails closed when the auth server is unreachable, since the thing being
+**Done in #20** — `caller.ts` resolves the bearer token against `/auth/v1/user`
+before anything billable runs, and refuses anything that does not name a real
+user. It fails closed when the auth server is unreachable, since the thing being
 protected is a billed call. The pattern is `notify-care`'s: validate the caller,
 do not trust the gateway.
+
+Verified against the deployed function:
+
+```
+no credentials         → 401  (gateway)
+publishable key only   → 401  {"error":"not_authenticated"}   ← was 200 + a billed extraction
+real signed-in user    → parses normally (exercised on the handset)
+```
 
 **Still open:** any account can still call it without limit — the original
 Medium finding, now the residual one. It needs a per-user call ledger keyed on
@@ -716,9 +786,14 @@ cases. What they do **not** cover:
 6. **The one-live-link race.** The partial unique indexes are never tested under
    a double claim.
 7. **Neither edge function has any authorization test.** `fcm_test.ts` exercises
-   FCM plumbing only.
+   FCM plumbing only. — *Partly closed in #20:* `caller_test.ts` covers
+   `parse-medicine`'s caller check, including the case that got through in
+   production. `notify-care`'s authorization branches still have none.
 
 Backfilling 1, 2 and 4 is the cheapest way to stop F-13 and F-15 regressing.
+
+#17 added 19 assertions of its own, but for the database constraints it
+introduced — they do not touch any of the gaps above.
 
 ---
 
@@ -858,18 +933,24 @@ hardcoded credentials, backdoors, debug menus, test accounts or bypass flags in
 
 ## Suggested order of work
 
-1. **F-1** — one try/catch and two loop bounds. Smallest diff, largest safety
-   return, and it closes the only path to a phone with no medication alarms.
-2. **F-2** — validate at all three entry points (LLM, manual, remote pull), and
-   fix the invisible-day-chip gap so the review screen means what its header
-   comment claims.
-3. **F-5** — one line; immediately reduces F-3 and F-4 to physical access only.
-4. **F-3** — secure storage for the session. Refresh-token exposure is the worst
-   confidentiality outcome available here.
-5. **F-6** — restore the property the Care Link design rests on.
-6. **F-13** — one predicate (`and status = 'active'`), clear privacy fix.
-7. **F-7**, then **F-4**, **F-14**, **F-8**, **F-9**, **F-10**, **F-15**.
-8. **F-16** — backfill the revoked-member and stale-claim tests so F-13 and F-15
+~~1. **F-1** — one try/catch and two loop bounds.~~ Done, #15.
+~~2. **F-2** — validate at all three entry points.~~ Done, #18 and #17.
+~~· **F-14** — the auth hole.~~ Done, #20. Its quota remains, below.
+
+What is left, in the order I would still take it:
+
+1. **F-5** — one line; immediately reduces F-3 and F-4 to physical access only.
+   Unchanged as the best ratio of risk removed to effort in the whole report.
+2. **F-3** — secure storage for the session. Refresh-token exposure is the worst
+   confidentiality outcome available here, and unlike F-4 it is not gated on a
+   data migration.
+3. **F-6** — restore the property the Care Link design rests on. The most
+   *interesting* remaining finding: two survivable weaknesses that compose.
+4. **F-13** — one predicate (`and status = 'active'`), clear privacy fix.
+5. **F-7**, then **F-4**, **F-8**, **F-9**, **F-10**, **F-15**.
+6. **F-14's residual** — a per-user quota. Deferred rather than dropped: abuse
+   now requires a Google account, which attaches an identity to it.
+7. **F-16** — backfill the revoked-member and stale-claim tests so F-13 and F-15
    cannot regress.
 
 ## Testing notes and limitations
@@ -885,5 +966,14 @@ hardcoded credentials, backdoors, debug menus, test accounts or bypass flags in
   deliberately not attempted, as it would have destroyed real reminders and real
   health data on a phone in daily use. F-1 is proven by source inspection plus
   the loop simulation above.
-- No traffic was sent to the live hosted Supabase project. The backend review is
-  static.
+- **This was true when written and is no longer:** *"No traffic was sent to the
+  live hosted Supabase project. The backend review is static."* Since then the
+  live project has been probed directly — the `parse-medicine` endpoint before
+  and after #20, the auth endpoints for the F-14 residual, and the database for
+  constraint-violating rows before #17 was applied. Everything below that was
+  established by reading code rather than by exercising it should be read as a
+  hypothesis until probed. Two already failed that test, both understating the
+  risk: F-14's original refutation, and its first residual paragraph.
+- The findings still resting on static review alone are **F-6, F-9, F-10, F-13
+  and F-15** — the backend set. F-3, F-4, F-5 and F-8 were exercised on the
+  handset and are not in doubt.
