@@ -5,6 +5,7 @@
 
 import { verifyCaller } from "./caller.ts";
 import { sanitiseExtraction } from "./extraction.ts";
+import { consumeParseMedicineQuota } from "./quota.ts";
 
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
@@ -87,6 +88,19 @@ Deno.serve(async (req: Request) => {
   });
   if (!caller.ok) {
     return jsonResponse({ success: false, data: null, error: caller.error }, caller.status);
+  }
+
+  // After identity, before anything that costs money. A signed-in Google
+  // account is cheap; an Anthropic call is not. The ledger is the cap: 40
+  // extractions per rolling 24h per verified user. Fail closed if it cannot
+  // be reached — skipping the check is how a DB blip becomes unbounded
+  // billed calls again.
+  const quota = await consumeParseMedicineQuota(caller.userId, {
+    supabaseUrl: SUPABASE_URL,
+    serviceRoleKey: SERVICE_ROLE_KEY,
+  });
+  if (!quota.ok) {
+    return jsonResponse({ success: false, data: null, error: quota.error }, quota.status);
   }
 
   let body: ParseRequest;
