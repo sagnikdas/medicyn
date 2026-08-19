@@ -35,6 +35,10 @@ dependencies:
   permission_handler: ^13.0.1
   sentry_flutter: ^9.26.0
   shared_preferences: ^2.5.5
+  # Direct so the sqlite3mc native-assets hook below applies. drift_flutter
+  # already pulled this in; encryption needs SQLite3MultipleCiphers, not the
+  # default unencrypted SQLite (and not sqlcipher_flutter_libs 0.7.0+eol).
+  sqlite3: ^3.5.1
   speech_to_text: ^7.4.0
   supabase_flutter: ^2.17.1
   timezone: ^0.11.1
@@ -54,6 +58,14 @@ dev_dependencies:
 # Keep the pin until that plugin compiles against this KGP.
 dependency_overrides:
   permission_handler_android: 13.0.1
+
+# Bundle SQLite3MultipleCiphers instead of upstream SQLite so NativeDatabase
+# can PRAGMA key the on-device medical file. See
+# https://drift.simonbinder.eu/platforms/encryption/
+hooks:
+  user_defines:
+    sqlite3:
+      source: sqlite3mc
 
 flutter:
   uses-material-design: true
