@@ -6,7 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/app_navigation.dart';
 import 'core/app_settings.dart';
 import 'core/sentry_config.dart';
-import 'core/supabase_config.dart';
+import 'core/supabase_init.dart';
 import 'core/theme.dart';
 import 'data/local/database.dart';
 import 'features/auth/sign_in_screen.dart';
@@ -30,10 +30,7 @@ void main() async {
     },
     appRunner: () async {
       WidgetsFlutterBinding.ensureInitialized();
-      await Supabase.initialize(
-        url: SupabaseConfig.url,
-        publishableKey: SupabaseConfig.publishableKey,
-      );
+      await initializeSupabase();
       await AppSettings.instance.init();
       // Must happen before checking the launch response below — the plugin
       // has to be initialized first to answer getNotificationAppLaunchDetails.

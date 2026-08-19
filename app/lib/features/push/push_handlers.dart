@@ -3,7 +3,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/widgets.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../core/supabase_config.dart';
+import '../../core/supabase_init.dart';
 import '../../data/local/database.dart';
 import '../../data/remote/sync_service.dart';
 import '../care/dose_feed_screen.dart';
@@ -29,10 +29,7 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   WidgetsFlutterBinding.ensureInitialized();
   try {
     await Firebase.initializeApp();
-    await Supabase.initialize(
-      url: SupabaseConfig.url,
-      publishableKey: SupabaseConfig.publishableKey,
-    );
+    await initializeSupabase();
   } catch (_) {
     // Already initialized (Android sometimes reuses a warm isolate), or
     // genuinely unavailable. Either way the pull below will tell us.
