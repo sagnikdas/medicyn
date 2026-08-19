@@ -12,6 +12,7 @@ import '../../data/local/database.dart';
 import '../../data/local/tables.dart';
 import 'notification_actions.dart';
 import 'notification_ids.dart';
+import 'schedule_validation.dart';
 
 // v4: Bumped again to ensure sound and alarm settings are applied fresh.
 // New channel ID forces a fresh channel with sound enabled for everyone.
@@ -53,6 +54,16 @@ class NotificationService {
   /// Every-X-hours schedules keep this many upcoming doses armed at once.
   static const int _everyXHoursWindowDays = 14;
   static const int _everyXHoursMaxOccurrences = 120;
+
+  /// Seven would do — the eighth step is slack so a schedule whose weekday
+  /// is valid but whose time has already passed today still resolves.
+  static const int _maxWeekdaySearchDays = 8;
+
+  /// A ceiling on the walk that finds the first every-X-hours slot. With an
+  /// interval validated to 1..24 the walk covers at most a day either way, so
+  /// this is unreachable in practice and exists only to make the loop
+  /// provably finite.
+  static const int _everyXHoursMaxSearchSteps = 64;
 
   Future<void> init() async {
     if (_initialized) return;
@@ -169,21 +180,33 @@ class NotificationService {
         ),
       );
 
-  tz.TZDateTime _nextInstanceOfTime(String hhmm, {int? weekday}) {
-    final parts = hhmm.split(':');
-    final hour = int.parse(parts[0]);
-    final minute = int.parse(parts[1]);
+  /// The next occurrence of [time], optionally on a specific [weekday]
+  /// (0 = Sunday, matching the stored convention).
+  ///
+  /// Returns null rather than throwing or spinning when no occurrence can be
+  /// found. [schedulableDays] should already have ruled that out, so a null
+  /// here means something got past it — and the one thing this must never do
+  /// is fail to return, because [reconcile] has already cancelled the
+  /// device's alarms by the time it calls this.
+  tz.TZDateTime? _nextInstanceOfTime(ClockTime time, {int? weekday}) {
     final now = tz.TZDateTime.now(tz.local);
-    var scheduled = tz.TZDateTime(tz.local, now.year, now.month, now.day, hour, minute);
-    
+    var scheduled = tz.TZDateTime(tz.local, now.year, now.month, now.day, time.hour, time.minute);
+
     if (weekday != null) {
       final targetDartWeekday = weekday == 0 ? 7 : weekday;
-      while (scheduled.weekday != targetDartWeekday || !scheduled.isAfter(now)) {
+      // A matching weekday is always within seven steps, so this bound is
+      // never reached for a value in 0..6. It is here so that one that is
+      // not — `9`, say, which no `DateTime.weekday` equals — costs this
+      // schedule and nothing else.
+      for (var i = 0; i <= _maxWeekdaySearchDays; i++) {
+        if (scheduled.weekday == targetDartWeekday && scheduled.isAfter(now)) {
+          return scheduled;
+        }
         scheduled = scheduled.add(const Duration(days: 1));
       }
-      return scheduled;
+      return null;
     }
-    
+
     if (!scheduled.isAfter(now)) {
       scheduled = scheduled.add(const Duration(days: 1));
     }
@@ -210,69 +233,107 @@ class NotificationService {
     await init();
     final schedule = sm.schedule;
     final medicine = sm.medicine;
-    final frequency = FrequencyType.values.byName(schedule.frequencyType);
+
+    // `byName` throws on a string that is not one of the enum's names, and a
+    // `frequencyType` arrives from the same three unvalidated sources as the
+    // fields below. Treat an unrecognised one as unschedulable rather than
+    // letting it abort a caller that has already cancelled the alarms.
+    FrequencyType? frequency;
+    for (final candidate in FrequencyType.values) {
+      if (candidate.name == schedule.frequencyType) {
+        frequency = candidate;
+        break;
+      }
+    }
+    if (frequency == null) {
+      throw UnschedulableSchedule(schedule.id, 'unknown frequencyType "${schedule.frequencyType}"');
+    }
 
     if (!skipCancel) await cancelForSchedule(schedule);
 
     if (!schedule.active || frequency == FrequencyType.asNeeded) return;
 
+    final times = schedulableTimes(schedule.times);
+
     switch (frequency) {
       case FrequencyType.daily:
-        for (final time in schedule.times) {
+        for (final time in times) {
+          final when = _nextInstanceOfTime(time.clock);
+          if (when == null) continue;
           await _plugin.zonedSchedule(
-            id: notificationIdFor(schedule.id, time),
+            id: notificationIdFor(schedule.id, time.label),
             title: _title(medicine),
             body: _body(medicine),
-            scheduledDate: _nextInstanceOfTime(time),
+            scheduledDate: when,
             notificationDetails: _details(),
             androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
             matchDateTimeComponents: DateTimeComponents.time,
-            payload: _payload(schedule.id, time),
+            payload: _payload(schedule.id, time.label),
           );
         }
         break;
 
       case FrequencyType.specificDays:
-        for (final day in schedule.daysOfWeek) {
-          for (final time in schedule.times) {
+        for (final day in schedulableDays(schedule.daysOfWeek)) {
+          for (final time in times) {
+            final when = _nextInstanceOfTime(time.clock, weekday: day);
+            if (when == null) continue;
             await _plugin.zonedSchedule(
-              id: notificationIdFor(schedule.id, '$day-$time'),
+              id: notificationIdFor(schedule.id, '$day-${time.label}'),
               title: _title(medicine),
               body: _body(medicine),
-              scheduledDate: _nextInstanceOfTime(time, weekday: day),
+              scheduledDate: when,
               notificationDetails: _details(),
               androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
               matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
-              payload: _payload(schedule.id, time),
+              payload: _payload(schedule.id, time.label),
             );
           }
         }
         break;
 
       case FrequencyType.everyXHours:
-        final interval = schedule.intervalHours ?? 8;
-        final anchorTime = schedule.times.isNotEmpty ? schedule.times.first : '08:00';
-        
-        // Correct every-X-hours logic: find the first occurrence in the sequence (anchor + N*interval)
-        // that is in the future, instead of just skipping to tomorrow.
-        final parts = anchorTime.split(':');
-        final anchorHour = int.parse(parts[0]);
-        final anchorMinute = int.parse(parts[1]);
+        final interval = schedulableIntervalHours(schedule.intervalHours);
+        if (interval == null) {
+          throw UnschedulableSchedule(
+            schedule.id,
+            'intervalHours ${schedule.intervalHours} is outside 1..24',
+          );
+        }
+
+        // The anchor is the first *parseable* time, not simply the first —
+        // a malformed entry ahead of a good one should not decide the
+        // sequence, and should not fall back to 08:00 while a real time sits
+        // behind it.
+        final anchor = times.isNotEmpty ? times.first : (label: '08:00', clock: (hour: 8, minute: 0));
         final now = tz.TZDateTime.now(tz.local);
-        
-        var next = tz.TZDateTime(tz.local, now.year, now.month, now.day, anchorHour, anchorMinute);
-        
-        // Shift back to start of sequence if needed to cover today's missed slots
-        while (next.isAfter(now)) {
+
+        var next = tz.TZDateTime(
+          tz.local,
+          now.year,
+          now.month,
+          now.day,
+          anchor.clock.hour,
+          anchor.clock.minute,
+        );
+
+        // Walk back to the start of today's sequence so a slot already past
+        // is still covered, then forward to the first one still ahead. Both
+        // walks move by a whole interval, which validation has guaranteed is
+        // at least an hour, so both terminate; the step ceilings are there
+        // for the case where that guarantee is ever weakened.
+        var steps = 0;
+        while (next.isAfter(now) && steps++ < _everyXHoursMaxSearchSteps) {
           final prev = next.subtract(Duration(hours: interval));
           if (prev.isBefore(now)) break;
           next = prev;
         }
-        
-        // Ensure 'next' is actually in the future
-        while (!next.isAfter(now)) {
+
+        steps = 0;
+        while (!next.isAfter(now) && steps++ < _everyXHoursMaxSearchSteps) {
           next = next.add(Duration(hours: interval));
         }
+        if (!next.isAfter(now)) break;
 
         final windowEnd = now.add(Duration(days: _everyXHoursWindowDays));
         var index = 0;
@@ -284,7 +345,7 @@ class NotificationService {
             scheduledDate: next,
             notificationDetails: _details(),
             androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-            payload: _payload(schedule.id, anchorTime),
+            payload: _payload(schedule.id, anchor.label),
           );
           next = next.add(Duration(hours: interval));
           index++;
@@ -392,7 +453,7 @@ class NotificationService {
   /// any other drift between what's armed and what the database says should
   /// be. Runs on every app foreground (see `HomeScreen`'s lifecycle
   /// observer), so the device self-heals without needing a fresh install.
-  Future<void> reconcile(AppDatabase db) async {
+  Future<ReconcileReport> reconcile(AppDatabase db) async {
     await init();
     final active = await db.activeSchedulesOnce();
     // One sweep clears everything: alarms belonging to no active schedule
@@ -400,8 +461,37 @@ class NotificationService {
     // below. Doing both here is what lets the per-schedule calls skip their
     // own cancel pass — see [scheduleForScheduleWithMedicine].
     await _cancelWhere((_) => true);
+
+    // Every schedule gets its own try/catch, because the sweep above has
+    // already happened: without this, the first schedule that cannot be
+    // armed leaves the device with *no* alarms rather than one fewer. That
+    // is the failure this method exists to prevent, so it must not be able
+    // to cause it.
+    final failures = <String, Object>{};
     for (final sm in active) {
-      await scheduleForScheduleWithMedicine(sm, skipCancel: true);
+      try {
+        await scheduleForScheduleWithMedicine(sm, skipCancel: true);
+      } catch (error) {
+        failures[sm.schedule.id] = error;
+      }
     }
+    return ReconcileReport(armed: active.length - failures.length, failures: failures);
   }
+}
+
+/// What [NotificationService.reconcile] managed to arm.
+///
+/// Returned rather than logged so a caller can tell the user that a specific
+/// reminder is not running. Nothing surfaces it yet; the value of returning
+/// it now is that the information stops being thrown away.
+class ReconcileReport {
+  const ReconcileReport({required this.armed, required this.failures});
+
+  /// Schedules whose alarms were armed without error.
+  final int armed;
+
+  /// Schedule id to the error that stopped it, for those that failed.
+  final Map<String, Object> failures;
+
+  bool get allArmed => failures.isEmpty;
 }
