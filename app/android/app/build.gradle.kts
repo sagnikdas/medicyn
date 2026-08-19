@@ -85,6 +85,11 @@ android {
                 } else {
                     signingConfigs.getByName("debug")
                 }
+            // Minify only in release so the Kotlin/Java surface is not shipped
+            // readable. Debug and profile stay unminified so iteration and
+            // attached-device debugging stay fast.
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
