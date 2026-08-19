@@ -38,7 +38,8 @@ These are settled. Revisit them deliberately, not incidentally.
 **On the Phase 1 branch, not yet merged:** push in both directions —
 `device_tokens` + `care_alerts`, the `notify-care` edge function, FCM
 registration and refresh on the client, and the inbound silent message that
-pulls and re-arms.
+pulls and re-arms. Plus the fix for retroactive missed doses (below), which
+push turned from a wrong row into a wrong notification.
 
 **Live on the hosted Supabase project** (`twybepxnqayypzljhcnx`): the first four
 migrations applied; Google provider configured with the Web and Android client
@@ -46,7 +47,7 @@ IDs; email sign-in and the custom SMTP sender both disabled. The push migration
 and `notify-care` are **not** deployed yet, and neither is the Firebase project
 they need.
 
-**Verification:** `flutter analyze` clean, `flutter test` 64/64, 34 adversarial
+**Verification:** `flutter analyze` clean, `flutter test` 73/73, 34 adversarial
 RLS assertions against a scratch Postgres (16 care-link, 18 push), and 6 Deno
 tests over the stale-token rule. Phase 0's device testing is done — see below.
 
@@ -100,7 +101,10 @@ through a security-definer function — the same shape as the link lifecycle.
 **Still to verify on hardware**, once Firebase is set up:
 
 - [ ] A missed dose on the parent's phone reaches the caregiver's phone,
-      locked, within a minute or two
+      locked, within a minute or two. To manufacture one: set a reminder a
+      couple of minutes out on the parent's phone, ignore the alarm, wait past
+      the 30-minute grace, then foreground the app. Backdating a reminder no
+      longer works — that was the retroactive bug, and it is fixed
 - [ ] The alert lands in the *care* channel, not the alarm channel — it must
       not loop its sound until dismissed
 - [ ] Tapping it opens the parent's feed, from both a cold start and a
@@ -197,6 +201,16 @@ Answer these when the phase that needs them arrives, not before.
 Real limitations in what is already merged. None are bugs; all are choices
 worth remembering.
 
+- **A sweep forfeits any backfill from before a schedule was last edited.**
+  `MissedDoseDetector.wasArmed` bounds every occurrence on the schedule's
+  `updatedAt`, because the alarms actually armed on the device always reflect
+  its *current* definition. Without that bound, adding a reminder at nine in
+  the morning reported three days of eight o'clock doses as skipped — nine of
+  the eleven missed doses in the live database were fabricated that way, and
+  since push landed each one would have been a notification on a family
+  member's phone. The residual cost is that editing a reminder loses any
+  not-yet-recorded backfill before the edit; sweeps run on every foreground, so
+  in practice almost nothing is lost, and silence beats a false alarm.
 - **Every-X-hours doses are never reported as missed.** The alarm scheduler
   re-anchors that sequence to today's anchor time on every run, so for an
   interval that does not divide 24, the slots armed yesterday are not the ones

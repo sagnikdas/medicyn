@@ -17,6 +17,9 @@ import 'expected_doses.dart';
 /// they were due. Detecting this server-side would mean a second
 /// implementation of the recurrence rules, in another language, free to
 /// drift out of agreement with the first about a medication schedule.
+///
+/// Only occurrences that were actually armed are judged — see [wasArmed]. A
+/// reminder cannot be missed before it existed.
 class MissedDoseDetector {
   const MissedDoseDetector();
 
@@ -34,6 +37,37 @@ class MissedDoseDetector {
   /// Ceiling on one sweep, so a pathological schedule can't spend minutes
   /// writing rows on a foreground.
   static const _maxPerSweep = 200;
+
+  /// Whether an occurrence at [due] was ever actually armed as an alarm, given
+  /// a schedule last defined at [definedAt] ([Schedules.updatedAt]).
+  ///
+  /// This is the guard against inventing history. [expectedDoses] answers "when
+  /// would this schedule have fired", with no idea when the schedule started
+  /// existing — so without this, saving a reminder for 08:00 at nine in the
+  /// morning immediately reports three days of 08:00 doses as skipped, for a
+  /// reminder nobody had yet been asked to take. That is not a stale row in a
+  /// list; since push landed it is a notification on a family member's phone
+  /// telling them their mother stopped taking her medication.
+  ///
+  /// It bounds on `updatedAt` rather than `createdAt`, which is the stronger
+  /// claim of the two. `createdAt` would fix the case above and still leave its
+  /// twin: edit a reminder from 08:00 to 09:00 and the previous days get judged
+  /// at 09:00, a time no alarm was ever set for. The alarms actually armed on
+  /// the device always reflect the schedule's *current* definition — `reconcile`
+  /// re-arms them from scratch on every foreground — so the last time that
+  /// definition changed is the honest earliest point we can speak about.
+  ///
+  /// The cost is that an edit forfeits any not-yet-recorded backfill before it.
+  /// That is a small and bounded loss: sweeps run on every foreground, so past
+  /// occurrences have usually been judged already, and anything recorded stays
+  /// recorded. It also sits the right way round with this file's rule that
+  /// silence beats a false alarm.
+  ///
+  /// Strictly after, mirroring `_nextInstanceOfTime`'s own `isAfter(now)`: a
+  /// dose due at the very instant a schedule was saved is not armed for today,
+  /// it is armed for tomorrow.
+  static bool wasArmed(DateTime due, {required DateTime definedAt}) =>
+      due.isAfter(definedAt);
 
   /// Writes a missed log for every dose due in the lookback window that
   /// nothing answered. Returns how many were recorded.
@@ -72,6 +106,9 @@ class MissedDoseDetector {
       final scheduleLogs = byScheduleId[schedule.id] ?? const <DoseLog>[];
       for (var i = 0; i < occurrences.length; i++) {
         final due = occurrences[i];
+        // Never happened as far as this device is concerned — the schedule did
+        // not exist yet, or not in this shape. See [wasArmed].
+        if (!wasArmed(due, definedAt: schedule.updatedAt)) continue;
         if (!due.isBefore(windowEnd)) continue; // still within grace
         // A response counts for this dose if it landed between this dose and
         // the next one. Matching on the log's own `scheduledAt` would be
