@@ -31,6 +31,38 @@ void main() {
         deleted: false,
       );
 
+  group('a schedule stored before these fields were validated', () {
+    test('reports nothing rather than aborting the whole sweep', () {
+      // FrequencyType.values.byName threw here. Because expectedDoses runs
+      // over every schedule in one pass, that took down missed-dose
+      // detection for all of them - so a family would be told about none of
+      // their relative's skipped doses, not just this one.
+      final poisoned = Schedule(
+        id: '0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0',
+        medicineId: 'med-1',
+        frequencyType: 'hourly',
+        times: const ['08:00'],
+        daysOfWeek: const [],
+        intervalHours: null,
+        active: true,
+        createdAt: DateTime(2026, 8, 1),
+        updatedAt: DateTime(2026, 8, 1),
+        updatedBy: null,
+        pendingSync: false,
+        deleted: false,
+      );
+
+      expect(
+        () => expectedDoses(poisoned, from: DateTime(2026, 8, 18), to: DateTime(2026, 8, 19)),
+        returnsNormally,
+      );
+      expect(
+        expectedDoses(poisoned, from: DateTime(2026, 8, 18), to: DateTime(2026, 8, 19)),
+        isEmpty,
+      );
+    });
+  });
+
   group('daily', () {
     test('finds one occurrence per day in the window', () {
       final doses = expectedDoses(

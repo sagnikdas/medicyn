@@ -2,6 +2,7 @@ import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../features/notification_engine/schedule_validation.dart';
 import '../local/database.dart';
 
 /// Syncs local-first Drift rows with Supabase. Never in the reminder-firing
@@ -44,6 +45,7 @@ class SyncService {
     final user = _client.auth.currentUser;
     if (user == null) return;
     _schedulesChanged = false;
+    _rejectedScheduleIds.clear();
     // Medicines before schedules before dose logs — each references the
     // one before it (medicine_id, schedule_id), so parents must land first.
     await _pullMedicines(user.id);
@@ -63,6 +65,13 @@ class SyncService {
   /// armed alarms no longer match the database and it should reconcile.
   bool _schedulesChanged = false;
   bool get schedulesChanged => _schedulesChanged;
+
+  /// Schedules the last pull refused to store because they could not be
+  /// armed — see [_pullSchedules]. Exposed rather than logged so a caller can
+  /// eventually tell the user that a reminder someone else edited did not
+  /// take; nothing surfaces it yet.
+  final Set<String> _rejectedScheduleIds = <String>{};
+  Set<String> get rejectedScheduleIds => Set.unmodifiable(_rejectedScheduleIds);
 
   /// Set when [syncAll] pushed a medicine or schedule edit — i.e. a change to
   /// *what* is meant to fire, as opposed to a record of what happened. The
@@ -235,13 +244,37 @@ class SyncService {
         final id = r['id'] as String;
         final remoteStamp = remoteUpdatedAt(r);
         if (!remoteWins(local[id], remoteStamp)) continue;
+
+        // Nothing validates a schedule on its way into Postgres, and row-level
+        // security lets a linked caregiver write this row — so these three
+        // fields arrive here unchecked, from a device this one does not
+        // control. A `daysOfWeek` outside 0..6 or an `intervalHours` of zero
+        // is enough to leave this phone with no medication alarms at all,
+        // silently, on the next reconcile.
+        //
+        // A row that cannot be salvaged is skipped rather than stored: the
+        // local copy stays as it was, which is a working schedule, and the
+        // next pull will try again if the other side corrects it. Losing an
+        // edit is recoverable; losing the alarms is not.
+        final fields = sanitiseScheduleFields(
+          frequencyType: r['frequency_type'] as String?,
+          times: (r['times'] as List?)?.whereType<String>().toList() ?? const [],
+          daysOfWeek: (r['days_of_week'] as List?)?.whereType<num>().map((e) => e.toInt()).toList() ??
+              const [],
+          intervalHours: r['interval_hours'] as int?,
+        );
+        if (fields == null) {
+          _rejectedScheduleIds.add(id);
+          continue;
+        }
+
         winners.add(SchedulesCompanion.insert(
           id: id,
           medicineId: r['medicine_id'] as String,
-          frequencyType: r['frequency_type'] as String,
-          times: (r['times'] as List).map((e) => e as String).toList(),
-          daysOfWeek: Value((r['days_of_week'] as List).map((e) => e as int).toList()),
-          intervalHours: Value(r['interval_hours'] as int?),
+          frequencyType: fields.frequency.name,
+          times: fields.times,
+          daysOfWeek: Value(fields.daysOfWeek),
+          intervalHours: Value(fields.intervalHours),
           active: Value(r['active'] as bool),
           createdAt: Value(DateTime.parse(r['created_at'] as String)),
           updatedAt: Value(remoteStamp),

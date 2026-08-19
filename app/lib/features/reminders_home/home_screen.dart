@@ -11,6 +11,7 @@ import '../capture_ocr/ocr_capture_screen.dart';
 import '../care/care_service.dart';
 import '../notification_engine/missed_doses.dart';
 import '../notification_engine/notification_service.dart';
+import '../notification_engine/schedule_validation.dart';
 import '../push/push_service.dart';
 import '../review_edit/review_edit_screen.dart';
 import '../settings/settings_screen.dart';
@@ -243,13 +244,18 @@ class _ReminderCard extends StatelessWidget {
 
   String _describe() {
     final s = item.schedule;
-    final frequency = FrequencyType.values.byName(s.frequencyType);
+    // A row stored before these fields were validated can still be here, and
+    // this runs for every card in the list — so an unrecognised frequency
+    // would blank the whole screen rather than one row.
+    final frequency = frequencyTypeFromName(s.frequencyType);
+    if (frequency == null) return 'Schedule needs attention';
     switch (frequency) {
       case FrequencyType.daily:
         return 'Daily at ${s.times.join(', ')}';
       case FrequencyType.specificDays:
         const labels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-        final days = s.daysOfWeek.map((d) => labels[d]).join(', ');
+        // Same reason: labels[9] is a RangeError, not a missing label.
+        final days = schedulableDays(s.daysOfWeek).map((d) => labels[d]).join(', ');
         return '$days at ${s.times.join(', ')}';
       case FrequencyType.everyXHours:
         return 'Every ${s.intervalHours ?? '?'} hours';
