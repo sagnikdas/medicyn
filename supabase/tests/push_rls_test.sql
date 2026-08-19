@@ -16,6 +16,8 @@
 --     token belongs to an app *install*: if signing in as a second account on
 --     one phone left the row pointing at the first, that phone would keep
 --     receiving alerts addressed to whoever handed it over.
+--   * A revoked caregiver cannot read care_alerts history. The patient keeps
+--     the record; a stranger sees nothing.
 
 begin;
 
@@ -237,6 +239,31 @@ values (current_setting('test.link_id')::uuid, :'parent', 'data_changed');
 select pg_temp.expect(
   (select count(*) from care_alerts where kind = 'data_changed') = 2,
   'repeated silent pushes are each recorded'
+);
+
+-- Revocation. The original policy authorised a read if the caller was
+-- either side of the link, with no status filter. Revoked rows are kept
+-- (deliberately) and still carry caregiver_id, so an ex-caregiver would
+-- keep reading every alert that had ever been sent. Access to medicines
+-- already stops at once; the alert history must match.
+
+select pg_temp.become(:'parent');
+select revoke_care_link(current_setting('test.link_id')::uuid);
+
+select pg_temp.become(:'child');
+select pg_temp.expect(
+  (select count(*) from care_alerts) = 0,
+  'a revoked caregiver cannot read the alert history'
+);
+select pg_temp.become(:'parent');
+select pg_temp.expect(
+  (select count(*) from care_alerts) = 4,
+  'the patient keeps the record of what was said about them after revoke'
+);
+select pg_temp.become(:'stranger');
+select pg_temp.expect(
+  (select count(*) from care_alerts) = 0,
+  'a stranger still sees no alerts after the link is revoked'
 );
 
 reset role;
