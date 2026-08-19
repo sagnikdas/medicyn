@@ -92,8 +92,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     // server reads those rows back to compose what the family is told. Telling
     // it about a dose that is still only on this phone would have it find
     // nothing.
-    if (sync.pushedMissedDoseIds.isNotEmpty) {
-      unawaited(CareNotifier.instance.missedDoses(sync.pushedMissedDoseIds));
+    //
+    // Asked of the database rather than of the sync that just ran. Using what
+    // that one call happened to push made the alert depend on it succeeding end
+    // to end — an upsert that commits but whose response never arrives left the
+    // dose in Postgres and the alert lost for good, with nothing anywhere to
+    // say so. Re-offering the window costs one request and the server drops
+    // everything it has already sent.
+    final missed = await widget.db.syncedMissedDoseIdsSince(
+      DateTime.now().subtract(CareNotifier.announceWindow),
+    );
+    if (missed.isNotEmpty) {
+      unawaited(CareNotifier.instance.missedDoses(missed));
     }
     // Wired now, inert until Phase 2: the server sends this only when the
     // caller is the *caregiver*, and caregiver-side editing has no screen yet.

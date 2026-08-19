@@ -47,7 +47,7 @@ IDs; email sign-in and the custom SMTP sender both disabled. The push migration
 and `notify-care` are **not** deployed yet, and neither is the Firebase project
 they need.
 
-**Verification:** `flutter analyze` clean, `flutter test` 73/73, 34 adversarial
+**Verification:** `flutter analyze` clean, `flutter test` 77/77, 34 adversarial
 RLS assertions against a scratch Postgres (16 care-link, 18 push), and 6 Deno
 tests over the stale-token rule. Phase 0's device testing is done — see below.
 
@@ -226,10 +226,15 @@ worth remembering.
   days generates no missed doses and therefore no alerts. This is the gap
   Phase 3's silent-device detection covers, and it is the reason a caregiver
   should never read "no alerts" as "all is well".
-- **A missed-dose alert is announced by whichever device pushed the log.** If
-  the parent's phone has no network when the sweep runs, the alert waits for
-  the next foreground with connectivity — it is not late by minutes, it is late
-  by however long the phone stays offline.
+- **A missed-dose alert waits for the parent's phone to have connectivity.**
+  If there is no network when the sweep runs, the alert goes out on the next
+  foreground that has one — it is not late by minutes, it is late by however
+  long the phone stays offline.
+- **An alert is only offered for 24 hours** (`CareNotifier.announceWindow`).
+  Every foreground re-offers every synced missed dose inside that window and
+  the server drops what it has already sent, so a failed call costs latency
+  rather than the alert. A dose missed longer ago than that is in the feed but
+  will never ring a phone, which is deliberate: nobody can act on it by then.
 - **The parent is told nothing when an alert fires.** Deliberate, and
   deliberately unresolved: see the open question below. `care_alerts` is
   readable by both sides, so whatever gets decided is implementable without a

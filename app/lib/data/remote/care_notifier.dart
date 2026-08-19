@@ -17,6 +17,15 @@ class CareNotifier {
   /// unresolved await here would hang a foreground indefinitely.
   static const _timeout = Duration(seconds: 8);
 
+  /// How far back a foreground re-offers missed doses for announcement.
+  ///
+  /// Long enough to recover an alert lost to a failed call — the phone simply
+  /// offers it again next time, and the server's de-duplication means only the
+  /// first offer ever rings anyone. Short enough that a dose missed last week
+  /// does not ring a phone today: by then nobody can act on it, and the feed is
+  /// where history belongs.
+  static const announceWindow = Duration(hours: 24);
+
   SupabaseClient get _client => Supabase.instance.client;
 
   /// Announces doses this device has just recorded as missed and pushed.
@@ -25,8 +34,10 @@ class CareNotifier {
   /// from those rows, so what a family is told cannot be assembled here — and
   /// cannot be forged by anything that gets hold of a session token.
   ///
-  /// Safe to call with ids that have already been announced: the server
-  /// de-duplicates on (link, dose) and sends nothing the second time.
+  /// Safe — and expected — to call with ids that have already been announced:
+  /// the server de-duplicates on (link, dose) and sends nothing the second
+  /// time. That is what lets the caller re-offer the same window on every
+  /// foreground instead of having to get one call right.
   Future<void> missedDoses(List<String> doseLogIds) async {
     if (doseLogIds.isEmpty) return;
     await _invoke({
