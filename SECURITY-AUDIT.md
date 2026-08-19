@@ -8,7 +8,7 @@ physical device.
 **Device:** Samsung SM-M336BU (Galaxy M33 5G), Android 15, API 35, security
 patch 2025-05-01, unrooted retail handset, debug build installed
 **Date:** 2026-08-19
-**Status reconciled:** `main` @ `99cf8f4` — see the status table and
+**Status reconciled:** `main` @ `b217c91` — see the status table and
 *What has changed since this audit*
 
 ---
@@ -34,39 +34,40 @@ silently destroy every medication alarm on their own phone by typing `0` into a
 form field**, and gives a caregiver a remote trigger for the same thing. For a
 medicine reminder app, that is the worst available outcome.
 
-*Of those two places, the scheduling code has since been fixed and the device
-has not.* One conclusion in this report was also wrong in the direction that
-mattered — F-14 originally recorded that `parse-medicine` could not be called
-anonymously, and it could. Both are covered below.
+*Of those two places, both have since been addressed.* One conclusion in this
+report was also wrong in the direction that mattered — F-14 originally recorded
+that `parse-medicine` could not be called anonymously, and it could. Both are
+covered below.
 
 Ordered by severity; ids are stable and not sequential. **Status** is
 maintained after the fact — the findings themselves describe the codebase as
 audited on 2026-08-19 and are not rewritten as they are fixed, so each section
 below still reads as the defect it was. Last reconciled against `main` @
-`99cf8f4`.
+`b217c91`.
 
 | # | Finding | Severity | Safety | Status |
 |---|---|---|---|---|
 | F-1 | `reconcile()` cancels all alarms, then re-arms through non-terminating loops | **Critical** | **Critical** | **Fixed** — #15, verified on device. One remediation item deliberately not taken; see below |
 | F-2 | LLM and sync output drive the scheduler with no validation | High | **High** | **Fixed** — #18 (client + server), #17 (database) |
-| F-3 | Supabase refresh token in plaintext SharedPreferences | High | — | Open |
-| F-4 | Local medical database unencrypted | High | — | Open |
-| F-5 | `android:allowBackup` unset — F-3 and F-4 leave the device | High | — | Open |
-| F-6 | Care Link confirm prompt cannot name the claimant, and the code is unthrottled | High | — | Open |
-| F-14 | `parse-medicine` answered anyone holding the publishable key | **High** | — | **Mostly fixed** — #20 closed the auth hole, verified live. Per-user quota still open |
-| F-7 | Release builds silently fall back to the debug signing key | Medium | — | Open |
-| F-8 | Drug name and strength rendered on the lock screen | Medium | — | Open |
-| F-9 | A caregiver can fabricate adherence history untraceably | Medium | Low | Open |
-| F-10 | `register_device_token` allows token takeover | Medium | Low | Open |
-| F-13 | Revoked caregiver keeps read access to alert history | Medium | Low | Open |
-| F-11 | R8 disabled in release builds | Low | — | Open |
-| F-12 | Dependency hygiene — an EOL package and a pinned override | Low | — | Open |
-| F-15 | `confirm_care_link` never re-checks `expires_at` | Low | — | Open |
-| F-16 | RLS test coverage gaps that let F-13 and F-15 ship | Info | — | Partly closed — #20 added the first edge-function authorization test; the RLS gaps remain |
+| F-3 | Supabase refresh token in plaintext SharedPreferences | High | — | **Fixed** — #29, verified on device: the refresh token is no longer in `FlutterSharedPreferences.xml` |
+| F-4 | Local medical database unencrypted | High | — | **Fixed** — #33, verified on device: per-account file, header is not `SQLite format 3`, drug names not recoverable as plaintext |
+| F-5 | `android:allowBackup` unset — F-3 and F-4 leave the device | High | — | **Fixed** — #22, verified on device: `ALLOW_BACKUP` gone from package flags |
+| F-6 | Care Link confirm prompt cannot name the claimant, and the code is unthrottled | High | — | **Fixed** — #34; identity RPC + 8-digit codes + 10 claims / 15 min. Migration applied to hosted |
+| F-14 | `parse-medicine` answered anyone holding the publishable key | **High** | — | **Fixed** — #20 closed the auth hole, verified live; #28 added the per-user quota |
+| F-7 | Release builds silently fall back to the debug signing key | Medium | — | **Fixed** — #31. `flutter build apk --release` now fails without `key.properties`. No upload keystore exists in the checkout, so a signed release artifact was not produced |
+| F-8 | Drug name and strength rendered on the lock screen | Medium | — | **Fixed** — #30. Default is private/redacted; Settings can opt in. Dart tests cover the copy; the lock-screen toggle was not tapped on the handset (device locked) |
+| F-9 | A caregiver can fabricate adherence history untraceably | Medium | Low | **Fixed** — #26. Caregiver SELECT-only on `dose_logs`; `recorded_by` stamped from `auth.uid()` |
+| F-10 | `register_device_token` allows token takeover | Medium | Low | **Fixed** — #25. Takeover requires the same `install_id` (proof of possession) |
+| F-13 | Revoked caregiver keeps read access to alert history | Medium | Low | **Fixed** — #23. Caregiver `care_alerts` read requires `status = 'active'` |
+| F-11 | R8 disabled in release builds | Low | — | **Fixed** — #27. `isMinifyEnabled` / `isShrinkResources` on release only |
+| F-12 | Dependency hygiene — an EOL package and a pinned override | Low | — | **Addressed** — #32. Pin to `permission_handler_android` 13.0.1 kept after 14.0.0 still failed on KGP 2.2.20; F-4 did not build on the unused EOL `sqlcipher_flutter_libs` |
+| F-15 | `confirm_care_link` never re-checks `expires_at` | Low | — | **Fixed** — #24. Claim stamps a 15-minute `expires_at`; confirm requires `expires_at > now()` |
+| F-16 | RLS test coverage gaps that let F-13 and F-15 ship | Info | — | **Fixed** — #20 (parse-medicine caller), #23/#24/#34 (revoked alerts, stale confirm, claim throttle), #35 (profiles, `can_access_user_data(null)`, one-live-link, notify-care authz) |
 
-**Two fixed, one mostly fixed, one partly closed, twelve open.** Nothing on the
-device side has been touched: F-3, F-4, F-5 and F-8 are all still exactly as
-found, and F-5 remains the one-line change with the largest effect.
+**All sixteen findings closed.** F-1 still has the remediation item that was
+deliberately not taken (blanket cancel before re-arm). F-7 has no signed
+release artifact in this checkout. F-12's `permission_handler_android` pin
+remains, dated 2026-08-19.
 
 ### What has changed since this audit
 
@@ -119,10 +120,79 @@ token against the auth server before anything billable runs. Verified live —
 publishable key alone returns 401 where it previously returned 200 and a full
 extraction — and the positive path confirmed by a real scan on the device.
 
-**Deployment state.** Both migrations and both edge-function changes are live on
-the hosted project; `parse-medicine` is at version 7 and matches `main`.
+**Deployment state.** Both migrations and both edge-function changes from #17
+and #20 are live on the hosted project. Subsequent security PRs applied further
+migrations and redeployed `parse-medicine` (quota) and `notify-care`
+(authorization helper) — see below.
 
-Everything else stands as written.
+**#22 — F-5 fixed.** `allowBackup` is false, with backup and D2D exclusion XML
+and `networkSecurityConfig` refusing cleartext. Verified on the same handset:
+`ALLOW_BACKUP` gone from the package flags; Backup Manager no longer lists
+Dosely.
+
+**#29 — F-3 fixed.** Session lives in `flutter_secure_storage` (Android
+EncryptedSharedPreferences). Shared leftover plaintext is migrated then
+deleted. Verified: `FlutterSharedPreferences.xml` has no `refresh_token` /
+`sb-*-auth-token`; `FlutterSecureStorage.xml` exists.
+
+**#30 — F-8 fixed.** Reminders default to a private, redacted lock-screen
+line. Settings can opt in to names. Care alerts were left unchanged. The
+handset was locked during later waves, so the Settings toggle was not tapped;
+the copy is covered by Dart tests.
+
+**#27 — F-11 fixed.** R8 minify and resource shrinking run on the release
+build type only.
+
+**#23 — F-13 fixed.** Caregiver `care_alerts` SELECT requires an active link;
+the patient keeps history after revoke. Asserted in `push_rls_test.sql`.
+Migration applied to hosted.
+
+**#24 — F-15 fixed.** Claim stamps `expires_at = now() + 15 minutes`;
+`confirm_care_link` requires that window still to be open. Asserted in
+`care_links_rls_test.sql`. Migration applied to hosted.
+
+**#25 — F-10 fixed.** `register_device_token(token, platform, install_id)`
+refuses a takeover unless the caller presents the same install id. Old 2-arg
+form dropped; old APKs fail token registration (caught, degraded care
+alerts). Migration applied to hosted.
+
+**#26 — F-9 fixed.** Caregivers are SELECT-only on `dose_logs`. A trigger
+stamps `recorded_by = auth.uid()` on insert. Migration applied to hosted.
+
+**#28 — F-14's quota.** 40 `parse-medicine` calls per user per 24 hours;
+fail-closed if the ledger is unreachable. Function redeployed to hosted.
+
+**#31 — F-7 fixed.** A release assemble without `app/android/key.properties`
+throws rather than signing with the debug keystore. Debug and profile still
+use the debug keystore. No upload keystore in the checkout, so a successful
+signed release was not built.
+
+**#32 — F-12 addressed.** Rechecked `permission_handler_android` 14.0.0
+against Kotlin Gradle Plugin 2.2.20; it still fails (`Unresolved reference:
+compilerOptions`), so 13.0.1 stays as a dated pin. Comment that F-4 must not
+depend on unused EOL `sqlcipher_flutter_libs`.
+
+**#33 — F-4 fixed.** On-device medical file is SQLite3MultipleCiphers via
+sqlite3 native-assets hooks, keyed from Keystore / Keychain, isolated per
+Google account. Verified on the same handset after overlay install: leftover
+`dosely.sqlite` (`SQLite format 3`, drug names readable) replaced by
+`dosely-<userId>.sqlite` whose header is not SQLite and which does not
+contain those names as plaintext.
+
+**#34 — F-6 fixed.** Confirmation loads the claimant through
+`claimed_care_link_claimant` (name and email) and fails closed without both.
+Invite codes are 8 digits; the 11th `claim_care_invite` in 15 minutes raises
+`too_many_attempts`. Migration applied to hosted before the client shipped.
+
+**#35 — F-16 fixed.** Remaining gaps: profiles (including the reverse
+patient→caregiver arm), `can_access_user_data(null)`, the one-live-link
+unique indexes, and `notify-care` authorization branches. `notify-care`
+redeployed to hosted so the extracted helper matches production.
+
+---
+
+Everything above is what changed. The finding sections below still describe
+the defects as they were on 2026-08-19.
 
 ---
 
@@ -299,6 +369,10 @@ discipline at the parse boundary.
 
 **Severity: High**
 
+> **Status: fixed in #29.** Both `Supabase.initialize` call sites share
+> Keystore-backed storage. Verified on the handset — the plaintext prefs file
+> no longer holds the session.
+
 Confirmed on the device. `shared_prefs/FlutterSharedPreferences.xml` holds key
 `flutter.sb-twybepxnqayypzljhcnx-auth-token` containing two JWT-shaped values and
 two `refresh_token` occurrences, in cleartext.
@@ -323,6 +397,11 @@ isolate will not see the session.
 ## F-4 — Local medical database is unencrypted
 
 **Severity: High**
+
+> **Status: fixed in #33.** SQLite3MultipleCiphers via sqlite3 hooks, not the
+> EOL `sqlcipher_flutter_libs` package. Verified on the handset after overlay
+> install: the plaintext `dosely.sqlite` is gone; the per-account file does
+> not start with `SQLite format 3`.
 
 Confirmed on the device by reading the file header through `run-as`:
 
@@ -371,6 +450,9 @@ sensitive, has no equivalent protection.
 
 **Severity: High (amplifier)**
 
+> **Status: fixed in #22.** Verified on the handset: Backup Manager no longer
+> lists Dosely.
+
 `app/android/app/src/main/AndroidManifest.xml:17-21` — the `<application>`
 element declares `label`, `name`, `icon`, `roundIcon` and nothing else. No
 `allowBackup`, no `dataExtractionRules`, no `fullBackupContent`, no
@@ -404,6 +486,10 @@ relying on the platform default.
 ## F-6 — The Care Link confirm prompt cannot name the person it is asking about
 
 **Severity: High**
+
+> **Status: fixed in #34.** A dedicated RPC names the claimant; confirmation
+> fails closed without name and email. Codes are 8 digits; claim attempts are
+> capped at 10 per 15 minutes. Migration is live on hosted.
 
 This defeats the property the whole design rests on: *possession of a code is
 never access; the parent confirms the named person.*
@@ -471,6 +557,10 @@ closed** — block confirmation when no name resolves. Separately, rate-limit
 
 **Severity: Medium**
 
+> **Status: fixed in #31.** A release assemble without `key.properties` fails
+> rather than signing with the debug keystore. Debug and profile are
+> unchanged. No upload keystore exists in this checkout.
+
 `app/android/app/build.gradle.kts:82-87`:
 
 ```kotlin
@@ -499,6 +589,10 @@ The fix is to keep it for `debug`/`profile` and **fail the release build** when
 ## F-8 — Drug name and strength rendered on the lock screen
 
 **Severity: Medium**
+
+> **Status: fixed in #30.** Default is private/redacted; Settings can show
+> names. Dart tests cover the copy. The Settings toggle was not tapped on the
+> handset (device locked during later waves).
 
 `notification_service.dart:157` sets `visibility: NotificationVisibility.public`
 on the reminder. Title is `"$drugName $strength"` (`:193-194`), body is
@@ -530,6 +624,10 @@ take without unlocking. It should be an informed one: offer
 
 **Severity: Medium · Safety impact: Low (misleads a clinical decision)**
 
+> **Status: fixed in #26.** Caregivers are SELECT-only on `dose_logs`.
+> `recorded_by` is stamped from `auth.uid()` and cannot be forged by the
+> payload.
+
 RLS grants an active caregiver full `for all` on `dose_logs`
 (`20260818161500_care_links.sql:131-133`). `dose_logs` has **no author column**
 (`tables.dart:56-68`) — unlike `medicines` and `schedules`, which both carry
@@ -555,6 +653,9 @@ in a comment but does not enforce; surface `source` and author in `DoseEvent`.
 ## F-10 — `register_device_token` allows token takeover
 
 **Severity: Medium · Safety impact: Low**
+
+> **Status: fixed in #25.** Takeover requires presenting the same
+> `install_id`. The 2-arg form was dropped.
 
 `supabase/migrations/20260819110000_push_notifications.sql:87-91`:
 
@@ -584,6 +685,9 @@ Medium.
 
 **Severity: Low**
 
+> **Status: fixed in #27.** Minify and resource shrinking are on for release
+> only.
+
 `app/android/app/build.gradle.kts:76-93` sets `proguardFiles(...)` but never
 `isMinifyEnabled = true` or `isShrinkResources = true`. AGP defaults both to
 false, so `proguard-rules.pro` never runs and the APK ships unshrunk and
@@ -598,6 +702,10 @@ patch-and-resign path.
 ## F-12 — Dependency hygiene
 
 **Severity: Low / informational**
+
+> **Status: addressed in #32.** 14.0.0 still fails on Kotlin Gradle Plugin
+> 2.2.20, so the 13.0.1 pin stays, dated. F-4 encrypted via sqlite3mc hooks
+> rather than the unused EOL `sqlcipher_flutter_libs` package.
 
 - **`sqlcipher_flutter_libs 0.7.0+eol`** (`app/pubspec.lock:1136-1143`) — the
   `+eol` suffix is the maintainer marking it end-of-life. It arrives transitively
@@ -615,6 +723,10 @@ patch-and-resign path.
 ## F-13 — A revoked caregiver keeps read access to the alert history
 
 **Severity: Medium · Safety impact: Low**
+
+> **Status: fixed in #23.** Caregiver reads require `status = 'active'`. The
+> patient keeps the history. Asserted against a revoked member, not only a
+> stranger.
 
 `supabase/migrations/20260819110000_push_notifications.sql:141-149` authorises a
 `care_alerts` read if the caller is the `patient_id` **or** the `caregiver_id` of
@@ -647,6 +759,9 @@ record, since it is what makes "who could see my medicines, and when" answerable
 ## F-14 — `parse-medicine` answered anyone holding the publishable key
 
 **Severity: High (financial) — corrected upward from Medium**
+
+> **Status: fixed.** #20 closed the anonymous/publishable-key hole, verified
+> live. #28 added the per-user quota (40 calls / 24 hours, fail closed).
 
 ### The correction
 
@@ -744,6 +859,9 @@ than exercised — which is most of the backend ones.
 
 **Severity: Low**
 
+> **Status: fixed in #24.** Claim stamps a fresh 15-minute window; confirm
+> requires `expires_at > now()`.
+
 `care_links.sql:295-299` matches only on `id`, `patient_id = me` and
 `status = 'claimed'`. `claim_care_invite:256` does enforce `expires_at > now()`
 for pending→claimed, and `confirm_care_link:296` then sets `expires_at = null`.
@@ -767,6 +885,11 @@ deadline on claim.
 ## F-16 — Test coverage gaps that let F-13 and F-15 ship
 
 **Severity: Informational**
+
+> **Status: fixed.** #20 added `parse-medicine` caller tests. #23, #24 and
+> #34 covered revoked `care_alerts`, stale confirm, and claim throttling.
+> #35 covered profiles (including the reverse arm), `can_access_user_data(null)`,
+> the one-live-link indexes, and `notify-care` authorization.
 
 The 34 assertions in `supabase/tests/care_links_rls_test.sql` and
 `push_rls_test.sql` are genuinely good on the happy path and the core adversarial
@@ -935,23 +1058,19 @@ hardcoded credentials, backdoors, debug menus, test accounts or bypass flags in
 
 ~~1. **F-1** — one try/catch and two loop bounds.~~ Done, #15.
 ~~2. **F-2** — validate at all three entry points.~~ Done, #18 and #17.
-~~· **F-14** — the auth hole.~~ Done, #20. Its quota remains, below.
+~~· **F-14** — the auth hole.~~ Done, #20. Quota in #28.
 
-What is left, in the order I would still take it:
+All of what was left, done:
 
-1. **F-5** — one line; immediately reduces F-3 and F-4 to physical access only.
-   Unchanged as the best ratio of risk removed to effort in the whole report.
-2. **F-3** — secure storage for the session. Refresh-token exposure is the worst
-   confidentiality outcome available here, and unlike F-4 it is not gated on a
-   data migration.
-3. **F-6** — restore the property the Care Link design rests on. The most
-   *interesting* remaining finding: two survivable weaknesses that compose.
-4. **F-13** — one predicate (`and status = 'active'`), clear privacy fix.
-5. **F-7**, then **F-4**, **F-8**, **F-9**, **F-10**, **F-15**.
-6. **F-14's residual** — a per-user quota. Deferred rather than dropped: abuse
-   now requires a Google account, which attaches an identity to it.
-7. **F-16** — backfill the revoked-member and stale-claim tests so F-13 and F-15
-   cannot regress.
+~~1. **F-5**~~ Done, #22.
+~~2. **F-3**~~ Done, #29.
+~~3. **F-6**~~ Done, #34.
+~~4. **F-13**~~ Done, #23.
+~~5. **F-7**, **F-4**, **F-8**, **F-9**, **F-10**, **F-15**.~~ Done, #31, #33, #30, #26, #25, #24.
+~~6. **F-14's residual** — a per-user quota.~~ Done, #28.
+~~7. **F-16** — backfill the revoked-member and stale-claim tests so F-13 and F-15 cannot regress.~~ Done, #35 (and #23, #24, #34 for the cases those PRs already asserted).
+
+F-1's blanket-cancel-before-re-arm item was deliberately not taken; see F-1.
 
 ## Testing notes and limitations
 
@@ -974,6 +1093,10 @@ What is left, in the order I would still take it:
   established by reading code rather than by exercising it should be read as a
   hypothesis until probed. Two already failed that test, both understating the
   risk: F-14's original refutation, and its first residual paragraph.
-- The findings still resting on static review alone are **F-6, F-9, F-10, F-13
-  and F-15** — the backend set. F-3, F-4, F-5 and F-8 were exercised on the
-  handset and are not in doubt.
+- The findings that still rested on static review alone at the previous
+  reconciliation were **F-6, F-9, F-10, F-13 and F-15**. They have since been
+  fixed in code and covered by the SQL harness (and, for F-6/F-9/F-10/F-13/F-15,
+  applied to hosted). They were not re-probed as live RPCs from an
+  unauthenticated client the way F-14 was. F-3, F-4, F-5 and F-8 were
+  exercised on the handset. F-8's Settings toggle was not tapped (device
+  locked). The two-account care-link UI was not re-run on two phones.
