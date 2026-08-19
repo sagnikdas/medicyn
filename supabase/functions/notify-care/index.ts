@@ -26,6 +26,7 @@
 
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
+import { authorizeNotify, bearerToken, CareLinkRef } from "./authorize.ts";
 import { FcmConfigError, FcmMessage, sendToToken } from "./fcm.ts";
 
 // Must match `careAlertChannelId` in
@@ -49,11 +50,7 @@ interface NotifyRequest {
   doseLogIds?: unknown;
 }
 
-interface CareLinkRow {
-  id: string;
-  patient_id: string;
-  caregiver_id: string | null;
-}
+type CareLinkRow = CareLinkRef;
 
 interface MissedDoseRow {
   id: string;
@@ -70,8 +67,7 @@ Deno.serve(async (req: Request) => {
     return json({ error: "server_misconfigured" }, 500);
   }
 
-  const authHeader = req.headers.get("Authorization") ?? "";
-  const jwt = authHeader.replace(/^Bearer\s+/i, "").trim();
+  const jwt = bearerToken(req.headers.get("Authorization"));
   if (!jwt) return json({ error: "not_authenticated" }, 401);
 
   // Validated against the auth server rather than by decoding `sub` out of the
@@ -93,11 +89,6 @@ Deno.serve(async (req: Request) => {
     return json({ error: "invalid_json_body" }, 400);
   }
 
-  const event = body.event;
-  if (event !== "missed_dose" && event !== "data_changed") {
-    return json({ error: "unknown_event" }, 400);
-  }
-
   const { data: linkRows, error: linkError } = await admin
     .from("care_links")
     .select("id, patient_id, caregiver_id")
@@ -108,17 +99,18 @@ Deno.serve(async (req: Request) => {
     console.error(`care_links_read_failed: ${linkError.message}`);
     return json({ error: "lookup_failed" }, 500);
   }
-  const link = linkRows?.[0] as CareLinkRow | undefined;
-  // Nobody to tell. Not an error: the app calls this unconditionally, because
-  // whether a link exists is the server's business and asking first would cost
-  // a round-trip on every sync.
-  if (!link) return json({ sent: 0, reason: "no_active_link" });
+  const authz = authorizeNotify({
+    event: body.event,
+    callerId: caller.id,
+    link: linkRows?.[0] as CareLinkRow | undefined,
+  });
+  if (!authz.allow) return json(authz.body, authz.status);
 
   try {
-    if (event === "missed_dose") {
-      return await announceMissedDoses(admin, caller.id, link, body.doseLogIds);
+    if (authz.event === "missed_dose") {
+      return await announceMissedDoses(admin, caller.id, authz.link, body.doseLogIds);
     }
-    return await announceDataChange(admin, caller.id, link);
+    return await announceDataChange(admin, caller.id, authz.link);
   } catch (err) {
     if (err instanceof FcmConfigError) {
       // Ours to fix, and invisible to the user either way — the app treats any
