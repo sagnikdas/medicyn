@@ -246,6 +246,91 @@ select pg_temp.expect(
 );
 
 -- ---------------------------------------------------------------------------
+-- profiles, can_access_user_data, one-live-link
+-- ---------------------------------------------------------------------------
+-- The confirm prompt's reverse read (patient → caregiver) is a separate
+-- policy arm from can_access_user_data. F-6 turned that arm on; these
+-- assertions are what would have caught a claimed-state leak and what
+-- stops it regressing. The unique indexes are the race backstop the RPCs
+-- are not allowed to be the only copy of.
+
+select pg_temp.become(:'parent');
+select pg_temp.expect(
+  (select display_name from profiles where user_id = :'parent') = 'Asha',
+  'a user can read their own profile'
+);
+select pg_temp.expect(
+  (select display_name from profiles where user_id = :'child') = 'Priya',
+  'an active patient can read the caregiver''s profile'
+);
+select pg_temp.expect(
+  can_access_user_data(:'parent'::uuid),
+  'can_access_user_data is true for the caller''s own id'
+);
+select pg_temp.expect(
+  not can_access_user_data(:'child'::uuid),
+  'can_access_user_data does not open the caregiver''s medical rows to the patient'
+);
+select pg_temp.expect(
+  not coalesce(can_access_user_data(null), false),
+  'can_access_user_data(null) is not true'
+);
+
+select pg_temp.become(:'child');
+select pg_temp.expect(
+  (select display_name from profiles where user_id = :'parent') = 'Asha',
+  'an active caregiver can read the patient''s profile'
+);
+select pg_temp.expect(
+  can_access_user_data(:'parent'::uuid),
+  'an active caregiver can_access_user_data of the patient'
+);
+update profiles set display_name = 'Hijacked' where user_id = :'parent';
+select pg_temp.expect(
+  (select display_name from profiles where user_id = :'parent') = 'Asha',
+  'a caregiver cannot rename the patient'
+);
+
+select pg_temp.become(:'stranger');
+select pg_temp.expect(
+  (select count(*) from profiles where user_id = :'parent') = 0,
+  'a stranger cannot read the patient''s profile'
+);
+select pg_temp.expect(
+  (select count(*) from profiles where user_id = :'child') = 0,
+  'a stranger cannot read the caregiver''s profile'
+);
+
+-- auth.uid() is null when the JWT names no user. RLS treats a null
+-- predicate as false; this asserts the function itself, not a table walk.
+select pg_temp.become(:'parent');
+select set_config('request.jwt.claims', '{}', true);
+select pg_temp.expect(
+  not coalesce(can_access_user_data(:'parent'::uuid), false),
+  'can_access_user_data is false when auth.uid() is null'
+);
+select pg_temp.become(:'parent');
+
+reset role;
+select pg_temp.expect_denied(
+  format(
+    $q$insert into care_links (id, patient_id, caregiver_id, status)
+       values ('88888888-8888-8888-8888-888888888888', %L, %L, 'active')$q$,
+    :'parent', :'stranger'
+  ),
+  'a second live link for the same patient is refused'
+);
+select pg_temp.expect_denied(
+  format(
+    $q$insert into care_links (id, patient_id, caregiver_id, status)
+       values ('99999999-9999-9999-9999-999999999999', %L, %L, 'active')$q$,
+    :'stranger', :'child'
+  ),
+  'a second live link for the same caregiver is refused'
+);
+select pg_temp.become(:'parent');
+
+-- ---------------------------------------------------------------------------
 -- dose_logs: the patient's device is the only writer
 -- ---------------------------------------------------------------------------
 -- The feed is readable by both sides of an active link. A caregiver writing
@@ -331,8 +416,16 @@ select pg_temp.expect(
   (select count(*) from medicines where user_id = :'parent') = 0,
   'revoking cuts the caregiver off at once'
 );
+select pg_temp.expect(
+  (select count(*) from profiles where user_id = :'parent') = 0,
+  'revoking cuts the caregiver off the patient''s profile'
+);
 
 select pg_temp.become(:'parent');
+select pg_temp.expect(
+  (select count(*) from profiles where user_id = :'child') = 0,
+  'revoking cuts the patient off the caregiver''s profile'
+);
 select create_care_invite() as code2 \gset
 select pg_temp.expect(
   length(:'code2') = 8,
