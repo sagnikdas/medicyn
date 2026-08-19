@@ -38,8 +38,14 @@ These are settled. Revisit them deliberately, not incidentally.
 **On the Phase 1 branch, not yet merged:** push in both directions —
 `device_tokens` + `care_alerts`, the `notify-care` edge function, FCM
 registration and refresh on the client, and the inbound silent message that
-pulls and re-arms. Plus the fix for retroactive missed doses (below), which
-push turned from a wrong row into a wrong notification.
+pulls and re-arms. Plus two fixes push turned from quiet wrongness into a
+wrong notification on a family member's phone: retroactive missed doses
+(below), and client timestamps that reached Postgres with no UTC offset —
+every dose time and every `updated_at` was shifted by the writing device's
+offset, so a 09:00 reminder read back as 14:30 to the other side. The
+device was always right; only what the *other* person saw was wrong. A
+migration corrects the existing history, shifting each row by its owner's
+recorded timezone.
 
 **Live on the hosted Supabase project** (`twybepxnqayypzljhcnx`): the first four
 migrations applied; Google provider configured with the Web and Android client
@@ -47,7 +53,7 @@ IDs; email sign-in and the custom SMTP sender both disabled. The push migration
 and `notify-care` are **not** deployed yet, and neither is the Firebase project
 they need.
 
-**Verification:** `flutter analyze` clean, `flutter test` 77/77, 34 adversarial
+**Verification:** `flutter analyze` clean, `flutter test` 81/81, 34 adversarial
 RLS assertions against a scratch Postgres (16 care-link, 18 push), and 6 Deno
 tests over the stale-token rule. Phase 0's device testing is done — see below.
 
@@ -250,6 +256,12 @@ worth remembering.
 - **The `deleted` column** on `medicines` and `schedules` is dead — never set,
   absent from Postgres, superseded by `active = false`. Removing it needs a
   Drift migration, which is not worth the risk for an unused boolean.
+
+- **The timestamp correction assumes every row predates the fix.** It shifts
+  by each owner's `profiles.timezone`, so it must be applied only once and
+  only after every device is on a build that sends UTC — a phone still running
+  an older one will re-shift whatever it pushes next. Rows whose owner has no
+  recorded timezone are left alone rather than guessed at.
 
 ## Conventions worth keeping
 
