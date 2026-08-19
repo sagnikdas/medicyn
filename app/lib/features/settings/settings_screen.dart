@@ -4,15 +4,17 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/app_settings.dart';
 import '../auth/auth_service.dart';
 import '../care/care_screen.dart';
+import '../notification_engine/notification_service.dart';
 
 /// Deliberately sparse — there's almost nothing to configure by design.
 /// Notification sound/vibration follow the OS channel settings (opened via
-/// the system link below) rather than a duplicate in-app setting. The two
-/// real controls are text size — the single highest-impact accessibility
-/// lever for elderly users, and it needs no extra "large touch targets"
-/// toggle alongside it since buttons/fields size around their text — and
-/// theme, which stays on the device's own light/dark setting unless the
-/// user overrides it here.
+/// the system link below) rather than a duplicate in-app setting. The
+/// controls that do live here are text size — the single highest-impact
+/// accessibility lever for elderly users, and it needs no extra "large
+/// touch targets" toggle alongside it since buttons/fields size around
+/// their text — theme, which stays on the device's own light/dark setting
+/// unless the user overrides it here, and whether a locked phone may show
+/// which medicine is due.
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
@@ -104,6 +106,19 @@ class SettingsScreen extends StatelessWidget {
                 showSelectedIcon: false,
               ),
             ),
+            const SizedBox(height: 20),
+            ListenableBuilder(
+              listenable: AppSettings.instance,
+              builder: (context, _) => SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Show medicine names on the lock screen'),
+                subtitle: const Text(
+                  'Off by default. When off, a locked phone only says a dose is due — not which medicine.',
+                ),
+                value: AppSettings.instance.showMedicineOnLockScreen,
+                onChanged: _setShowMedicineOnLockScreen,
+              ),
+            ),
             const SizedBox(height: 28),
             OutlinedButton(
               onPressed: () => _confirmSignOut(context),
@@ -113,6 +128,18 @@ class SettingsScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  /// Already-armed alarms still carry the old title and visibility, so a
+  /// toggle that only wrote the pref would not take effect until the next
+  /// app foreground. Re-arm here so the lock screen matches the switch.
+  Future<void> _setShowMedicineOnLockScreen(bool value) async {
+    await AppSettings.instance.setShowMedicineOnLockScreen(value);
+    try {
+      await NotificationService.instance.reconcileFromDisk();
+    } catch (_) {
+      // Next foreground re-arms; the pref is already stored.
+    }
   }
 
   /// Signing out is a one-tap action sitting at the end of a screen people

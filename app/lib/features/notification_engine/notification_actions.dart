@@ -126,8 +126,7 @@ Future<void> recordDoseSnoozed(
 
   await NotificationService.instance.scheduleSnooze(
     scheduleId: scheduleId,
-    title: medicine.strength.isEmpty ? medicine.drugName : '${medicine.drugName} ${medicine.strength}',
-    body: medicine.doseAmount.isEmpty ? 'Time for your dose' : 'Take ${medicine.doseAmount}',
+    medicine: medicine,
     delay: delay,
   );
 }
