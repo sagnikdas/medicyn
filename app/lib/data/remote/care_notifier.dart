@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../features/push/push_events.dart';
@@ -61,12 +62,18 @@ class CareNotifier {
     if (_client.auth.currentUser == null) return;
     try {
       await _client.functions.invoke('notify-care', body: body).timeout(_timeout);
-    } catch (_) {
-      // Swallowed on purpose. Every caller has already committed the data this
-      // was announcing; retrying is not possible from here (the dose logs are
-      // marked synced) and surfacing it would put a failure in front of someone
-      // who cannot act on it. The server-side `care_alerts.delivered_count` is
-      // where an undelivered alert is actually visible.
+    } catch (error) {
+      // Never rethrown: every caller has already committed the data this was
+      // announcing, and putting a failure in front of someone who cannot act on
+      // it helps nobody. The next foreground offers the same doses again.
+      //
+      // Logged, though, and that is not decoration. A silent catch here meant a
+      // failure to tell a family about a missed dose left no trace anywhere —
+      // not on the device, and not in `care_alerts`, which only ever records
+      // what *did* go out. Debugging one cost a round trip through the database,
+      // the deployed function and the device's own sqlite before it could even
+      // be localised to this line.
+      debugPrint('[dosely] notify-care failed: $error');
     }
   }
 }
