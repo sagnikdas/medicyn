@@ -80,7 +80,7 @@ merged without ever running on hardware; all of it behaves as specified.
 - [x] Confirm alarms still fire after the `reconcile` change (one blanket
       cancel replaced per-schedule cancels)
 
-## Phase 1 — Push — **built, awaiting device verification**
+## Phase 1 — Push — **done**
 
 The binding constraint. Three later items are worth little without it, and
 one existing feature is quietly dishonest until it exists.
@@ -109,27 +109,33 @@ one moves the row, which is what stops a handed-back phone receiving the
 previous person's alerts. RLS cannot express that move, so registration goes
 through a security-definer function — the same shape as the link lifecycle.
 
-**Still to verify on hardware**, once Firebase is set up:
+**Verified on hardware**, 2026-08-19, two phones and two Google accounts:
 
-- [x] The chain works end to end: a missed dose on the parent's phone reached
-      `notify-care`, which recorded three `care_alerts` rows with
-      `delivered_count = 1` — FCM accepted the message for the caregiver's
-      device. To manufacture a missed dose: set a reminder a couple of minutes
-      out on the parent's phone, ignore the alarm, wait past the 30-minute
-      grace, then foreground the app. Backdating a reminder no longer works —
-      that was the retroactive bug, and it is fixed
-- [ ] The alert actually *appears* on the caregiver's locked phone.
-      `delivered_count` proves FCM accepted it, not that Android drew it
-- [ ] The alert lands in the *care* channel, not the alarm channel — it must
+- [x] A missed dose on the parent's phone reaches the caregiver's phone. One
+      reminder set two minutes out and ignored produced exactly one alert —
+      `dfdf`, due 16:19, `delivered_count = 1` — and the notification arrived
+- [x] It reports **one** dose, not three. Backdating used to manufacture a
+      phantom miss for every day in the lookback; `wasArmed` closed that
+- [x] It quotes the time the reminder was actually set for. Before the
+      timestamp fix the same alert would have read 21:49
+- [x] It lands in the *care* channel rather than the alarm channel, so it does
       not loop its sound until dismissed
-- [ ] Tapping it opens the parent's feed, from both a cold start and a
-      backgrounded app
+- [x] Tapping it opens the parent's feed
+- [x] Already-announced doses are never announced again — three earlier alerts
+      stayed at three across repeated foregrounds
+
+**Not yet exercised.** None of these blocks the phase; each is a distinct
+failure mode that only shows up under a specific accident.
+
 - [ ] Two devices signed into one account announce a missed dose **once**
       (`care_alerts` is the de-duplication; check for a single row)
 - [ ] Sign out on one phone, sign in as the other account, confirm the first
-      account's alerts stop arriving there
+      account's alerts stop arriving there — the reason `device_tokens` is
+      keyed by the token rather than a surrogate id
 - [ ] Uninstall the caregiver's app, raise an alert, confirm the token is
       pruned rather than retried forever
+- [ ] The cold-start tap path specifically (`getInitialMessage`), as opposed to
+      the app-alive one that was tested
 
 The inbound direction cannot be verified end-to-end until Phase 2, because
 nothing yet produces a caregiver-side edit to push. The receiving half is
