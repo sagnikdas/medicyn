@@ -16,6 +16,7 @@
 --     -f supabase/migrations/20260819161000_claimed_link_expiry.sql \
 --     -f supabase/migrations/20260819162000_device_token_possession.sql \
 --     -f supabase/migrations/20260819163000_dose_logs_recorded_by.sql \
+--     -f supabase/migrations/20260819164000_parse_medicine_quota.sql \
 --     -f supabase/tests/care_links_rls_test.sql
 --
 -- and the push tables' own assertions, which need a fresh database because

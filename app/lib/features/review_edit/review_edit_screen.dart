@@ -47,6 +47,7 @@ enum _LoadState { loading, ready, failed }
 
 class _ReviewEditScreenState extends State<ReviewEditScreen> {
   _LoadState _loadState = _LoadState.loading;
+  String? _parseError;
   double? _confidence;
 
   final _drugNameController = TextEditingController();
@@ -112,9 +113,20 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
     try {
       final parsed = await MedicineParser().parse(ocrText: widget.ocrText, transcript: widget.transcript);
       _applyParsed(parsed);
-      setState(() => _loadState = _LoadState.ready);
+      setState(() {
+        _loadState = _LoadState.ready;
+        _parseError = null;
+      });
+    } on MedicineParseException catch (e) {
+      setState(() {
+        _loadState = _LoadState.failed;
+        _parseError = e.message;
+      });
     } catch (_) {
-      setState(() => _loadState = _LoadState.failed);
+      setState(() {
+        _loadState = _LoadState.failed;
+        _parseError = null;
+      });
     }
   }
 
@@ -333,7 +345,7 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text('Could not understand that automatically.'),
+                Text(_parseError ?? 'Could not understand that automatically.'),
                 const SizedBox(height: 16),
                 FilledButton(onPressed: _load, child: const Text('Try again')),
                 const SizedBox(height: 8),
