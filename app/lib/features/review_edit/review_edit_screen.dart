@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:drift/drift.dart' hide Column;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../core/ids.dart';
 import '../../data/local/database.dart';
@@ -11,6 +12,7 @@ import '../../data/remote/sync_service.dart';
 import '../auth/auth_service.dart';
 import '../history/dose_history_screen.dart';
 import '../notification_engine/notification_service.dart';
+import '../notification_engine/schedule_validation.dart';
 import 'parsed_medicine.dart';
 
 /// The one gate everything else in the capture flow passes through: nothing
@@ -123,10 +125,12 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
     _doseAmountController.text = p.doseAmount;
     _notesController.text = p.notes;
     _frequency = p.frequencyType;
-    _times = List.of(p.times);
+    _times = schedulableTimes(p.times).map((t) => t.label).toList();
+    // ParsedMedicine already filtered these; the form keeps its own state in
+    // range so that a day it cannot draw a chip for can never be held.
     _daysOfWeek
       ..clear()
-      ..addAll(p.daysOfWeek);
+      ..addAll(schedulableDays(p.daysOfWeek));
     if (p.intervalHours != null) _intervalController.text = '${p.intervalHours}';
     _confidence = p.confidence;
   }
@@ -139,11 +143,15 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
     _formController.text = medicine.form;
     _doseAmountController.text = medicine.doseAmount;
     _notesController.text = medicine.notes;
-    _frequency = FrequencyType.values.byName(schedule.frequencyType);
-    _times = List.of(schedule.times);
+    // A row saved before these fields were validated can still be sitting in
+    // the database, and `byName` throws rather than defaulting. Clean it on
+    // the way into the form so editing a poisoned reminder is how it gets
+    // fixed, not another way to crash.
+    _frequency = frequencyTypeFromName(schedule.frequencyType) ?? FrequencyType.daily;
+    _times = schedulableTimes(schedule.times).map((t) => t.label).toList();
     _daysOfWeek
       ..clear()
-      ..addAll(schedule.daysOfWeek);
+      ..addAll(schedulableDays(schedule.daysOfWeek));
     if (schedule.intervalHours != null) _intervalController.text = '${schedule.intervalHours}';
     // No AI parse happened, so there's no confidence score to show.
     _confidence = null;
@@ -173,11 +181,33 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
     });
   }
 
+  /// Why the interval field is unusable, or null when it is fine.
+  ///
+  /// Only meaningful for every-X-hours; any other frequency ignores the
+  /// column entirely.
+  String? get _intervalError {
+    if (_frequency != FrequencyType.everyXHours) return null;
+    final raw = _intervalController.text.trim();
+    if (raw.isEmpty) return null; // falls back to the 8-hour default
+    final parsed = int.tryParse(raw);
+    if (parsed == null) return 'Enter a number of hours';
+    if (schedulableIntervalHours(parsed) == null) return 'Must be between 1 and 24 hours';
+    return null;
+  }
+
+  /// The interval the user typed, or null for "not set, use the default".
+  int? get _enteredIntervalHours {
+    final parsed = int.tryParse(_intervalController.text.trim());
+    if (parsed == null) return null;
+    return schedulableIntervalHours(parsed) == null ? null : parsed;
+  }
+
   bool get _canSave {
     if (_drugNameController.text.trim().isEmpty) return false;
     if (_frequency == FrequencyType.asNeeded) return true;
     if (_times.isEmpty) return false;
     if (_frequency == FrequencyType.specificDays && _daysOfWeek.isEmpty) return false;
+    if (_intervalError != null) return false;
     return true;
   }
 
@@ -212,7 +242,13 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
         frequencyType: _frequency.name,
         times: _times,
         daysOfWeek: _frequency == FrequencyType.specificDays ? (_daysOfWeek.toList()..sort()) : const [],
-        intervalHours: _frequency == FrequencyType.everyXHours ? int.tryParse(_intervalController.text) : null,
+        // An empty field still means "use the default", as before. A value
+        // that is present but out of range cannot reach here — _canSave
+        // blocks it — and is mapped to null rather than trusted if it ever
+        // does.
+        intervalHours: _frequency == FrequencyType.everyXHours
+            ? _enteredIntervalHours
+            : null,
         active: true,
         createdAt: DateTime.now(),
         updatedAt: savedAt,
@@ -383,7 +419,18 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
           TextField(
             controller: _intervalController,
             keyboardType: TextInputType.number,
-            decoration: const InputDecoration(labelText: 'Every how many hours?'),
+            // Digits only, so a stray character cannot reach int.tryParse and
+            // arrive as a null interval. The range is checked separately —
+            // formatters cannot express "not zero".
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            onChanged: (_) => setState(() {}),
+            decoration: InputDecoration(
+              labelText: 'Every how many hours?',
+              // Typing 0 here used to be enough to leave the phone with no
+              // medication alarms at all, so say why it is refused rather
+              // than just disabling Save with no explanation.
+              errorText: _intervalError,
+            ),
           ),
           const SizedBox(height: 16),
         ],

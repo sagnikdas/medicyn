@@ -1,3 +1,4 @@
+import 'package:dosely/data/local/tables.dart';
 import 'package:dosely/features/notification_engine/schedule_validation.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -111,6 +112,99 @@ void main() {
     test('does not substitute a guess for a value someone entered', () {
       // Falling back to 8 here would arm alarms at times nobody asked for.
       expect(schedulableIntervalHours(0, fallback: 8), isNull);
+    });
+  });
+
+  group('sanitiseScheduleFields', () {
+    test('passes a healthy row through unchanged', () {
+      final f = sanitiseScheduleFields(
+        frequencyType: 'specificDays',
+        times: ['08:00'],
+        daysOfWeek: [1, 3],
+        intervalHours: null,
+      );
+      expect(f, isNotNull);
+      expect(f!.frequency, FrequencyType.specificDays);
+      expect(f.times, ['08:00']);
+      expect(f.daysOfWeek, [1, 3]);
+      expect(f.changed, isFalse);
+    });
+
+    test('salvages what it can and says it changed something', () {
+      final f = sanitiseScheduleFields(
+        frequencyType: 'specificDays',
+        times: ['08:00', '9am'],
+        daysOfWeek: [1, 9],
+        intervalHours: null,
+      );
+      expect(f!.times, ['08:00']);
+      expect(f.daysOfWeek, [1]);
+      expect(f.changed, isTrue);
+    });
+
+    test('rejects a row whose frequency names nothing', () {
+      // There is no way to guess what the row meant, and byName would throw.
+      expect(
+        sanitiseScheduleFields(
+          frequencyType: 'hourly',
+          times: ['08:00'],
+          daysOfWeek: const [],
+          intervalHours: null,
+        ),
+        isNull,
+      );
+      expect(
+        sanitiseScheduleFields(
+          frequencyType: null,
+          times: ['08:00'],
+          daysOfWeek: const [],
+          intervalHours: null,
+        ),
+        isNull,
+      );
+    });
+
+    test('rejects an every-X-hours row with an unusable interval', () {
+      // Substituting the 8-hour default would arm alarms at times nobody
+      // chose, so the row is refused rather than guessed at.
+      expect(
+        sanitiseScheduleFields(
+          frequencyType: 'everyXHours',
+          times: ['08:00'],
+          daysOfWeek: const [],
+          intervalHours: 0,
+        ),
+        isNull,
+      );
+    });
+
+    test('ignores a stray interval on a frequency that does not use one', () {
+      // The column is unread for daily schedules, so an odd value there is
+      // not worth refusing a working reminder over.
+      final f = sanitiseScheduleFields(
+        frequencyType: 'daily',
+        times: ['08:00'],
+        daysOfWeek: const [],
+        intervalHours: 0,
+      );
+      expect(f, isNotNull);
+      expect(f!.frequency, FrequencyType.daily);
+    });
+  });
+
+  group('frequencyTypeFromName', () {
+    test('resolves every name the database can hold', () {
+      for (final f in FrequencyType.values) {
+        expect(frequencyTypeFromName(f.name), f);
+      }
+    });
+
+    test('returns null rather than throwing on anything else', () {
+      // FrequencyType.values.byName throws, which is how an unrecognised
+      // string could abort a caller mid-reconcile.
+      expect(frequencyTypeFromName('hourly'), isNull);
+      expect(frequencyTypeFromName(''), isNull);
+      expect(frequencyTypeFromName(null), isNull);
     });
   });
 }
