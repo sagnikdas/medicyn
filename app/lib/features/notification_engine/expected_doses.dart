@@ -1,5 +1,6 @@
 import '../../data/local/database.dart';
 import '../../data/local/tables.dart';
+import 'schedule_validation.dart';
 
 /// When a schedule *should* have gone off, over a window of the recent past.
 ///
@@ -29,7 +30,12 @@ List<DateTime> expectedDoses(
 }) {
   if (!schedule.active || schedule.times.isEmpty) return const [];
 
-  final frequency = FrequencyType.values.byName(schedule.frequencyType);
+  // A row stored before these fields were validated can still be here, and a
+  // throw would abort the whole missed-dose sweep rather than skip one
+  // schedule — which would silently stop a family being told about any of
+  // them.
+  final frequency = frequencyTypeFromName(schedule.frequencyType);
+  if (frequency == null) return const [];
   switch (frequency) {
     case FrequencyType.daily:
       return _atClockTimes(schedule.times, from: from, to: to);

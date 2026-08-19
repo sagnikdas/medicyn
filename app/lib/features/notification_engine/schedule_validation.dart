@@ -27,6 +27,8 @@
 /// it.
 library;
 
+import '../../data/local/tables.dart';
+
 /// A wall-clock time of day, already range-checked.
 typedef ClockTime = ({int hour, int minute});
 
@@ -123,4 +125,80 @@ int? schedulableIntervalHours(int? intervalHours, {int fallback = 8}) {
   if (intervalHours == null) return fallback;
   if (intervalHours < 1 || intervalHours > 24) return null;
   return intervalHours;
+}
+
+/// The frequency named by [raw], or null if it names none of them.
+///
+/// `FrequencyType.values.byName` throws on an unrecognised string, and
+/// `frequencyType` arrives from the same unvalidated sources as everything
+/// else here — including a pull from Supabase, which a linked caregiver can
+/// write. Callers that are storing a row want the null; callers that are
+/// reading one they already stored can treat null as impossible.
+FrequencyType? frequencyTypeFromName(String? raw) {
+  if (raw == null) return null;
+  for (final candidate in FrequencyType.values) {
+    if (candidate.name == raw) return candidate;
+  }
+  return null;
+}
+
+/// A schedule's fields, cleaned so that nothing downstream has to re-check
+/// them, and nothing unschedulable is ever written to the database.
+typedef ScheduleFields = ({
+  FrequencyType frequency,
+  List<String> times,
+  List<int> daysOfWeek,
+  int? intervalHours,
+  bool changed,
+});
+
+/// Cleans one schedule's fields, or returns null if the row cannot be stored
+/// as a working schedule at all.
+///
+/// The guards in this file exist so the scheduler cannot be hung by a stored
+/// value. This function is the other half: it stops such a value being stored
+/// in the first place, at each of the three boundaries that write one — the
+/// model's tool output, the review form, and a pull from Supabase.
+///
+/// Salvage is preferred over rejection, because a schedule the user is
+/// expecting is worth keeping if any of it is usable. Two cases cannot be
+/// salvaged and return null instead:
+///
+///   - a `frequencyType` naming nothing, since there is no way to guess what
+///     the row meant;
+///   - an out-of-range `intervalHours`, since substituting a default would
+///     arm alarms at times nobody chose.
+///
+/// [changed] reports whether anything was dropped, so a caller can tell the
+/// user that what it stored is not quite what it was given.
+ScheduleFields? sanitiseScheduleFields({
+  required String? frequencyType,
+  required List<String> times,
+  required List<int> daysOfWeek,
+  required int? intervalHours,
+}) {
+  final frequency = frequencyTypeFromName(frequencyType);
+  if (frequency == null) return null;
+
+  final cleanTimes = schedulableTimes(times).map((t) => t.label).toList();
+  final cleanDays = schedulableDays(daysOfWeek);
+
+  // Only meaningful for every-X-hours; for any other frequency the column is
+  // ignored, so an odd value there is not worth rejecting a row over.
+  int? cleanInterval = intervalHours;
+  if (frequency == FrequencyType.everyXHours) {
+    if (schedulableIntervalHours(intervalHours) == null) return null;
+  } else {
+    cleanInterval = intervalHours;
+  }
+
+  final changed = cleanTimes.length != times.length || cleanDays.length != daysOfWeek.length;
+
+  return (
+    frequency: frequency,
+    times: cleanTimes,
+    daysOfWeek: cleanDays,
+    intervalHours: cleanInterval,
+    changed: changed,
+  );
 }
