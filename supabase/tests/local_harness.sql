@@ -13,6 +13,7 @@
 --     -f supabase/migrations/20260819140000_schedule_field_constraints.sql \
 --     -f supabase/migrations/20260819150000_drop_redundant_dose_logs_check.sql \
 --     -f supabase/migrations/20260819160000_care_alerts_active_caregiver.sql \
+--     -f supabase/migrations/20260819161000_claimed_link_expiry.sql \
 --     -f supabase/tests/care_links_rls_test.sql
 --
 -- and the push tables' own assertions, which need a fresh database because

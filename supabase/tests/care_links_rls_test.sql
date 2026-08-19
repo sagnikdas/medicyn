@@ -67,6 +67,24 @@ begin
 end;
 $$;
 
+-- Like expect_denied, but the message has to be the one the client maps.
+create or replace function pg_temp.expect_exception(stmt text, expected text, what text)
+returns void
+language plpgsql as $$
+begin
+  begin
+    execute stmt;
+  exception when others then
+    if position(expected in sqlerrm) = 0 then
+      raise exception 'FAILED: % — expected %, got %', what, expected, sqlerrm;
+    end if;
+    raise notice 'ok: % (%)', what, sqlerrm;
+    return;
+  end;
+  raise exception 'FAILED: % — it was allowed', what;
+end;
+$$;
+
 -- ---------------------------------------------------------------------------
 -- baseline: no link, no access
 -- ---------------------------------------------------------------------------
@@ -188,6 +206,53 @@ select create_care_invite() as code2 \gset
 select pg_temp.expect(
   length(:'code2') = 6,
   'both sides are free to pair again after revoking'
+);
+
+-- ---------------------------------------------------------------------------
+-- claimed-link expiry
+-- ---------------------------------------------------------------------------
+-- A claimed row is not a permanent ticket. Confirmation has to honour the
+-- same 15-minute bound the UI promises, otherwise a claimed-but-unconfirmed
+-- link sits forever.
+
+select pg_temp.become(:'child');
+select claim_care_invite(:'code2') as expired_link_id \gset
+select set_config('test.expired_link_id', :'expired_link_id', false);
+
+select pg_temp.expect(
+  (select expires_at = now() + interval '15 minutes'
+     from care_links
+    where id = current_setting('test.expired_link_id')::uuid),
+  'claiming stamps a fresh 15-minute confirmation window'
+);
+
+-- Age the claimed window into the past. Direct update: there is no write
+-- policy on care_links, so this has to run as the table owner.
+reset role;
+update care_links
+   set expires_at = now() - interval '1 minute'
+ where id = current_setting('test.expired_link_id')::uuid;
+
+select pg_temp.become(:'parent');
+select pg_temp.expect_exception(
+  format('select confirm_care_link(%L::uuid)', current_setting('test.expired_link_id')),
+  'no_link_to_confirm',
+  'a claimed link cannot be confirmed after its window expires'
+);
+
+-- Happy path on a fresh invite: claim then confirm while the window is open.
+select revoke_care_link(current_setting('test.expired_link_id')::uuid);
+select create_care_invite() as code3 \gset
+select pg_temp.become(:'child');
+select claim_care_invite(:'code3') as fresh_link_id \gset
+select set_config('test.fresh_link_id', :'fresh_link_id', false);
+select pg_temp.become(:'parent');
+select confirm_care_link(current_setting('test.fresh_link_id')::uuid);
+select pg_temp.expect(
+  (select status = 'active' and expires_at is null
+     from care_links
+    where id = current_setting('test.fresh_link_id')::uuid),
+  'confirming a still-valid claimed link succeeds and clears expiry'
 );
 
 reset role;
