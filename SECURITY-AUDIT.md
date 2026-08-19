@@ -32,26 +32,49 @@ silently destroy every medication alarm on their own phone by typing `0` into a
 form field**, and gives a caregiver a remote trigger for the same thing. For a
 medicine reminder app, that is the worst available outcome.
 
-Ordered by severity; ids are stable and not sequential.
+Ordered by severity; ids are stable and not sequential. **Status** is
+maintained after the fact — the findings themselves describe the codebase as
+audited on 2026-08-19 and are not rewritten as they are fixed.
 
-| # | Finding | Severity | Safety |
-|---|---|---|---|
-| F-1 | `reconcile()` cancels all alarms, then re-arms through non-terminating loops | **Critical** | **Critical** |
-| F-2 | LLM and sync output drive the scheduler with no validation | High | **High** |
-| F-3 | Supabase refresh token in plaintext SharedPreferences | High | — |
-| F-4 | Local medical database unencrypted | High | — |
-| F-5 | `android:allowBackup` unset — F-3 and F-4 leave the device | High | — |
-| F-6 | Care Link confirm prompt cannot name the claimant, and the code is unthrottled | High | — |
-| F-7 | Release builds silently fall back to the debug signing key | Medium | — |
-| F-8 | Drug name and strength rendered on the lock screen | Medium | — |
-| F-9 | A caregiver can fabricate adherence history untraceably | Medium | Low |
-| F-10 | `register_device_token` allows token takeover | Medium | Low |
-| F-13 | Revoked caregiver keeps read access to alert history | Medium | Low |
-| F-14 | `parse-medicine` has no per-user quota — billable to an authenticated attacker | Medium | — |
-| F-11 | R8 disabled in release builds | Low | — |
-| F-12 | Dependency hygiene — an EOL package and a pinned override | Low | — |
-| F-15 | `confirm_care_link` never re-checks `expires_at` | Low | — |
-| F-16 | RLS test coverage gaps that let F-13 and F-15 ship | Info | — |
+| # | Finding | Severity | Safety | Status |
+|---|---|---|---|---|
+| F-1 | `reconcile()` cancels all alarms, then re-arms through non-terminating loops | **Critical** | **Critical** | Fixed — #15 |
+| F-2 | LLM and sync output drive the scheduler with no validation | High | **High** | Fixed — #18 |
+| F-3 | Supabase refresh token in plaintext SharedPreferences | High | — | Open |
+| F-4 | Local medical database unencrypted | High | — | Open |
+| F-5 | `android:allowBackup` unset — F-3 and F-4 leave the device | High | — | Open |
+| F-6 | Care Link confirm prompt cannot name the claimant, and the code is unthrottled | High | — | Open |
+| F-7 | Release builds silently fall back to the debug signing key | Medium | — | Open |
+| F-8 | Drug name and strength rendered on the lock screen | Medium | — | Open |
+| F-9 | A caregiver can fabricate adherence history untraceably | Medium | Low | Open |
+| F-10 | `register_device_token` allows token takeover | Medium | Low | Open |
+| F-13 | Revoked caregiver keeps read access to alert history | Medium | Low | Open |
+| F-14 | `parse-medicine` has no per-user quota — billable to an authenticated attacker | Medium | — | Open |
+| F-11 | R8 disabled in release builds | Low | — | Open |
+| F-12 | Dependency hygiene — an EOL package and a pinned override | Low | — | Open |
+| F-15 | `confirm_care_link` never re-checks `expires_at` | Low | — | Open |
+| F-16 | RLS test coverage gaps that let F-13 and F-15 ship | Info | — | Open |
+
+### What has changed since this audit
+
+- **F-1** fixed in #15: the re-arm loop is bounded and each schedule is
+  isolated, so one unschedulable row can no longer cost the device every
+  other alarm.
+- **F-2** fixed in #18: the model's output, the review form and the sync pull
+  are all validated, and three read paths that threw on an already-stored row
+  are guarded.
+- **A layer this audit did not ask for**, added in #17 and applied to the
+  hosted project: CHECK constraints on `frequency_type`, `times`,
+  `days_of_week` and `interval_hours`. The audit noted the client and the
+  scheduler were unprotected; it did not check whether the *database* would
+  accept a value neither could use. It would, and it no longer does.
+- **Still pending:** the `parse-medicine` edge function has not been
+  redeployed, so F-2's server-side half is on `main` but not running. Until it
+  is, a client sending a malformed structure is stopped by the database rather
+  than by the function, which turns a bad write into a failed sync rather than
+  a rejected response.
+
+Everything else stands as written.
 
 ---
 

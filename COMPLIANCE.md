@@ -366,11 +366,20 @@ formal DPIAs. Lift it directly rather than starting fresh.
 
 ### 3.3 International transfers
 
-`PRIVACY.md` has no transfer section. All recipients are US. **Establish the
-Supabase database region first** — if it is not EU/UK, moving the project is the
-single cleanest fix and removes the largest transfer entirely. Then rely on the
-EU-US Data Privacy Framework where each entity is certified, plus SCCs and the
-UK IDTA, and complete a Transfer Impact Assessment per recipient.
+`PRIVACY.md` has no transfer section.
+
+**The Supabase database is in `ap-southeast-1` (Singapore)** — established
+directly against the hosted project, and no longer an open question. Singapore
+has no EU adequacy decision. Together with Anthropic and Google, all three
+recipients of health data are outside the EEA and the UK, and not one transfer
+has a documented safeguard.
+
+Moving the project to an EU or UK region is the single cleanest fix and removes
+the largest transfer entirely. It is also far cheaper now than after launch:
+the data is small, and a region change means recreating the project rather than
+flipping a setting. For Anthropic and Google, rely on the EU-US Data Privacy
+Framework where each entity is certified, plus SCCs and the UK IDTA, and
+complete a Transfer Impact Assessment per recipient.
 
 ### 3.4 Record of processing (Art. 30)
 
