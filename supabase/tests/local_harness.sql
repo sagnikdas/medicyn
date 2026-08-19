@@ -9,6 +9,8 @@
 --     -f supabase/migrations/20260818143000_row_versioning.sql \
 --     -f supabase/migrations/20260818161500_care_links.sql \
 --     -f supabase/migrations/20260819110000_push_notifications.sql \
+--     -f supabase/migrations/20260819120000_fix_naive_client_timestamps.sql \
+--     -f supabase/migrations/20260819140000_schedule_field_constraints.sql \
 --     -f supabase/tests/care_links_rls_test.sql
 --
 -- and the push tables' own assertions, which need a fresh database because
@@ -19,6 +21,21 @@
 --     -f supabase/tests/local_harness.sql \
 --     -f supabase/migrations/*.sql (in the order above) \
 --     -f supabase/tests/push_rls_test.sql
+--
+-- and the schedule constraint assertions, which also want a fresh database:
+--
+--   dropdb --if-exists dosely_rls_test && createdb dosely_rls_test
+--   psql -d dosely_rls_test -v ON_ERROR_STOP=1 \
+--     -f supabase/tests/local_harness.sql \
+--     -f supabase/migrations/*.sql (in the order above) \
+--     -f supabase/tests/schedule_constraints_test.sql
+--
+-- Note the assertions print to stderr, not stdout, so redirect both when
+-- counting them.
+--
+-- The two migrations after push_notifications were missing from the list
+-- above until the constraints migration was added; a run without them
+-- exercises a schema that no longer exists anywhere.
 --
 -- This stubs the parts of the platform the policies depend on. It is a
 -- convenience for testing policy *logic*; it is not a claim that the local
