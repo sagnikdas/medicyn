@@ -8,6 +8,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:timezone/data/latest_all.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 
+import '../../core/app_settings.dart';
 import '../../data/local/database.dart';
 import '../../data/local/tables.dart';
 import 'notification_actions.dart';
@@ -37,6 +38,35 @@ const String careAlertChannelDescription =
 
 const String actionTaken = 'taken';
 const String actionSnooze = 'snooze';
+
+const String _redactedReminderTitle = 'Medicine reminder';
+const String _redactedReminderBody = 'Time to take your dose';
+
+/// Title, body and lock-screen visibility for a medicine reminder.
+///
+/// A locked phone is readable by anyone in the room, so the named copy is
+/// only used when the user has opted in. Kept as a top-level function so
+/// the redacted vs named strings can be tested without the notification
+/// plugin.
+({String title, String body, NotificationVisibility visibility}) reminderLockScreenCopy({
+  required bool showMedicineOnLockScreen,
+  required String drugName,
+  required String strength,
+  required String doseAmount,
+}) {
+  if (!showMedicineOnLockScreen) {
+    return (
+      title: _redactedReminderTitle,
+      body: _redactedReminderBody,
+      visibility: NotificationVisibility.private,
+    );
+  }
+  return (
+    title: strength.isEmpty ? drugName : '$drugName $strength',
+    body: doseAmount.isEmpty ? 'Time for your dose' : 'Take $doseAmount',
+    visibility: NotificationVisibility.public,
+  );
+}
 
 // Android's Notification.FLAG_INSISTENT: repeats the sound/vibration on loop
 // until the notification is dismissed or tapped, instead of playing once.
@@ -153,7 +183,7 @@ class NotificationService {
     return notifGranted && exactGranted;
   }
 
-  NotificationDetails _details() => NotificationDetails(
+  NotificationDetails _details({required NotificationVisibility visibility}) => NotificationDetails(
         android: AndroidNotificationDetails(
           reminderChannelId,
           reminderChannelName,
@@ -165,7 +195,7 @@ class NotificationService {
           enableVibration: true,
           fullScreenIntent: true,
           audioAttributesUsage: AudioAttributesUsage.alarm,
-          visibility: NotificationVisibility.public,
+          visibility: visibility,
           additionalFlags: Int32List.fromList(<int>[_flagInsistent]),
           actions: [
             AndroidNotificationAction(actionTaken, 'Taken', showsUserInterface: true),
@@ -179,6 +209,21 @@ class NotificationService {
           interruptionLevel: InterruptionLevel.critical,
         ),
       );
+
+  /// Reads the lock-screen setting at schedule time. Android stores title,
+  /// body and visibility on the alarm itself, so a later toggle only
+  /// takes effect after the next reconcile.
+  Future<({String title, String body, NotificationVisibility visibility})> _copyFor(
+    Medicine medicine,
+  ) async {
+    await AppSettings.instance.init();
+    return reminderLockScreenCopy(
+      showMedicineOnLockScreen: AppSettings.instance.showMedicineOnLockScreen,
+      drugName: medicine.drugName,
+      strength: medicine.strength,
+      doseAmount: medicine.doseAmount,
+    );
+  }
 
   /// The next occurrence of [time], optionally on a specific [weekday]
   /// (0 = Sunday, matching the stored convention).
@@ -212,11 +257,6 @@ class NotificationService {
     }
     return scheduled;
   }
-
-  String _title(Medicine m) =>
-      m.strength.isEmpty ? m.drugName : '${m.drugName} ${m.strength}';
-
-  String _body(Medicine m) => m.doseAmount.isEmpty ? 'Time for your dose' : 'Take ${m.doseAmount}';
 
   String _payload(String scheduleId, String timeLabel) =>
       jsonEncode({'scheduleId': scheduleId, 'timeLabel': timeLabel});
@@ -254,6 +294,8 @@ class NotificationService {
     if (!schedule.active || frequency == FrequencyType.asNeeded) return;
 
     final times = schedulableTimes(schedule.times);
+    final copy = await _copyFor(medicine);
+    final details = _details(visibility: copy.visibility);
 
     switch (frequency) {
       case FrequencyType.daily:
@@ -262,10 +304,10 @@ class NotificationService {
           if (when == null) continue;
           await _plugin.zonedSchedule(
             id: notificationIdFor(schedule.id, time.label),
-            title: _title(medicine),
-            body: _body(medicine),
+            title: copy.title,
+            body: copy.body,
             scheduledDate: when,
-            notificationDetails: _details(),
+            notificationDetails: details,
             androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
             matchDateTimeComponents: DateTimeComponents.time,
             payload: _payload(schedule.id, time.label),
@@ -280,10 +322,10 @@ class NotificationService {
             if (when == null) continue;
             await _plugin.zonedSchedule(
               id: notificationIdFor(schedule.id, '$day-${time.label}'),
-              title: _title(medicine),
-              body: _body(medicine),
+              title: copy.title,
+              body: copy.body,
               scheduledDate: when,
-              notificationDetails: _details(),
+              notificationDetails: details,
               androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
               matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
               payload: _payload(schedule.id, time.label),
@@ -340,10 +382,10 @@ class NotificationService {
         while (next.isBefore(windowEnd) && index < _everyXHoursMaxOccurrences) {
           await _plugin.zonedSchedule(
             id: notificationIdFor(schedule.id, 'slot-$index'),
-            title: _title(medicine),
-            body: _body(medicine),
+            title: copy.title,
+            body: copy.body,
             scheduledDate: next,
-            notificationDetails: _details(),
+            notificationDetails: details,
             androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
             payload: _payload(schedule.id, anchor.label),
           );
@@ -394,17 +436,17 @@ class NotificationService {
 
   Future<void> scheduleSnooze({
     required String scheduleId,
-    required String title,
-    required String body,
+    required Medicine medicine,
     required Duration delay,
   }) async {
     await init();
+    final copy = await _copyFor(medicine);
     await _plugin.zonedSchedule(
       id: notificationIdFor(scheduleId, 'snooze-${DateTime.now().millisecondsSinceEpoch}'),
-      title: title,
-      body: body,
+      title: copy.title,
+      body: copy.body,
       scheduledDate: tz.TZDateTime.now(tz.local).add(delay),
-      notificationDetails: _details(),
+      notificationDetails: _details(visibility: copy.visibility),
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
       payload: _payload(scheduleId, 'snooze'),
     );
@@ -476,6 +518,18 @@ class NotificationService {
       }
     }
     return ReconcileReport(armed: active.length - failures.length, failures: failures);
+  }
+
+  /// Re-arms from a short-lived database connection — for callers that do
+  /// not already hold one, such as Settings when the lock-screen toggle
+  /// changes. Matches the isolate pattern in push_handlers: open, use, close.
+  Future<ReconcileReport> reconcileFromDisk() async {
+    final db = AppDatabase();
+    try {
+      return await reconcile(db);
+    } finally {
+      await db.close();
+    }
   }
 }
 

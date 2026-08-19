@@ -26,6 +26,7 @@ class AppSettings extends ChangeNotifier {
   static const _legacyTextSizeKey = 'text_size';
   static const _themeModeKey = 'theme_mode';
   static const _hasSeenOnboardingKey = 'has_seen_onboarding';
+  static const _showMedicineOnLockScreenKey = 'show_medicine_on_lock_screen';
 
   /// Elderly-friendly text sizing, as a scale factor the Settings slider
   /// drives directly. It scales every screen's text (and, since buttons and
@@ -54,6 +55,13 @@ class AppSettings extends ChangeNotifier {
   bool _hasSeenOnboarding = false;
   bool get hasSeenOnboarding => _hasSeenOnboarding;
 
+  /// Off by default so a locked phone never shows which medicine is due
+  /// unless the user has chosen to. Existing installs inherit the private
+  /// behaviour — this is a security fix, not a restoration of the old
+  /// public notifications.
+  bool _showMedicineOnLockScreen = false;
+  bool get showMedicineOnLockScreen => _showMedicineOnLockScreen;
+
   bool _loaded = false;
 
   Future<void> init() async {
@@ -68,6 +76,7 @@ class AppSettings extends ChangeNotifier {
       orElse: () => ThemeMode.system,
     );
     _hasSeenOnboarding = prefs.getBool(_hasSeenOnboardingKey) ?? false;
+    _showMedicineOnLockScreen = prefs.getBool(_showMedicineOnLockScreenKey) ?? false;
     _loaded = true;
   }
 
@@ -114,5 +123,13 @@ class AppSettings extends ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_hasSeenOnboardingKey, true);
+  }
+
+  Future<void> setShowMedicineOnLockScreen(bool value) async {
+    if (value == _showMedicineOnLockScreen) return;
+    _showMedicineOnLockScreen = value;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_showMedicineOnLockScreenKey, value);
   }
 }
