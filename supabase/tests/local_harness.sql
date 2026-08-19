@@ -11,6 +11,8 @@
 --     -f supabase/migrations/20260819110000_push_notifications.sql \
 --     -f supabase/migrations/20260819120000_fix_naive_client_timestamps.sql \
 --     -f supabase/migrations/20260819140000_schedule_field_constraints.sql \
+--     -f supabase/migrations/20260819150000_drop_redundant_dose_logs_check.sql \
+--     -f supabase/migrations/20260819160000_care_alerts_active_caregiver.sql \
 --     -f supabase/tests/care_links_rls_test.sql
 --
 -- and the push tables' own assertions, which need a fresh database because
@@ -33,9 +35,9 @@
 -- Note the assertions print to stderr, not stdout, so redirect both when
 -- counting them.
 --
--- The two migrations after push_notifications were missing from the list
--- above until the constraints migration was added; a run without them
--- exercises a schema that no longer exists anywhere.
+-- Later migrations after push_notifications were missing from the list
+-- above until they were added; a run without them exercises a schema that
+-- no longer exists anywhere.
 --
 -- This stubs the parts of the platform the policies depend on. It is a
 -- convenience for testing policy *logic*; it is not a claim that the local
