@@ -3,6 +3,8 @@
 // ships in the app. Called by the Flutter review screen; nothing here is
 // persisted — the client shows the result for the user to edit and confirm.
 
+import { sanitiseExtraction } from "./extraction.ts";
+
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
 const ANTHROPIC_MODEL = "claude-haiku-4-5";
 const REQUEST_TIMEOUT_MS = 10_000;
@@ -173,7 +175,7 @@ async function requestClaude(userMessage: string, signal: AbortSignal): Promise<
   if (!toolUse) {
     return { ok: false, error: "no_tool_use_in_response" };
   }
-  return { ok: true, data: toolUse.input };
+  return { ok: true, data: sanitiseExtraction(toolUse.input) };
 }
 
 function jsonResponse(body: unknown, status = 200): Response {
