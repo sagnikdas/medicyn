@@ -7,7 +7,7 @@
 --   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/care_links_rls_test.sql
 --
 -- Everything runs inside a transaction that is rolled back, so it leaves no
--- users, links or medicines behind. The three test users are impersonated by
+-- users, links or medicines behind. The test users are impersonated by
 -- setting the JWT claims that `auth.uid()` reads.
 --
 -- It checks the things that would be worst to get wrong: that a caregiver
@@ -19,11 +19,19 @@ begin;
 \set parent   '11111111-1111-1111-1111-111111111111'
 \set child    '22222222-2222-2222-2222-222222222222'
 \set stranger '33333333-3333-3333-3333-333333333333'
+\set guesser  '44444444-4444-4444-4444-444444444444'
 
 insert into auth.users (id, email) values
   (:'parent',   'parent@test.invalid'),
   (:'child',    'child@test.invalid'),
-  (:'stranger', 'stranger@test.invalid');
+  (:'stranger', 'stranger@test.invalid'),
+  (:'guesser',  'guesser@test.invalid');
+
+insert into profiles (user_id, display_name) values
+  (:'parent',   'Asha'),
+  (:'child',    'Priya'),
+  (:'stranger', 'Ravi'),
+  (:'guesser',  'Dev');
 
 insert into medicines (id, user_id, drug_name) values
   ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', :'parent',   'Metformin'),
@@ -85,6 +93,32 @@ begin
 end;
 $$;
 
+-- Repeats [stmt] [n] times, each of which must fail with [expected].
+create or replace function pg_temp.expect_n_failures(n int, stmt text, expected text, what text)
+returns void
+language plpgsql as $$
+declare
+  i int;
+begin
+  for i in 1..n loop
+    begin
+      execute stmt;
+      raise exception 'FAILED: % — attempt % was allowed', what, i;
+    exception
+      when others then
+        if sqlerrm like 'FAILED:%' then
+          raise;
+        end if;
+        if position(expected in sqlerrm) = 0 then
+          raise exception 'FAILED: % — attempt % expected %, got %',
+            what, i, expected, sqlerrm;
+        end if;
+    end;
+  end loop;
+  raise notice 'ok: % (% times)', what, n;
+end;
+$$;
+
 -- ---------------------------------------------------------------------------
 -- baseline: no link, no access
 -- ---------------------------------------------------------------------------
@@ -110,7 +144,7 @@ select pg_temp.expect(
 -- ---------------------------------------------------------------------------
 
 select create_care_invite() as code \gset
-select pg_temp.expect(length(:'code') = 6, 'the invite code is six digits');
+select pg_temp.expect(length(:'code') = 8, 'the invite code is eight digits');
 
 select pg_temp.become(:'child');
 select pg_temp.expect(
@@ -130,6 +164,44 @@ select pg_temp.expect(
 select pg_temp.expect_denied(
   format('select confirm_care_link(%L::uuid)', current_setting('test.link_id')),
   'a caregiver cannot confirm their own link'
+);
+
+-- Identity at confirmation: the patient may name the claimant through the
+-- dedicated RPC, and nobody else may. `profiles_read` stays closed while the
+-- link is only claimed — that was the original hole, and it must stay shut.
+select pg_temp.expect(
+  (select count(*) from claimed_care_link_claimant(current_setting('test.link_id')::uuid)) = 0,
+  'a caregiver cannot read claimant identity'
+);
+select pg_temp.expect(
+  (select count(*) from profiles where user_id = :'parent') = 0,
+  'a claimed caregiver still cannot read the patient''s profile'
+);
+
+select pg_temp.become(:'stranger');
+select pg_temp.expect(
+  (select count(*) from claimed_care_link_claimant(current_setting('test.link_id')::uuid)) = 0,
+  'a stranger cannot read claimant identity'
+);
+
+select pg_temp.become(:'parent');
+select pg_temp.expect(
+  (select count(*) from profiles where user_id = :'child') = 0,
+  'claimed profiles_read is still empty for the caregiver'
+);
+select pg_temp.expect(
+  (select count(*) from claimed_care_link_claimant(current_setting('test.link_id')::uuid)) = 1,
+  'the claimed patient can call the identity rpc'
+);
+select pg_temp.expect(
+  (select email from claimed_care_link_claimant(current_setting('test.link_id')::uuid))
+    = 'child@test.invalid',
+  'the claimed patient sees the claimant''s email'
+);
+select pg_temp.expect(
+  (select display_name from claimed_care_link_claimant(current_setting('test.link_id')::uuid))
+    = 'Priya',
+  'the claimed patient sees the claimant''s display name'
 );
 
 -- ---------------------------------------------------------------------------
@@ -238,7 +310,7 @@ select pg_temp.expect(
 
 select pg_temp.become(:'stranger');
 select pg_temp.expect_denied(
-  $q$select claim_care_invite('000000')$q$,
+  $q$select claim_care_invite('00000000')$q$,
   'a wrong code is refused'
 );
 
@@ -263,7 +335,7 @@ select pg_temp.expect(
 select pg_temp.become(:'parent');
 select create_care_invite() as code2 \gset
 select pg_temp.expect(
-  length(:'code2') = 6,
+  length(:'code2') = 8,
   'both sides are free to pair again after revoking'
 );
 
@@ -314,5 +386,34 @@ select pg_temp.expect(
   'confirming a still-valid claimed link succeeds and clears expiry'
 );
 
+-- ---------------------------------------------------------------------------
+-- claim rate limit
+-- ---------------------------------------------------------------------------
+-- Every attempt is counted, including failures, so the counter cannot tell
+-- a guesser whether a code exists. The 11th call in 15 minutes is refused
+-- before the code is even looked up.
+
+select pg_temp.become(:'guesser');
+select pg_temp.expect_n_failures(
+  10,
+  $q$select claim_care_invite('00000000')$q$,
+  'invalid_or_expired_code',
+  'the first ten wrong claims in a window still look like a bad code'
+);
+select pg_temp.expect_exception(
+  $q$select claim_care_invite('00000000')$q$,
+  'too_many_attempts',
+  'an 11th claim attempt in 15 minutes is refused'
+);
+select pg_temp.expect(
+  (select count(*) from care_invite_claim_attempts) = 0,
+  'clients cannot read the claim-attempt ledger'
+);
+
 reset role;
 rollback;
+
+-- Attempt rows are written on a second connection so a failed claim still
+-- counts. ROLLBACK above does not remove them; sweep so a re-run on the
+-- same database does not inherit the cap.
+delete from care_invite_claim_attempts;

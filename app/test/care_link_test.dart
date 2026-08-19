@@ -35,12 +35,12 @@ void main() {
 
     test('reads an unclaimed invite, which has no caregiver yet', () {
       final link = CareLink.fromRow(
-        row(status: 'pending', caregiverId: null, code: '048213'),
+        row(status: 'pending', caregiverId: null, code: '04821300'),
       );
 
       expect(link.status, CareLinkStatus.pending);
       expect(link.caregiverId, isNull);
-      expect(link.inviteCode, '048213');
+      expect(link.inviteCode, '04821300');
     });
 
     test('parses every status the database can produce', () {
@@ -84,6 +84,56 @@ void main() {
       final link = CareLink.fromRow(row(status: 'pending', caregiverId: null));
 
       expect(link.otherPartyId(patient), isNull);
+    });
+  });
+
+  group('CareClaimant.tryParse', () {
+    test('accepts a single row with name and email', () {
+      final claimant = CareClaimant.tryParse([
+        {'display_name': 'Priya', 'email': 'priya@test.invalid'},
+      ]);
+
+      expect(claimant, isNotNull);
+      expect(claimant!.displayName, 'Priya');
+      expect(claimant.email, 'priya@test.invalid');
+    });
+
+    test('accepts a bare map, which some RPC clients return for one row', () {
+      final claimant = CareClaimant.tryParse({
+        'display_name': 'Priya',
+        'email': 'priya@test.invalid',
+      });
+
+      expect(claimant?.displayName, 'Priya');
+    });
+
+    test('fails closed when the rpc returned nothing', () {
+      expect(CareClaimant.tryParse([]), isNull);
+      expect(CareClaimant.tryParse(null), isNull);
+    });
+
+    test('fails closed when the display name is missing', () {
+      expect(
+        CareClaimant.tryParse([
+          {'display_name': null, 'email': 'priya@test.invalid'},
+        ]),
+        isNull,
+      );
+      expect(
+        CareClaimant.tryParse([
+          {'display_name': '  ', 'email': 'priya@test.invalid'},
+        ]),
+        isNull,
+      );
+    });
+
+    test('fails closed when the email is missing — a name alone is not enough', () {
+      expect(
+        CareClaimant.tryParse([
+          {'display_name': 'Priya', 'email': null},
+        ]),
+        isNull,
+      );
     });
   });
 }
