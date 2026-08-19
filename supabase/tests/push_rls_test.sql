@@ -12,10 +12,12 @@
 --   * A device token is never readable by anyone but its owner — not even by
 --     a confirmed caregiver, who can read everything else about the person.
 --     A token is a capability to ring a phone, not information about health.
---   * Registering a token that already exists moves it to the caller. An FCM
---     token belongs to an app *install*: if signing in as a second account on
---     one phone left the row pointing at the first, that phone would keep
---     receiving alerts addressed to whoever handed it over.
+--   * Registering a token that already exists moves it to the caller, but
+--     only when they prove they hold the same install. An FCM token belongs
+--     to an app *install*: if signing in as a second account on one phone
+--     left the row pointing at the first, that phone would keep receiving
+--     alerts addressed to whoever handed it over. A different install that
+--     merely knows the token string cannot steal it.
 --   * A revoked caregiver cannot read care_alerts history. The patient keeps
 --     the record; a stranger sees nothing.
 
@@ -70,16 +72,29 @@ $$;
 -- ---------------------------------------------------------------------------
 
 select pg_temp.become(:'parent');
-select register_device_token('token-parent-phone', 'android');
+select register_device_token('token-parent-phone', 'android', 'install-parent-phone');
 select pg_temp.expect(
   (select count(*) from device_tokens where token = 'token-parent-phone'
-     and user_id = :'parent') = 1,
+     and user_id = :'parent' and install_id = 'install-parent-phone') = 1,
   'registering a token records it against the caller'
 );
 
+select register_device_token('token-parent-phone', 'ios', 'install-parent-phone');
+select pg_temp.expect(
+  (select count(*) from device_tokens where token = 'token-parent-phone'
+     and user_id = :'parent' and platform = 'ios'
+     and install_id = 'install-parent-phone') = 1,
+  're-registering your own token refreshes it'
+);
+select register_device_token('token-parent-phone', 'android', 'install-parent-phone');
+
 select pg_temp.expect_denied(
-  $q$select register_device_token('token-bad-platform', 'windows')$q$,
+  $q$select register_device_token('token-bad-platform', 'windows', 'install-parent-phone')$q$,
   'an unknown platform is refused'
+);
+select pg_temp.expect_denied(
+  $q$select register_device_token('token-no-install', 'android', '')$q$,
+  'an empty install id is refused'
 );
 
 -- Registration is only reachable through the function; there is no insert
@@ -97,7 +112,7 @@ select pg_temp.expect_denied(
 
 -- The shared-phone case. Same install, second Google account.
 select pg_temp.become(:'child');
-select register_device_token('token-parent-phone', 'android');
+select register_device_token('token-parent-phone', 'android', 'install-parent-phone');
 select pg_temp.become(:'parent');
 select pg_temp.expect(
   (select count(*) from device_tokens where token = 'token-parent-phone') = 0,
@@ -106,16 +121,50 @@ select pg_temp.expect(
 select pg_temp.become(:'child');
 select pg_temp.expect(
   (select count(*) from device_tokens where token = 'token-parent-phone'
-     and user_id = :'child') = 1,
+     and user_id = :'child' and install_id = 'install-parent-phone') = 1,
   'a re-registered token moves to the account that registered it'
 );
+
+-- A different install that only knows the token string cannot steal it.
+select pg_temp.become(:'stranger');
+select pg_temp.expect_denied(
+  $q$select register_device_token('token-parent-phone', 'android', 'install-attacker')$q$,
+  'a different install cannot take over a token it does not possess'
+);
+select pg_temp.become(:'child');
+select pg_temp.expect(
+  (select count(*) from device_tokens where token = 'token-parent-phone'
+     and user_id = :'child') = 1,
+  'a refused takeover leaves the row with its original owner'
+);
+
+-- Pre-migration rows have a null install_id. The first caller may claim one
+-- (otherwise every existing production token would be stuck); after that the
+-- row is possessed like any other.
+reset role;
+insert into device_tokens (token, user_id, platform)
+values ('token-legacy', :'parent', 'android');
+select pg_temp.become(:'stranger');
+select register_device_token('token-legacy', 'android', 'install-stranger');
+select pg_temp.expect(
+  (select count(*) from device_tokens where token = 'token-legacy'
+     and user_id = :'stranger' and install_id = 'install-stranger') = 1,
+  'a pre-migration row with no install_id can be claimed once'
+);
+select pg_temp.become(:'parent');
+select pg_temp.expect_denied(
+  $q$select register_device_token('token-legacy', 'android', 'install-parent-phone')$q$,
+  'the back-compat arm is one-time: a claimed row cannot be stolen'
+);
+select pg_temp.become(:'stranger');
+delete from device_tokens where token = 'token-legacy';
 
 -- ---------------------------------------------------------------------------
 -- visibility, including across a confirmed link
 -- ---------------------------------------------------------------------------
 
 select pg_temp.become(:'parent');
-select register_device_token('token-parent-2', 'android');
+select register_device_token('token-parent-2', 'android', 'install-parent-second');
 
 select pg_temp.become(:'stranger');
 select pg_temp.expect(
@@ -158,7 +207,7 @@ select pg_temp.expect(
 );
 
 select pg_temp.become(:'child');
-select register_device_token('token-child-phone', 'android');
+select register_device_token('token-child-phone', 'android', 'install-child-phone');
 select pg_temp.become(:'parent');
 delete from device_tokens where token = 'token-child-phone';
 select pg_temp.become(:'child');
