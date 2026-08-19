@@ -44,12 +44,12 @@ audited on 2026-08-19 and are not rewritten as they are fixed.
 | F-4 | Local medical database unencrypted | High | — | Open |
 | F-5 | `android:allowBackup` unset — F-3 and F-4 leave the device | High | — | Open |
 | F-6 | Care Link confirm prompt cannot name the claimant, and the code is unthrottled | High | — | Open |
+| F-14 | `parse-medicine` answered anyone holding the publishable key | **High** | — | Caller check fixed; quota open |
 | F-7 | Release builds silently fall back to the debug signing key | Medium | — | Open |
 | F-8 | Drug name and strength rendered on the lock screen | Medium | — | Open |
 | F-9 | A caregiver can fabricate adherence history untraceably | Medium | Low | Open |
 | F-10 | `register_device_token` allows token takeover | Medium | Low | Open |
 | F-13 | Revoked caregiver keeps read access to alert history | Medium | Low | Open |
-| F-14 | `parse-medicine` has no per-user quota — billable to an authenticated attacker | Medium | — | Open |
 | F-11 | R8 disabled in release builds | Low | — | Open |
 | F-12 | Dependency hygiene — an EOL package and a pinned override | Low | — | Open |
 | F-15 | `confirm_care_link` never re-checks `expires_at` | Low | — | Open |
@@ -68,11 +68,11 @@ audited on 2026-08-19 and are not rewritten as they are fixed.
   `days_of_week` and `interval_hours`. The audit noted the client and the
   scheduler were unprotected; it did not check whether the *database* would
   accept a value neither could use. It would, and it no longer does.
-- **Still pending:** the `parse-medicine` edge function has not been
-  redeployed, so F-2's server-side half is on `main` but not running. Until it
-  is, a client sending a malformed structure is stopped by the database rather
-  than by the function, which turns a bad write into a failed sync rather than
-  a rejected response.
+- **F-14 corrected upward** to High, and its caller check fixed. Redeploying
+  for F-2 was what exposed it: a probe of the live endpoint showed the
+  publishable key alone was enough to run a billed model call. The finding as
+  originally written recorded the opposite, reasoned from config rather than
+  tested. Its per-user quota remains open.
 
 Everything else stands as written.
 
@@ -582,32 +582,94 @@ record, since it is what makes "who could see my medicines, and when" answerable
 
 ---
 
-## F-14 — `parse-medicine` has no per-user quota
+## F-14 — `parse-medicine` answered anyone holding the publishable key
 
-**Severity: Medium (financial)**
+**Severity: High (financial) — corrected upward from Medium**
 
-**First, the refutation:** `supabase/config.toml:410-412` sets
-`verify_jwt = true`. This is **not** an open unauthenticated proxy to the owner's
-Anthropic key, and it will not answer an anonymous caller. That is the worst case
-and it does not apply.
+### The correction
 
-What remains is real but smaller. Any signed-up account can call it without
-limit. Input is capped (`MAX_FIELD_CHARS = 4000`) and retries are capped at 2,
-but there is **no per-user rate limit or daily quota**, and sign-up is open
-(`config.toml:167`). A handful of accounts in a loop bill the owner's Anthropic
-key indefinitely.
+This finding originally recorded a refutation: that `verify_jwt = true`
+(`supabase/config.toml:410-412`) meant the function was **not** an open proxy to
+the owner's Anthropic key and would not answer an anonymous caller.
+
+**That was wrong, and it was wrong in the direction that mattered.** It was
+reasoned from configuration rather than tested against the deployed function.
+Probing the live endpoint after a routine redeploy:
+
+```
+no credentials at all                → HTTP 401
+publishable key as `apikey`, no JWT  → HTTP 200, full extraction returned
+```
+
+The second request ran a complete Claude call and billed the project owner,
+with no account and no sign-in of any kind.
+
+`verify_jwt` checks that a request carries a credential the project accepts.
+**The publishable key is one.** It ships inside the app by design
+(`app/lib/core/supabase_config.dart:7`) and is extractable from any APK, so the
+gateway check establishes only that the caller has read a string out of a
+published binary — not that a user is calling.
+
+### Impact
+
+Unbounded billed model calls on the owner's Anthropic account, reachable by
+anyone who pulls one string out of the APK. No account, no sign-up, no rate
+limit, no quota. Input is capped (`MAX_FIELD_CHARS = 4000`) and retries at 2,
+which bounds the cost of a single call and not the number of them.
+
+The repository being private limits how easily the key is *found*; it does
+nothing once the app is distributed.
+
+### Remediation
+
+**Done** — `caller.ts` resolves the bearer token against `/auth/v1/user` before
+anything billable runs, and refuses anything that does not name a real user.
+It fails closed when the auth server is unreachable, since the thing being
+protected is a billed call. The pattern is `notify-care`'s: validate the caller,
+do not trust the gateway.
+
+**Still open:** any account can still call it without limit — the original
+Medium finding, now the residual one. It needs a per-user call ledger keyed on
+the verified caller id.
+
+How hard is it to get an account? Tested rather than read off the config this
+time, because the first version of this paragraph cited
+`enable_signup = true` (`config.toml:167`) and called sign-up open, which is the
+same mistake as the one above. Against the live project:
+
+```
+POST /auth/v1/signup (email)  → 400 email_provider_disabled
+POST /auth/v1/signup (anon)   → 422
+```
+
+The global `enable_signup` is overridden by the email provider being disabled,
+and anonymous sign-ins are off. Google is the only way in. So the residual needs
+a Google account — free and unlimited, but not nothing, and it attaches an
+identity to the abuse. That makes a quota worth having and not urgent.
 
 ```
 POST /functions/v1/parse-medicine
-Authorization: Bearer <any_signed_up_user_jwt>
-{"ocrText":"aaaa…(4000 chars)","transcript":"bbbb…(4000 chars)"}   // in a loop
+Authorization: Bearer <any_google_signed_in_user_jwt>
+{"ocrText":"aaaa…(4000 chars)","transcript":"bbbb…(4000 chars)"}   // still unbounded
 ```
 
-**Remediation:** a per-user call ledger keyed on the verified `caller.id`, and
-consider requiring email confirmation before this endpoint answers.
+### Why it was missed
+
+The audit was static. `verify_jwt = true` reads like an authentication control
+and was accepted as one, by me as well as by the review that produced it — the
+distinction between "a credential this project accepts" and "a user" is not
+visible in the config file. It took one `curl` against the deployed function to
+see it.
+
+The same trap caught the first draft of the residual above, which read
+`enable_signup = true` and concluded sign-up was open; the live project refuses
+email and anonymous sign-ups regardless. `config.toml` is the *local* config,
+and the hosted project is the only authority on its own settings.
+
+Worth remembering for every finding in this report that is still reasoned rather
+than exercised — which is most of the backend ones.
 
 ---
-
 ## F-15 — `confirm_care_link` never re-checks `expires_at`
 
 **Severity: Low**

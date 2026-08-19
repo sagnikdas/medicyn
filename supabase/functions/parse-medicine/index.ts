@@ -3,9 +3,12 @@
 // ships in the app. Called by the Flutter review screen; nothing here is
 // persisted — the client shows the result for the user to edit and confirm.
 
+import { verifyCaller } from "./caller.ts";
 import { sanitiseExtraction } from "./extraction.ts";
 
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 const ANTHROPIC_MODEL = "claude-haiku-4-5";
 const REQUEST_TIMEOUT_MS = 10_000;
 const MAX_FIELD_CHARS = 4_000;
@@ -71,8 +74,19 @@ Deno.serve(async (req: Request) => {
   if (req.method !== "POST") {
     return jsonResponse({ success: false, data: null, error: "method_not_allowed" }, 405);
   }
-  if (!ANTHROPIC_API_KEY) {
+  if (!ANTHROPIC_API_KEY || !SUPABASE_URL || !SERVICE_ROLE_KEY) {
     return jsonResponse({ success: false, data: null, error: "server_misconfigured" }, 500);
+  }
+
+  // Before anything that costs money. The gateway's `verify_jwt` is satisfied
+  // by the publishable key, which ships in the app, so it does not establish
+  // that a *user* is calling — see caller.ts.
+  const caller = await verifyCaller(req.headers.get("Authorization"), {
+    supabaseUrl: SUPABASE_URL,
+    serviceRoleKey: SERVICE_ROLE_KEY,
+  });
+  if (!caller.ok) {
+    return jsonResponse({ success: false, data: null, error: caller.error }, caller.status);
   }
 
   let body: ParseRequest;
