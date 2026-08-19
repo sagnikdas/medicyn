@@ -156,7 +156,7 @@ class SettingsScreen extends StatelessWidget {
         title: const Text('Sign out?'),
         content: const Text(
           "You'll need to sign in with Google again to get back in. "
-          'Your reminders stay on this device either way.',
+          'Your reminders stay on this phone for this Google account.',
         ),
         actions: [
           // Plain TextButtons on purpose: the app theme stretches

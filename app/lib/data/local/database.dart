@@ -1,8 +1,8 @@
 import 'package:drift/drift.dart';
-import 'package:drift_flutter/drift_flutter.dart';
 import 'package:flutter/foundation.dart';
 
 import 'converters.dart';
+import 'encrypted_database.dart';
 import 'tables.dart';
 
 part 'database.g.dart';
@@ -17,10 +17,14 @@ class ScheduleWithMedicine {
 
 @DriftDatabase(tables: [Medicines, Schedules, DoseLogs])
 class AppDatabase extends _$AppDatabase {
-  AppDatabase() : super(driftDatabase(name: 'dosely'));
+  /// Opens the encrypted per-account file via [openEncryptedAppDatabase].
+  /// Background isolates construct this the same way so Taken/Snooze and
+  /// FCM pull hit the same key and the same file.
+  AppDatabase() : super(openEncryptedAppDatabase());
 
   /// For tests: an isolated database with no file behind it, so logic that
-  /// spans several tables can be exercised without a device.
+  /// spans several tables can be exercised without a device. Unencrypted
+  /// on purpose — tests never hold real medical rows.
   @visibleForTesting
   AppDatabase.forTesting(super.executor);
 

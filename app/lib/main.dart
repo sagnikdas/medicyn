@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
@@ -15,8 +17,6 @@ import 'features/notification_engine/notification_service.dart';
 import 'features/onboarding/onboarding_screen.dart';
 import 'features/push/push_service.dart';
 import 'features/reminders_home/home_screen.dart';
-
-final appDatabase = AppDatabase();
 
 void main() async {
   // With SentryConfig.dsn empty (the default), SentryFlutter.init disables
@@ -127,16 +127,53 @@ class _OnboardingGate extends StatelessWidget {
 /// `currentSession` is checked on every rebuild (including the initial
 /// build), and `onAuthStateChange` triggers rebuilds as sign-in/sign-out
 /// happen.
-class _AuthGate extends StatelessWidget {
+///
+/// The database connection is per Google account: a second person signing
+/// in on this phone must not inherit the previous person's file. The same
+/// person signing back in reopens theirs — reminders stay.
+class _AuthGate extends StatefulWidget {
   const _AuthGate();
+
+  @override
+  State<_AuthGate> createState() => _AuthGateState();
+}
+
+class _AuthGateState extends State<_AuthGate> {
+  AppDatabase? _db;
+  String? _userId;
+
+  @override
+  void dispose() {
+    unawaited(_db?.close());
+    super.dispose();
+  }
+
+  AppDatabase _databaseFor(String userId) {
+    if (_db != null && _userId == userId) return _db!;
+    unawaited(_db?.close());
+    _userId = userId;
+    _db = AppDatabase();
+    return _db!;
+  }
+
+  void _releaseDatabase() {
+    final open = _db;
+    _db = null;
+    _userId = null;
+    unawaited(open?.close());
+  }
 
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<AuthState>(
       stream: Supabase.instance.client.auth.onAuthStateChange,
       builder: (context, snapshot) {
-        final signedIn = Supabase.instance.client.auth.currentSession != null;
-        return signedIn ? HomeScreen(db: appDatabase) : const SignInScreen();
+        final user = Supabase.instance.client.auth.currentUser;
+        if (user == null) {
+          _releaseDatabase();
+          return const SignInScreen();
+        }
+        return HomeScreen(db: _databaseFor(user.id));
       },
     );
   }
