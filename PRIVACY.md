@@ -22,8 +22,20 @@ password.
 amount, any notes you add, and the times and days you've set for reminders.
 
 **Your dose history.** Each time you mark a dose as taken or snoozed, Dosely
-records which reminder it was for, the time the dose was due, and the time
-you responded.
+records which reminder it was for, the time the dose was due, and the time you
+responded. If a reminder goes unanswered for more than half an hour, Dosely
+records that too, as a missed dose.
+
+**A notification token for your phone.** So that Dosely can alert the person
+you have chosen to share with (see below), it stores an identifier that
+Google's notification service uses to reach your device. It is tied to this
+installation of the app, not to you as a person, and it is deleted when you
+sign out. It is not used for advertising or analytics, and it cannot be used to
+locate you.
+
+**A record of the alerts that were sent.** When Dosely notifies the person you
+share with, it records that it did so and when. Both of you can see that
+record — you are never told less about your own information than they are.
 
 **Nothing else.** Dosely does not collect your location, your contacts, your
 device identifiers for advertising, your browsing activity, or any other
@@ -48,7 +60,17 @@ never uploads a recording.
 **Supabase** hosts Dosely's database and handles sign-in. Your medicines,
 schedules, and dose history are stored there so that they survive losing or
 replacing your phone. Access is restricted per account at the database level:
-one account cannot read another account's data.
+no other account can read your data unless you have connected it yourself, as
+described in "Sharing with someone who helps you" below.
+
+**Google** delivers Dosely's notifications between two connected phones, using
+Firebase Cloud Messaging. Google receives the notification token for the
+receiving device and the contents of the notification — which, for a missed
+dose, includes the name of the medicine, the time it was due, and the display
+name on your account. This is only used to deliver the message, under Google's
+own privacy policy. If you have not connected your account to anyone, Dosely
+sends no such notifications and nothing about your medicines is sent to
+Google.
 
 **Anthropic** receives the text — and only the text — from a label scan and a
 voice description, when you use the automatic fill-in feature on the review
@@ -62,6 +84,38 @@ updated first to say what it reports.
 
 Dosely does not sell your data, does not share it with advertisers, and
 contains no advertising or analytics SDKs.
+
+## Sharing with someone who helps you
+
+Dosely can connect your account to **one** other person's — typically a family
+member who wants to know that you are taking your medicines. Nothing is shared
+until you set this up, and it works in two steps that both need you:
+
+1. You show them a short code that Dosely generates for you.
+2. They enter it, and then **you** confirm, by name, that it is really them.
+
+Holding the code is not access. Until you confirm, the person who entered it
+can see nothing at all.
+
+**What they can see once connected.** Your medicines, your schedules, and your
+dose history — including doses recorded as missed. They can also add and edit
+medicines for you. **You see exactly the same screens about yourself that they
+see about you**, and you can see every alert Dosely has sent them.
+
+Access runs one way only. Connecting lets them see your medicines; it does not
+let you see theirs — they may have prescriptions of their own that are none of
+your business. And neither of you gains access to anybody else: an account can
+be connected to at most one other.
+
+**What they are told automatically.** If a reminder goes unanswered for more
+than half an hour, Dosely sends them a notification naming the medicine and the
+time it was due.
+
+**Ending it.** Either of you can disconnect at any time, from inside the app,
+and access stops immediately. Dosely keeps a record that the connection existed
+and when it ended, so the question "who could see my medicines, and when" always
+has an answer. Your medicines and dose history belong to your account and are
+unaffected by disconnecting.
 
 ## Where your data lives
 
@@ -90,7 +144,8 @@ Dosely is not intended for children and is not directed at anyone under 13.
 ## Permissions and why they are needed
 
 - **Notifications, exact alarms** — to make a reminder fire at the right
-  time. This is the core function of the app.
+  time. This is the core function of the app. The same notification permission
+  is what lets Dosely tell you if someone you help has missed a dose.
 - **Ignore battery optimisations** — Android power saving can silently stop
   scheduled alarms. This permission is requested so reminders are not missed.
   You can decline it and the rest of the app still works.

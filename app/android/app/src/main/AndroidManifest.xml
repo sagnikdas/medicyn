@@ -50,6 +50,17 @@
             android:name="flutterEmbedding"
             android:value="2" />
 
+        <!-- Where an FCM notification lands if it names no channel of its own.
+             The notify-care function always names the care-alert channel
+             explicitly, so this is the fallback for anything that doesn't —
+             and it must NOT be the alarm channel, which loops its sound until
+             dismissed. Android drops a notification addressed to a channel
+             that doesn't exist, so the id here has to match the one
+             NotificationService creates. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="dosely_care_alerts_v1" />
+
         <!-- flutter_local_notifications: reschedule exact alarms after reboot/app update -->
         <receiver android:exported="false"
             android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver">

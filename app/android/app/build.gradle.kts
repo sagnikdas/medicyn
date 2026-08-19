@@ -7,6 +7,23 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+// Firebase Cloud Messaging config, same shape as the release keystore below:
+// machine-local, git-ignored, and absent by default so a fresh checkout builds.
+// The google-services plugin aborts the build if applied without the file, so
+// it is applied conditionally rather than declared in the `plugins` block —
+// which cannot be conditional.
+//
+// When the file is missing, the app builds and runs with push disabled: see
+// PushService, which reports Firebase as unconfigured rather than crashing.
+val googleServicesFile = file("google-services.json")
+if (googleServicesFile.exists()) {
+    apply(plugin = "com.google.gms.google-services")
+} else {
+    logger.lifecycle(
+        "google-services.json not found — building without push. See README's Push section.",
+    )
+}
+
 // Release signing is optional and machine-local: `key.properties` is
 // git-ignored (see .gitignore) and absent by default, so a fresh checkout
 // still builds. When present, it points at a keystore for release signing;

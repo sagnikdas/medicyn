@@ -50,3 +50,10 @@ app.*.map.json
 /android/key.properties
 *.keystore
 *.jks
+
+# Firebase config. Not a secret in the cryptographic sense — every installed
+# APK contains it — but it names a specific Firebase project, and a checkout
+# picking up someone else's would register its devices in the wrong one. Kept
+# out so the file has exactly one source: the Firebase console.
+/android/app/google-services.json
+/ios/Runner/GoogleService-Info.plist

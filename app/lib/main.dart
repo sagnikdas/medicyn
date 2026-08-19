@@ -13,6 +13,7 @@ import 'features/auth/sign_in_screen.dart';
 import 'features/notification_engine/notification_actions.dart';
 import 'features/notification_engine/notification_service.dart';
 import 'features/onboarding/onboarding_screen.dart';
+import 'features/push/push_service.dart';
 import 'features/reminders_home/home_screen.dart';
 
 final appDatabase = AppDatabase();
@@ -37,6 +38,11 @@ void main() async {
       // Must happen before checking the launch response below — the plugin
       // has to be initialized first to answer getNotificationAppLaunchDetails.
       await NotificationService.instance.init();
+      // Before runApp, and that matters: PushService.init registers the
+      // background message handler, which has to be in place while the main
+      // isolate starts up or a message arriving with the app dead has nowhere
+      // to go. It no-ops when Firebase isn't configured in this build.
+      await PushService.instance.init();
       final launchResponse = await NotificationService.instance.consumeLaunchNotificationResponse();
       runApp(DoselyApp(launchNotificationResponse: launchResponse));
     },

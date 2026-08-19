@@ -9,6 +9,13 @@ environment:
 dependencies:
   drift: ^2.34.3
   drift_flutter: ^0.3.1
+  # Push. Both are needed even though the app only ever *receives*: the native
+  # Firebase app has to be configured at process start for a notification to be
+  # drawn while the app is dead, and that configuration comes from
+  # android/app/google-services.json (git-ignored — see README's Push section).
+  # Without the file the app still builds and runs, just without push.
+  firebase_core: ^4.13.0
+  firebase_messaging: ^16.5.0
   flutter:
     sdk: flutter
   flutter_local_notifications: ^22.3.0

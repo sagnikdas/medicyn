@@ -19,6 +19,21 @@ const String reminderChannelId = 'dosely_reminders_v4';
 const String reminderChannelName = 'Medicine Alarms';
 const String reminderChannelDescription = 'Critical alerts for your medication schedule.';
 
+/// A care alert is not an alarm and must not share the alarm channel: that
+/// channel loops its sound until the notification is dismissed, which is right
+/// for "take your tablet" and hostile for "your mother missed one". An ordinary
+/// high-importance channel instead — it should be noticed, not obeyed.
+///
+/// Must match `CARE_ALERT_CHANNEL_ID` in
+/// supabase/functions/notify-care/index.ts and the
+/// `default_notification_channel_id` meta-data in AndroidManifest.xml. Android
+/// silently drops a notification addressed to a channel that does not exist,
+/// so a mismatch here produces no error anywhere — just no alert.
+const String careAlertChannelId = 'dosely_care_alerts_v1';
+const String careAlertChannelName = 'Care alerts';
+const String careAlertChannelDescription =
+    "When someone you're helping misses a dose.";
+
 const String actionTaken = 'taken';
 const String actionSnooze = 'snooze';
 
@@ -64,7 +79,28 @@ class NotificationService {
       onDidReceiveNotificationResponse: handleNotificationResponse,
       onDidReceiveBackgroundNotificationResponse: notificationTapBackground,
     );
+    await _createCareAlertChannel();
     _initialized = true;
+  }
+
+  /// Creates the care-alert channel up front rather than on first use.
+  ///
+  /// A push from the server can arrive before this device has ever shown a care
+  /// alert itself, and Android drops a notification whose channel does not yet
+  /// exist — so waiting until we need it means losing the first one, which is
+  /// the one most likely to matter.
+  Future<void> _createCareAlertChannel() async {
+    final android = _plugin.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
+    if (android == null) return;
+    await android.createNotificationChannel(
+      const AndroidNotificationChannel(
+        careAlertChannelId,
+        careAlertChannelName,
+        description: careAlertChannelDescription,
+        importance: Importance.high,
+      ),
+    );
   }
 
   /// The response for the notification that cold-launched the app, if any.
@@ -310,6 +346,42 @@ class NotificationService {
       notificationDetails: _details(),
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
       payload: _payload(scheduleId, 'snooze'),
+    );
+  }
+
+  /// Shows a care alert this device received while in the foreground.
+  ///
+  /// Only needed for the foreground: Android draws an FCM notification message
+  /// itself when the app is backgrounded or dead, and deliberately does not
+  /// when it is in front of the user. Without this, a caregiver sitting in the
+  /// app is the one person who never hears that a dose was missed.
+  ///
+  /// [patientId] rides along in the payload so a tap opens the right feed —
+  /// see `handleNotificationResponse`.
+  Future<void> showCareAlert({
+    required String title,
+    required String body,
+    String? patientId,
+  }) async {
+    await init();
+    await _plugin.show(
+      // A fresh id per alert, so a second missed dose does not overwrite the
+      // first while the caregiver is reading it.
+      id: DateTime.now().millisecondsSinceEpoch.remainder(1 << 31),
+      title: title,
+      body: body,
+      notificationDetails: const NotificationDetails(
+        android: AndroidNotificationDetails(
+          careAlertChannelId,
+          careAlertChannelName,
+          channelDescription: careAlertChannelDescription,
+          importance: Importance.high,
+          priority: Priority.high,
+          category: AndroidNotificationCategory.message,
+        ),
+        iOS: DarwinNotificationDetails(presentAlert: true, presentSound: true),
+      ),
+      payload: jsonEncode({'careAlertPatientId': patientId}),
     );
   }
 

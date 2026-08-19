@@ -1,6 +1,7 @@
 import 'package:dosely/data/local/database.dart';
 import 'package:dosely/data/local/tables.dart';
 import 'package:dosely/features/notification_engine/missed_doses.dart';
+import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -26,15 +27,24 @@ void main() {
 
   tearDown(() async => db.close());
 
+  // Well before any window these tests use, so the schedule counts as having
+  // existed all along. It has to be stated rather than defaulted: the column
+  // defaults to the real wall clock, which for a sweep at a *simulated* `now`
+  // would put every occurrence before the schedule existed — and correctly
+  // produce nothing. See [MissedDoseDetector.wasArmed].
+  final longEstablished = DateTime(2026, 8, 1);
+
   Future<void> givenSchedule({
     List<String> times = const ['08:00', '20:00'],
     FrequencyType frequency = FrequencyType.daily,
+    DateTime? definedAt,
   }) async {
     await db.upsertSchedule(SchedulesCompanion.insert(
       id: scheduleId,
       medicineId: medicineId,
       frequencyType: frequency.name,
       times: times,
+      updatedAt: Value(definedAt ?? longEstablished),
     ));
   }
 
@@ -169,5 +179,119 @@ void main() {
 
     final unsynced = await db.unsyncedDoseLogs();
     expect(unsynced.where((l) => l.action == DoseAction.missed.name), isNotEmpty);
+  });
+
+  /// A reminder cannot be missed before it existed.
+  ///
+  /// [expectedDoses] answers "when would this schedule have fired", knowing
+  /// nothing about when the schedule came into being — so an unbounded sweep
+  /// invents history. It is the sharpest false positive the whole feature can
+  /// produce: adding a medicine at nine in the morning would announce three
+  /// days of eight o'clock doses as skipped, doses nobody was ever asked to
+  /// take. Since push landed that is not a stale row in a list, it is a
+  /// notification on a family member's phone.
+  group('a dose before the schedule was defined', () {
+    test('is not reported for a reminder saved after it was due', () async {
+      // Saved at 10:00; the 08:00 alarm that morning was never armed.
+      await givenSchedule(
+        times: ['08:00'],
+        definedAt: DateTime(2026, 8, 19, 10, 0),
+      );
+
+      final count = await sweep(lookback: const Duration(hours: 6));
+
+      expect(count, 0);
+      expect(await missedLogs(), isEmpty);
+    });
+
+    test('is reported for a reminder saved before it was due', () async {
+      // Saved at 07:00, so the 08:00 alarm really was armed and really was
+      // ignored. The bound must not cost the true positives.
+      await givenSchedule(
+        times: ['08:00'],
+        definedAt: DateTime(2026, 8, 19, 7, 0),
+      );
+
+      final count = await sweep(lookback: const Duration(hours: 6));
+
+      expect(count, 1);
+      expect((await missedLogs()).single.scheduledAt, DateTime(2026, 8, 19, 8, 0));
+    });
+
+    test('does not backfill the days before a reminder was added', () async {
+      // The bug as it actually appeared in production data: a schedule added
+      // this morning carrying missed doses dated three days earlier.
+      await givenSchedule(
+        times: ['08:00'],
+        definedAt: DateTime(2026, 8, 19, 7, 0),
+      );
+
+      final count = await sweep(lookback: const Duration(days: 3));
+
+      expect(count, 1, reason: 'only today, not the three days before it existed');
+      final missed = await missedLogs();
+      expect(missed.map((l) => l.scheduledAt), [DateTime(2026, 8, 19, 8, 0)]);
+    });
+
+    test('does not judge earlier days at a time that was only just set', () async {
+      // The twin case, and why the bound is `updatedAt` and not `createdAt`:
+      // this schedule may have existed for weeks, but its 08:00 was set an
+      // hour ago. Yesterday's alarm rang at some other time, or not at all —
+      // either way, 08:00 yesterday is a time no alarm was ever set for.
+      await givenSchedule(
+        times: ['08:00'],
+        definedAt: DateTime(2026, 8, 19, 7, 0),
+      );
+
+      await sweep(lookback: const Duration(days: 3));
+
+      final missed = await missedLogs();
+      expect(
+        missed.every((l) => l.scheduledAt.isAfter(DateTime(2026, 8, 19, 7, 0))),
+        isTrue,
+      );
+    });
+
+    test('a dose due at the very instant of the save is armed for tomorrow', () async {
+      // Mirrors _nextInstanceOfTime's own `isAfter(now)`: save at exactly
+      // 08:00 and today's 08:00 has already gone, so the alarm is set for
+      // tomorrow and today's occurrence was never armed.
+      await givenSchedule(
+        times: ['08:00'],
+        definedAt: DateTime(2026, 8, 19, 8, 0),
+      );
+
+      expect(await sweep(lookback: const Duration(hours: 6)), 0);
+    });
+
+    test('an established reminder is unaffected', () async {
+      // The guard must be invisible to the ordinary case, which is every
+      // reminder that has been sitting there since before the window.
+      await givenSchedule(times: ['08:00'], definedAt: longEstablished);
+
+      expect(await sweep(lookback: const Duration(days: 3)), 3);
+    });
+  });
+
+  group('wasArmed', () {
+    final definedAt = DateTime(2026, 8, 19, 8, 0);
+
+    test('a dose after the definition was armed', () {
+      expect(
+        MissedDoseDetector.wasArmed(DateTime(2026, 8, 19, 8, 1), definedAt: definedAt),
+        isTrue,
+      );
+    });
+
+    test('a dose before the definition was not', () {
+      expect(
+        MissedDoseDetector.wasArmed(DateTime(2026, 8, 19, 7, 59), definedAt: definedAt),
+        isFalse,
+      );
+    });
+
+    test('a dose exactly at the definition was not', () {
+      expect(MissedDoseDetector.wasArmed(definedAt, definedAt: definedAt), isFalse);
+    });
   });
 }

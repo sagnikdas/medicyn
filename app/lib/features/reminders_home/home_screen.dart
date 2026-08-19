@@ -4,12 +4,14 @@ import 'package:flutter/material.dart';
 
 import '../../data/local/database.dart';
 import '../../data/local/tables.dart';
+import '../../data/remote/care_notifier.dart';
 import '../../data/remote/sync_service.dart';
 import '../auth/auth_service.dart';
 import '../capture_ocr/ocr_capture_screen.dart';
 import '../care/care_service.dart';
 import '../notification_engine/missed_doses.dart';
 import '../notification_engine/notification_service.dart';
+import '../push/push_service.dart';
 import '../review_edit/review_edit_screen.dart';
 import '../settings/settings_screen.dart';
 import '../voice_capture/voice_capture_screen.dart';
@@ -64,7 +66,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       // existed — without it their name never appears on the other side of a
       // link, and nothing would ever create the row.
       unawaited(CareService.instance.upsertOwnProfile());
+      // Only needs the navigator, which exists by now. Not in `main`, where
+      // PushService.init runs: a tapped alert has nowhere to open a feed
+      // before runApp.
+      unawaited(PushService.instance.attachForegroundListeners(db: widget.db));
     }
+    // Every foreground, not just the first: FCM can reissue a token while the
+    // app isn't running, and nothing announces that beyond the token itself
+    // having changed. An unregistered device is one a family's alerts never
+    // reach, which is the failure this whole phase exists to remove.
+    unawaited(PushService.instance.registerToken());
     final sync = SyncService(widget.db);
     // Pull before reconcile: a fresh install/new device has no local
     // schedules yet, so restoring them from Supabase first means reconcile
@@ -76,6 +87,30 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     // and reaches the other side without waiting for another foreground.
     await const MissedDoseDetector().sweep(widget.db);
     await sync.syncAll();
+
+    // After the push, never before it: the alert names dose-log ids, and the
+    // server reads those rows back to compose what the family is told. Telling
+    // it about a dose that is still only on this phone would have it find
+    // nothing.
+    //
+    // Asked of the database rather than of the sync that just ran. Using what
+    // that one call happened to push made the alert depend on it succeeding end
+    // to end — an upsert that commits but whose response never arrives left the
+    // dose in Postgres and the alert lost for good, with nothing anywhere to
+    // say so. Re-offering the window costs one request and the server drops
+    // everything it has already sent.
+    final missed = await widget.db.syncedMissedDoseIdsSince(
+      DateTime.now().subtract(CareNotifier.announceWindow),
+    );
+    if (missed.isNotEmpty) {
+      unawaited(CareNotifier.instance.missedDoses(missed));
+    }
+    // Wired now, inert until Phase 2: the server sends this only when the
+    // caller is the *caregiver*, and caregiver-side editing has no screen yet.
+    // See CareNotifier.dataChanged.
+    if (sync.pushedEdits) {
+      unawaited(CareNotifier.instance.dataChanged());
+    }
   }
 
   Future<void> _startCapture() async {

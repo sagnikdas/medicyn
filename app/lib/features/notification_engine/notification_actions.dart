@@ -7,6 +7,7 @@ import '../../core/app_navigation.dart';
 import '../../core/ids.dart';
 import '../../data/local/database.dart';
 import '../../data/local/tables.dart';
+import '../care/dose_feed_screen.dart';
 import '../dose_confirm/dose_confirm_screen.dart';
 import 'notification_service.dart';
 
@@ -42,6 +43,17 @@ void handleNotificationResponse(NotificationResponse response) async {
   } catch (_) {
     return;
   }
+  // A care alert — "someone you help missed a dose" — is not about a schedule
+  // of this device's own, so it is routed before the scheduleId check below
+  // rather than being dropped by it. Only the foreground path produces one
+  // (see NotificationService.showCareAlert); a push that Android drew itself
+  // is tapped through FirebaseMessaging instead.
+  final careAlertPatientId = payload['careAlertPatientId'] as String?;
+  if (careAlertPatientId != null && careAlertPatientId.isNotEmpty) {
+    openFeedForPatient(careAlertPatientId);
+    return;
+  }
+
   final scheduleId = payload['scheduleId'] as String?;
   if (scheduleId == null) return;
   // The dose was due whenever the alarm was set for — not whenever the user

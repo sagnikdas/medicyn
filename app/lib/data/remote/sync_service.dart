@@ -19,6 +19,7 @@ class SyncService {
   Future<void> syncAll() async {
     final user = _client.auth.currentUser;
     if (user == null) return;
+    _pushedEdits = false;
     await _syncMedicines(user.id);
     await _syncSchedules(user.id);
     await _syncDoseLogs(user.id);
@@ -63,6 +64,27 @@ class SyncService {
   bool _schedulesChanged = false;
   bool get schedulesChanged => _schedulesChanged;
 
+  /// Set when [syncAll] pushed a medicine or schedule edit — i.e. a change to
+  /// *what* is meant to fire, as opposed to a record of what happened. The
+  /// caller uses it to decide whether the other side of a care link needs the
+  /// silent re-arm push; see CareNotifier.dataChanged.
+  bool _pushedEdits = false;
+  bool get pushedEdits => _pushedEdits;
+
+  /// Serialises an instant for Postgres, with its offset attached.
+  ///
+  /// `toIso8601String()` on a *local* `DateTime` emits no offset at all —
+  /// `2026-08-19T09:00:00.000` — and Postgres reads a bare timestamp as UTC. So
+  /// every client-stamped time used to land shifted by the writing device's UTC
+  /// offset: a 09:00 IST dose was stored as 09:00Z and read back as 14:30 IST.
+  ///
+  /// Nothing on the device was ever wrong — Drift stores instants — and nothing
+  /// crashed. The damage was entirely in what the *other* side was shown: a
+  /// caregiver's feed, and now a missed-dose notification, quoting a time no
+  /// alarm ever rang at. `toUtc()` makes the string carry its `Z`.
+  @visibleForTesting
+  static String isoUtc(DateTime value) => value.toUtc().toIso8601String();
+
   /// Missing means the row predates versioning on a server that has since
   /// been migrated — treat it as the beginning of time so any local copy
   /// with a real timestamp wins, rather than letting a null masquerade as
@@ -106,11 +128,12 @@ class SyncService {
             'form': m.form,
             'dose_amount': m.doseAmount,
             'notes': m.notes,
-            'created_at': m.createdAt.toIso8601String(),
-            'updated_at': m.updatedAt.toIso8601String(),
+            'created_at': isoUtc(m.createdAt),
+            'updated_at': isoUtc(m.updatedAt),
             'updated_by': m.updatedBy,
           },
       ]).timeout(_networkTimeout);
+      _pushedEdits = true;
       for (final m in rows) {
         await _db.markMedicineSynced(m.id);
       }
@@ -134,11 +157,12 @@ class SyncService {
             'days_of_week': s.daysOfWeek,
             'interval_hours': s.intervalHours,
             'active': s.active,
-            'created_at': s.createdAt.toIso8601String(),
-            'updated_at': s.updatedAt.toIso8601String(),
+            'created_at': isoUtc(s.createdAt),
+            'updated_at': isoUtc(s.updatedAt),
             'updated_by': s.updatedBy,
           },
       ]).timeout(_networkTimeout);
+      _pushedEdits = true;
       for (final s in rows) {
         await _db.markScheduleSynced(s.id);
       }
@@ -157,9 +181,9 @@ class SyncService {
             'id': log.id,
             'schedule_id': log.scheduleId,
             'user_id': userId,
-            'scheduled_at': log.scheduledAt.toIso8601String(),
+            'scheduled_at': isoUtc(log.scheduledAt),
             'action': log.action,
-            'logged_at': log.loggedAt.toIso8601String(),
+            'logged_at': isoUtc(log.loggedAt),
             'source': log.source,
           },
       ]).timeout(_networkTimeout);

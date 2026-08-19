@@ -1,7 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:timezone/timezone.dart' as tz;
 
+import '../../core/app_navigation.dart';
 import 'care_service.dart';
+
+/// Opens [patientId]'s feed from outside the widget tree — a tapped missed-dose
+/// notification, whether it arrived as a push (see PushService) or was drawn
+/// locally while the app was in the foreground.
+///
+/// A null navigator (no widget tree yet) makes this a harmless no-op, the same
+/// contract [navigatorKey] carries everywhere else.
+void openFeedForPatient(String patientId) {
+  navigatorKey.currentState?.push(
+    MaterialPageRoute(
+      builder: (_) => DoseFeedScreen(patientId: patientId, viewingOwnData: false),
+    ),
+  );
+}
 
 /// What actually happened with someone's medicines, newest first.
 ///

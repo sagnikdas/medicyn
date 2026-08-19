@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io' show Platform;
 
 import 'package:google_sign_in/google_sign_in.dart';
@@ -5,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/google_auth_config.dart';
 import '../care/care_service.dart';
+import '../push/push_service.dart';
 
 /// Raised when Google sign-in doesn't produce a session. [message] is
 /// written to be shown to the user as-is; [isCancellation] is true when the
@@ -87,6 +89,10 @@ class AuthService {
       // first screen renders. A failure here costs a display name, not a
       // session, so it never throws.
       await CareService.instance.upsertOwnProfile();
+      // Not awaited: a device that fails to register receives no care alerts,
+      // which is a degraded link rather than a failed sign-in, and every
+      // foreground retries it.
+      unawaited(PushService.instance.registerToken());
     } on GoogleSignInFailure {
       rethrow;
     } on GoogleSignInException catch (e) {
@@ -129,6 +135,11 @@ class AuthService {
   /// whoever signed in last — otherwise "sign out" looks broken to anyone
   /// switching accounts.
   Future<void> signOut() async {
+    // Before the session is cleared, because the delete is authorised by row-
+    // level security against the signed-in user. A phone handed back should
+    // stop receiving the previous account's alerts now, not whenever FCM next
+    // reissues its token.
+    await PushService.instance.unregisterToken();
     if (_googleSignInInitialized) {
       try {
         await GoogleSignIn.instance.signOut();

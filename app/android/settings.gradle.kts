@@ -21,6 +21,11 @@ plugins {
     id("dev.flutter.flutter-plugin-loader") version "1.0.0"
     id("com.android.application") version "8.11.1" apply false
     id("org.jetbrains.kotlin.android") version "2.2.20" apply false
+    // Declared but not applied here. app/build.gradle.kts applies it only when
+    // google-services.json is present, so a checkout without the file (which is
+    // git-ignored) still builds — the plugin fails the build outright if it is
+    // applied with no config file to read.
+    id("com.google.gms.google-services") version "4.4.4" apply false
 }
 
 include(":app")

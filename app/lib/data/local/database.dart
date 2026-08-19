@@ -151,6 +151,36 @@ class AppDatabase extends _$AppDatabase {
   Future<List<DoseLog>> doseLogsSince(DateTime since) =>
       (select(doseLogs)..where((t) => t.loggedAt.isBiggerOrEqualValue(since))).get();
 
+  /// Ids of missed doses recorded since [since] that are known to be on the
+  /// server.
+  ///
+  /// This is what the caregiver's alert is raised from, and it is deliberately
+  /// a question about *state* rather than about what a particular sync call
+  /// happened to push. Deriving it from one call's result ties the alert to
+  /// that call succeeding end to end: an upsert that commits server-side but
+  /// whose response never arrives — a timeout, a dropped connection, the app
+  /// being killed — leaves the dose in Postgres and the alert lost for good,
+  /// silently. Asking the database instead means the next foreground simply
+  /// asks again, and `care_alerts`' unique index makes saying it twice free.
+  ///
+  /// Synced rows only: the notification's wording is composed server-side from
+  /// these rows, so naming one that is still on this phone alone would have the
+  /// server find nothing to talk about.
+  ///
+  /// Newest first and capped, so a phone returning from a long absence sends a
+  /// bounded request rather than every dose in the lookback window.
+  Future<List<String>> syncedMissedDoseIdsSince(DateTime since, {int limit = 200}) async {
+    final rows = await (select(doseLogs)
+          ..where((t) =>
+              t.action.equals(DoseAction.missed.name) &
+              t.pendingSync.equals(false) &
+              t.loggedAt.isBiggerOrEqualValue(since))
+          ..orderBy([(t) => OrderingTerm.desc(t.loggedAt)])
+          ..limit(limit))
+        .get();
+    return [for (final r in rows) r.id];
+  }
+
   /// Insert-or-ignore, because missed doses carry deterministic ids: a sweep
   /// that runs twice, or on a second device, must converge on the same row
   /// rather than filling the feed with duplicates of the same skipped dose.
