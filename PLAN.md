@@ -47,11 +47,18 @@ device was always right; only what the *other* person saw was wrong. A
 migration corrects the existing history, shifting each row by its owner's
 recorded timezone.
 
-**Live on the hosted Supabase project** (`twybepxnqayypzljhcnx`): the first four
-migrations applied; Google provider configured with the Web and Android client
-IDs; email sign-in and the custom SMTP sender both disabled. The push migration
-and `notify-care` are **not** deployed yet, and neither is the Firebase project
-they need.
+**Live on the hosted Supabase project** (`twybepxnqayypzljhcnx`): all six
+migrations applied, including the timestamp correction (2026-08-19, after both
+phones were on a build that sends UTC — it reported 14/19 daily doses landing
+on a time their schedule names, the other five being doses recorded before a
+schedule was edited and `taken` logs stamped from the snooze fallback rather
+than a clock time). Both edge functions deployed. Google provider configured
+with the Web and Android client IDs; email sign-in and the custom SMTP sender
+both disabled.
+
+**Live on Firebase** (`decent-digit-135023`, the same Google Cloud project as
+sign-in): Android app registered for `com.sagnikdas.dosely`, and the service
+account stored as the `FCM_SERVICE_ACCOUNT` secret.
 
 **Verification:** `flutter analyze` clean, `flutter test` 81/81, 34 adversarial
 RLS assertions against a scratch Postgres (16 care-link, 18 push), and 6 Deno
@@ -78,9 +85,7 @@ merged without ever running on hardware; all of it behaves as specified.
 The binding constraint. Three later items are worth little without it, and
 one existing feature is quietly dishonest until it exists.
 
-- [ ] FCM project setup; `google-services.json` — **the one item only you can
-      do.** Browser work in the Firebase console plus one `supabase secrets
-      set`; the walkthrough is README → Push → "Enabling push"
+- [x] FCM project setup; `google-services.json`
 - [x] `device_tokens` table, with registration and refresh on the client
 - [x] **Outbound:** the parent's device calls `notify-care` after pushing a
       missed dose → the caregiver gets a visible alert
@@ -106,11 +111,15 @@ through a security-definer function — the same shape as the link lifecycle.
 
 **Still to verify on hardware**, once Firebase is set up:
 
-- [ ] A missed dose on the parent's phone reaches the caregiver's phone,
-      locked, within a minute or two. To manufacture one: set a reminder a
-      couple of minutes out on the parent's phone, ignore the alarm, wait past
-      the 30-minute grace, then foreground the app. Backdating a reminder no
-      longer works — that was the retroactive bug, and it is fixed
+- [x] The chain works end to end: a missed dose on the parent's phone reached
+      `notify-care`, which recorded three `care_alerts` rows with
+      `delivered_count = 1` — FCM accepted the message for the caregiver's
+      device. To manufacture a missed dose: set a reminder a couple of minutes
+      out on the parent's phone, ignore the alarm, wait past the 30-minute
+      grace, then foreground the app. Backdating a reminder no longer works —
+      that was the retroactive bug, and it is fixed
+- [ ] The alert actually *appears* on the caregiver's locked phone.
+      `delivered_count` proves FCM accepted it, not that Android drew it
 - [ ] The alert lands in the *care* channel, not the alarm channel — it must
       not loop its sound until dismissed
 - [ ] Tapping it opens the parent's feed, from both a cold start and a
