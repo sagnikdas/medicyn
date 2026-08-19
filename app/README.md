@@ -5,10 +5,11 @@ A new Flutter project.
 ## Release signing
 
 The `release` build type in `android/app/build.gradle.kts` signs with a real
-upload keystore when `android/key.properties` exists, and falls back to the
-debug keystore when it doesn't — so a fresh checkout still builds
-(`flutter build apk --debug`, `flutter run --release`, etc.) without any
-signing setup. `android/key.properties` and `*.keystore`/`*.jks` files are
+upload keystore from `android/key.properties`. If that file is missing, a
+release build fails rather than shipping an APK signed with the shared
+debug key. Debug and profile still use the debug keystore, so a fresh
+checkout can `flutter run` / `flutter build apk --debug` with no signing
+setup. `android/key.properties` and `*.keystore`/`*.jks` files are
 git-ignored; never commit them.
 
 To set up real release signing:
