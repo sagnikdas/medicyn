@@ -174,6 +174,65 @@ select pg_temp.expect(
 );
 
 -- ---------------------------------------------------------------------------
+-- dose_logs: the patient's device is the only writer
+-- ---------------------------------------------------------------------------
+-- The feed is readable by both sides of an active link. A caregiver writing
+-- a 'taken' row for the parent is the thing this policy exists to refuse.
+
+insert into schedules (id, medicine_id, user_id, frequency_type, times)
+values ('ffffffff-ffff-ffff-ffff-ffffffffffff',
+        'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', :'parent', 'daily', '["09:00"]'::jsonb);
+
+insert into dose_logs (id, schedule_id, user_id, scheduled_at, action, recorded_by)
+values ('12121212-1212-1212-1212-121212121212',
+        'ffffffff-ffff-ffff-ffff-ffffffffffff', :'parent', now(), 'taken', :'child');
+select pg_temp.expect(
+  (select count(*) from dose_logs where user_id = :'parent') = 1,
+  'the patient can record a dose log'
+);
+select pg_temp.expect(
+  (select recorded_by from dose_logs where id = '12121212-1212-1212-1212-121212121212')
+    = :'parent'::uuid,
+  'recorded_by is the caller, even when the payload names someone else'
+);
+
+select pg_temp.become(:'child');
+select pg_temp.expect(
+  (select count(*) from dose_logs where user_id = :'parent') = 1,
+  'a confirmed caregiver can read the parent''s dose logs'
+);
+select pg_temp.expect_denied(
+  $q$insert into dose_logs (id, schedule_id, user_id, scheduled_at, action)
+     values ('13131313-1313-1313-1313-131313131313',
+             'ffffffff-ffff-ffff-ffff-ffffffffffff',
+             '11111111-1111-1111-1111-111111111111', now(), 'taken')$q$,
+  'a caregiver cannot write a dose log for the parent'
+);
+
+-- UPDATE/DELETE under RLS that match no rows succeed with a row count of
+-- zero rather than raising, so "was it refused" is "did the row survive".
+update dose_logs set action = 'missed' where user_id = :'parent';
+select pg_temp.expect(
+  (select action from dose_logs where id = '12121212-1212-1212-1212-121212121212') = 'taken',
+  'a caregiver cannot update the parent''s dose logs'
+);
+delete from dose_logs where user_id = :'parent';
+select pg_temp.expect(
+  (select count(*) from dose_logs where user_id = :'parent') = 1,
+  'a caregiver cannot delete the parent''s dose logs'
+);
+
+-- Caregiver writes to medicines/schedules must still be allowed — that is a
+-- later phase, and tightening those policies here would take it away.
+insert into schedules (id, medicine_id, user_id, frequency_type, times)
+values ('abababab-abab-abab-abab-abababababab',
+        'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', :'parent', 'daily', '["21:00"]'::jsonb);
+select pg_temp.expect(
+  (select count(*) from schedules where user_id = :'parent') = 2,
+  'a caregiver can still add a schedule for the parent'
+);
+
+-- ---------------------------------------------------------------------------
 -- one-to-one, and bad codes
 -- ---------------------------------------------------------------------------
 

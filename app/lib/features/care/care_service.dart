@@ -90,6 +90,8 @@ class DoseEvent {
     required this.drugName,
     required this.strength,
     required this.doseAmount,
+    this.source,
+    this.recordedBy,
   });
 
   final String id;
@@ -106,6 +108,15 @@ class DoseEvent {
   final String drugName;
   final String strength;
   final String doseAmount;
+
+  /// How the row was produced. The official app writes `notification` for a
+  /// Taken/Snooze tap and `auto` for the missed-dose sweep. Anything else is
+  /// unusual and worth a quiet note on the feed.
+  final String? source;
+
+  /// Who Postgres stamped as the writer (`dose_logs.recorded_by`). Null on
+  /// rows from before that column existed, or on a malformed response.
+  final String? recordedBy;
 
   /// How late the response was. Negative when answered early, which happens
   /// often and legitimately — people take a tablet when they remember it.
@@ -136,6 +147,22 @@ class DoseEvent {
     return days == 1 ? '1 day' : '$days days';
   }
 
+  /// Sources the official app actually writes. Anything outside this set is
+  /// worth a quiet note; `notification` on every Taken tap is not.
+  static const _deviceSources = {'notification', 'auto'};
+
+  /// A quiet line for the feed when this row wasn't a normal recording from
+  /// the patient's own device. Null for ordinary Taken / Snooze / missed
+  /// answers, so the card stays uncluttered.
+  String? attributionNote(String patientId) {
+    final loggedByOther = recordedBy != null && recordedBy != patientId;
+    if (loggedByOther) return 'Logged by someone else';
+    final sourceUnusual =
+        source != null && source!.isNotEmpty && !_deviceSources.contains(source);
+    if (sourceUnusual) return 'Not from the reminder';
+    return null;
+  }
+
   static DoseEvent fromRow(Map<String, dynamic> row) {
     // PostgREST nests the embedded rows; a dose log cannot exist without its
     // schedule and medicine, and the query inner-joins both, so anything
@@ -150,6 +177,8 @@ class DoseEvent {
       drugName: (medicine?['drug_name'] as String?) ?? 'Medicine',
       strength: (medicine?['strength'] as String?) ?? '',
       doseAmount: (medicine?['dose_amount'] as String?) ?? '',
+      source: row['source'] as String?,
+      recordedBy: row['recorded_by'] as String?,
     );
   }
 }
@@ -236,7 +265,7 @@ class CareService {
       final rows = await _client
           .from('dose_logs')
           .select(
-            'id, scheduled_at, logged_at, action, source, '
+            'id, scheduled_at, logged_at, action, source, recorded_by, '
             'schedules!inner(medicines!inner(drug_name, strength, dose_amount))',
           )
           .eq('user_id', userId)
