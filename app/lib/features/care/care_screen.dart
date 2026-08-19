@@ -32,6 +32,7 @@ class _CareScreenState extends State<CareScreen> {
 
   CareLink? _link;
   String? _otherName;
+  CareClaimant? _claimant;
   bool _loading = true;
   String? _error;
   Timer? _poll;
@@ -63,10 +64,17 @@ class _CareScreenState extends State<CareScreen> {
       final link = await CareService.instance.currentLink();
       final otherId = link?.otherPartyId(_myId);
       final name = otherId == null ? null : await CareService.instance.displayName(otherId);
+      CareClaimant? claimant;
+      if (link != null &&
+          link.status == CareLinkStatus.claimed &&
+          link.isPatient(_myId)) {
+        claimant = await CareService.instance.claimedLinkClaimant(link.id);
+      }
       if (!mounted) return;
       setState(() {
         _link = link;
         _otherName = name;
+        _claimant = claimant;
         _loading = false;
         _error = null;
       });
@@ -110,7 +118,11 @@ class _CareScreenState extends State<CareScreen> {
     await _run(() => CareService.instance.claimInvite(code));
   }
 
-  Future<void> _confirm() => _run(() => CareService.instance.confirmLink(_link!.id));
+  Future<void> _confirm() {
+    // Fail closed: never offer confirmation when the claimant did not resolve.
+    if (_claimant == null || _link == null) return Future.value();
+    return _run(() => CareService.instance.confirmLink(_link!.id));
+  }
 
   Future<void> _disconnect() async {
     final link = _link;
@@ -289,17 +301,45 @@ class _CareScreenState extends State<CareScreen> {
 
   Widget _confirmPrompt() {
     final text = Theme.of(context).textTheme;
-    final who = _otherName ?? 'Someone';
+    final scheme = Theme.of(context).colorScheme;
+    final claimant = _claimant;
+    if (claimant == null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Icon(Icons.error_outline, size: 64, color: scheme.error),
+          const SizedBox(height: 20),
+          Text(
+            'We could not confirm who typed in your number',
+            style: text.headlineSmall,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Connecting would let them see your medicines. Disconnect this '
+            'invitation and ask the person you meant to invite to try again.',
+            style: text.bodyMedium,
+          ),
+          const SizedBox(height: 28),
+          OutlinedButton(
+            onPressed: _disconnect,
+            child: const Text('Disconnect'),
+          ),
+        ],
+      );
+    }
+    final who = claimant.displayName;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Icon(
           Icons.person_add_alt_1,
           size: 64,
-          color: Theme.of(context).colorScheme.primary,
+          color: scheme.primary,
         ),
         const SizedBox(height: 20),
         Text('$who typed in your number', style: text.headlineSmall),
+        const SizedBox(height: 8),
+        Text(claimant.email, style: text.titleMedium),
         const SizedBox(height: 12),
         Text(
           'If that is who you expected, connect with them. They will be able '
@@ -408,7 +448,7 @@ class _CareScreenState extends State<CareScreen> {
   }
 }
 
-/// Six digits, nothing else. Kept as its own dialog so the number pad is the
+/// Eight digits, nothing else. Kept as its own dialog so the number pad is the
 /// only thing on screen while it's being read out over a phone call.
 class _CodeEntryDialog extends StatefulWidget {
   const _CodeEntryDialog();
@@ -425,7 +465,7 @@ class _CodeEntryDialogState extends State<_CodeEntryDialog> {
   void initState() {
     super.initState();
     _controller.addListener(() {
-      final complete = _controller.text.length == 6;
+      final complete = _controller.text.length == 8;
       if (complete != _complete) setState(() => _complete = complete);
     });
   }
@@ -445,7 +485,7 @@ class _CodeEntryDialogState extends State<_CodeEntryDialog> {
         children: [
           const Text(
             'Ask them to open Dosely and tap "Ask someone to help me". '
-            'They will read you a six-digit number.',
+            'They will read you an eight-digit number.',
           ),
           const SizedBox(height: 20),
           TextField(
@@ -453,12 +493,12 @@ class _CodeEntryDialogState extends State<_CodeEntryDialog> {
             autofocus: true,
             keyboardType: TextInputType.number,
             textAlign: TextAlign.center,
-            maxLength: 6,
+            maxLength: 8,
             style: Theme.of(context).textTheme.headlineMedium?.copyWith(letterSpacing: 8),
             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            decoration: const InputDecoration(counterText: '', hintText: '000000'),
+            decoration: const InputDecoration(counterText: '', hintText: '00000000'),
             onSubmitted: (v) {
-              if (v.length == 6) Navigator.of(context).pop(v);
+              if (v.length == 8) Navigator.of(context).pop(v);
             },
           ),
         ],

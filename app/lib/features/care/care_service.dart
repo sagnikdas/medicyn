@@ -68,6 +68,36 @@ class CareLink {
       );
 }
 
+/// The person who claimed a pending invite, as shown on the patient's
+/// confirmation prompt. Both fields are required: a Google display name
+/// alone is weak proof, and a missing email means we cannot name them.
+class CareClaimant {
+  const CareClaimant({required this.displayName, required this.email});
+
+  final String displayName;
+  final String email;
+
+  /// Null unless both a name and an email are present. Confirmation must
+  /// fail closed rather than invent a person.
+  static CareClaimant? tryParse(Object? raw) {
+    Map<String, dynamic>? row;
+    if (raw is List) {
+      if (raw.isEmpty) return null;
+      final first = raw.first;
+      if (first is Map) row = Map<String, dynamic>.from(first);
+    } else if (raw is Map) {
+      row = Map<String, dynamic>.from(raw);
+    }
+    if (row == null) return null;
+    final name = (row['display_name'] as String?)?.trim();
+    final email = (row['email'] as String?)?.trim();
+    if (name == null || name.isEmpty || email == null || email.isEmpty) {
+      return null;
+    }
+    return CareClaimant(displayName: name, email: email);
+  }
+}
+
 /// Who someone is, as far as the other side of a link can see.
 class CareProfile {
   const CareProfile({required this.userId, this.displayName, this.timezone});
@@ -296,7 +326,8 @@ class CareService {
 
   /// Display name for someone the caller is allowed to see — the other half
   /// of an active link, or themselves. Falls back to null rather than
-  /// inventing a name.
+  /// inventing a name. Does **not** resolve a claimed (unconfirmed) claimant;
+  /// use [claimedLinkClaimant] for that.
   Future<String?> displayName(String userId) async {
     try {
       final rows = await _client
@@ -306,6 +337,22 @@ class CareService {
           .limit(1);
       if (rows.isEmpty) return null;
       return rows.first['display_name'] as String?;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Name and email of the person who claimed [linkId], usable only by the
+  /// patient while the link is still [CareLinkStatus.claimed]. Null when the
+  /// RPC returns nothing or either field is empty — the confirm prompt must
+  /// not invent an identity.
+  Future<CareClaimant?> claimedLinkClaimant(String linkId) async {
+    try {
+      final raw = await _client.rpc(
+        'claimed_care_link_claimant',
+        params: {'link_id': linkId},
+      );
+      return CareClaimant.tryParse(raw);
     } catch (_) {
       return null;
     }
@@ -368,6 +415,9 @@ class CareService {
     }
     if (raw.contains('invalid_or_expired_code')) {
       return "That code didn't work. Codes last 15 minutes — ask for a fresh one.";
+    }
+    if (raw.contains('too_many_attempts')) {
+      return 'Too many tries. Wait a few minutes and ask for a fresh number.';
     }
     if (raw.contains('cannot_link_to_self')) {
       return "That's your own code.";
