@@ -628,14 +628,28 @@ It fails closed when the auth server is unreachable, since the thing being
 protected is a billed call. The pattern is `notify-care`'s: validate the caller,
 do not trust the gateway.
 
-**Still open:** sign-up is open (`config.toml:167`), so a signed-up account can
-still call it without limit — the original Medium finding, now the residual one.
-It needs a per-user call ledger keyed on the verified caller id, and possibly
-email confirmation before this endpoint answers.
+**Still open:** any account can still call it without limit — the original
+Medium finding, now the residual one. It needs a per-user call ledger keyed on
+the verified caller id.
+
+How hard is it to get an account? Tested rather than read off the config this
+time, because the first version of this paragraph cited
+`enable_signup = true` (`config.toml:167`) and called sign-up open, which is the
+same mistake as the one above. Against the live project:
+
+```
+POST /auth/v1/signup (email)  → 400 email_provider_disabled
+POST /auth/v1/signup (anon)   → 422
+```
+
+The global `enable_signup` is overridden by the email provider being disabled,
+and anonymous sign-ins are off. Google is the only way in. So the residual needs
+a Google account — free and unlimited, but not nothing, and it attaches an
+identity to the abuse. That makes a quota worth having and not urgent.
 
 ```
 POST /functions/v1/parse-medicine
-Authorization: Bearer <any_signed_up_user_jwt>
+Authorization: Bearer <any_google_signed_in_user_jwt>
 {"ocrText":"aaaa…(4000 chars)","transcript":"bbbb…(4000 chars)"}   // still unbounded
 ```
 
@@ -645,8 +659,15 @@ The audit was static. `verify_jwt = true` reads like an authentication control
 and was accepted as one, by me as well as by the review that produced it — the
 distinction between "a credential this project accepts" and "a user" is not
 visible in the config file. It took one `curl` against the deployed function to
-see it. Worth remembering for the findings in this report that are still
-reasoned rather than exercised.
+see it.
+
+The same trap caught the first draft of the residual above, which read
+`enable_signup = true` and concluded sign-up was open; the live project refuses
+email and anonymous sign-ups regardless. `config.toml` is the *local* config,
+and the hosted project is the only authority on its own settings.
+
+Worth remembering for every finding in this report that is still reasoned rather
+than exercised — which is most of the backend ones.
 
 ---
 ## F-15 — `confirm_care_link` never re-checks `expires_at`
