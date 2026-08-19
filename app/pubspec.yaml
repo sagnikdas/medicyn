@@ -8,6 +8,9 @@ environment:
 
 dependencies:
   drift: ^2.34.3
+  # drift_flutter still pulls sqlcipher_flutter_libs 0.7.0+eol transitively.
+  # That package is unused here and EOL; F-4 must encrypt via sqlite3 hooks
+  # (source: sqlcipher / sqlite3mc), not this package. Do not depend on it.
   drift_flutter: ^0.3.1
   # Push. Both are needed even though the app only ever *receives*: the native
   # Firebase app has to be configured at process start for a notification to be
@@ -43,9 +46,12 @@ dev_dependencies:
   drift_dev: ^2.34.0
   build_runner: ^2.15.1
 
-# permission_handler_android 14.0.0 ships a build.gradle.kts that fails to
-# compile against this project's Kotlin Gradle Plugin version ("Unresolved
-# reference: compilerOptions"). Pin to the last known-good release.
+# Rechecked 2026-08-19 against Kotlin Gradle Plugin 2.2.20
+# (app/android/settings.gradle.kts). permission_handler_android 14.0.0 still
+# fails to compile:
+#   Unresolved reference: compilerOptions
+# in its android/build.gradle.kts (`kotlin { compilerOptions { jvmTarget } }`).
+# Keep the pin until that plugin compiles against this KGP.
 dependency_overrides:
   permission_handler_android: 13.0.1
 
