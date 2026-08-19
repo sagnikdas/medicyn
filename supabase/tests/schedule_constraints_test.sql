@@ -162,6 +162,12 @@ select pg_temp.expect_rejected(
 
 -- ---------------------------------------------------------------------------
 -- dose_logs.action
+--
+-- This column has been constrained since `init.sql`; the assertions below
+-- cover it because nothing did, not because this migration added it. An
+-- earlier version of that migration added a second, identical CHECK on the
+-- mistaken belief the column was unconstrained — see
+-- 20260819150000_drop_redundant_dose_logs_check.sql.
 -- ---------------------------------------------------------------------------
 
 insert into dose_logs (id, schedule_id, user_id, scheduled_at, action)
