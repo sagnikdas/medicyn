@@ -3,8 +3,10 @@ import 'dart:io' show Platform;
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../core/ids.dart';
 import '../../data/local/database.dart';
 import '../notification_engine/notification_service.dart';
 import 'push_events.dart';
@@ -27,6 +29,7 @@ class PushService {
   bool _initialized = false;
   bool _available = false;
   String? _registeredToken;
+  String? _installId;
   StreamSubscription<String>? _refreshSubscription;
   StreamSubscription<RemoteMessage>? _foregroundSubscription;
   StreamSubscription<RemoteMessage>? _openedSubscription;
@@ -153,10 +156,13 @@ class PushService {
       // a second person on one phone has to move the existing row. RLS cannot
       // express that — the update arm is checked against the row being
       // replaced, which belongs to whoever signed out — so the upsert lives in
-      // a security-definer function. See the push migration.
+      // a security-definer function. The install id is what stops a different
+      // phone that has only the token string from doing the same move. See the
+      // device-token-possession migration.
       await Supabase.instance.client.rpc('register_device_token', params: {
         'p_token': token,
         'p_platform': Platform.isIOS ? 'ios' : 'android',
+        'p_install_id': await _ensureInstallId(),
       });
       _registeredToken = token;
     } catch (_) {
@@ -164,6 +170,26 @@ class PushService {
       // is a degraded care link rather than a broken app, and the next
       // foreground retries.
     }
+  }
+
+  /// Stable id for *this* app install, minted once and kept across sign-out.
+  ///
+  /// SharedPreferences is enough here: the value is not a secret so much as a
+  /// proof that this process is the same install that last registered the
+  /// token, and F-5 is what stops prefs leaving the device. A new id on every
+  /// launch would break the handed-back-phone move, because the second account
+  /// would look like a stranger who merely knows the token.
+  Future<String> _ensureInstallId() async {
+    if (_installId != null) return _installId!;
+    final prefs = await SharedPreferences.getInstance();
+    const key = 'push_install_id';
+    var id = prefs.getString(key);
+    if (id == null || id.isEmpty) {
+      id = newUuid();
+      await prefs.setString(key, id);
+    }
+    _installId = id;
+    return id;
   }
 
   /// Drops this device's token on sign-out, so a phone handed back stops
