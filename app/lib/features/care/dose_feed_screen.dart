@@ -169,6 +169,7 @@ class _DoseFeedScreenState extends State<DoseFeedScreen> {
                 child: _DoseEventCard(
                   event: event,
                   clockTime: _inPatientZone(event.scheduledAt),
+                  patientId: widget.patientId,
                 ),
               ),
           ],
@@ -257,12 +258,20 @@ class _DayGroup {
 }
 
 class _DoseEventCard extends StatelessWidget {
-  const _DoseEventCard({required this.event, required this.clockTime});
+  const _DoseEventCard({
+    required this.event,
+    required this.clockTime,
+    required this.patientId,
+  });
 
   final DoseEvent event;
 
   /// [DoseEvent.scheduledAt] rendered in the patient's own zone.
   final DateTime clockTime;
+
+  /// Whose history this card is in — the feed is always for the patient, so
+  /// a `recorded_by` that isn't this id is someone else writing their log.
+  final String patientId;
 
   ({IconData icon, Color color, String label}) _visuals(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
@@ -286,6 +295,7 @@ class _DoseEventCard extends StatelessWidget {
     final visuals = _visuals(context);
     final text = Theme.of(context).textTheme;
     final punctuality = event.punctuality;
+    final attribution = event.attributionNote(patientId);
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(14),
@@ -311,6 +321,15 @@ class _DoseEventCard extends StatelessWidget {
                   if (event.doseAmount.isNotEmpty) ...[
                     const SizedBox(height: 2),
                     Text(event.doseAmount, style: text.bodySmall),
+                  ],
+                  if (attribution != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      attribution,
+                      style: text.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.outline,
+                      ),
+                    ),
                   ],
                 ],
               ),

@@ -13,22 +13,27 @@ void main() {
     String drugName = 'Metformin',
     String strength = '500mg',
     String doseAmount = '1 tablet',
-  }) =>
-      {
-        'id': 'log-1',
-        'scheduled_at': scheduledAt,
-        'logged_at': loggedAt,
-        'action': action,
-        'source': 'notification',
-        // PostgREST nests embedded resources one level per hop.
-        'schedules': {
-          'medicines': {
-            'drug_name': drugName,
-            'strength': strength,
-            'dose_amount': doseAmount,
-          },
+    String? source = 'notification',
+    String? recordedBy,
+  }) {
+    final map = <String, dynamic>{
+      'id': 'log-1',
+      'scheduled_at': scheduledAt,
+      'logged_at': loggedAt,
+      'action': action,
+      // PostgREST nests embedded resources one level per hop.
+      'schedules': {
+        'medicines': {
+          'drug_name': drugName,
+          'strength': strength,
+          'dose_amount': doseAmount,
         },
-      };
+      },
+    };
+    if (source != null) map['source'] = source;
+    if (recordedBy != null) map['recorded_by'] = recordedBy;
+    return map;
+  }
 
   DoseEvent event({
     String action = 'taken',
@@ -75,6 +80,67 @@ void main() {
 
       expect(e.drugName, 'Medicine');
       expect(e.strength, isEmpty);
+      expect(e.source, isNull);
+      expect(e.recordedBy, isNull);
+    });
+
+    test('reads source and recorded_by when they are present', () {
+      final e = DoseEvent.fromRow(row(
+        scheduledAt: '2026-08-18T08:00:00.000Z',
+        loggedAt: '2026-08-18T08:00:00.000Z',
+        source: 'auto',
+        recordedBy: 'patient-1',
+      ));
+
+      expect(e.source, 'auto');
+      expect(e.recordedBy, 'patient-1');
+    });
+  });
+
+  group('attributionNote', () {
+    const patientId = 'patient-1';
+
+    test('is silent for a normal device-recorded row', () {
+      expect(event().attributionNote(patientId), isNull);
+      expect(
+        DoseEvent.fromRow(row(
+          scheduledAt: '2026-08-18T08:00:00.000Z',
+          loggedAt: '2026-08-18T08:00:00.000Z',
+          source: 'auto',
+          recordedBy: patientId,
+        )).attributionNote(patientId),
+        isNull,
+      );
+    });
+
+    test('is silent when source and recorded_by are missing', () {
+      // Older payloads, and the existing fromRow tests, omit both.
+      final e = DoseEvent.fromRow({
+        'id': 'log-2',
+        'scheduled_at': '2026-08-18T08:00:00.000Z',
+        'logged_at': '2026-08-18T08:00:00.000Z',
+        'action': 'taken',
+      });
+      expect(e.attributionNote(patientId), isNull);
+    });
+
+    test('mentions a writer who is not the patient', () {
+      final e = DoseEvent.fromRow(row(
+        scheduledAt: '2026-08-18T08:00:00.000Z',
+        loggedAt: '2026-08-18T08:00:00.000Z',
+        recordedBy: 'caregiver-1',
+      ));
+      expect(e.attributionNote(patientId), 'Logged by someone else');
+    });
+
+    test('mentions an unusual source without cluttering a reminder tap', () {
+      final e = DoseEvent.fromRow(row(
+        scheduledAt: '2026-08-18T08:00:00.000Z',
+        loggedAt: '2026-08-18T08:00:00.000Z',
+        source: 'manual',
+        recordedBy: patientId,
+      ));
+      expect(e.attributionNote(patientId), 'Not from the reminder');
     });
   });
 
