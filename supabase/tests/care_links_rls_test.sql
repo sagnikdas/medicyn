@@ -152,7 +152,7 @@ select pg_temp.expect(
   'an outstanding invite is invisible to the person about to claim it'
 );
 
-select claim_care_invite(:'code') as link_id \gset
+select claim_care_invite(:'code')->>'id' as link_id \gset
 select set_config('test.link_id', :'link_id', false);
 
 -- The critical one: possession of the code is not access.
@@ -471,8 +471,8 @@ select pg_temp.expect(
 -- ---------------------------------------------------------------------------
 
 select pg_temp.become(:'stranger');
-select pg_temp.expect_denied(
-  $q$select claim_care_invite('00000000')$q$,
+select pg_temp.expect(
+  claim_care_invite('00000000')->>'error' = 'invalid_or_expired_code',
   'a wrong code is refused'
 );
 
@@ -517,7 +517,7 @@ select pg_temp.expect(
 -- link sits forever.
 
 select pg_temp.become(:'child');
-select claim_care_invite(:'code2') as expired_link_id \gset
+select claim_care_invite(:'code2')->>'id' as expired_link_id \gset
 select set_config('test.expired_link_id', :'expired_link_id', false);
 
 select pg_temp.expect(
@@ -545,7 +545,7 @@ select pg_temp.expect_exception(
 select revoke_care_link(current_setting('test.expired_link_id')::uuid);
 select create_care_invite() as code3 \gset
 select pg_temp.become(:'child');
-select claim_care_invite(:'code3') as fresh_link_id \gset
+select claim_care_invite(:'code3')->>'id' as fresh_link_id \gset
 select set_config('test.fresh_link_id', :'fresh_link_id', false);
 select pg_temp.become(:'parent');
 select confirm_care_link(current_setting('test.fresh_link_id')::uuid);
@@ -604,15 +604,14 @@ select pg_temp.expect_exception(
 -- before the code is even looked up.
 
 select pg_temp.become(:'guesser');
-select pg_temp.expect_n_failures(
-  10,
-  $q$select claim_care_invite('00000000')$q$,
-  'invalid_or_expired_code',
+select pg_temp.expect(
+  (select count(*) from (
+     select claim_care_invite('00000000') as r from generate_series(1, 10)
+   ) s where s.r->>'error' = 'invalid_or_expired_code') = 10,
   'the first ten wrong claims in a window still look like a bad code'
 );
-select pg_temp.expect_exception(
-  $q$select claim_care_invite('00000000')$q$,
-  'too_many_attempts',
+select pg_temp.expect(
+  claim_care_invite('00000000')->>'error' = 'too_many_attempts',
   'an 11th claim attempt in 15 minutes is refused'
 );
 select pg_temp.expect(
@@ -623,7 +622,7 @@ select pg_temp.expect(
 reset role;
 rollback;
 
--- Attempt rows are written on a second connection so a failed claim still
--- counts. ROLLBACK above does not remove them; sweep so a re-run on the
--- same database does not inherit the cap.
+-- Failed claims now commit the ledger in the same transaction as the
+-- refusal, so ROLLBACK above removes them. Sweep anyway so a re-run on
+-- the same database does not inherit the cap if something leaked.
 delete from care_invite_claim_attempts;

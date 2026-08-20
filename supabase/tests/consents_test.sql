@@ -142,7 +142,7 @@ select pg_temp.expect(
 select pg_temp.become(:'parent');
 select create_care_invite() as code \gset
 select pg_temp.become(:'child');
-select claim_care_invite(:'code') as link_id \gset
+select claim_care_invite(:'code')->>'id' as link_id \gset
 select pg_temp.become(:'parent');
 select confirm_care_link(:'link_id'::uuid);
 

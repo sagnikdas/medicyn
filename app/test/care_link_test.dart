@@ -99,6 +99,30 @@ void main() {
     });
   });
 
+  group('claimInviteError', () {
+    test('reads a refused claim from the jsonb payload', () {
+      expect(
+        CareService.claimInviteError({'error': 'invalid_or_expired_code'}),
+        'invalid_or_expired_code',
+      );
+    });
+
+    test('treats a successful {"id": ...} payload as no error', () {
+      expect(
+        CareService.claimInviteError({
+          'id': 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+        }),
+        isNull,
+      );
+    });
+
+    test('ignores a missing or empty error rather than inventing one', () {
+      expect(CareService.claimInviteError(null), isNull);
+      expect(CareService.claimInviteError({'error': ''}), isNull);
+      expect(CareService.claimInviteError('link-id'), isNull);
+    });
+  });
+
   group('CareClaimant.tryParse', () {
     test('accepts a single row with name and email', () {
       final claimant = CareClaimant.tryParse([

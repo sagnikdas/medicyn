@@ -465,10 +465,29 @@ class CareService {
   /// confirm it really is you.
   Future<void> claimInvite(String code) async {
     try {
-      await _client.rpc('claim_care_invite', params: {'code': code});
+      final raw = await _client.rpc(
+        'claim_care_invite',
+        params: {'code': code},
+      );
+      final error = claimInviteError(raw);
+      if (error != null) throw CareLinkFailure(_describe(error));
+    } on CareLinkFailure {
+      rethrow;
     } catch (e) {
       throw CareLinkFailure(_describe(e));
     }
+  }
+
+  /// Error code from [claim_care_invite]'s jsonb payload, or null on success.
+  /// Hosted Postgres cannot RAISE on a failed guess (the attempt ledger would
+  /// roll back), so refusal is a committed `{"error": ...}` instead.
+  @visibleForTesting
+  static String? claimInviteError(Object? raw) {
+    if (raw is Map) {
+      final error = raw['error'];
+      if (error is String && error.isNotEmpty) return error;
+    }
+    return null;
   }
 
   /// The consent step. Only the patient can do this.
