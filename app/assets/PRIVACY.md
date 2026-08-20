@@ -298,6 +298,22 @@ Dosely is not intended for children and is not directed at anyone under 13.
 If what Dosely does with your data changes, this policy will be updated and
 the date at the top will change.
 
+## Data Protection Officer
+
+Dosely has no Data Protection Officer. That role is not required at this
+scale. Privacy questions still go to **sagnikd91@gmail.com**. There is
+not yet an EU or UK representative (GDPR / UK GDPR Article 27). If you
+are in the EEA or the UK, that gap is ours, not yours — you can still
+write to the email above and to your supervisory authority.
+
+## Washington and Nevada health privacy
+
+If Washington's My Health My Data Act or Nevada SB370 applies to you,
+there is a **separate** consumer health data policy in `docs/MHMD.md` in
+the Dosely source tree. Ask for it by email if you cannot open that
+file. It names Supabase, Anthropic, and Google, and it describes the
+second consent before family sharing.
+
 ## Contact
 
 sagnikd91@gmail.com
