@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/account_deletion.dart';
 import '../../core/app_settings.dart';
@@ -7,6 +6,8 @@ import '../../core/privacy_policy.dart';
 import '../../data/local/encrypted_database.dart';
 import '../auth/auth_service.dart';
 import '../care/care_screen.dart';
+import '../consent/consent_purpose.dart';
+import '../consent/consent_service.dart';
 import '../notification_engine/notification_service.dart';
 
 /// Deliberately sparse — there's almost nothing to configure by design.
@@ -18,40 +19,85 @@ import '../notification_engine/notification_service.dart';
 /// their text — theme, which stays on the device's own light/dark setting
 /// unless the user overrides it here, and whether a locked phone may show
 /// which medicine is due.
-class SettingsScreen extends StatelessWidget {
+class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
   @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
+  bool _signingIn = false;
+  String? _signInError;
+
+  bool get _signedIn => AuthService.instance.isSignedIn;
+
+  Future<void> _signInWithGoogle() async {
+    setState(() {
+      _signingIn = true;
+      _signInError = null;
+    });
+    final error = await AuthService.instance.trySignInWithGoogle();
+    if (!mounted) return;
+    setState(() {
+      _signInError = error;
+      _signingIn = false;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final currentUser = Supabase.instance.client.auth.currentUser;
-    final email = currentUser?.email ?? '';
+    final email = AuthService.instance.currentUser?.email ?? '';
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(20),
           children: [
-            if (email.isNotEmpty) ...[
+            if (_signedIn) ...[
               Text('Signed in as', style: Theme.of(context).textTheme.bodySmall),
               const SizedBox(height: 4),
               Text(email, style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 24),
+            ] else ...[
+              OutlinedButton(
+                onPressed: _signingIn ? null : _signInWithGoogle,
+                child: _signingIn
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Sign in with Google'),
+              ),
+              if (_signInError != null) ...[
+                const SizedBox(height: 12),
+                Text(
+                  _signInError!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+              ],
               const SizedBox(height: 24),
             ],
             Text('Family', style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 4),
             Text(
-              'Let one person help you keep track of your medicines — or help '
-              'someone else with theirs.',
+              _signedIn
+                  ? 'Let one person help you keep track of your medicines — or help '
+                      'someone else with theirs.'
+                  : 'Family sharing needs a Google account.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
-            const SizedBox(height: 12),
-            OutlinedButton.icon(
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const CareScreen()),
+            if (_signedIn) ...[
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const CareScreen()),
+                ),
+                icon: const Icon(Icons.people_outline),
+                label: const Text('Connect with family'),
               ),
-              icon: const Icon(Icons.people_outline),
-              label: const Text('Connect with family'),
-            ),
+            ],
             const SizedBox(height: 24),
             Text('Text size', style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 4),
@@ -124,11 +170,36 @@ class SettingsScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 28),
-            OutlinedButton(
-              onPressed: () => _confirmSignOut(context),
-              child: const Text('Sign out'),
+            Text('Manage what Dosely can do', style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 4),
+            Text(
+              'Turning any of these off takes effect straight away, the same as turning them on.',
+              style: Theme.of(context).textTheme.bodySmall,
             ),
-            if (currentUser != null) ...[
+            const SizedBox(height: 8),
+            ListenableBuilder(
+              listenable: AppSettings.instance,
+              builder: (context, _) {
+                return Column(
+                  children: [
+                    for (final purpose in ConsentPurpose.values)
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(purpose.title),
+                        subtitle: Text(purpose.sentence),
+                        value: ConsentService.instance.isGranted(purpose),
+                        onChanged: (v) => ConsentService.instance.setGranted(purpose, v),
+                      ),
+                  ],
+                );
+              },
+            ),
+            if (_signedIn) ...[
+              const SizedBox(height: 28),
+              OutlinedButton(
+                onPressed: () => _confirmSignOut(context),
+                child: const Text('Sign out'),
+              ),
               const SizedBox(height: 12),
               OutlinedButton(
                 onPressed: () => _confirmDeleteAccount(context),
@@ -272,7 +343,7 @@ class SettingsScreen extends StatelessWidget {
 
     // Captured before sign-out: AuthGate closes the database when the
     // session ends, and wipe must still know which per-user file to remove.
-    final userId = Supabase.instance.client.auth.currentUser?.id;
+    final userId = AuthService.instance.currentUser?.id;
     if (userId == null || userId.isEmpty) return;
 
     if (!context.mounted) return;

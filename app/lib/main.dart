@@ -11,7 +11,10 @@ import 'core/sentry_config.dart';
 import 'core/supabase_init.dart';
 import 'core/theme.dart';
 import 'data/local/database.dart';
+import 'data/local/database_encryption.dart';
 import 'features/auth/sign_in_screen.dart';
+import 'features/consent/consent_screen.dart';
+import 'features/consent/consent_service.dart';
 import 'features/notification_engine/notification_actions.dart';
 import 'features/notification_engine/notification_service.dart';
 import 'features/onboarding/onboarding_screen.dart';
@@ -100,9 +103,9 @@ class _DoselyAppState extends State<DoselyApp> {
 }
 
 /// Shows onboarding once, on first launch only, before anything else —
-/// including sign-in. Once the user finishes or skips it, the persisted
-/// flag (see AppSettings.hasSeenOnboarding) means this gate goes straight
-/// to `_AuthGate` on every later launch.
+/// including consent and sign-in. Once the user finishes or skips it, the
+/// persisted flag (see AppSettings.hasSeenOnboarding) means this gate goes
+/// straight to `_ConsentGate` on every later launch.
 class _OnboardingGate extends StatelessWidget {
   const _OnboardingGate();
 
@@ -112,25 +115,49 @@ class _OnboardingGate extends StatelessWidget {
       listenable: AppSettings.instance,
       builder: (context, _) {
         if (AppSettings.instance.hasSeenOnboarding) {
-          return const _AuthGate();
+          return const _ConsentGate();
         }
         // No navigation needed here: OnboardingScreen persists the flag via
         // AppSettings, and that change alone triggers this ListenableBuilder
-        // to rebuild into _AuthGate.
+        // to rebuild into _ConsentGate.
         return const OnboardingScreen();
       },
     );
   }
 }
 
-/// Shows the sign-in screen until there's a session, then the app itself.
+/// Shows the consent screen until the user has recorded a choice — including
+/// on existing installs that already skipped onboarding. After Continue the
+/// persisted flag (see AppSettings.hasRecordedConsents) means this gate goes
+/// straight to `_AuthGate`.
+class _ConsentGate extends StatelessWidget {
+  const _ConsentGate();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: AppSettings.instance,
+      builder: (context, _) {
+        if (AppSettings.instance.hasRecordedConsents) {
+          return const _AuthGate();
+        }
+        return const ConsentScreen();
+      },
+    );
+  }
+}
+
+/// Shows the sign-in screen until there's a session *or* the user chose
+/// local-only mode, then the app itself.
 /// `currentSession` is checked on every rebuild (including the initial
 /// build), and `onAuthStateChange` triggers rebuilds as sign-in/sign-out
-/// happen.
+/// happen. Choosing "Use without an account" notifies via [AppSettings].
 ///
 /// The database connection is per Google account: a second person signing
 /// in on this phone must not inherit the previous person's file. The same
-/// person signing back in reopens theirs — reminders stay.
+/// person signing back in reopens theirs — reminders stay. Local-only uses
+/// the sentinel owner [localOwnerUserId] (`dosely-local.sqlite`); first
+/// sign-in on this phone adopts that file when the account has none yet.
 class _AuthGate extends StatefulWidget {
   const _AuthGate();
 
@@ -141,6 +168,8 @@ class _AuthGate extends StatefulWidget {
 class _AuthGateState extends State<_AuthGate> {
   AppDatabase? _db;
   String? _userId;
+  var _closing = false;
+  String? _syncedConsentUserId;
 
   @override
   void dispose() {
@@ -148,32 +177,68 @@ class _AuthGateState extends State<_AuthGate> {
     super.dispose();
   }
 
-  AppDatabase _databaseFor(String userId) {
+  /// Returns the open database for [userId], or null while a previous
+  /// connection is still closing. First sign-in after local-only *renames*
+  /// `dosely-local.sqlite`; that cannot happen while the local file is open.
+  AppDatabase? _databaseFor(String userId) {
     if (_db != null && _userId == userId) return _db!;
-    unawaited(_db?.close());
+    if (_db != null && !_closing) {
+      _closing = true;
+      unawaited(_closeThenRebuild());
+      return null;
+    }
+    if (_closing) return null;
     _userId = userId;
     _db = AppDatabase();
     return _db!;
+  }
+
+  Future<void> _closeThenRebuild() async {
+    final open = _db;
+    _db = null;
+    _userId = null;
+    await open?.close();
+    _closing = false;
+    if (mounted) setState(() {});
   }
 
   void _releaseDatabase() {
     final open = _db;
     _db = null;
     _userId = null;
+    _closing = false;
+    _syncedConsentUserId = null;
     unawaited(open?.close());
   }
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<AuthState>(
-      stream: Supabase.instance.client.auth.onAuthStateChange,
-      builder: (context, snapshot) {
-        final user = Supabase.instance.client.auth.currentUser;
-        if (user == null) {
-          _releaseDatabase();
-          return const SignInScreen();
-        }
-        return HomeScreen(db: _databaseFor(user.id));
+    return ListenableBuilder(
+      listenable: AppSettings.instance,
+      builder: (context, _) {
+        return StreamBuilder<AuthState>(
+          stream: Supabase.instance.client.auth.onAuthStateChange,
+          builder: (context, snapshot) {
+            final user = Supabase.instance.client.auth.currentUser;
+            final owner = user?.id ??
+                (AppSettings.instance.localOnly ? localOwnerUserId : null);
+            if (owner == null) {
+              _releaseDatabase();
+              return const SignInScreen();
+            }
+            if (user != null && _syncedConsentUserId != user.id) {
+              _syncedConsentUserId = user.id;
+              unawaited(ConsentService.instance.syncToServer());
+            }
+            final db = _databaseFor(owner);
+            if (db == null) {
+              return const Scaffold(
+                body: Center(child: CircularProgressIndicator()),
+              );
+            }
+            return HomeScreen(db: db);
+          },
+        );
       },
     );
   }

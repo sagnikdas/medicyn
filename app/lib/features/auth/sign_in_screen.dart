@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 
+import '../../core/app_settings.dart';
 import '../../core/privacy_policy.dart';
 import 'auth_service.dart';
 
-/// One button. Google is the only way in — the email one-time-code flow was
-/// removed along with the custom SMTP sender behind it.
+/// Google sign-in, or local-only so reminders work without an account.
+/// Backup and family sharing stay off until the user signs in later.
 ///
 /// The app-level auth gate (see main.dart) moves on by itself once a
-/// session exists, so nothing here navigates on success.
+/// session exists or [AppSettings.localOnly] is set, so nothing here
+/// navigates on success.
 class SignInScreen extends StatefulWidget {
   const SignInScreen({super.key});
 
@@ -24,17 +26,15 @@ class _SignInScreenState extends State<SignInScreen> {
       _busy = true;
       _error = null;
     });
-    try {
-      await AuthService.instance.signInWithGoogle();
-      // Success moves the app on via the auth-state stream in main.dart.
-    } on GoogleSignInFailure catch (e) {
-      // Backing out of the account picker isn't a failure — showing an
-      // error for it would make a deliberate action look broken.
-      setState(() => _error = e.isCancellation ? null : e.message);
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
+    final error = await AuthService.instance.trySignInWithGoogle();
+    if (!mounted) return;
+    setState(() {
+      _error = error;
+      _busy = false;
+    });
   }
+
+  Future<void> _useWithoutAccount() => AppSettings.instance.setLocalOnly(true);
 
   @override
   Widget build(BuildContext context) {
@@ -62,6 +62,16 @@ class _SignInScreenState extends State<SignInScreen> {
                 child: _busy
                     ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
                     : const Text('Continue with Google'),
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton(
+                onPressed: _busy ? null : _useWithoutAccount,
+                child: const Text('Use without an account'),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Reminders stay on this phone. Backup and family sharing need Google later.',
+                style: Theme.of(context).textTheme.bodySmall,
               ),
               if (_error != null) ...[
                 const SizedBox(height: 16),

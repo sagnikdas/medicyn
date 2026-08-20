@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../core/app_settings.dart';
 import '../../data/local/database.dart';
 import '../../data/local/tables.dart';
 import '../../data/remote/care_notifier.dart';
@@ -9,6 +10,8 @@ import '../../data/remote/sync_service.dart';
 import '../auth/auth_service.dart';
 import '../capture_ocr/ocr_capture_screen.dart';
 import '../care/care_service.dart';
+import '../consent/consent_purpose.dart';
+import '../consent/consent_service.dart';
 import '../notification_engine/missed_doses.dart';
 import '../notification_engine/notification_service.dart';
 import '../notification_engine/schedule_validation.dart';
@@ -62,7 +65,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (requestPermissions) {
       await NotificationService.instance.requestPermissions();
     }
-    if (requestPermissions) {
+    final signedIn = AuthService.instance.currentUser != null;
+    if (signedIn && requestPermissions) {
       // Also backfills a profile for anyone who signed in before profiles
       // existed — without it their name never appears on the other side of a
       // link, and nothing would ever create the row.
@@ -72,22 +76,27 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       // before runApp.
       unawaited(PushService.instance.attachForegroundListeners(db: widget.db));
     }
-    // Every foreground, not just the first: FCM can reissue a token while the
-    // app isn't running, and nothing announces that beyond the token itself
-    // having changed. An unregistered device is one a family's alerts never
-    // reach, which is the failure this whole phase exists to remove.
-    unawaited(PushService.instance.registerToken());
-    final sync = SyncService(widget.db);
+    // Local-only has no JWT, so Care Link RPCs and FCM registration stay
+    // off until the user signs in from Settings.
+    if (signedIn) {
+      unawaited(PushService.instance.registerToken());
+    }
+    final sync = signedIn ? SyncService(widget.db) : null;
     // Pull before reconcile: a fresh install/new device has no local
     // schedules yet, so restoring them from Supabase first means reconcile
     // arms their alarms in this same pass instead of waiting for the next
     // resume.
-    if (requestPermissions) await sync.pullAll();
+    if (sync != null && requestPermissions) await sync.pullAll();
     await NotificationService.instance.reconcile(widget.db);
     // Before the push, so a dose recorded as missed goes up in the same pass
     // and reaches the other side without waiting for another foreground.
     await const MissedDoseDetector().sweep(widget.db);
+    if (sync == null) return;
     await sync.syncAll();
+
+    // Care alerts name dose-log ids the server reads back. Without cloud
+    // backup there is no push, so there is nothing to announce.
+    if (!AppSettings.instance.consentCloudBackup) return;
 
     // After the push, never before it: the alert names dose-log ids, and the
     // server reads those rows back to compose what the family is told. Telling
@@ -120,10 +129,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
     if (ocrText == null || !mounted) return;
 
-    final transcript = await Navigator.of(context).push<String>(
-      MaterialPageRoute(builder: (_) => const VoiceCaptureScreen()),
-    );
-    if (transcript == null || !mounted) return;
+    var transcript = '';
+    if (ConsentService.instance.isGranted(ConsentPurpose.googleSpeech)) {
+      final spoken = await Navigator.of(context).push<String>(
+        MaterialPageRoute(builder: (_) => const VoiceCaptureScreen()),
+      );
+      if (spoken == null || !mounted) return;
+      transcript = spoken;
+    }
 
     await Navigator.of(context).push(
       MaterialPageRoute(
