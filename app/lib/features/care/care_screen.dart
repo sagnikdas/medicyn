@@ -49,6 +49,12 @@ class _CareScreenState extends State<CareScreen> {
 
   String get _myId => AuthService.instance.currentUser?.id ?? '';
 
+  bool get _inviteExpired {
+    final expiresAt = _link?.expiresAt;
+    if (expiresAt == null) return false;
+    return !expiresAt.isAfter(DateTime.now());
+  }
+
   @override
   void initState() {
     super.initState();
@@ -302,32 +308,42 @@ class _CareScreenState extends State<CareScreen> {
             ),
           ),
         ),
-        const SizedBox(height: 16),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            SizedBox(
-              height: 16,
-              width: 16,
-              child: CircularProgressIndicator(strokeWidth: 2, color: scheme.outline),
-            ),
-            const SizedBox(width: 10),
-            Flexible(
-              child: Text(
-                'Waiting for them to type it in…',
-                style: text.bodySmall,
+        if (!_inviteExpired) ...[
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              SizedBox(
+                height: 16,
+                width: 16,
+                child: CircularProgressIndicator(strokeWidth: 2, color: scheme.outline),
               ),
-            ),
-          ],
-        ),
+              const SizedBox(width: 10),
+              Flexible(
+                child: Text(
+                  'Waiting for them to type it in…',
+                  style: text.bodySmall,
+                ),
+              ),
+            ],
+          ),
+        ],
         const SizedBox(height: 8),
         Text(
-          'This number stops working after 15 minutes. You can always come '
-          'back for a new one.',
+          _inviteExpired
+              ? 'This number has expired. Get a new one and read that instead.'
+              : 'This number stops working after 15 minutes. You can always come '
+                  'back for a new one.',
           style: text.bodySmall,
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 28),
+        if (_inviteExpired)
+          FilledButton(
+            onPressed: _invite,
+            child: const Text('Get a new number'),
+          ),
+        const SizedBox(height: 12),
         TextButton(onPressed: _disconnect, child: const Text('Cancel')),
       ],
     );
