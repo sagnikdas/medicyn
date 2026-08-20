@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:sqlite3/sqlite3.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../core/app_settings.dart';
 import 'database_encryption.dart';
 import 'database_key_store.dart';
 
@@ -23,15 +24,18 @@ class EncryptedDatabaseOpener {
   EncryptedDatabaseOpener({
     DatabaseKeyStore? keyStore,
     String? Function()? lookupSignedInUserId,
+    bool Function()? lookupLocalOnly,
     Future<Directory> Function()? documentsDirectory,
     Future<Directory> Function()? temporaryDirectory,
   })  : _keyStore = keyStore ?? DatabaseKeyStore(),
         _lookupSignedInUserId = lookupSignedInUserId ?? _supabaseUserId,
+        _lookupLocalOnly = lookupLocalOnly ?? _appSettingsLocalOnly,
         _documentsDirectory = documentsDirectory ?? getApplicationDocumentsDirectory,
         _temporaryDirectory = temporaryDirectory ?? getTemporaryDirectory;
 
   final DatabaseKeyStore _keyStore;
   final String? Function() _lookupSignedInUserId;
+  final bool Function() _lookupLocalOnly;
   final Future<Directory> Function() _documentsDirectory;
   final Future<Directory> Function() _temporaryDirectory;
 
@@ -43,6 +47,8 @@ class EncryptedDatabaseOpener {
     sqlite3.tempDirectory = cache.path;
 
     ensureSqlite3MultipleCiphers();
+
+    await adoptLocalDatabaseIfNeeded(docs: docs, ownerUserId: userId);
 
     final plaintext = File(p.join(docs.path, plaintextDatabaseFileName));
     final encrypted = File(p.join(docs.path, encryptedDatabaseFileName(userId)));
@@ -78,6 +84,10 @@ class EncryptedDatabaseOpener {
   /// Prefer the signed-in account so a second Google user on this phone
   /// opens (or creates) their own file. Fall back to the stored owner so
   /// a background isolate after sign-out still finds the same reminders.
+  ///
+  /// Local-only writes [localOwnerUserId] into the keystore on first open
+  /// so Taken/Snooze isolates can find `dosely-local.sqlite` without
+  /// reading prefs (AppSettings is not initialized there).
   Future<String> _resolveOwnerUserId() async {
     final signedIn = _lookupSignedInUserId();
     if (signedIn != null && signedIn.isNotEmpty) {
@@ -89,6 +99,10 @@ class EncryptedDatabaseOpener {
     }
     final stored = await _keyStore.readOwnerUserId();
     if (stored != null && stored.isNotEmpty) return stored;
+    if (_lookupLocalOnly()) {
+      await _keyStore.writeOwnerUserId(localOwnerUserId);
+      return localOwnerUserId;
+    }
     throw StateError('Cannot open the medical database without an account');
   }
 }
@@ -100,6 +114,81 @@ String? _supabaseUserId() {
     return null;
   }
 }
+
+/// Defaults to [AppSettings.localOnly]. Background isolates must not rely
+/// on this — they resolve the file from the keystore owner written on the
+/// first local-only open. A missing or uninitialized singleton is treated
+/// as not local-only.
+bool _appSettingsLocalOnly() {
+  try {
+    return AppSettings.instance.localOnly;
+  } catch (_) {
+    return false;
+  }
+}
+
+/// What to do with `dosely-local.sqlite` when a Google session is opening
+/// its per-account file for the first time on this phone.
+enum LocalAdoptDecision {
+  /// Rename the local-only file (and sidecars) to the account name so
+  /// reminders are not stranded.
+  adopt,
+
+  /// This Google user already has a file; leave local-only data in place.
+  leaveLocalInPlace,
+
+  /// No local-only file to move, or the opener is itself in local-only.
+  nothingToAdopt,
+}
+
+LocalAdoptDecision decideAdoptLocalDatabase({
+  required bool accountFileExists,
+  required bool localFileExists,
+}) {
+  if (accountFileExists) return LocalAdoptDecision.leaveLocalInPlace;
+  if (localFileExists) return LocalAdoptDecision.adopt;
+  return LocalAdoptDecision.nothingToAdopt;
+}
+
+/// If this is the first time [ownerUserId] has a file on this phone and
+/// local-only data exists, rename `dosely-local.sqlite` (including WAL/SHM
+/// sidecars) to the account file. Never overwrite an existing account file.
+Future<LocalAdoptDecision> adoptLocalDatabaseIfNeeded({
+  required Directory docs,
+  required String ownerUserId,
+}) async {
+  if (ownerUserId == localOwnerUserId) {
+    return LocalAdoptDecision.nothingToAdopt;
+  }
+  final account = File(p.join(docs.path, encryptedDatabaseFileName(ownerUserId)));
+  final local = File(p.join(docs.path, encryptedDatabaseFileName(localOwnerUserId)));
+  final decision = decideAdoptLocalDatabase(
+    accountFileExists: await account.exists(),
+    localFileExists: await local.exists(),
+  );
+  if (decision == LocalAdoptDecision.adopt) {
+    await renameSqliteWithSidecars(from: local, to: account);
+  }
+  return decision;
+}
+
+/// Renames a SQLite main file and any `-wal` / `-shm` / `-journal` sidecars
+/// that sit next to it, so an adopted database keeps its WAL state.
+Future<void> renameSqliteWithSidecars({
+  required File from,
+  required File to,
+}) async {
+  await to.parent.create(recursive: true);
+  for (final suffix in _sqliteSidecarSuffixes) {
+    final src = File('${from.path}$suffix');
+    if (!await src.exists()) continue;
+    final dest = File('${to.path}$suffix');
+    if (await dest.exists()) await dest.delete();
+    await src.rename(dest.path);
+  }
+}
+
+const _sqliteSidecarSuffixes = ['', '-wal', '-shm', '-journal'];
 
 /// Throws if this process linked vanilla SQLite. Writing "encrypted" files
 /// without sqlite3mc would recreate the original finding: a `SQLite format 3`
@@ -179,7 +268,7 @@ Future<void> migratePlaintextDatabase({
 }
 
 Future<void> _deleteSqliteSidecars(File db) async {
-  for (final suffix in const ['', '-wal', '-shm', '-journal']) {
+  for (final suffix in _sqliteSidecarSuffixes) {
     final file = File('${db.path}$suffix');
     try {
       if (await file.exists()) await file.delete();

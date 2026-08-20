@@ -11,6 +11,7 @@ import 'core/sentry_config.dart';
 import 'core/supabase_init.dart';
 import 'core/theme.dart';
 import 'data/local/database.dart';
+import 'data/local/database_encryption.dart';
 import 'features/auth/sign_in_screen.dart';
 import 'features/notification_engine/notification_actions.dart';
 import 'features/notification_engine/notification_service.dart';
@@ -123,14 +124,17 @@ class _OnboardingGate extends StatelessWidget {
   }
 }
 
-/// Shows the sign-in screen until there's a session, then the app itself.
+/// Shows the sign-in screen until there's a session *or* the user chose
+/// local-only mode, then the app itself.
 /// `currentSession` is checked on every rebuild (including the initial
 /// build), and `onAuthStateChange` triggers rebuilds as sign-in/sign-out
-/// happen.
+/// happen. Choosing "Use without an account" notifies via [AppSettings].
 ///
 /// The database connection is per Google account: a second person signing
 /// in on this phone must not inherit the previous person's file. The same
-/// person signing back in reopens theirs — reminders stay.
+/// person signing back in reopens theirs — reminders stay. Local-only uses
+/// the sentinel owner [localOwnerUserId] (`dosely-local.sqlite`); first
+/// sign-in on this phone adopts that file when the account has none yet.
 class _AuthGate extends StatefulWidget {
   const _AuthGate();
 
@@ -165,15 +169,23 @@ class _AuthGateState extends State<_AuthGate> {
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<AuthState>(
-      stream: Supabase.instance.client.auth.onAuthStateChange,
-      builder: (context, snapshot) {
-        final user = Supabase.instance.client.auth.currentUser;
-        if (user == null) {
-          _releaseDatabase();
-          return const SignInScreen();
-        }
-        return HomeScreen(db: _databaseFor(user.id));
+    return ListenableBuilder(
+      listenable: AppSettings.instance,
+      builder: (context, _) {
+        return StreamBuilder<AuthState>(
+          stream: Supabase.instance.client.auth.onAuthStateChange,
+          builder: (context, snapshot) {
+            final user = Supabase.instance.client.auth.currentUser;
+            if (user != null) {
+              return HomeScreen(db: _databaseFor(user.id));
+            }
+            if (AppSettings.instance.localOnly) {
+              return HomeScreen(db: _databaseFor(localOwnerUserId));
+            }
+            _releaseDatabase();
+            return const SignInScreen();
+          },
+        );
       },
     );
   }

@@ -11,9 +11,14 @@ final Uint8List sqlitePlaintextHeader = Uint8List.fromList(
   const [0x53, 0x51, 0x4c, 0x69, 0x74, 0x65, 0x20, 0x66, 0x6f, 0x72, 0x6d, 0x61, 0x74, 0x20, 0x33, 0x00],
 );
 
+/// Owner id used when the user runs without a Google account. Names the
+/// file `dosely-local.sqlite` via [encryptedDatabaseFileName].
+const localOwnerUserId = 'local';
+
 /// Encrypted, per-account file name. [userId] is the Supabase auth subject
-/// (a uuid). Characters outside a conservative filesystem set are replaced
-/// so a surprising id cannot escape the documents directory by name.
+/// (a uuid), or [localOwnerUserId] in local-only mode. Characters outside a
+/// conservative filesystem set are replaced so a surprising id cannot escape
+/// the documents directory by name.
 String encryptedDatabaseFileName(String userId) =>
     'dosely-${sanitizeDatabaseUserId(userId)}.sqlite';
 

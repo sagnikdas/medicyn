@@ -4,6 +4,7 @@ import 'dart:io' show Platform;
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../core/app_settings.dart';
 import '../../core/google_auth_config.dart';
 import '../care/care_service.dart';
 import '../push/push_service.dart';
@@ -85,6 +86,9 @@ class AuthService {
         provider: OAuthProvider.google,
         idToken: idToken,
       );
+      // Local-only is the unbundled path; a live Google session means
+      // backup and Care Link are available, so drop the flag.
+      await AppSettings.instance.setLocalOnly(false);
       // Best-effort, and awaited only so the name is present by the time the
       // first screen renders. A failure here costs a display name, not a
       // session, so it never throws.
@@ -106,6 +110,17 @@ class AuthService {
       );
     } catch (e) {
       throw GoogleSignInFailure('Could not sign in with Google. Check your connection and try again. ($e)');
+    }
+  }
+
+  /// Runs [signInWithGoogle] and returns a message fit to show, or null on
+  /// success or when the user backed out of the account picker.
+  Future<String?> trySignInWithGoogle() async {
+    try {
+      await signInWithGoogle();
+      return null;
+    } on GoogleSignInFailure catch (e) {
+      return e.isCancellation ? null : e.message;
     }
   }
 

@@ -27,6 +27,7 @@ class AppSettings extends ChangeNotifier {
   static const _themeModeKey = 'theme_mode';
   static const _hasSeenOnboardingKey = 'has_seen_onboarding';
   static const _showMedicineOnLockScreenKey = 'show_medicine_on_lock_screen';
+  static const _localOnlyKey = 'local_only';
 
   /// Elderly-friendly text sizing, as a scale factor the Settings slider
   /// drives directly. It scales every screen's text (and, since buttons and
@@ -62,6 +63,12 @@ class AppSettings extends ChangeNotifier {
   bool _showMedicineOnLockScreen = false;
   bool get showMedicineOnLockScreen => _showMedicineOnLockScreen;
 
+  /// True when the user chose to use the app without a Google account.
+  /// Reminders stay on this phone; backup and family sharing stay off
+  /// until they sign in.
+  bool _localOnly = false;
+  bool get localOnly => _localOnly;
+
   bool _loaded = false;
 
   Future<void> init() async {
@@ -77,6 +84,7 @@ class AppSettings extends ChangeNotifier {
     );
     _hasSeenOnboarding = prefs.getBool(_hasSeenOnboardingKey) ?? false;
     _showMedicineOnLockScreen = prefs.getBool(_showMedicineOnLockScreenKey) ?? false;
+    _localOnly = prefs.getBool(_localOnlyKey) ?? false;
     _loaded = true;
   }
 
@@ -131,5 +139,13 @@ class AppSettings extends ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_showMedicineOnLockScreenKey, value);
+  }
+
+  Future<void> setLocalOnly(bool value) async {
+    if (value == _localOnly) return;
+    _localOnly = value;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_localOnlyKey, value);
   }
 }

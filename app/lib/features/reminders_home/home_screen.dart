@@ -62,7 +62,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (requestPermissions) {
       await NotificationService.instance.requestPermissions();
     }
-    if (requestPermissions) {
+    final signedIn = AuthService.instance.currentUser != null;
+    if (signedIn && requestPermissions) {
       // Also backfills a profile for anyone who signed in before profiles
       // existed — without it their name never appears on the other side of a
       // link, and nothing would ever create the row.
@@ -72,21 +73,22 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       // before runApp.
       unawaited(PushService.instance.attachForegroundListeners(db: widget.db));
     }
-    // Every foreground, not just the first: FCM can reissue a token while the
-    // app isn't running, and nothing announces that beyond the token itself
-    // having changed. An unregistered device is one a family's alerts never
-    // reach, which is the failure this whole phase exists to remove.
-    unawaited(PushService.instance.registerToken());
-    final sync = SyncService(widget.db);
+    // Local-only has no JWT, so Care Link RPCs and FCM registration stay
+    // off until the user signs in from Settings.
+    if (signedIn) {
+      unawaited(PushService.instance.registerToken());
+    }
+    final sync = signedIn ? SyncService(widget.db) : null;
     // Pull before reconcile: a fresh install/new device has no local
     // schedules yet, so restoring them from Supabase first means reconcile
     // arms their alarms in this same pass instead of waiting for the next
     // resume.
-    if (requestPermissions) await sync.pullAll();
+    if (sync != null && requestPermissions) await sync.pullAll();
     await NotificationService.instance.reconcile(widget.db);
     // Before the push, so a dose recorded as missed goes up in the same pass
     // and reaches the other side without waiting for another foreground.
     await const MissedDoseDetector().sweep(widget.db);
+    if (sync == null) return;
     await sync.syncAll();
 
     // After the push, never before it: the alert names dose-log ids, and the
