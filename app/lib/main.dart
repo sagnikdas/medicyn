@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/app_navigation.dart';
 import 'core/app_settings.dart';
+import 'core/device_lock_gate.dart';
 import 'core/sentry_config.dart';
 import 'core/supabase_init.dart';
 import 'core/theme.dart';
@@ -43,7 +44,8 @@ void main() async {
       // isolate starts up or a message arriving with the app dead has nowhere
       // to go. It no-ops when Firebase isn't configured in this build.
       await PushService.instance.init();
-      final launchResponse = await NotificationService.instance.consumeLaunchNotificationResponse();
+      final launchResponse = await NotificationService.instance
+          .consumeLaunchNotificationResponse();
       runApp(DoselyApp(launchNotificationResponse: launchResponse));
     },
   );
@@ -68,7 +70,9 @@ class _DoselyAppState extends State<DoselyApp> {
     if (response != null) {
       // The navigator isn't attached yet during this build, so defer until
       // after the first frame — by then navigatorKey.currentState is live.
-      WidgetsBinding.instance.addPostFrameCallback((_) => handleNotificationResponse(response));
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => handleNotificationResponse(response),
+      );
     }
   }
 
@@ -94,7 +98,7 @@ class _DoselyAppState extends State<DoselyApp> {
           data: MediaQuery.of(context).copyWith(
             textScaler: TextScaler.linear(AppSettings.instance.textScale),
           ),
-          child: child!,
+          child: DeviceLockGate(child: child!),
         ),
         home: const _OnboardingGate(),
       ),
@@ -220,7 +224,8 @@ class _AuthGateState extends State<_AuthGate> {
           stream: Supabase.instance.client.auth.onAuthStateChange,
           builder: (context, snapshot) {
             final user = Supabase.instance.client.auth.currentUser;
-            final owner = user?.id ??
+            final owner =
+                user?.id ??
                 (AppSettings.instance.localOnly ? localOwnerUserId : null);
             if (owner == null) {
               _releaseDatabase();

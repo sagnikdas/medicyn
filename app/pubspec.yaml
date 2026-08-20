@@ -30,6 +30,10 @@ dependencies:
   google_mlkit_text_recognition: ^0.16.0
   google_sign_in: ^7.2.0
   image_picker: ^1.2.3
+  # Device PIN / pattern / biometric re-unlock after the app has been in the
+  # background. biometricOnly is left off so a fingerprint is not required —
+  # the person this app is for already has a phone PIN.
+  local_auth: ^2.3.0
   path: ^1.9.1
   path_provider: ^2.1.6
   permission_handler: ^13.0.1
