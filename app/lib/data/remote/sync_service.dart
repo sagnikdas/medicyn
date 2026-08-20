@@ -26,6 +26,7 @@ class SyncService {
     await _syncMedicines(user.id);
     await _syncSchedules(user.id);
     await _syncDoseLogs(user.id);
+    await _syncDoseLogContests(user.id);
   }
 
   /// Brings down rows this device is missing *or* holds an older copy of —
@@ -42,7 +43,9 @@ class SyncService {
   /// every reminder is expected to show who last changed it.
   ///
   /// Dose logs stay insert-only. Nothing ever edits one, so a log this
-  /// device already has can only be identical.
+  /// device already has can only be identical. Contest notes are the
+  /// exception: they are an editable row keyed by the log, resolved by
+  /// last-write-wins on `updatedAt` like medicines and schedules.
   Future<void> pullAll() async {
     if (!AppSettings.instance.consentCloudBackup) return;
     final user = _client.auth.currentUser;
@@ -54,6 +57,7 @@ class SyncService {
     await _pullMedicines(user.id);
     await _pullSchedules(user.id);
     await _pullDoseLogs(user.id);
+    await _pullDoseLogContests(user.id);
   }
 
   // Every network call below is bounded with a timeout. Without one, a
@@ -207,6 +211,28 @@ class SyncService {
     }
   }
 
+  Future<void> _syncDoseLogContests(String userId) async {
+    final rows = await _db.unsyncedDoseLogContests();
+    if (rows.isEmpty) return;
+    try {
+      await _client.from('dose_log_contests').upsert([
+        for (final c in rows)
+          {
+            'dose_log_id': c.doseLogId,
+            'user_id': userId,
+            'note': c.note,
+            'created_at': isoUtc(c.createdAt),
+            'updated_at': isoUtc(c.updatedAt),
+          },
+      ]).timeout(_networkTimeout);
+      for (final c in rows) {
+        await _db.markDoseLogContestSynced(c.doseLogId);
+      }
+    } catch (_) {
+      // Leave pendingSync=true; retried on the next syncAll() call.
+    }
+  }
+
   Future<void> _pullMedicines(String userId) async {
     try {
       final rows = await _client.from('medicines').select().eq('user_id', userId).timeout(_networkTimeout);
@@ -315,6 +341,37 @@ class SyncService {
         ));
       }
       await _db.applyRemoteDoseLogs(incoming);
+    } catch (_) {
+      // Best-effort — retried on the next pullAll() call.
+    }
+  }
+
+  Future<void> _pullDoseLogContests(String userId) async {
+    try {
+      final rows = await _client
+          .from('dose_log_contests')
+          .select()
+          .eq('user_id', userId)
+          .timeout(_networkTimeout);
+      final knownLogs = await _db.doseLogIds();
+      final local = await _db.doseLogContestVersions();
+      final winners = <DoseLogContestsCompanion>[];
+      for (final r in rows) {
+        final doseLogId = r['dose_log_id'] as String;
+        if (!knownLogs.contains(doseLogId)) continue;
+        final note = (r['note'] as String?)?.trim() ?? '';
+        if (note.isEmpty) continue;
+        final remoteStamp = remoteUpdatedAt(r);
+        if (!remoteWins(local[doseLogId], remoteStamp)) continue;
+        winners.add(DoseLogContestsCompanion.insert(
+          doseLogId: doseLogId,
+          note: note,
+          createdAt: Value(DateTime.parse(r['created_at'] as String)),
+          updatedAt: Value(remoteStamp),
+          pendingSync: const Value(false),
+        ));
+      }
+      await _db.applyRemoteDoseLogContests(winners);
     } catch (_) {
       // Best-effort — retried on the next pullAll() call.
     }

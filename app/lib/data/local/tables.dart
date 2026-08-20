@@ -66,3 +66,17 @@ class DoseLogs extends Table {
   @override
   Set<Column> get primaryKey => {id};
 }
+
+/// A user correction attached to an immutable dose log. The log's [DoseLogs.action]
+/// and timestamps never change; this row is the Art. 16 path.
+class DoseLogContests extends Table {
+  TextColumn get doseLogId =>
+      text().references(DoseLogs, #id, onDelete: KeyAction.cascade)();
+  TextColumn get note => text()();
+  DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+  BoolColumn get pendingSync => boolean().withDefault(const Constant(true))();
+
+  @override
+  Set<Column> get primaryKey => {doseLogId};
+}

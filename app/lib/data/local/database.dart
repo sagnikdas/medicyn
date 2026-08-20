@@ -15,7 +15,14 @@ class ScheduleWithMedicine {
   ScheduleWithMedicine(this.schedule, this.medicine);
 }
 
-@DriftDatabase(tables: [Medicines, Schedules, DoseLogs])
+/// A dose log plus the optional user correction note attached to it.
+class DoseLogWithContest {
+  final DoseLog log;
+  final DoseLogContest? contest;
+  DoseLogWithContest(this.log, this.contest);
+}
+
+@DriftDatabase(tables: [Medicines, Schedules, DoseLogs, DoseLogContests])
 class AppDatabase extends _$AppDatabase {
   /// Opens the encrypted per-account file via [openEncryptedAppDatabase].
   /// Background isolates construct this the same way so Taken/Snooze and
@@ -29,7 +36,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -47,6 +54,9 @@ class AppDatabase extends _$AppDatabase {
             // newer edits waiting on the server.
             await customStatement('UPDATE medicines SET updated_at = created_at');
             await customStatement('UPDATE schedules SET updated_at = created_at');
+          }
+          if (from < 3) {
+            await m.createTable(doseLogContests);
           }
         },
       );
@@ -139,6 +149,63 @@ class AppDatabase extends _$AppDatabase {
   Stream<List<DoseLog>> watchDoseLogsForSchedule(String scheduleId) =>
       (select(doseLogs)..where((t) => t.scheduleId.equals(scheduleId))).watch();
 
+  Stream<List<DoseLogWithContest>> watchDoseLogsWithContests(String scheduleId) {
+    final query = select(doseLogs).join([
+      leftOuterJoin(
+        doseLogContests,
+        doseLogContests.doseLogId.equalsExp(doseLogs.id),
+      ),
+    ])
+      ..where(doseLogs.scheduleId.equals(scheduleId));
+    return query.watch().map(
+          (rows) => rows
+              .map(
+                (r) => DoseLogWithContest(
+                  r.readTable(doseLogs),
+                  r.readTableOrNull(doseLogContests),
+                ),
+              )
+              .toList(),
+        );
+  }
+
+  Future<DoseLog?> doseLogById(String id) =>
+      (select(doseLogs)..where((t) => t.id.equals(id))).getSingleOrNull();
+
+  Future<DoseLogContest?> contestForDoseLog(String doseLogId) =>
+      (select(doseLogContests)..where((t) => t.doseLogId.equals(doseLogId)))
+          .getSingleOrNull();
+
+  /// Attaches or replaces the correction note. Does not touch the log row.
+  Future<void> upsertDoseLogContest({
+    required String doseLogId,
+    required String note,
+  }) async {
+    final trimmed = note.trim();
+    if (trimmed.isEmpty) {
+      throw ArgumentError.value(note, 'note', 'must not be empty');
+    }
+    final existing = await contestForDoseLog(doseLogId);
+    final now = DateTime.now();
+    if (existing == null) {
+      await into(doseLogContests).insert(
+        DoseLogContestsCompanion.insert(
+          doseLogId: doseLogId,
+          note: trimmed,
+        ),
+      );
+      return;
+    }
+    await (update(doseLogContests)..where((t) => t.doseLogId.equals(doseLogId)))
+        .write(
+      DoseLogContestsCompanion(
+        note: Value(trimmed),
+        updatedAt: Value(now),
+        pendingSync: const Value(true),
+      ),
+    );
+  }
+
   /// Most recent dose log for a schedule, if any. One-shot rather than
   /// reactive: the notification engine records Taken/Snooze from its own
   /// `AppDatabase` instance (often a different isolate entirely), and those
@@ -204,6 +271,9 @@ class AppDatabase extends _$AppDatabase {
   Future<List<DoseLog>> unsyncedDoseLogs() =>
       (select(doseLogs)..where((t) => t.pendingSync.equals(true))).get();
 
+  Future<List<DoseLogContest>> unsyncedDoseLogContests() =>
+      (select(doseLogContests)..where((t) => t.pendingSync.equals(true))).get();
+
   Future<void> markMedicineSynced(String id) =>
       (update(medicines)..where((t) => t.id.equals(id)))
           .write(const MedicinesCompanion(pendingSync: Value(false)));
@@ -215,6 +285,10 @@ class AppDatabase extends _$AppDatabase {
   Future<void> markDoseLogSynced(String id) =>
       (update(doseLogs)..where((t) => t.id.equals(id)))
           .write(const DoseLogsCompanion(pendingSync: Value(false)));
+
+  Future<void> markDoseLogContestSynced(String doseLogId) =>
+      (update(doseLogContests)..where((t) => t.doseLogId.equals(doseLogId)))
+          .write(const DoseLogContestsCompanion(pendingSync: Value(false)));
 
   // --- Pull/restore helpers ------------------------------------------------
   //
@@ -241,6 +315,13 @@ class AppDatabase extends _$AppDatabase {
     return {for (final r in rows) r.id};
   }
 
+  /// `doseLogId -> updatedAt` for every local contest note. Unlike dose logs,
+  /// these rows are editable, so a pull has to version-compare them.
+  Future<Map<String, DateTime>> doseLogContestVersions() async {
+    final rows = await select(doseLogContests).get();
+    return {for (final r in rows) r.doseLogId: r.updatedAt};
+  }
+
   /// Writes remote rows that won the version comparison, in one batch rather
   /// than a statement per row.
   Future<void> applyRemoteMedicines(List<MedicinesCompanion> rows) async {
@@ -256,5 +337,10 @@ class AppDatabase extends _$AppDatabase {
   Future<void> applyRemoteDoseLogs(List<DoseLogsCompanion> rows) async {
     if (rows.isEmpty) return;
     await batch((b) => b.insertAll(doseLogs, rows, mode: InsertMode.insertOrIgnore));
+  }
+
+  Future<void> applyRemoteDoseLogContests(List<DoseLogContestsCompanion> rows) async {
+    if (rows.isEmpty) return;
+    await batch((b) => b.insertAllOnConflictUpdate(doseLogContests, rows));
   }
 }
