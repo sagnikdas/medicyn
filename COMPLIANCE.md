@@ -519,11 +519,12 @@ exposure closed), and 2.7 (one predicate). The largest are 1.3 (consent flow),
 
 ---
 
-## Status against `main` @ `b2af8c3` (2026-08-20)
+## Status against `feature/phase-2` (2026-08-20)
 
 The body of this plan still describes the codebase as audited on 2026-08-19.
 Closed items are **not** rewritten above. This table is the live tracker and
-should be updated when a phase (or a Phase 1-style blocker) closes.
+should be updated when a phase (or a Phase 1-style blocker) closes. Phase 2
+lives on `feature/phase-2` until that branch is merged to `main`.
 
 | # | Change the application needs | Kind | Status | Notes |
 |---|---|---|---|---|
@@ -533,13 +534,13 @@ should be updated when a phase (or a Phase 1-style blocker) closes.
 | 1.4 | Local-only mode so reminders work without signing in / cloud | App | **Done** — #38 | “Use without an account” writes `dosely-local.sqlite`. Sync / push / Care Link stay off until Google sign-in; first sign-in can adopt the local file. |
 | 1.5 | In-app account deletion + `delete_account` function + wipe local DB + web URL | App + backend | **Done** — #39 | In-app two-step delete, hosted `delete_account` function, local sqlite wipe, `docs/delete-account.md`. Play still needs a *public* web URL; the GitHub page is on a private repo. |
 | 1.6 | Name the Care Link claimant (name + email); fail closed; longer code; claim throttle | App + DB | **Done** — #34 | 8-digit codes; 10 claims / 15 min; hosted migration applied. |
-| 1.7 | Fill `PRIVACY.md` placeholders and link the policy in-app | Docs + app | **Done** — #37; in-app copy #41 (open) | Placeholders filled. The GitHub blob URL 404s because the repo is private; #41 opens a bundled `PRIVACY.md` in-app instead. Play still needs a public web policy URL. |
-| 2.1 | Rewrite `PRIVACY.md` for Art. 13 (bases, transfers, retention, rights, Art. 22) | Docs | **Todo** | Do before Play Data Safety (3.8). |
-| 2.2 | Stop claiming a `care_alerts` screen and guaranteed FCM-token deletion that the code does not do | Docs or app | **Todo** | Either build the alerts screen or delete the sentences. Soften token-on-sign-out. |
-| 2.3 | Disclose timezone, `last_seen_at`, Firebase install id; fix README “on-device” speech | Docs | **Todo** | `README.md:13` still says speech is transcribed on-device. |
-| 2.4 | Settings: download my data, delete account, manage consents; contest note on a dose log | App + DB | **Partial** — #39, #40 | Delete account and manage consents are in Settings. Download my data and a contest-a-log note are not. |
-| 2.5 | “Remove this reminder” still only sets `active = false` | App | **Todo** | Rename to “Stop reminding me” and/or add true delete of medicine + history. |
-| 2.6 | Retention TTLs + prune job (`dose_logs` 24m, `care_alerts` 12m, revoked links 12m, tokens 90d) | Backend | **Todo** | No cron/TTL today. |
+| 1.7 | Fill `PRIVACY.md` placeholders and link the policy in-app | Docs + app | **Done** — #37, #41 | Placeholders filled. The GitHub blob URL 404s because the repo is private; the app opens a bundled `PRIVACY.md` instead. Play still needs a public web policy URL. |
+| 2.1 | Rewrite `PRIVACY.md` for Art. 13 (bases, transfers, retention, rights, Art. 22) | Docs | **Done** — #43 | Legal bases, Singapore/US transfers (no invented SCCs), retention, six rights + withdraw/complain, Art. 22 human review. |
+| 2.2 | Stop claiming a `care_alerts` screen and guaranteed FCM-token deletion that the code does not do | Docs or app | **Done** — #43 | Alerts are recorded to avoid duplicates; there is no in-app list. FCM delete on sign-out is best-effort. |
+| 2.3 | Disclose timezone, `last_seen_at`, Firebase install id; fix README “on-device” speech | Docs | **Done** — #43 | Timezone / `last_seen_at` / `push_install_id` disclosed. README no longer says speech is on-device. |
+| 2.4 | Settings: download my data, delete account, manage consents; contest note on a dose log | App + DB | **Done** — #39, #40, #46 | Download my data (JSON share). Dose logs stay immutable; a correction note is a separate `dose_log_contests` row. Hosted contest migration applied (`--include-all`, after the later prune migration). |
+| 2.5 | “Remove this reminder” still only sets `active = false` | App | **Done** — #45 | **Stop reminding me** keeps history. **Delete medicine and history** tombstones locally and `DELETE`s the medicine in Postgres so the family feed drops it. |
+| 2.6 | Retention TTLs + prune job (`dose_logs` 24m, `care_alerts` 12m, revoked links 12m, tokens 90d) | Backend | **Done** — #44 | `prune_expired_data()` on hosted `twybepxnqayypzljhcnx`. pg_cron job `prune-expired-data` at 03:20 UTC. Local 24-month dose-log prune on bootstrap. |
 | 2.7 | Revoked caregiver must not read `care_alerts`; expire stale claimed links | DB | **Done** — #23, #24 | Caregiver read requires `status = 'active'`. Confirm checks `expires_at`. Lazy auto-revoke of stale `claimed` rows is not implemented. |
 | 3.1 | DPIA | Paper | **Todo** | Mandatory. Lift `PLAN.md` known gaps. |
 | 3.2 | Processor DPAs (Supabase, Anthropic, Google FCM / Sign-In) | Paper | **Todo** | Speech recogniser is a Google controller — consent or `onDevice: true`. |
@@ -559,14 +560,14 @@ should be updated when a phase (or a Phase 1-style blocker) closes.
 | 4.3f | Certificate pinning (network security config exists for no-cleartext) | App | **Todo** (low) | `networkSecurityConfig` already forbids cleartext (#22). Pinning is not done. |
 | 4.4 | Written HIPAA policies, MFA on admin accounts, key rotation | Paper | **Deferred** | |
 
-**Counts:** Phase 1 is closed. 12 items done (or done differently); 2 partial (2.4, 4.3d); remaining application/backend work is Phase 2 (policy rewrite, overclaiming, export, reminder delete, retention) plus 4.3 leftovers; 8 Phase 3 paperwork/store items; HIPAA 4.1–4.2 and 4.4 deferred.
+**Counts:** Phases 1 and 2 are closed on this branch. 16 items done (or done differently); 1 partial (4.3d); remaining application work is 4.3 leftovers; 8 Phase 3 paperwork/store items; HIPAA 4.1–4.2 and 4.4 deferred.
 
 ### Remaining work, in order
 
-Do not start Phase 4 (except 4.3e, which is cheap and shrinks Anthropic’s blast radius) until Phases 2–3 can ship.
+Do not start Phase 4 (except 4.3e, which is cheap and shrinks Anthropic’s blast radius) until Phase 3 can ship.
 
-1. **Phase 1 blockers:** closed (#22, #33, #34, #37–#40; in-app policy #41 still open). Overlay-install on the Galaxy M33 still pending.
-2. **Phase 2 honesty:** 2.1 rewrite the policy → 2.2 / 2.3 stop overclaiming → 2.5 rename or truly delete a reminder → 2.4 finish export + contest-a-log → 2.6 retention prune. Optional: auto-revoke stale `claimed` links left from 2.7.
+1. **Phase 1 blockers:** closed (#22, #33, #34, #37–#41). Overlay-install on the Galaxy M33 still pending.
+2. **Phase 2 honesty:** closed on `feature/phase-2` (#41, #43–#46). Optional leftover from 2.7: auto-revoke stale `claimed` links.
 3. **Phase 3:** DPIA, ROPA, DPAs, transfers (consider EU region), breach register, MHMD policy, Play Data Safety.
 4. **When useful, not when a term sheet appears:** 4.3e OCR redaction; 4.3d private care-alert lock screen; 4.3c device-credential unlock; 4.3f pinning.
 5. **When a B2B/HIPAA deal exists:** 4.1 access log, 4.2 BAAs, 4.4 written Security Rule policies.
