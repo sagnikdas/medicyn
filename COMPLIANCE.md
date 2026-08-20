@@ -519,12 +519,12 @@ exposure closed), and 2.7 (one predicate). The largest are 1.3 (consent flow),
 
 ---
 
-## Status against `feature/phase-2` (2026-08-20)
+## Status against `main` @ `f73aed5` (2026-08-20)
 
 The body of this plan still describes the codebase as audited on 2026-08-19.
 Closed items are **not** rewritten above. This table is the live tracker and
 should be updated when a phase (or a Phase 1-style blocker) closes. Phase 2
-lives on `feature/phase-2` until that branch is merged to `main`.
+landed on `main` as #47.
 
 | # | Change the application needs | Kind | Status | Notes |
 |---|---|---|---|---|
@@ -560,14 +560,14 @@ lives on `feature/phase-2` until that branch is merged to `main`.
 | 4.3f | Certificate pinning (network security config exists for no-cleartext) | App | **Todo** (low) | `networkSecurityConfig` already forbids cleartext (#22). Pinning is not done. |
 | 4.4 | Written HIPAA policies, MFA on admin accounts, key rotation | Paper | **Deferred** | |
 
-**Counts:** Phases 1 and 2 are closed on this branch. 16 items done (or done differently); 1 partial (4.3d); remaining application work is 4.3 leftovers; 8 Phase 3 paperwork/store items; HIPAA 4.1–4.2 and 4.4 deferred.
+**Counts:** Phases 1 and 2 are closed on `main`. 16 items done (or done differently); 1 partial (4.3d); remaining application work is 4.3 leftovers; 8 Phase 3 paperwork/store items; HIPAA 4.1–4.2 and 4.4 deferred.
 
 ### Remaining work, in order
 
 Do not start Phase 4 (except 4.3e, which is cheap and shrinks Anthropic’s blast radius) until Phase 3 can ship.
 
 1. **Phase 1 blockers:** closed (#22, #33, #34, #37–#41). Overlay-install on the Galaxy M33 still pending.
-2. **Phase 2 honesty:** closed on `feature/phase-2` (#41, #43–#46). Optional leftover from 2.7: auto-revoke stale `claimed` links.
+2. **Phase 2 honesty:** closed on `main` (#47, from #41 and #43–#46). Optional leftover from 2.7: auto-revoke stale `claimed` links.
 3. **Phase 3:** DPIA, ROPA, DPAs, transfers (consider EU region), breach register, MHMD policy, Play Data Safety.
 4. **When useful, not when a term sheet appears:** 4.3e OCR redaction; 4.3d private care-alert lock screen; 4.3c device-credential unlock; 4.3f pinning.
 5. **When a B2B/HIPAA deal exists:** 4.1 access log, 4.2 BAAs, 4.4 written Security Rule policies.
