@@ -185,6 +185,26 @@ class AppDatabase extends _$AppDatabase {
     return [for (final r in rows) r.id];
   }
 
+  /// Drops local dose history older than 24 months, matching the server
+  /// retention period. [now] is for tests that need a frozen clock.
+  ///
+  /// Calendar months, not 730 days, so this agrees with Postgres
+  /// `logged_at < now() - interval '24 months'`.
+  Future<int> pruneExpiredDoseLogs({DateTime? now}) {
+    final clock = now ?? DateTime.now();
+    final cutoff = DateTime(
+      clock.year - 2,
+      clock.month,
+      clock.day,
+      clock.hour,
+      clock.minute,
+      clock.second,
+      clock.millisecond,
+      clock.microsecond,
+    );
+    return (delete(doseLogs)..where((t) => t.loggedAt.isSmallerThanValue(cutoff))).go();
+  }
+
   /// Insert-or-ignore, because missed doses carry deterministic ids: a sweep
   /// that runs twice, or on a second device, must converge on the same row
   /// rather than filling the feed with duplicates of the same skipped dose.

@@ -88,6 +88,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     // resume.
     if (sync != null && requestPermissions) await sync.pullAll();
     await NotificationService.instance.reconcile(widget.db);
+    try {
+      await widget.db.pruneExpiredDoseLogs();
+    } catch (_) {
+      // Best-effort: a local prune failure must not skip the missed-dose
+      // sweep or the push. The server job is the lasting copy.
+    }
     // Before the push, so a dose recorded as missed goes up in the same pass
     // and reaches the other side without waiting for another foreground.
     await const MissedDoseDetector().sweep(widget.db);

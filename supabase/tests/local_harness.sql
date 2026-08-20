@@ -18,6 +18,8 @@
 --     -f supabase/migrations/20260819163000_dose_logs_recorded_by.sql \
 --     -f supabase/migrations/20260819164000_parse_medicine_quota.sql \
 --     -f supabase/migrations/20260819165000_claimed_link_identity.sql \
+--     -f supabase/migrations/20260820170000_consents.sql \
+--     -f supabase/migrations/20260820190000_retention_prune.sql \
 --     -f supabase/tests/care_links_rls_test.sql
 --
 -- and the push tables' own assertions, which need a fresh database because
@@ -36,6 +38,14 @@
 --     -f supabase/tests/local_harness.sql \
 --     -f supabase/migrations/*.sql (in the order above) \
 --     -f supabase/tests/schedule_constraints_test.sql
+--
+-- and the retention prune assertions, which also want a fresh database:
+--
+--   dropdb --if-exists dosely_rls_test && createdb dosely_rls_test
+--   psql -d dosely_rls_test -v ON_ERROR_STOP=1 \
+--     -f supabase/tests/local_harness.sql \
+--     -f supabase/migrations/*.sql (in the order above) \
+--     -f supabase/tests/retention_prune_test.sql
 --
 -- Note the assertions print to stderr, not stdout, so redirect both when
 -- counting them.
