@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/privacy_policy.dart';
 import 'auth_service.dart';
 
 /// One button. Google is the only way in — the email one-time-code flow was
@@ -66,6 +67,17 @@ class _SignInScreenState extends State<SignInScreen> {
                 const SizedBox(height: 16),
                 Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
               ],
+              const SizedBox(height: 20),
+              TextButton(
+                onPressed: openPrivacyPolicy,
+                child: Text(
+                  'Privacy policy',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.primary,
+                    decoration: TextDecoration.underline,
+                  ),
+                ),
+              ),
             ],
           ),
         ),

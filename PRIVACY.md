@@ -1,7 +1,10 @@
 # Privacy Policy for Dosely
 
-**Last updated:** _[FILL IN before publishing]_
-**Contact:** _[FILL IN — the support email you use on the Play listing]_
+**Last updated:** 20 August 2026
+**Contact:** sagnikd91@gmail.com
+
+The controller is Sagnik Das, the sole developer of Dosely. Correspondence
+is by email only.
 
 Dosely is a medication reminder app. It records what medicines you take and
 when, so it can remind you and so you can look back at what you've taken.
@@ -159,4 +162,4 @@ the date at the top will change.
 
 ## Contact
 
-_[FILL IN — support email]_
+sagnikd91@gmail.com
