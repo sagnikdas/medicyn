@@ -516,3 +516,58 @@ Firebase — enable MFA and document a key rotation cadence.
 The cheapest high-value items are 1.1 (one line), 1.2 (small change, largest
 exposure closed), and 2.7 (one predicate). The largest are 1.3 (consent flow),
 1.5 (deletion), and 4.1 (the access log).
+
+---
+
+## Status against `feature/phase-2` (2026-08-20)
+
+The body of this plan still describes the codebase as audited on 2026-08-19.
+Closed items are **not** rewritten above. This table is the live tracker and
+should be updated when a phase (or a Phase 1-style blocker) closes. Phase 2
+lives on `feature/phase-2` until that branch is merged to `main`.
+
+| # | Change the application needs | Kind | Status | Notes |
+|---|---|---|---|---|
+| 1.1 | `allowBackup="false"` + backup / D2D exclude XML | App | **Done** — #22 | Verified on the Galaxy M33. |
+| 1.2 | Wipe local DB on sign-out so a second Google account cannot see the previous person's medicines | App | **Done differently** — #33 | Not a wipe: encrypted `dosely-<userId>.sqlite` per Google account. Same account keeps reminders; a different account opens a different file. Dialog copy was updated. |
+| 1.3 | Consent screen (unticked purposes) + `consents` table + Settings toggles | App + DB | **Done** — #40 | Onboarding → consent → auth. Unticked purposes: `cloud_backup`, `anthropic_parse`, `google_speech`. Care-share at Care Link. Settings withdraw. Hosted `consents` migration applied. |
+| 1.4 | Local-only mode so reminders work without signing in / cloud | App | **Done** — #38 | “Use without an account” writes `dosely-local.sqlite`. Sync / push / Care Link stay off until Google sign-in; first sign-in can adopt the local file. |
+| 1.5 | In-app account deletion + `delete_account` function + wipe local DB + web URL | App + backend | **Done** — #39 | In-app two-step delete, hosted `delete_account` function, local sqlite wipe, `docs/delete-account.md`. Play still needs a *public* web URL; the GitHub page is on a private repo. |
+| 1.6 | Name the Care Link claimant (name + email); fail closed; longer code; claim throttle | App + DB | **Done** — #34 | 8-digit codes; 10 claims / 15 min; hosted migration applied. |
+| 1.7 | Fill `PRIVACY.md` placeholders and link the policy in-app | Docs + app | **Done** — #37, #41 | Placeholders filled. The GitHub blob URL 404s because the repo is private; the app opens a bundled `PRIVACY.md` instead. Play still needs a public web policy URL. |
+| 2.1 | Rewrite `PRIVACY.md` for Art. 13 (bases, transfers, retention, rights, Art. 22) | Docs | **Done** — #43 | Legal bases, Singapore/US transfers (no invented SCCs), retention, six rights + withdraw/complain, Art. 22 human review. |
+| 2.2 | Stop claiming a `care_alerts` screen and guaranteed FCM-token deletion that the code does not do | Docs or app | **Done** — #43 | Alerts are recorded to avoid duplicates; there is no in-app list. FCM delete on sign-out is best-effort. |
+| 2.3 | Disclose timezone, `last_seen_at`, Firebase install id; fix README “on-device” speech | Docs | **Done** — #43 | Timezone / `last_seen_at` / `push_install_id` disclosed. README no longer says speech is on-device. |
+| 2.4 | Settings: download my data, delete account, manage consents; contest note on a dose log | App + DB | **Done** — #39, #40, #46 | Download my data (JSON share). Dose logs stay immutable; a correction note is a separate `dose_log_contests` row. Hosted contest migration applied (`--include-all`, after the later prune migration). |
+| 2.5 | “Remove this reminder” still only sets `active = false` | App | **Done** — #45 | **Stop reminding me** keeps history. **Delete medicine and history** tombstones locally and `DELETE`s the medicine in Postgres so the family feed drops it. |
+| 2.6 | Retention TTLs + prune job (`dose_logs` 24m, `care_alerts` 12m, revoked links 12m, tokens 90d) | Backend | **Done** — #44 | `prune_expired_data()` on hosted `twybepxnqayypzljhcnx`. pg_cron job `prune-expired-data` at 03:20 UTC. Local 24-month dose-log prune on bootstrap. |
+| 2.7 | Revoked caregiver must not read `care_alerts`; expire stale claimed links | DB | **Done** — #23, #24 | Caregiver read requires `status = 'active'`. Confirm checks `expires_at`. Lazy auto-revoke of stale `claimed` rows is not implemented. |
+| 3.1 | DPIA | Paper | **Todo** | Mandatory. Lift `PLAN.md` known gaps. |
+| 3.2 | Processor DPAs (Supabase, Anthropic, Google FCM / Sign-In) | Paper | **Todo** | Speech recogniser is a Google controller — consent or `onDevice: true`. |
+| 3.3 | Document (or eliminate) Singapore + US transfers; TIA / SCCs / DPF | Paper + infra | **Todo** | Cleanest code-adjacent move: recreate the project in an EU/UK region. |
+| 3.4 | Record of processing — `COMPLIANCE/ROPA.md` | Paper | **Todo** | Art. 30; small-org exemption does not apply. |
+| 3.5 | Breach plan, register, reachable contact; backfill timezone-corruption incident | Paper | **Todo** | |
+| 3.6 | Decide EEA distribution; Art. 27 representative if yes; privacy contact (no DPO required) | Paper | **Todo** | |
+| 3.7 | Separate Washington MHMD consumer health data policy | Docs | **Todo** | Second consent before sharing. |
+| 3.8 | Play Data Safety + Health apps declaration + `USE_FULL_SCREEN_INTENT` | Store | **Todo** | After 2.1 so the form matches the policy. |
+| 4.1 | Append-only `phi_access_log` + “who looked” screen | App + DB | **Deferred** | HIPAA track. Also useful for FTC HBNR / MHMD. Start when a B2B deal exists. |
+| 4.2 | BAAs (Supabase Team+HIPAA add-on; Anthropic; no BAA for platform speech) | Paper | **Deferred** | |
+| 4.3a | Encrypt local medical database | App | **Done** — #33 | sqlite3mc hooks + Keystore, not the EOL `sqlcipher_flutter_libs` package the plan named. |
+| 4.3b | Session in Keystore / Keychain | App | **Done** — #29 | |
+| 4.3c | Automatic logoff / device-credential re-unlock | App | **Todo** (HIPAA) | `timebox` / `inactivity_timeout` still commented in `config.toml`. Prefer device unlock over a 15-minute logout. |
+| 4.3d | Lock-screen names: setting, default private for *care* alerts | App | **Partial** — #30 | Patient reminders default private with an opt-in. Care alerts are still public / unspecified visibility. |
+| 4.3e | Redact OCR (name, address, DoB, Rx) on-device before `parse-medicine` | App | **Todo** (do before any Anthropic BAA) | Still sends up to 4,000 characters of raw label text. |
+| 4.3f | Certificate pinning (network security config exists for no-cleartext) | App | **Todo** (low) | `networkSecurityConfig` already forbids cleartext (#22). Pinning is not done. |
+| 4.4 | Written HIPAA policies, MFA on admin accounts, key rotation | Paper | **Deferred** | |
+
+**Counts:** Phases 1 and 2 are closed on this branch. 16 items done (or done differently); 1 partial (4.3d); remaining application work is 4.3 leftovers; 8 Phase 3 paperwork/store items; HIPAA 4.1–4.2 and 4.4 deferred.
+
+### Remaining work, in order
+
+Do not start Phase 4 (except 4.3e, which is cheap and shrinks Anthropic’s blast radius) until Phase 3 can ship.
+
+1. **Phase 1 blockers:** closed (#22, #33, #34, #37–#41). Overlay-install on the Galaxy M33 still pending.
+2. **Phase 2 honesty:** closed on `feature/phase-2` (#41, #43–#46). Optional leftover from 2.7: auto-revoke stale `claimed` links.
+3. **Phase 3:** DPIA, ROPA, DPAs, transfers (consider EU region), breach register, MHMD policy, Play Data Safety.
+4. **When useful, not when a term sheet appears:** 4.3e OCR redaction; 4.3d private care-alert lock screen; 4.3c device-credential unlock; 4.3f pinning.
+5. **When a B2B/HIPAA deal exists:** 4.1 access log, 4.2 BAAs, 4.4 written Security Rule policies.

@@ -15,7 +15,14 @@ class ScheduleWithMedicine {
   ScheduleWithMedicine(this.schedule, this.medicine);
 }
 
-@DriftDatabase(tables: [Medicines, Schedules, DoseLogs])
+/// A dose log plus the optional user correction note attached to it.
+class DoseLogWithContest {
+  final DoseLog log;
+  final DoseLogContest? contest;
+  DoseLogWithContest(this.log, this.contest);
+}
+
+@DriftDatabase(tables: [Medicines, Schedules, DoseLogs, DoseLogContests])
 class AppDatabase extends _$AppDatabase {
   /// Opens the encrypted per-account file via [openEncryptedAppDatabase].
   /// Background isolates construct this the same way so Taken/Snooze and
@@ -29,7 +36,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -47,6 +54,9 @@ class AppDatabase extends _$AppDatabase {
             // newer edits waiting on the server.
             await customStatement('UPDATE medicines SET updated_at = created_at');
             await customStatement('UPDATE schedules SET updated_at = created_at');
+          }
+          if (from < 3) {
+            await m.createTable(doseLogContests);
           }
         },
       );
@@ -71,7 +81,11 @@ class AppDatabase extends _$AppDatabase {
     final query = select(schedules).join([
       innerJoin(medicines, medicines.id.equalsExp(schedules.medicineId)),
     ])
-      ..where(schedules.active.equals(true) & schedules.deleted.equals(false));
+      ..where(
+        schedules.active.equals(true) &
+            schedules.deleted.equals(false) &
+            medicines.deleted.equals(false),
+      );
     return query.watch().map(
           (rows) => rows
               .map((r) => ScheduleWithMedicine(
@@ -86,7 +100,11 @@ class AppDatabase extends _$AppDatabase {
     final query = select(schedules).join([
       innerJoin(medicines, medicines.id.equalsExp(schedules.medicineId)),
     ])
-      ..where(schedules.active.equals(true) & schedules.deleted.equals(false));
+      ..where(
+        schedules.active.equals(true) &
+            schedules.deleted.equals(false) &
+            medicines.deleted.equals(false),
+      );
     final rows = await query.get();
     return rows
         .map((r) => ScheduleWithMedicine(
@@ -95,6 +113,9 @@ class AppDatabase extends _$AppDatabase {
             ))
         .toList();
   }
+
+  Future<List<Schedule>> schedulesForMedicine(String medicineId) =>
+      (select(schedules)..where((t) => t.medicineId.equals(medicineId))).get();
 
   /// Turning a reminder off is an edit like any other, so it has to carry a
   /// fresh [Schedules.updatedAt]. Without one it loses every version
@@ -109,6 +130,46 @@ class AppDatabase extends _$AppDatabase {
           updatedBy: Value(by),
         ),
       );
+
+  /// Removes this medicine's dose history and tombstones the medicine and its
+  /// schedules. The rows stay locally with [Medicines.deleted] /
+  /// [Schedules.deleted] set so a later pull cannot resurrect them before the
+  /// server `DELETE` lands. Dose logs are hard-deleted: history must actually
+  /// go, and there is no tombstone column on that table.
+  Future<void> deleteMedicineAndHistory(String medicineId, {String? by}) async {
+    final now = DateTime.now();
+    final related = await schedulesForMedicine(medicineId);
+    final scheduleIds = [for (final s in related) s.id];
+    await transaction(() async {
+      if (scheduleIds.isNotEmpty) {
+        final logs = await (select(doseLogs)
+              ..where((t) => t.scheduleId.isIn(scheduleIds)))
+            .get();
+        final logIds = [for (final l in logs) l.id];
+        if (logIds.isNotEmpty) {
+          await (delete(doseLogContests)..where((t) => t.doseLogId.isIn(logIds))).go();
+        }
+        await (delete(doseLogs)..where((t) => t.scheduleId.isIn(scheduleIds))).go();
+        await (update(schedules)..where((t) => t.medicineId.equals(medicineId))).write(
+          SchedulesCompanion(
+            deleted: const Value(true),
+            active: const Value(false),
+            pendingSync: const Value(true),
+            updatedAt: Value(now),
+            updatedBy: Value(by),
+          ),
+        );
+      }
+      await (update(medicines)..where((t) => t.id.equals(medicineId))).write(
+        MedicinesCompanion(
+          deleted: const Value(true),
+          pendingSync: const Value(true),
+          updatedAt: Value(now),
+          updatedBy: Value(by),
+        ),
+      );
+    });
+  }
 
   // --- Dose logs -----------------------------------------------------------
 
@@ -138,6 +199,63 @@ class AppDatabase extends _$AppDatabase {
 
   Stream<List<DoseLog>> watchDoseLogsForSchedule(String scheduleId) =>
       (select(doseLogs)..where((t) => t.scheduleId.equals(scheduleId))).watch();
+
+  Stream<List<DoseLogWithContest>> watchDoseLogsWithContests(String scheduleId) {
+    final query = select(doseLogs).join([
+      leftOuterJoin(
+        doseLogContests,
+        doseLogContests.doseLogId.equalsExp(doseLogs.id),
+      ),
+    ])
+      ..where(doseLogs.scheduleId.equals(scheduleId));
+    return query.watch().map(
+          (rows) => rows
+              .map(
+                (r) => DoseLogWithContest(
+                  r.readTable(doseLogs),
+                  r.readTableOrNull(doseLogContests),
+                ),
+              )
+              .toList(),
+        );
+  }
+
+  Future<DoseLog?> doseLogById(String id) =>
+      (select(doseLogs)..where((t) => t.id.equals(id))).getSingleOrNull();
+
+  Future<DoseLogContest?> contestForDoseLog(String doseLogId) =>
+      (select(doseLogContests)..where((t) => t.doseLogId.equals(doseLogId)))
+          .getSingleOrNull();
+
+  /// Attaches or replaces the correction note. Does not touch the log row.
+  Future<void> upsertDoseLogContest({
+    required String doseLogId,
+    required String note,
+  }) async {
+    final trimmed = note.trim();
+    if (trimmed.isEmpty) {
+      throw ArgumentError.value(note, 'note', 'must not be empty');
+    }
+    final existing = await contestForDoseLog(doseLogId);
+    final now = DateTime.now();
+    if (existing == null) {
+      await into(doseLogContests).insert(
+        DoseLogContestsCompanion.insert(
+          doseLogId: doseLogId,
+          note: trimmed,
+        ),
+      );
+      return;
+    }
+    await (update(doseLogContests)..where((t) => t.doseLogId.equals(doseLogId)))
+        .write(
+      DoseLogContestsCompanion(
+        note: Value(trimmed),
+        updatedAt: Value(now),
+        pendingSync: const Value(true),
+      ),
+    );
+  }
 
   /// Most recent dose log for a schedule, if any. One-shot rather than
   /// reactive: the notification engine records Taken/Snooze from its own
@@ -185,6 +303,26 @@ class AppDatabase extends _$AppDatabase {
     return [for (final r in rows) r.id];
   }
 
+  /// Drops local dose history older than 24 months, matching the server
+  /// retention period. [now] is for tests that need a frozen clock.
+  ///
+  /// Calendar months, not 730 days, so this agrees with Postgres
+  /// `logged_at < now() - interval '24 months'`.
+  Future<int> pruneExpiredDoseLogs({DateTime? now}) {
+    final clock = now ?? DateTime.now();
+    final cutoff = DateTime(
+      clock.year - 2,
+      clock.month,
+      clock.day,
+      clock.hour,
+      clock.minute,
+      clock.second,
+      clock.millisecond,
+      clock.microsecond,
+    );
+    return (delete(doseLogs)..where((t) => t.loggedAt.isSmallerThanValue(cutoff))).go();
+  }
+
   /// Insert-or-ignore, because missed doses carry deterministic ids: a sweep
   /// that runs twice, or on a second device, must converge on the same row
   /// rather than filling the feed with duplicates of the same skipped dose.
@@ -204,6 +342,9 @@ class AppDatabase extends _$AppDatabase {
   Future<List<DoseLog>> unsyncedDoseLogs() =>
       (select(doseLogs)..where((t) => t.pendingSync.equals(true))).get();
 
+  Future<List<DoseLogContest>> unsyncedDoseLogContests() =>
+      (select(doseLogContests)..where((t) => t.pendingSync.equals(true))).get();
+
   Future<void> markMedicineSynced(String id) =>
       (update(medicines)..where((t) => t.id.equals(id)))
           .write(const MedicinesCompanion(pendingSync: Value(false)));
@@ -215,6 +356,10 @@ class AppDatabase extends _$AppDatabase {
   Future<void> markDoseLogSynced(String id) =>
       (update(doseLogs)..where((t) => t.id.equals(id)))
           .write(const DoseLogsCompanion(pendingSync: Value(false)));
+
+  Future<void> markDoseLogContestSynced(String doseLogId) =>
+      (update(doseLogContests)..where((t) => t.doseLogId.equals(doseLogId)))
+          .write(const DoseLogContestsCompanion(pendingSync: Value(false)));
 
   // --- Pull/restore helpers ------------------------------------------------
   //
@@ -241,20 +386,87 @@ class AppDatabase extends _$AppDatabase {
     return {for (final r in rows) r.id};
   }
 
+  /// `doseLogId -> updatedAt` for every local contest note. Unlike dose logs,
+  /// these rows are editable, so a pull has to version-compare them.
+  Future<Map<String, DateTime>> doseLogContestVersions() async {
+    final rows = await select(doseLogContests).get();
+    return {for (final r in rows) r.doseLogId: r.updatedAt};
+  }
+
   /// Writes remote rows that won the version comparison, in one batch rather
-  /// than a statement per row.
+  /// than a statement per row. A local tombstone is never overwritten: pull
+  /// runs before push on cold start, and restoring the pre-delete server copy
+  /// would put a "removed" medicine back on this phone.
   Future<void> applyRemoteMedicines(List<MedicinesCompanion> rows) async {
     if (rows.isEmpty) return;
-    await batch((b) => b.insertAllOnConflictUpdate(medicines, rows));
+    final tombstoned = await _deletedMedicineIds();
+    final accepted = [
+      for (final row in rows)
+        if (!_isTombstoned(_companionId(row.id), tombstoned)) row,
+    ];
+    if (accepted.isEmpty) return;
+    await batch((b) => b.insertAllOnConflictUpdate(medicines, accepted));
   }
 
   Future<void> applyRemoteSchedules(List<SchedulesCompanion> rows) async {
     if (rows.isEmpty) return;
-    await batch((b) => b.insertAllOnConflictUpdate(schedules, rows));
+    final tombstonedSchedules = await _deletedScheduleIds();
+    final tombstonedMedicines = await _deletedMedicineIds();
+    final accepted = <SchedulesCompanion>[];
+    for (final row in rows) {
+      if (_isTombstoned(_companionId(row.id), tombstonedSchedules)) continue;
+      if (_isTombstoned(_companionId(row.medicineId), tombstonedMedicines)) {
+        continue;
+      }
+      accepted.add(row);
+    }
+    if (accepted.isEmpty) return;
+    await batch((b) => b.insertAllOnConflictUpdate(schedules, accepted));
   }
 
   Future<void> applyRemoteDoseLogs(List<DoseLogsCompanion> rows) async {
     if (rows.isEmpty) return;
-    await batch((b) => b.insertAll(doseLogs, rows, mode: InsertMode.insertOrIgnore));
+    final blocked = await _scheduleIdsHiddenFromRemoteDoseLogs();
+    final accepted = [
+      for (final row in rows)
+        if (!_isTombstoned(_companionId(row.scheduleId), blocked)) row,
+    ];
+    if (accepted.isEmpty) return;
+    await batch((b) => b.insertAll(doseLogs, accepted, mode: InsertMode.insertOrIgnore));
   }
+
+  Future<void> applyRemoteDoseLogContests(List<DoseLogContestsCompanion> rows) async {
+    if (rows.isEmpty) return;
+    await batch((b) => b.insertAllOnConflictUpdate(doseLogContests, rows));
+  }
+
+  Future<Set<String>> _deletedMedicineIds() async {
+    final rows = await (select(medicines)..where((t) => t.deleted.equals(true))).get();
+    return {for (final r in rows) r.id};
+  }
+
+  Future<Set<String>> _deletedScheduleIds() async {
+    final rows = await (select(schedules)..where((t) => t.deleted.equals(true))).get();
+    return {for (final r in rows) r.id};
+  }
+
+  /// Dose history for a locally deleted schedule, or for any schedule of a
+  /// deleted medicine, must not come back from the server. Local dose logs
+  /// were hard-deleted; insert-or-ignore would otherwise restore them.
+  Future<Set<String>> _scheduleIdsHiddenFromRemoteDoseLogs() async {
+    final deletedSchedules = await _deletedScheduleIds();
+    final deletedMedicines = await _deletedMedicineIds();
+    if (deletedMedicines.isEmpty) return deletedSchedules;
+    final fromDeletedMedicines =
+        await (select(schedules)..where((t) => t.medicineId.isIn(deletedMedicines))).get();
+    return {
+      ...deletedSchedules,
+      for (final s in fromDeletedMedicines) s.id,
+    };
+  }
+
+  static String? _companionId(Value<String> id) => id.present ? id.value : null;
+
+  static bool _isTombstoned(String? id, Set<String> tombstoned) =>
+      id != null && tombstoned.contains(id);
 }
