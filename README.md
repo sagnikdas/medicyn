@@ -10,11 +10,11 @@ fire from the device itself, so they work even with no network.
    The photo is discarded immediately; only the text ever leaves the camera
    screen.
 2. **Speak** — say the dosage/schedule naturally ("one tablet twice a day,
-   morning and night"), transcribed on-device.
+   morning and night"). On most Android phones the recogniser is Google's,
+   and the audio may leave the device — see PRIVACY.md.
 3. **Understand** — the OCR text + transcript are sent to a Supabase Edge
    Function, which asks Claude to structure them into drug name, strength,
-   dose, frequency, and times. This is the only step that touches the
-   network, and no photo is ever included in that call.
+   dose, frequency, and times. No photo is ever included in that call.
 4. **Review** — every field is shown in an editable form. Nothing is saved
    until you tap Save.
 5. **Remind** — an exact alarm is scheduled directly on the device (source
@@ -33,7 +33,7 @@ dosely/
       data/remote/      Supabase sync + the parse-medicine client
       features/
         capture_ocr/    camera + on-device OCR
-        voice_capture/  on-device speech-to-text
+        voice_capture/  speech-to-text (Google on most phones; audio may leave)
         review_edit/    AI-structured, user-editable confirmation screen
         notification_engine/  exact-alarm scheduling, action handling
         reminders_home/ the main list
@@ -74,10 +74,10 @@ cd ~/research/dosely/app
 flutter pub get
 ```
 
-**3. Register Google Sign-In.** Required — it's the only way into the app,
-so nothing past the sign-in screen is reachable until it's done. It's a
-browser-only job across the Google Cloud and Supabase consoles; the full
-walkthrough is under [Auth](#auth) below.
+**3. Register Google Sign-In.** Needed for cloud backup and family sharing.
+You can still use the app without an account (local-only). Registering
+Google Sign-In is a browser-only job across the Google Cloud and Supabase
+consoles; the full walkthrough is under [Auth](#auth) below.
 
 **4. Set up push.** Optional for a single user, required for a care link to
 be worth anything — see [Push](#push). Without it the app builds, runs, and
