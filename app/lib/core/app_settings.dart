@@ -27,6 +27,7 @@ class AppSettings extends ChangeNotifier {
   static const _themeModeKey = 'theme_mode';
   static const _hasSeenOnboardingKey = 'has_seen_onboarding';
   static const _showMedicineOnLockScreenKey = 'show_medicine_on_lock_screen';
+  static const _localOnlyKey = 'local_only';
   static const _hasRecordedConsentsKey = 'has_recorded_consents';
   static const _consentCloudBackupKey = 'consent_cloud_backup';
   static const _consentAnthropicParseKey = 'consent_anthropic_parse';
@@ -67,6 +68,12 @@ class AppSettings extends ChangeNotifier {
   bool _showMedicineOnLockScreen = false;
   bool get showMedicineOnLockScreen => _showMedicineOnLockScreen;
 
+  /// True when the user chose to use the app without a Google account.
+  /// Reminders stay on this phone; backup and family sharing stay off
+  /// until they sign in.
+  bool _localOnly = false;
+  bool get localOnly => _localOnly;
+
   /// False until the consent screen's Continue is tapped — including on
   /// existing installs that already skipped onboarding. Implied consent is
   /// never grandfathered.
@@ -102,6 +109,7 @@ class AppSettings extends ChangeNotifier {
     );
     _hasSeenOnboarding = prefs.getBool(_hasSeenOnboardingKey) ?? false;
     _showMedicineOnLockScreen = prefs.getBool(_showMedicineOnLockScreenKey) ?? false;
+    _localOnly = prefs.getBool(_localOnlyKey) ?? false;
     _hasRecordedConsents = prefs.getBool(_hasRecordedConsentsKey) ?? false;
     _consentCloudBackup = prefs.getBool(_consentCloudBackupKey) ?? false;
     _consentAnthropicParse = prefs.getBool(_consentAnthropicParseKey) ?? false;
@@ -163,6 +171,14 @@ class AppSettings extends ChangeNotifier {
     await prefs.setBool(_showMedicineOnLockScreenKey, value);
   }
 
+  Future<void> setLocalOnly(bool value) async {
+    if (value == _localOnly) return;
+    _localOnly = value;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_localOnlyKey, value);
+  }
+
   Future<void> setHasRecordedConsents() async {
     _hasRecordedConsents = true;
     notifyListeners();
@@ -203,6 +219,7 @@ class AppSettings extends ChangeNotifier {
     _themeMode = ThemeMode.system;
     _hasSeenOnboarding = false;
     _showMedicineOnLockScreen = false;
+    _localOnly = false;
     _hasRecordedConsents = false;
     _consentCloudBackup = false;
     _consentAnthropicParse = false;

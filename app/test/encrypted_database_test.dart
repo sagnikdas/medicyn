@@ -39,6 +39,12 @@ void main() {
       expect(isPerUserDatabaseFileName(encryptedDatabaseFileName(a)), isTrue);
     });
 
+    test('local-only sentinel names dosely-local.sqlite', () {
+      expect(localOwnerUserId, 'local');
+      expect(encryptedDatabaseFileName(localOwnerUserId), 'dosely-local.sqlite');
+      expect(isPerUserDatabaseFileName(encryptedDatabaseFileName(localOwnerUserId)), isTrue);
+    });
+
     test('sanitises surprising characters in the user id', () {
       expect(encryptedDatabaseFileName('alice/../bob'), 'dosely-alice_.._bob.sqlite');
     });
@@ -186,6 +192,182 @@ void main() {
       stillA.execute('PRAGMA key = "${sqlcipherHexKeyLiteral(hexKey)}";');
       expect(stillA.select('SELECT drug_name FROM medicines').first['drug_name'], 'Metformin');
       stillA.close();
+    });
+
+    test('local-only with no session opens dosely-local.sqlite and does not throw', () async {
+      if (!_sqlite3HasCipher()) {
+        markTestSkipped('sqlite3mc native assets are not linked in this test run');
+        return;
+      }
+
+      final docs = await Directory.systemTemp.createTemp('dosely-docs');
+      final tmp = await Directory.systemTemp.createTemp('dosely-tmp');
+      addTearDown(() async {
+        await docs.delete(recursive: true);
+        await tmp.delete(recursive: true);
+      });
+
+      final store = _MemorySecureStore();
+      final opener = EncryptedDatabaseOpener(
+        keyStore: DatabaseKeyStore(store: store),
+        lookupSignedInUserId: () => null,
+        lookupLocalOnly: () => true,
+        documentsDirectory: () async => docs,
+        temporaryDirectory: () async => tmp,
+      );
+
+      final exec = await opener.open();
+      final db = AppDatabase.forTesting(exec);
+      expect(await db.select(db.medicines).get(), isEmpty);
+      await db.close();
+
+      final localFile = File('${docs.path}/${encryptedDatabaseFileName(localOwnerUserId)}');
+      expect(await localFile.exists(), isTrue);
+      expect(store.data[DatabaseKeyStore.ownerUserIdName], localOwnerUserId);
+    });
+
+    test('two Google users still get different files', () async {
+      if (!_sqlite3HasCipher()) {
+        markTestSkipped('sqlite3mc native assets are not linked in this test run');
+        return;
+      }
+
+      final docs = await Directory.systemTemp.createTemp('dosely-docs');
+      final tmp = await Directory.systemTemp.createTemp('dosely-tmp');
+      addTearDown(() async {
+        await docs.delete(recursive: true);
+        await tmp.delete(recursive: true);
+      });
+
+      final store = _MemorySecureStore();
+      String? user = 'user-a';
+      final opener = EncryptedDatabaseOpener(
+        keyStore: DatabaseKeyStore(store: store),
+        lookupSignedInUserId: () => user,
+        lookupLocalOnly: () => false,
+        documentsDirectory: () async => docs,
+        temporaryDirectory: () async => tmp,
+      );
+
+      final execA = await opener.open();
+      final dbA = AppDatabase.forTesting(execA);
+      expect(await dbA.select(dbA.medicines).get(), isEmpty);
+      await dbA.close();
+      user = 'user-b';
+      final execB = await opener.open();
+      final dbB = AppDatabase.forTesting(execB);
+      expect(await dbB.select(dbB.medicines).get(), isEmpty);
+      await dbB.close();
+
+      final fileA = File('${docs.path}/${encryptedDatabaseFileName('user-a')}');
+      final fileB = File('${docs.path}/${encryptedDatabaseFileName('user-b')}');
+      expect(await fileA.exists(), isTrue);
+      expect(await fileB.exists(), isTrue);
+      expect(fileA.path, isNot(fileB.path));
+      expect(store.data[DatabaseKeyStore.ownerUserIdName], 'user-b');
+    });
+  });
+
+  group('adopt local-only on first sign-in', () {
+    test('renames dosely-local.sqlite and sidecars onto a new account file', () async {
+      expect(
+        decideAdoptLocalDatabase(accountFileExists: false, localFileExists: true),
+        LocalAdoptDecision.adopt,
+      );
+
+      final docs = await Directory.systemTemp.createTemp('dosely-adopt');
+      addTearDown(() async {
+        await docs.delete(recursive: true);
+      });
+
+      final local = File('${docs.path}/${encryptedDatabaseFileName(localOwnerUserId)}');
+      await local.writeAsBytes(const [1, 2, 3]);
+      await File('${local.path}-wal').writeAsBytes(const [4]);
+      await File('${local.path}-shm').writeAsBytes(const [5]);
+
+      const userId = 'user-a';
+      final decision = await adoptLocalDatabaseIfNeeded(docs: docs, ownerUserId: userId);
+      expect(decision, LocalAdoptDecision.adopt);
+
+      final account = File('${docs.path}/${encryptedDatabaseFileName(userId)}');
+      expect(await account.exists(), isTrue);
+      expect(await account.readAsBytes(), const [1, 2, 3]);
+      expect(await File('${account.path}-wal').readAsBytes(), const [4]);
+      expect(await File('${account.path}-shm').readAsBytes(), const [5]);
+      expect(await local.exists(), isFalse);
+      expect(await File('${local.path}-wal').exists(), isFalse);
+      expect(await File('${local.path}-shm').exists(), isFalse);
+    });
+
+    test('leaves dosely-local.sqlite in place when the account already has a file', () async {
+      expect(
+        decideAdoptLocalDatabase(accountFileExists: true, localFileExists: true),
+        LocalAdoptDecision.leaveLocalInPlace,
+      );
+      expect(
+        decideAdoptLocalDatabase(accountFileExists: false, localFileExists: false),
+        LocalAdoptDecision.nothingToAdopt,
+      );
+
+      final docs = await Directory.systemTemp.createTemp('dosely-adopt');
+      addTearDown(() async {
+        await docs.delete(recursive: true);
+      });
+
+      const userId = 'user-a';
+      final local = File('${docs.path}/${encryptedDatabaseFileName(localOwnerUserId)}');
+      final account = File('${docs.path}/${encryptedDatabaseFileName(userId)}');
+      await local.writeAsBytes(const [9]);
+      await account.writeAsBytes(const [8]);
+
+      final decision = await adoptLocalDatabaseIfNeeded(docs: docs, ownerUserId: userId);
+      expect(decision, LocalAdoptDecision.leaveLocalInPlace);
+      expect(await local.readAsBytes(), const [9]);
+      expect(await account.readAsBytes(), const [8]);
+    });
+
+    test('first signed-in open adopts the local-only file', () async {
+      if (!_sqlite3HasCipher()) {
+        markTestSkipped('sqlite3mc native assets are not linked in this test run');
+        return;
+      }
+
+      final docs = await Directory.systemTemp.createTemp('dosely-docs');
+      final tmp = await Directory.systemTemp.createTemp('dosely-tmp');
+      addTearDown(() async {
+        await docs.delete(recursive: true);
+        await tmp.delete(recursive: true);
+      });
+
+      final store = _MemorySecureStore();
+      String? user;
+      var localOnly = true;
+      final opener = EncryptedDatabaseOpener(
+        keyStore: DatabaseKeyStore(store: store),
+        lookupSignedInUserId: () => user,
+        lookupLocalOnly: () => localOnly,
+        documentsDirectory: () async => docs,
+        temporaryDirectory: () async => tmp,
+      );
+
+      final localExec = await opener.open();
+      final localDb = AppDatabase.forTesting(localExec);
+      expect(await localDb.select(localDb.medicines).get(), isEmpty);
+      await localDb.close();
+      final localFile = File('${docs.path}/${encryptedDatabaseFileName(localOwnerUserId)}');
+      expect(await localFile.exists(), isTrue);
+
+      user = 'user-a';
+      localOnly = false;
+      final signedIn = await opener.open();
+      final signedInDb = AppDatabase.forTesting(signedIn);
+      expect(await signedInDb.select(signedInDb.medicines).get(), isEmpty);
+      await signedInDb.close();
+
+      final accountFile = File('${docs.path}/${encryptedDatabaseFileName('user-a')}');
+      expect(await accountFile.exists(), isTrue);
+      expect(await localFile.exists(), isFalse);
+      expect(store.data[DatabaseKeyStore.ownerUserIdName], 'user-a');
     });
   });
 }
