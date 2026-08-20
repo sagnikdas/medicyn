@@ -10,10 +10,6 @@ const kConsentPolicyVersion = '2026-08-20';
 /// `pubspec.yaml`.
 const kConsentAppVersion = '0.1.0+1';
 
-/// Hardcoded until 1.7 makes it tappable. Selectable so someone can copy it.
-const kPrivacyPolicyUrl =
-    'https://github.com/sagnikdas/dosely/blob/main/PRIVACY.md';
-
 /// One processing purpose, with the exact on-screen sentence that is hashed
 /// into the Article 7 record. Changing [sentence] changes the hash; tests
 /// pin both.

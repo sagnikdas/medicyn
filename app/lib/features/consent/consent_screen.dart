@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/privacy_policy.dart';
 import 'consent_purpose.dart';
 import 'consent_service.dart';
 
@@ -65,14 +66,15 @@ class _ConsentScreenState extends State<ConsentScreen> {
                     const SizedBox(height: 8),
                   ],
                   const SizedBox(height: 16),
-                  Text(
-                    'How Dosely handles your health information:',
-                    style: text.bodyMedium,
-                  ),
-                  const SizedBox(height: 4),
-                  SelectableText(
-                    kPrivacyPolicyUrl,
-                    style: text.bodySmall,
+                  TextButton(
+                    onPressed: openPrivacyPolicy,
+                    child: Text(
+                      'Privacy policy',
+                      style: text.titleMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.primary,
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
                   ),
                 ],
               ),

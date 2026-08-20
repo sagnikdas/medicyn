@@ -14,6 +14,10 @@ void main() {
     await AppSettings.instance.init();
   });
 
+  tearDown(() {
+    AppSettings.instance.resetForTest();
+  });
+
   group('defaults', () {
     test('every purpose starts unticked, and consents are unrecorded', () {
       expect(AppSettings.instance.hasRecordedConsents, isFalse);
@@ -140,6 +144,9 @@ void main() {
 
       expect(find.text('Share with family'), findsNothing);
       expect(find.text(ConsentPurpose.careShare.sentence), findsNothing);
+
+      await tester.scrollUntilVisible(find.text('Privacy policy'), 80);
+      expect(find.text('Privacy policy'), findsOneWidget);
 
       final continueButton = tester.widget<FilledButton>(
         find.widgetWithText(FilledButton, 'Continue'),

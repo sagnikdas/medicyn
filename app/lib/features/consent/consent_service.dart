@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/app_settings.dart';
+import '../care/care_service.dart';
 import 'consent_purpose.dart';
 
 /// Local prefs are the source of truth for gating. The server row is the
@@ -22,7 +23,12 @@ class ConsentService {
   }
 
   /// Persist locally first, then upsert the server row if a session exists.
+  /// Withdrawing family sharing also ends any live Care Link — otherwise
+  /// the toggle would lie while the other person still had access.
   Future<void> setGranted(ConsentPurpose purpose, bool granted) async {
+    if (purpose == ConsentPurpose.careShare && !granted) {
+      await _revokeLiveCareLink();
+    }
     await _persistLocal(purpose, granted);
     await _recordOnServer(purpose, granted);
   }
@@ -77,6 +83,19 @@ class ConsentService {
       // before sign-in still persists locally).
     } catch (e) {
       debugPrint('record_consent failed: $e');
+    }
+  }
+
+  Future<void> _revokeLiveCareLink() async {
+    try {
+      if (Supabase.instance.client.auth.currentUser == null) return;
+      final link = await CareService.instance.currentLink();
+      if (link == null || link.status == CareLinkStatus.revoked) return;
+      await CareService.instance.revokeLink(link.id);
+    } on AssertionError {
+      // Tests and the first-screen path have no session.
+    } catch (e) {
+      debugPrint('care_share withdraw did not revoke the link: $e');
     }
   }
 }
