@@ -28,6 +28,29 @@ class SyncService {
     await _syncDoseLogs(user.id);
   }
 
+  /// Best-effort `DELETE` of one medicine on the server. Postgres cascades
+  /// its schedules and dose logs, which is what actually clears the family
+  /// feed. Failures leave the local tombstone dirty so [syncAll] retries.
+  Future<void> tryDeleteRemoteMedicine(String medicineId) async {
+    final user = _client.auth.currentUser;
+    if (user == null) return;
+    try {
+      await _client
+          .from('medicines')
+          .delete()
+          .eq('id', medicineId)
+          .timeout(_networkTimeout);
+      await _db.markMedicineSynced(medicineId);
+      final related = await _db.schedulesForMedicine(medicineId);
+      for (final s in related) {
+        await _db.markScheduleSynced(s.id);
+      }
+      _pushedEdits = true;
+    } catch (_) {
+      // Retried by [syncAll].
+    }
+  }
+
   /// Brings down rows this device is missing *or* holds an older copy of —
   /// the other half of "sync". Without it, a fresh install or a second
   /// device signing into the same account starts empty, and an edit made
@@ -41,8 +64,13 @@ class SyncService {
   /// vanishing. This is the trade last-write-wins asks for, and the reason
   /// every reminder is expected to show who last changed it.
   ///
+  /// Local tombstones are the exception. Cold start pulls before it pushes,
+  /// so a medicine this device has already deleted would otherwise come
+  /// back from the still-live server copy, dose logs included.
+  ///
   /// Dose logs stay insert-only. Nothing ever edits one, so a log this
-  /// device already has can only be identical.
+  /// device already has can only be identical. Logs whose schedule or
+  /// medicine is locally deleted are skipped rather than restored.
   Future<void> pullAll() async {
     if (!AppSettings.instance.consentCloudBackup) return;
     final user = _client.auth.currentUser;
@@ -129,9 +157,29 @@ class SyncService {
   Future<void> _syncMedicines(String userId) async {
     final rows = await _db.unsyncedMedicines();
     if (rows.isEmpty) return;
+    final toDelete = [for (final m in rows) if (m.deleted) m];
+    final toUpsert = [for (final m in rows) if (!m.deleted) m];
+
+    if (toDelete.isNotEmpty) {
+      try {
+        await _client
+            .from('medicines')
+            .delete()
+            .inFilter('id', [for (final m in toDelete) m.id])
+            .timeout(_networkTimeout);
+        _pushedEdits = true;
+        for (final m in toDelete) {
+          await _db.markMedicineSynced(m.id);
+        }
+      } catch (_) {
+        // Leave pendingSync=true; retried on the next syncAll() call.
+      }
+    }
+
+    if (toUpsert.isEmpty) return;
     try {
       await _client.from('medicines').upsert([
-        for (final m in rows)
+        for (final m in toUpsert)
           {
             'id': m.id,
             'user_id': userId,
@@ -146,7 +194,7 @@ class SyncService {
           },
       ]).timeout(_networkTimeout);
       _pushedEdits = true;
-      for (final m in rows) {
+      for (final m in toUpsert) {
         await _db.markMedicineSynced(m.id);
       }
     } catch (_) {
@@ -157,9 +205,29 @@ class SyncService {
   Future<void> _syncSchedules(String userId) async {
     final rows = await _db.unsyncedSchedules();
     if (rows.isEmpty) return;
+    final toDelete = [for (final s in rows) if (s.deleted) s];
+    final toUpsert = [for (final s in rows) if (!s.deleted) s];
+
+    if (toDelete.isNotEmpty) {
+      try {
+        await _client
+            .from('schedules')
+            .delete()
+            .inFilter('id', [for (final s in toDelete) s.id])
+            .timeout(_networkTimeout);
+        _pushedEdits = true;
+        for (final s in toDelete) {
+          await _db.markScheduleSynced(s.id);
+        }
+      } catch (_) {
+        // Retried next call.
+      }
+    }
+
+    if (toUpsert.isEmpty) return;
     try {
       await _client.from('schedules').upsert([
-        for (final s in rows)
+        for (final s in toUpsert)
           {
             'id': s.id,
             'medicine_id': s.medicineId,
@@ -175,7 +243,7 @@ class SyncService {
           },
       ]).timeout(_networkTimeout);
       _pushedEdits = true;
-      for (final s in rows) {
+      for (final s in toUpsert) {
         await _db.markScheduleSynced(s.id);
       }
     } catch (_) {
