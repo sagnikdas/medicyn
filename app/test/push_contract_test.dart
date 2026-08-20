@@ -18,15 +18,23 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   // Tests run from the `app/` directory; everything else is a sibling.
   final repoRoot = Directory.current.parent;
-  final notifyCare = File('${repoRoot.path}/supabase/functions/notify-care/index.ts');
-  final manifest = File('${Directory.current.path}/android/app/src/main/AndroidManifest.xml');
+  final notifyCare = File(
+    '${repoRoot.path}/supabase/functions/notify-care/index.ts',
+  );
+  final manifest = File(
+    '${Directory.current.path}/android/app/src/main/AndroidManifest.xml',
+  );
 
   group('event names', () {
     late String functionSource;
 
     setUpAll(() {
-      expect(notifyCare.existsSync(), isTrue,
-          reason: 'the notify-care function has moved; this test needs its new path');
+      expect(
+        notifyCare.existsSync(),
+        isTrue,
+        reason:
+            'the notify-care function has moved; this test needs its new path',
+      );
       functionSource = notifyCare.readAsStringSync();
     });
 
@@ -42,27 +50,14 @@ void main() {
       // The `data` map's discriminator. Read on every arriving message, in the
       // background isolate where nothing can report a mismatch.
       expect(functionSource, contains('$pushEventKey: "$pushEventMissedDose"'));
-      expect(functionSource, contains('$pushEventKey: "$pushEventDataChanged"'));
+      expect(
+        functionSource,
+        contains('$pushEventKey: "$pushEventDataChanged"'),
+      );
     });
 
     test('the function names the patient by the key the tap handler reads', () {
       expect(functionSource, contains('$pushPatientIdKey:'));
-    });
-
-    test('the function labels a re-arm with the key the device reads', () {
-      expect(functionSource, contains('$pushRearmKey: "$pushRearmYes"'));
-      expect(functionSource, contains('$pushRearmKey: "$pushRearmNo"'));
-    });
-
-    test('the caregiver-facing change ping names no medicine', () {
-      // The visible data_changed copy is composed in data_change.ts and must
-      // stay generic: a lock-screen alert that quoted a drug name would be
-      // the Phase 2 path recreating the 4.3d care-alert exposure.
-      final dataChange = File('${repoRoot.path}/supabase/functions/notify-care/data_change.ts')
-          .readAsStringSync();
-      expect(dataChange, contains('A reminder was changed'));
-      expect(dataChange, contains('Open Dosely to see what changed.'));
-      expect(dataChange, isNot(contains('drug_name')));
     });
   });
 
@@ -71,13 +66,31 @@ void main() {
       expect(notifyCare.readAsStringSync(), contains('"$careAlertChannelId"'));
     });
 
-    test("Android's fallback channel is the care-alert one, not the alarm one", () {
-      // If this ever became the alarm channel, a "your mother missed a dose"
-      // notification would loop its sound until dismissed.
-      final xml = manifest.readAsStringSync();
-      expect(xml, contains('com.google.firebase.messaging.default_notification_channel_id'));
-      expect(xml, contains('android:value="$careAlertChannelId"'));
-      expect(xml, isNot(contains('android:value="$reminderChannelId"')));
+    test('FCM conceals care-alert copy on a secure lock screen', () {
+      // Android draws the FCM notification itself when the app is dead, so
+      // the visibility has to live on the payload, not only on the local
+      // NotificationDetails the foreground path uses.
+      final fcm = File(
+        '${repoRoot.path}/supabase/functions/notify-care/fcm.ts',
+      ).readAsStringSync();
+      expect(fcm, contains('visibility: "PRIVATE"'));
     });
+
+    test(
+      "Android's fallback channel is the care-alert one, not the alarm one",
+      () {
+        // If this ever became the alarm channel, a "your mother missed a dose"
+        // notification would loop its sound until dismissed.
+        final xml = manifest.readAsStringSync();
+        expect(
+          xml,
+          contains(
+            'com.google.firebase.messaging.default_notification_channel_id',
+          ),
+        );
+        expect(xml, contains('android:value="$careAlertChannelId"'));
+        expect(xml, isNot(contains('android:value="$reminderChannelId"')));
+      },
+    );
   });
 }

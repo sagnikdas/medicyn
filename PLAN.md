@@ -3,9 +3,9 @@
 The working plan for turning Dosely from a single-user pill reminder into
 something an elderly parent and one adult child in another city use together.
 Updated as work lands; the design rationale behind these choices lives in the
-Care Link spec artifact.
+Care Link spec artifact. How the app makes money is in `MONETIZE.md`, not here.
 
-**Last updated:** 2026-08-20 · Phase 2 caregiver editing on `feat/phase2-caregiver-edit`
+**Last updated:** 2026-08-20 · Phase 2 on `main` (#54)
 
 ---
 
@@ -16,7 +16,7 @@ These are settled. Revisit them deliberately, not incidentally.
 | Decision | Choice |
 |---|---|
 | Pairing | **Exactly one caregiver to one parent.** Each person belongs to at most one live pair. |
-| Editing | **Either side can add or edit medicines.** |
+| Editing | **Either side can add or edit medicines. The caregiver cannot delete.** |
 | Visibility | **Full symmetry** — the parent sees exactly what the caregiver sees. |
 | Consent | Two steps. Possession of an invite code is never access; the parent confirms the named person. |
 | Roles | Never asked for. Whoever shows a code needs help, whoever types one in is giving it. |
@@ -33,36 +33,28 @@ These are settled. Revisit them deliberately, not incidentally.
 - The linking flow: invite, claim, confirm, disconnect
 - The adherence feed — what happened with someone's medicines, punctuality first
 - Missed-dose detection, written on the device that owns the reminders
-- A privacy policy draft, and the app name capitalised
 - Push in both directions: `device_tokens` + `care_alerts`, `notify-care`, FCM
   registration, and the inbound silent message that pulls and re-arms
+- A privacy policy (Art. 13 rewrite), consent, local-only, account deletion,
+  and the Phase 4 technical leftovers (OCR redaction, private care alerts,
+  device-credential unlock)
+- Caregiver editing (remote writes under the patient's `user_id`, no delete),
+  silent `data_changed` both ways, per-medicine change history, and setup
+  health on the Care Screen (#54)
 
-**On this Phase 2 branch, not yet merged:** caregiver-side add/edit that writes
-the patient's rows in Postgres and never into the caregiver's encrypted file;
-"Changed by Priya, Tuesday" on both phones; `data_changed` widened so a
-parent's edit pings the caregiver (visible, PRIVATE, no medicine name) and a
-caregiver's edit still silently re-arms the parent. Per-medicine history and
-setup health are not in this slice.
-
-**Live on the hosted Supabase project** (`twybepxnqayypzljhcnx`): all six
-migrations applied, including the timestamp correction (2026-08-19, after both
-phones were on a build that sends UTC — it reported 14/19 daily doses landing
-on a time their schedule names, the other five being doses recorded before a
-schedule was edited and `taken` logs stamped from the snooze fallback rather
-than a clock time). Both edge functions deployed. **Redeploy `notify-care`
-with this branch** before the bidirectional ping is live — the currently
-deployed function still refuses `data_changed` from the parent. Google
-provider configured with the Web and Android client IDs; email sign-in and the
-custom SMTP sender both disabled.
+**Live on the hosted Supabase project** (`twybepxnqayypzljhcnx`): migrations
+applied, including the timestamp correction (2026-08-19, after both phones were
+on a build that sends UTC). Edge functions deployed. Google provider configured
+with the Web and Android client IDs; email sign-in and the custom SMTP sender
+both disabled.
 
 **Live on Firebase** (`decent-digit-135023`, the same Google Cloud project as
 sign-in): Android app registered for `com.sagnikdas.dosely`, and the service
 account stored as the `FCM_SERVICE_ACCOUNT` secret.
 
-**Verification:** `flutter analyze` clean, `flutter test` 202/202, 34 adversarial
-RLS assertions against a scratch Postgres (16 care-link, 18 push), and 17 Deno
-tests over authorize / data-change delivery / the stale-token rule. Phase 0's
-device testing is done — see below.
+**Verification:** Phase 0's device testing is done — see below. Phase 1's happy
+path was verified on two phones on 2026-08-19. Four accident cases still need
+hardware; they are listed under Phase 1 and in the README.
 
 ---
 
@@ -124,41 +116,47 @@ through a security-definer function — the same shape as the link lifecycle.
 - [x] Already-announced doses are never announced again — three earlier alerts
       stayed at three across repeated foregrounds
 
-**Not yet exercised.** None of these blocks the phase; each is a distinct
-failure mode that only shows up under a specific accident.
+**Not yet exercised on hardware.** None of these blocks the phase; each is a
+distinct failure mode that only shows up under a specific accident. The
+mechanisms are covered by tests (unique index, token possession, `isStale`,
+tap routing); the README lists the device steps.
 
 - [ ] Two devices signed into one account announce a missed dose **once**
-      (`care_alerts` is the de-duplication; check for a single row)
+      (`care_alerts` unique on `(link_id, dose_log_id)`; `push_rls_test.sql`)
 - [ ] Sign out on one phone, sign in as the other account, confirm the first
-      account's alerts stop arriving there — the reason `device_tokens` is
-      keyed by the token rather than a surrogate id
+      account's alerts stop arriving there — `unregisterToken` runs before
+      the session is cleared; `register_device_token` moves the row only
+      with the same install id
 - [ ] Uninstall the caregiver's app, raise an alert, confirm the token is
-      pruned rather than retried forever
-- [ ] The cold-start tap path specifically (`getInitialMessage`), as opposed to
-      the app-alive one that was tested
+      pruned rather than retried forever (`fcm_test.ts` `isStale`)
+- [ ] The cold-start tap path specifically (`getInitialMessage`), as opposed
+      to the app-alive one that was tested. The message is now consumed
+      once and opened after the first frame, same deferral as a local
+      notification, so it does not race the navigator or replay on a
+      later sign-in. A device-credential lock still covers the feed until
+      unlock — the tap must not put medicine names on the lock screen.
 
-The inbound direction cannot be verified end-to-end until Phase 2, because
-nothing yet produces a caregiver-side edit to push. The receiving half is
-testable now by inserting a `data_changed` push by hand. **Phase 2 now
-produces that edit** — hardware verification of inbound re-arm is the
-remaining check, and it needs the redeployed `notify-care`.
+The inbound direction could not be verified end-to-end until Phase 2 produced
+a caregiver-side edit. That screen exists on `main` (#54); hardware
+verification of inbound re-arm is the remaining check.
 
-## Phase 2 — What push makes honest
+## Phase 2 — What push makes honest — **done**
 
-- [x] **Caregiver-side editing.** The database permits it and sync carries it;
-      no screen did it. The review/edit form now writes under the patient's
-      `user_id` in Postgres and never into the caregiver's local file.
-      Attribution — "changed by Priya, Tuesday" — shows on both phones when
-      the last writer was not the patient. Caregivers cannot delete.
-- [x] Notify the other side on a change — the silent push already existed
-      (`CareNotifier.dataChanged`). Phase 2 widens the server's rule so the
-      *caregiver* is told about the parent's changes too (visible, PRIVATE,
-      no medicine name). Redeploy `notify-care` for this to be live.
-- [ ] Per-medicine change history
-- [ ] **Setup health.** Whether the parent's phone can actually ring:
-      notifications allowed, exact alarms permitted, battery exemption
-      granted, alarms armed, last check-in. The device already knows all of
-      it; it needs syncing and a panel on the caregiver's side
+- [x] **Caregiver-side editing.** Care Screen → Their reminders. Writes go
+      straight to Supabase under the patient's `user_id`. This phone's Drift
+      file is not touched, so alarms cannot fire on the wrong device. Scan
+      and voice stay on the patient's phone — those would send a label under
+      the caregiver's Anthropic consent. Attribution — "changed by Priya,
+      Tuesday" — on both lists. `updated_by` is stamped from the JWT, not
+      the payload.
+- [x] Notify the other side on a change. `data_changed` is now either side
+      of an active link; the silent message goes to the other person. Still
+      no notification block (lock-screen / 4.3d, and the open question about
+      what the parent is told is still open).
+- [x] Per-medicine change history (`medicine_edits`, append-only, trigger)
+- [x] **Setup health.** Notifications, exact alarms, battery exemption,
+      armed count, last check-in. Written by the owner; shown on Care
+      Screen to both sides.
 
 Setup health matters more than it sounds. A skipped permission leaves the app
 looking perfectly healthy and simply never firing, so the caregiver stops
@@ -212,12 +210,6 @@ Answer these when the phase that needs them arrives, not before.
   per-medicine.
 - **What the parent is told when an alert fires.** Silence undercuts the
   symmetry promise; "we told your daughter" could read as being told off.
-  A schedule change the caregiver makes is still silent on the parent's
-  phone — only the alarms change.
-- **Whether a caregiver can delete, or only add and edit.** **Edit and add
-  only.** Deletion has no undo, and the most likely to be done by the wrong
-  person in a hurry. The caregiver list has no delete control; the patient
-  keeps Stop reminding / Delete medicine and history.
 - **What happens when a link is broken and remade** — a sibling taking over.
   The dose history belongs to the parent's account and should survive it, but
   that has to be deliberate rather than incidental.
@@ -243,12 +235,10 @@ worth remembering.
   `expectedDoses` would compute today. Inventing occurrences that were never
   armed would tell a family their parent skipped medication that was never
   asked for. Silence beats a false alarm.
-- **A caregiver's edit does not re-arm the parent's alarms** until the silent
-  `data_changed` push is delivered. The screen that produces that edit now
-  exists, and the client calls `notify-care` after it lands. Until the
-  function is redeployed with this branch, a parent-side edit is still
-  dropped (`caller_not_on_link` / the old `no_alarms_to_rearm`), and inbound
-  re-arm has not been exercised on hardware.
+- **A caregiver's edit re-arms the parent's alarms** via the silent
+  `data_changed` push (Phase 2). Residual: the parent's phone still has to
+  be reachable by FCM. If it is offline or force-stopped in a way that
+  drops data messages, the change sits until the next foreground pull.
 - **A missed dose is only noticed while the parent's app runs.** The sweep is
   device-side, on foreground, so a parent who does not open the app for two
   days generates no missed doses and therefore no alerts. This is the gap

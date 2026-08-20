@@ -4,20 +4,23 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('reminderLockScreenCopy', () {
-    test('redacts name, strength and dose when the lock-screen setting is off', () {
-      final copy = reminderLockScreenCopy(
-        showMedicineOnLockScreen: false,
-        drugName: 'Metformin',
-        strength: '500mg',
-        doseAmount: '1 tablet',
-      );
-      expect(copy.title, 'Medicine reminder');
-      expect(copy.body, 'Time to take your dose');
-      expect(copy.visibility, NotificationVisibility.private);
-      expect(copy.title.toLowerCase(), isNot(contains('metformin')));
-      expect(copy.body, isNot(contains('500mg')));
-      expect(copy.body.toLowerCase(), isNot(contains('tablet')));
-    });
+    test(
+      'redacts name, strength and dose when the lock-screen setting is off',
+      () {
+        final copy = reminderLockScreenCopy(
+          showMedicineOnLockScreen: false,
+          drugName: 'Metformin',
+          strength: '500mg',
+          doseAmount: '1 tablet',
+        );
+        expect(copy.title, 'Medicine reminder');
+        expect(copy.body, 'Time to take your dose');
+        expect(copy.visibility, NotificationVisibility.private);
+        expect(copy.title.toLowerCase(), isNot(contains('metformin')));
+        expect(copy.body, isNot(contains('500mg')));
+        expect(copy.body.toLowerCase(), isNot(contains('tablet')));
+      },
+    );
 
     test('keeps the named title and dose when the user opts in', () {
       final copy = reminderLockScreenCopy(
@@ -41,5 +44,9 @@ void main() {
       expect(copy.title, 'Aspirin');
       expect(copy.body, 'Time for your dose');
     });
+  });
+
+  test('care alerts are private on the lock screen, with no named opt-in', () {
+    expect(careAlertLockScreenVisibility, NotificationVisibility.private);
   });
 }

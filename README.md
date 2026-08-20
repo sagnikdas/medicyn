@@ -400,41 +400,11 @@ one thing:
 |---|---|---|
 | Parent → caregiver | **Visible** alert: "Amma missed a dose" | The alert the care link is for. Arrives while someone can still act on it. |
 | Caregiver → parent | **Silent** data message | Wakes the parent's app to pull and re-arm its alarms after the caregiver changed a schedule. |
-| Parent → caregiver | **Visible, PRIVATE** ping: "A reminder was changed" | Tells the caregiver the parent edited something. Names no medicine. Must not pull into the caregiver's local database. |
 
 The silent direction is the one that's easy to forget and expensive to omit:
 without it, a schedule the caregiver changed doesn't reach the parent's alarms
 until they next open the app — which could be a week — while the caregiver
 believes the change is live.
-
-A visible change ping to the caregiver is the other half of attribution. It
-must stay generic: a lock-screen alert that quoted a drug name would put
-someone else's medicines on a phone that is often in a shared room.
-
-Redeploy `notify-care` after this lands. The previously deployed function
-refused `data_changed` unless the caller was the caregiver, so a parent's
-edit never rang anyone.
-
-### Caregiver editing (Phase 2)
-
-Family → **Add or change a reminder** writes the patient's rows in Postgres
-and never into the caregiver's encrypted `dosely-<uid>.sqlite`. Caregivers
-can add and edit; they cannot delete. After a save, both phones show
-"Changed by Priya, Tuesday" when the last writer was not the patient.
-
-**Device tests for this slice:**
-
-1. Caregiver adds a reminder for the parent. The parent's phone, still in
-   a pocket, pulls and arms it (silent `data_changed`, `rearm=true`).
-2. Parent edits a reminder. The caregiver gets "A reminder was changed" /
-   "Open Dosely to see what changed." — no drug name, lock-screen PRIVATE.
-   Tapping it opens the parent's reminder list, not the dose feed.
-3. Both phones show "Changed by \<name\>, \<weekday\>" on a card the other
-   person last edited.
-4. The caregiver list has no delete control. The parent still has Stop
-   reminding / Delete medicine and history.
-5. After a caregiver save, the caregiver's own home list is unchanged —
-   the patient's medicines did not land in the caregiver's local file.
 
 Both go through the `notify-care` edge function. The **device** calls it
 rather than a Postgres trigger firing on the insert: a trigger needs `pg_net`
@@ -539,6 +509,103 @@ the same shape the care-link lifecycle uses. `supabase/tests/push_rls_test.sql`
 asserts it, along with the rule that a device token is never readable by
 anyone but its owner, not even by a confirmed caregiver.
 
+### Phase 1 accident cases (still need a real phone)
+
+The happy path was verified on two phones. These four were not. Automated
+tests cover the mechanism; they cannot cover FCM, uninstall, or a second
+physical device.
+
+**Two devices, one account, one alert.** Sign the same Google account into
+two phones. Let a reminder go missed. `care_alerts` must gain **one** row
+for that dose, and the caregiver phone must ring once. The unique index on
+`(link_id, dose_log_id)` is the lock; `notify-care` claims before send.
+
+**Handed-back phone.** On the caregiver phone, sign out, then sign in as
+the parent. Raise a missed dose for the original caregiver account. This
+phone must stay silent. Sign-out deletes this install's token before the
+session ends; a later registration moves the row only when the install id
+matches.
+
+**Uninstall prunes the token.** Uninstall the caregiver app. Raise a missed
+dose. `notify-care` should delete the token when FCM answers 404 /
+UNREGISTERED, not retry it forever. `delivered_count` may be 0 on that
+send; the next send must not keep targeting the dead token.
+
+**Cold-start tap.** Force-stop Dosely on the caregiver phone. Raise a
+missed dose, tap the notification on the lock screen (unlock the *phone*
+first if asked). Dosely may then ask for the device PIN — that cover is
+deliberate and must stay; the feed opens after unlock, not on the lock
+screen. The medicine name must not appear on the lock screen (care alerts
+are `PRIVATE`).
+
+### Phase 2 — caregiver editing (needs two phones)
+
+The migration and `notify-care` must be on the hosted project **before** the
+app build that uses them. A save against an old schema fails every write; a
+save against an old function still drops the parent's `data_changed`. From
+the repo (or this worktree), once:
+
+```
+cd ~/research/dosely-wt/p2   # or ~/research/dosely after this lands
+supabase link --project-ref twybepxnqayypzljhcnx --yes
+supabase db push --yes
+supabase functions deploy notify-care --project-ref twybepxnqayypzljhcnx
+```
+
+`FCM_SERVICE_ACCOUNT` is already set; do not rotate it for this. Then install
+this build on both phones (`google-services.json` is gitignored — copy it into
+`app/android/app/` if this tree does not already have it):
+
+```
+cd ~/research/dosely-wt/p2/app
+cp ~/research/dosely/app/android/app/google-services.json android/app/
+flutter run
+```
+
+Automated checks, optional but cheap:
+
+```
+cd ~/research/dosely-wt/p2/app && flutter test
+deno test --config supabase/functions/notify-care/deno.json \
+  supabase/functions/notify-care/
+```
+
+The RLS assertions for caregiver add/edit, no-delete, JWT-stamped
+`updated_by`, history rows, and setup-health read/write are in
+`supabase/tests/care_links_rls_test.sql`. They need every migration applied
+(see `supabase/tests/local_harness.sql`).
+
+Missed-dose grace is still **30 minutes**. Use a **fresh** reminder for each
+pass so an already-announced miss does not confuse the result.
+
+- [ ] **Caregiver adds, parent re-arms.** Caregiver: Settings → Connect with
+      family → Their reminders → Add reminder. Fill in by hand (no camera,
+      no voice). Set a time a few minutes out. Save. The parent phone must
+      show **no** notification and **no** medicine name on the lock screen.
+      After the silent push (or the next parent foreground), Home lists the
+      new reminder, attributed to the caregiver, and the alarm fires at the
+      time you set.
+- [ ] **Parent edits, caregiver sees it.** Change a time on the parent
+      phone. Caregiver Their reminders shows the new time. Parent card:
+      "Changed by you, …". Caregiver card: "Changed by [parent], …". Still
+      no lock-screen banner.
+- [ ] **No caregiver delete.** Their reminders has no delete control.
+      Parent Home still offers Stop / Delete, and that is what actually
+      removes the row.
+- [ ] **What changed.** Open the reminder on either phone → What changed.
+      Both sides see the same history, newest first, naming who wrote it.
+- [ ] **Setup health.** On the parent phone, deny notifications (or skip
+      battery exemption). Foreground Dosely so it reports. Caregiver Care
+      screen: the flag reads No, and the warning that reminders may not be
+      firing. Parent Care screen shows the same panel.
+- [ ] **Manual form only.** The caregiver add path never opens the camera
+      or the voice screen.
+- [ ] **`care_alerts`.** After a caregiver save, a new `data_changed` row
+      exists for the **parent** as recipient. After a parent save, one
+      exists for the **caregiver**. `delivered_count` ≥ 1 if that phone
+      had a live token. No `notification` title/body on those FCM
+      messages — check the function logs if a banner appeared anyway.
+
 ## Reliability notes
 
 - Notifications are the whole point of this app, so they've been tested
@@ -559,8 +626,7 @@ anyone but its owner, not even by a confirmed caregiver.
 - **Push is never in the firing path either.** A reminder is armed by the
   device's own exact alarms and fires whether or not FCM, Supabase, or the
   network exist. Push only carries news *between* two phones: a missed dose to
-  the caregiver, a schedule change back to the parent, and a nameless ping
-  the other way when the parent edits. Losing it degrades
+  the caregiver, and a schedule change back to the parent. Losing it degrades
   the care link; it cannot stop a reminder.
 
 ## Test data

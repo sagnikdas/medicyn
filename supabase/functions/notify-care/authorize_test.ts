@@ -53,7 +53,7 @@ Deno.test("missed_dose is only the patient's to raise", () => {
   });
 });
 
-Deno.test("data_changed is either party's to raise", () => {
+Deno.test("data_changed is either side of an active link", () => {
   const asCaregiver = authorizeNotify({ event: "data_changed", callerId: "caregiver-1", link });
   assertEquals(asCaregiver, { allow: true, event: "data_changed", link });
 
@@ -64,7 +64,7 @@ Deno.test("data_changed is either party's to raise", () => {
   assertEquals(asStranger, {
     allow: false,
     status: 200,
-    body: { sent: 0, reason: "caller_not_on_link" },
+    body: { sent: 0, reason: "no_alarms_to_rearm" },
   });
 });
 
@@ -78,6 +78,6 @@ Deno.test("a claimed link with no caregiver cannot raise data_changed", () => {
   assertEquals(result, {
     allow: false,
     status: 200,
-    body: { sent: 0, reason: "caller_not_on_link" },
+    body: { sent: 0, reason: "no_alarms_to_rearm" },
   });
 });

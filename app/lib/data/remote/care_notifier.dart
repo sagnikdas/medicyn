@@ -49,9 +49,9 @@ class CareNotifier {
 
   /// Announces that this device has pushed an edit to medicines or schedules.
   ///
-  /// Either side of an active link may raise it. The server sends a silent
-  /// re-arm to the parent when the caregiver wrote, and a visible (but
-  /// nameless) ping to the caregiver when the parent wrote.
+  /// Either side of an active link may raise it. The server delivers a silent
+  /// data message to the other person: the parent re-arms, the caregiver
+  /// refreshes the remote list. There is still no visible notification.
   Future<void> dataChanged() async {
     await _invoke({pushEventKey: pushEventDataChanged});
   }

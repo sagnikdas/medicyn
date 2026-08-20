@@ -1,5 +1,7 @@
 package com.sagnikdas.dosely
 
-import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.android.FlutterFragmentActivity
 
-class MainActivity : FlutterActivity()
+/// [FlutterFragmentActivity] rather than [FlutterActivity]: local_auth's
+/// biometric prompt is a fragment, and a plain Activity cannot host it.
+class MainActivity : FlutterFragmentActivity()

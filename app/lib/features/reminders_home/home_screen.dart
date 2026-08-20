@@ -8,15 +8,18 @@ import '../../data/local/tables.dart';
 import '../../data/remote/care_notifier.dart';
 import '../../data/remote/sync_service.dart';
 import '../auth/auth_service.dart';
+import '../capture_ocr/ocr_capture_screen.dart';
 import '../care/care_service.dart';
-import '../care/reminder_attribution.dart';
+import '../care/edit_attribution.dart';
+import '../consent/consent_purpose.dart';
+import '../consent/consent_service.dart';
 import '../notification_engine/missed_doses.dart';
 import '../notification_engine/notification_service.dart';
-import '../notification_engine/schedule_validation.dart';
 import '../push/push_service.dart';
-import '../review_edit/capture_flow.dart';
 import '../review_edit/review_edit_screen.dart';
 import '../settings/settings_screen.dart';
+import '../voice_capture/voice_capture_screen.dart';
+import 'reminder_copy.dart';
 
 enum _ReminderDisposition { stop, deleteHistory }
 
@@ -29,8 +32,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
-  String? _otherPartyId;
-  String? _otherPartyName;
+  Map<String, String> _names = {};
   @override
   void initState() {
     super.initState();
@@ -90,6 +92,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     // resume.
     if (sync != null && requestPermissions) await sync.pullAll();
     await NotificationService.instance.reconcile(widget.db);
+    if (signedIn) {
+      unawaited(_reportHealth());
+      unawaited(_refreshNames());
+    }
     try {
       await widget.db.pruneExpiredDoseLogs();
     } catch (_) {
@@ -101,7 +107,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     await const MissedDoseDetector().sweep(widget.db);
     if (sync == null) return;
     await sync.syncAll();
-    unawaited(_refreshAttribution());
 
     // Care alerts name dose-log ids the server reads back. Without cloud
     // backup there is no push, so there is nothing to announce.
@@ -129,45 +134,48 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _refreshAttribution() async {
-    final me = AuthService.instance.currentUser?.id;
+  Future<void> _reportHealth() async {
+    final health = await NotificationService.instance.readDeviceHealth();
+    if (health == null) return;
+    await CareService.instance.reportOwnDeviceHealth(health);
+  }
+
+  Future<void> _refreshNames() async {
+    final me = AuthService.instance.currentUser;
     if (me == null) return;
     try {
       final link = await CareService.instance.currentLink();
-      if (link == null || link.status != CareLinkStatus.active) {
-        if (!mounted) return;
-        setState(() {
-          _otherPartyId = null;
-          _otherPartyName = null;
-        });
-        return;
-      }
-      final other = link.otherPartyId(me);
-      final name = other == null ? null : await CareService.instance.displayName(other);
-      if (!mounted) return;
-      setState(() {
-        _otherPartyId = other;
-        _otherPartyName = name;
-      });
+      if (link == null || link.status != CareLinkStatus.active) return;
+      final other = link.otherPartyId(me.id);
+      if (other == null) return;
+      final name = await CareService.instance.displayName(other);
+      if (!mounted || name == null) return;
+      setState(() => _names = {other: name});
     } catch (_) {
-      // A missing name only costs the attribution line, not the list.
+      // Attribution falls back to "someone".
     }
   }
 
-  String? _attributionFor(ScheduleWithMedicine item) {
-    final me = AuthService.instance.currentUser?.id;
-    if (me == null) return null;
-    final change = latestReminderChange(item.medicine, item.schedule);
-    return reminderChangedByLine(
-      ownerUserId: me,
-      updatedBy: change.updatedBy,
-      updatedAt: change.updatedAt,
-      actorDisplayName: change.updatedBy == _otherPartyId ? _otherPartyName : null,
-    );
-  }
-
   Future<void> _startCapture() async {
-    await pushCaptureThenReview(context: context, db: widget.db);
+    final ocrText = await Navigator.of(context).push<String>(
+      MaterialPageRoute(builder: (_) => const OcrCaptureScreen()),
+    );
+    if (ocrText == null || !mounted) return;
+
+    var transcript = '';
+    if (ConsentService.instance.isGranted(ConsentPurpose.googleSpeech)) {
+      final spoken = await Navigator.of(context).push<String>(
+        MaterialPageRoute(builder: (_) => const VoiceCaptureScreen()),
+      );
+      if (spoken == null || !mounted) return;
+      transcript = spoken;
+    }
+
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ReviewEditScreen(ocrText: ocrText, transcript: transcript, db: widget.db),
+      ),
+    );
   }
 
   Future<void> _edit(ScheduleWithMedicine item) => Navigator.of(context).push(
@@ -227,7 +235,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (choice == _ReminderDisposition.stop) {
       await NotificationService.instance.cancelForSchedule(item.schedule);
       await widget.db.deactivateSchedule(item.schedule.id, by: by);
-      _syncThenNotify();
       return;
     }
 
@@ -239,20 +246,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (AuthService.instance.currentUser == null) return;
     final sync = SyncService(widget.db);
     unawaited(
-      sync.tryDeleteRemoteMedicine(item.medicine.id).whenComplete(() async {
-        await sync.syncAll();
-        if (sync.pushedEdits) await CareNotifier.instance.dataChanged();
-      }),
+      sync.tryDeleteRemoteMedicine(item.medicine.id).whenComplete(sync.syncAll),
     );
-  }
-
-  void _syncThenNotify() {
-    if (AuthService.instance.currentUser == null) return;
-    final sync = SyncService(widget.db);
-    unawaited(() async {
-      await sync.syncAll();
-      if (sync.pushedEdits) await CareNotifier.instance.dataChanged();
-    }());
   }
 
   @override
@@ -290,7 +285,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               return _ReminderCard(
                 item: item,
                 db: widget.db,
-                attribution: _attributionFor(item),
+                attribution: editAttributionLine(
+                  updatedBy: item.schedule.updatedBy ?? item.medicine.updatedBy,
+                  updatedAt: item.schedule.updatedAt.isAfter(item.medicine.updatedAt)
+                      ? item.schedule.updatedAt
+                      : item.medicine.updatedAt,
+                  createdAt: item.medicine.createdAt,
+                  currentUserId: AuthService.instance.currentUser?.id,
+                  nameOf: (id) => _names[id],
+                ),
                 onTap: () => _edit(item),
                 onDelete: () => _delete(item),
               );
@@ -348,32 +351,10 @@ class _ReminderCard extends StatelessWidget {
   final VoidCallback onDelete;
   final String? attribution;
 
-  String _describe() {
-    final s = item.schedule;
-    // A row stored before these fields were validated can still be here, and
-    // this runs for every card in the list — so an unrecognised frequency
-    // would blank the whole screen rather than one row.
-    final frequency = frequencyTypeFromName(s.frequencyType);
-    if (frequency == null) return 'Schedule needs attention';
-    switch (frequency) {
-      case FrequencyType.daily:
-        return 'Daily at ${s.times.join(', ')}';
-      case FrequencyType.specificDays:
-        const labels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-        // Same reason: labels[9] is a RangeError, not a missing label.
-        final days = schedulableDays(s.daysOfWeek).map((d) => labels[d]).join(', ');
-        return '$days at ${s.times.join(', ')}';
-      case FrequencyType.everyXHours:
-        return 'Every ${s.intervalHours ?? '?'} hours';
-      case FrequencyType.asNeeded:
-        return 'As needed';
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final medicine = item.medicine;
-    final title = medicine.strength.isEmpty ? medicine.drugName : '${medicine.drugName} ${medicine.strength}';
+    final title = medicineTitle(medicine);
     return Card(
       child: InkWell(
         onTap: onTap,
@@ -391,7 +372,7 @@ class _ReminderCard extends StatelessWidget {
                     if (medicine.doseAmount.isNotEmpty)
                       Text(medicine.doseAmount, style: Theme.of(context).textTheme.bodyMedium),
                     const SizedBox(height: 4),
-                    Text(_describe(), style: Theme.of(context).textTheme.bodySmall),
+                    Text(describeSchedule(item.schedule), style: Theme.of(context).textTheme.bodySmall),
                     if (attribution != null) ...[
                       const SizedBox(height: 4),
                       Text(attribution!, style: Theme.of(context).textTheme.bodySmall),

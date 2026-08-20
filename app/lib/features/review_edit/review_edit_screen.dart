@@ -11,7 +11,9 @@ import '../../data/remote/care_notifier.dart';
 import '../../data/remote/medicine_parser.dart';
 import '../../data/remote/sync_service.dart';
 import '../auth/auth_service.dart';
+import '../care/care_remote_refresh.dart';
 import '../care/care_service.dart';
+import '../care/change_history_screen.dart';
 import '../consent/consent_purpose.dart';
 import '../consent/consent_service.dart';
 import '../history/dose_history_screen.dart';
@@ -29,10 +31,6 @@ import 'parsed_medicine.dart';
 /// parsing entirely and prefills from the current values). Saving always
 /// upserts by ID, so the edit path updates in place rather than creating a
 /// duplicate.
-///
-/// [ownerUserId] is whose medicines these are. When it is someone other than
-/// the signed-in user — a caregiver editing a parent — the save goes to
-/// Postgres under that id and never touches this device's encrypted file.
 class ReviewEditScreen extends StatefulWidget {
   const ReviewEditScreen({
     super.key,
@@ -40,8 +38,7 @@ class ReviewEditScreen extends StatefulWidget {
     this.transcript = '',
     this.existing,
     required this.db,
-    this.ownerUserId,
-    this.ownerDisplayName,
+    this.forPatientId,
   });
 
   final String ocrText;
@@ -49,12 +46,11 @@ class ReviewEditScreen extends StatefulWidget {
   final ScheduleWithMedicine? existing;
   final AppDatabase db;
 
-  /// Whose `user_id` the rows should carry. Null means the signed-in user,
-  /// which is the ordinary home-screen path.
-  final String? ownerUserId;
-
-  /// Shown on the caregiver path so it is obvious whose alarms will change.
-  final String? ownerDisplayName;
+  /// When set to someone other than the signed-in user, save writes to
+  /// Supabase under that id and does not arm alarms on this phone. Scan and
+  /// voice are skipped — those would send the patient's label under the
+  /// caregiver's Anthropic consent.
+  final String? forPatientId;
 
   @override
   State<ReviewEditScreen> createState() => _ReviewEditScreenState();
@@ -84,12 +80,10 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
 
   bool get _isEditing => widget.existing != null;
 
-  /// Writing under another person's `user_id`. Their alarms live on *their*
-  /// phone; this one must not mix those rows into its own encrypted file.
-  bool get _editingForSomeoneElse {
-    final owner = widget.ownerUserId;
+  bool get _forSomeoneElse {
+    final them = widget.forPatientId;
     final me = AuthService.instance.currentUser?.id;
-    return owner != null && me != null && owner != me;
+    return them != null && me != null && them != me;
   }
 
   @override
@@ -131,13 +125,14 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
       setState(() => _loadState = _LoadState.ready);
       return;
     }
-    if (!shouldParseMedicine(
+    if (_forSomeoneElse ||
+        !shouldParseMedicine(
       anthropicGranted: ConsentService.instance.isGranted(ConsentPurpose.anthropicParse),
       ocrText: widget.ocrText,
       transcript: widget.transcript,
     )) {
-      // Empty capture, or Anthropic consent not given — same empty/manual
-      // form, and the parse-medicine edge function is never called.
+      // Empty capture, Anthropic not granted, or editing someone else's
+      // record — same empty/manual form, and parse-medicine is never called.
       setState(() => _loadState = _LoadState.ready);
       return;
     }
@@ -210,6 +205,14 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
     );
   }
 
+  void _viewChangeHistory() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ChangeHistoryScreen(medicineId: widget.existing!.medicine.id),
+      ),
+    );
+  }
+
   Future<void> _addTime() async {
     final picked = await showTimePicker(context: context, initialTime: TimeOfDay.now());
     if (picked == null) return;
@@ -257,68 +260,63 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
   Future<void> _save() async {
     setState(() => _saving = true);
     try {
+      if (_forSomeoneElse) {
+        await _saveRemote();
+      } else {
+        await _saveLocal();
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not save: $e')),
+      );
+    }
+  }
+
+  Future<void> _saveRemote() async {
+    final patientId = widget.forPatientId!;
+    final medicineId = _isEditing ? widget.existing!.medicine.id : newUuid();
+    final scheduleId = _isEditing ? widget.existing!.schedule.id : newUuid();
+    final savedAt = DateTime.now();
+    await CareService.instance.savePatientReminder(
+      patientId: patientId,
+      medicineId: medicineId,
+      scheduleId: scheduleId,
+      drugName: _drugNameController.text.trim(),
+      strength: _strengthController.text.trim(),
+      form: _formController.text.trim(),
+      doseAmount: _doseAmountController.text.trim(),
+      notes: _notesController.text.trim(),
+      frequencyType: _frequency.name,
+      times: _times,
+      daysOfWeek: _frequency == FrequencyType.specificDays ? (_daysOfWeek.toList()..sort()) : const [],
+      intervalHours: _frequency == FrequencyType.everyXHours ? _enteredIntervalHours : null,
+      savedAt: savedAt,
+      medicineCreatedAt: widget.existing?.medicine.createdAt,
+      scheduleCreatedAt: widget.existing?.schedule.createdAt,
+    );
+    unawaited(CareNotifier.instance.dataChanged());
+    CareRemoteRefresh.instance.ping();
+    if (!mounted) return;
+    Navigator.of(context).pop(true);
+  }
+
+  Future<void> _saveLocal() async {
       final medicineId = _isEditing ? widget.existing!.medicine.id : newUuid();
       final scheduleId = _isEditing ? widget.existing!.schedule.id : newUuid();
       // One timestamp for both rows, so a medicine and its schedule saved
       // together can never end up on opposite sides of a version comparison.
       final savedAt = DateTime.now();
       final savedBy = AuthService.instance.currentUser?.id;
-      final medicineCreatedAt =
-          _isEditing ? widget.existing!.medicine.createdAt : savedAt;
-      final scheduleCreatedAt =
-          _isEditing ? widget.existing!.schedule.createdAt : savedAt;
-
-      final medicine = Medicine(
-        id: medicineId,
-        drugName: _drugNameController.text.trim(),
-        strength: _strengthController.text.trim(),
-        form: _formController.text.trim(),
-        doseAmount: _doseAmountController.text.trim(),
-        notes: _notesController.text.trim(),
-        createdAt: medicineCreatedAt,
-        updatedAt: savedAt,
-        updatedBy: savedBy,
-        pendingSync: !_editingForSomeoneElse,
-        deleted: false,
-      );
-      final schedule = Schedule(
-        id: scheduleId,
-        medicineId: medicineId,
-        frequencyType: _frequency.name,
-        times: _times,
-        daysOfWeek: _frequency == FrequencyType.specificDays
-            ? (_daysOfWeek.toList()..sort())
-            : const [],
-        intervalHours: _frequency == FrequencyType.everyXHours
-            ? _enteredIntervalHours
-            : null,
-        active: true,
-        createdAt: scheduleCreatedAt,
-        updatedAt: savedAt,
-        updatedBy: savedBy,
-        pendingSync: !_editingForSomeoneElse,
-        deleted: false,
-      );
-
-      if (_editingForSomeoneElse) {
-        await CareService.instance.savePatientReminder(
-          patientId: widget.ownerUserId!,
-          medicine: medicine,
-          schedule: schedule,
-        );
-        await CareNotifier.instance.dataChanged();
-        if (!mounted) return;
-        Navigator.of(context).pop(true);
-        return;
-      }
 
       await widget.db.upsertMedicine(MedicinesCompanion.insert(
         id: medicineId,
-        drugName: medicine.drugName,
-        strength: Value(medicine.strength),
-        form: Value(medicine.form),
-        doseAmount: Value(medicine.doseAmount),
-        notes: Value(medicine.notes),
+        drugName: _drugNameController.text.trim(),
+        strength: Value(_strengthController.text.trim()),
+        form: Value(_formController.text.trim()),
+        doseAmount: Value(_doseAmountController.text.trim()),
+        notes: Value(_notesController.text.trim()),
         // insertOnConflictUpdate only touches columns present here — without
         // this, editing an already-synced medicine would silently leave
         // pendingSync at its old (false) value and the edit would never sync.
@@ -327,11 +325,31 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
         updatedBy: Value(savedBy),
       ));
 
+      final schedule = Schedule(
+        id: scheduleId,
+        medicineId: medicineId,
+        frequencyType: _frequency.name,
+        times: _times,
+        daysOfWeek: _frequency == FrequencyType.specificDays ? (_daysOfWeek.toList()..sort()) : const [],
+        // An empty field still means "use the default", as before. A value
+        // that is present but out of range cannot reach here — _canSave
+        // blocks it — and is mapped to null rather than trusted if it ever
+        // does.
+        intervalHours: _frequency == FrequencyType.everyXHours
+            ? _enteredIntervalHours
+            : null,
+        active: true,
+        createdAt: DateTime.now(),
+        updatedAt: savedAt,
+        updatedBy: savedBy,
+        pendingSync: true,
+        deleted: false,
+      );
       await widget.db.upsertSchedule(SchedulesCompanion.insert(
         id: scheduleId,
         medicineId: medicineId,
-        frequencyType: schedule.frequencyType,
-        times: schedule.times,
+        frequencyType: _frequency.name,
+        times: _times,
         daysOfWeek: Value(schedule.daysOfWeek),
         intervalHours: Value(schedule.intervalHours),
         // Same reasoning as the medicine upsert above — force it dirty so an
@@ -341,18 +359,21 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
         updatedBy: Value(savedBy),
       ));
 
-      try {
-        await NotificationService.instance.scheduleForScheduleWithMedicine(
-          ScheduleWithMedicine(schedule, medicine),
-        );
-      } catch (e) {
-        // The reminder is saved either way; a scheduling failure (e.g. the
-        // Android 12+ exact-alarm permission was revoked) shouldn't block
-        // the save or strand the spinner — surface it and move on.
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Saved, but the alarm could not be scheduled: $e')),
+      final medicine = await widget.db.medicineById(medicineId);
+      if (medicine != null) {
+        try {
+          await NotificationService.instance.scheduleForScheduleWithMedicine(
+            ScheduleWithMedicine(schedule, medicine),
           );
+        } catch (e) {
+          // The reminder is saved either way; a scheduling failure (e.g. the
+          // Android 12+ exact-alarm permission was revoked) shouldn't block
+          // the save or strand the spinner — surface it and move on.
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Saved, but the alarm could not be scheduled: $e')),
+            );
+          }
         }
       }
       // Fire-and-forget: sync is backup/multi-device only, never the source
@@ -363,30 +384,27 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
       unawaited(() async {
         final sync = SyncService(widget.db);
         await sync.syncAll();
-        if (sync.pushedEdits) await CareNotifier.instance.dataChanged();
+        if (sync.pushedEdits) {
+          await CareNotifier.instance.dataChanged();
+        }
       }());
 
       if (!mounted) return;
-      Navigator.of(context).pop(true);
-    } on CareLinkFailure catch (e) {
-      if (!mounted) return;
-      setState(() => _saving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message)),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _saving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not save: $e')),
-      );
-    }
+      Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(_isEditing ? 'Edit reminder' : 'Review reminder')),
+      appBar: AppBar(
+        title: Text(
+          _isEditing
+              ? 'Edit reminder'
+              : _forSomeoneElse
+                  ? 'Add a reminder'
+                  : 'Review reminder',
+        ),
+      ),
       body: SafeArea(child: _body()),
     );
   }
@@ -429,16 +447,15 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
-        if (_editingForSomeoneElse) ...[
+        if (_forSomeoneElse)
           Padding(
             padding: const EdgeInsets.only(bottom: 16),
             child: Text(
-              'This reminder is for ${widget.ownerDisplayName ?? 'them'}. '
-              'Saving it changes the alarms on their phone, not yours.',
+              'This saves on their account. Their phone will re-arm the alarm. '
+              'Fill it in by hand — scan and voice stay on their phone.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ),
-        ],
         if (_confidence != null)
           Padding(
             padding: const EdgeInsets.only(bottom: 16),
@@ -547,18 +564,30 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
           maxLines: 2,
           decoration: const InputDecoration(labelText: 'Notes (optional)'),
         ),
-        if (_isEditing && !_editingForSomeoneElse) ...[
+        if (_isEditing) ...[
           const SizedBox(height: 20),
           const Divider(),
           const SizedBox(height: 8),
-          OutlinedButton.icon(
-            onPressed: _viewHistory,
-            icon: const Icon(Icons.history),
-            label: const Text('View history'),
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size.fromHeight(48),
+          if (!_forSomeoneElse)
+            OutlinedButton.icon(
+              onPressed: _viewHistory,
+              icon: const Icon(Icons.history),
+              label: const Text('View dose history'),
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size.fromHeight(48),
+              ),
             ),
-          ),
+          if (AuthService.instance.currentUser != null) ...[
+            if (!_forSomeoneElse) const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: _viewChangeHistory,
+              icon: const Icon(Icons.edit_note),
+              label: const Text('What changed'),
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size.fromHeight(48),
+              ),
+            ),
+          ],
         ],
         const SizedBox(height: 28),
         FilledButton(

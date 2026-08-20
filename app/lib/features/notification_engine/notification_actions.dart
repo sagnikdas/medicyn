@@ -8,7 +8,6 @@ import '../../core/ids.dart';
 import '../../data/local/database.dart';
 import '../../data/local/tables.dart';
 import '../care/dose_feed_screen.dart';
-import '../care/patient_reminders_screen.dart';
 import '../dose_confirm/dose_confirm_screen.dart';
 import 'notification_service.dart';
 
@@ -49,11 +48,6 @@ void handleNotificationResponse(NotificationResponse response) async {
   // rather than being dropped by it. Only the foreground path produces one
   // (see NotificationService.showCareAlert); a push that Android drew itself
   // is tapped through FirebaseMessaging instead.
-  final careRemindersPatientId = payload['careRemindersPatientId'] as String?;
-  if (careRemindersPatientId != null && careRemindersPatientId.isNotEmpty) {
-    openPatientReminders(careRemindersPatientId);
-    return;
-  }
   final careAlertPatientId = payload['careAlertPatientId'] as String?;
   if (careAlertPatientId != null && careAlertPatientId.isNotEmpty) {
     openFeedForPatient(careAlertPatientId);

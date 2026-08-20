@@ -34,12 +34,17 @@ Dosely never sees or stores your Google password. Signing in with Google is
 account** and keep reminders on this phone only. Backup and family sharing
 need a Google account later.
 
-**Your timezone and last-seen time, if you sign in.** On sign-in Dosely
-writes the phone's IANA timezone (for example `Asia/Kolkata`) to your
-profile. That is a coarse location — the region of the clock you use, not a
-GPS pin. A linked family member can see it, so their screens show your
-reminder times on your clock. Dosely also records `last_seen_at` on the
-profile, which is when this signed-in app last updated that profile.
+**Your timezone, last-seen time, and whether reminders can fire, if you
+sign in.** On sign-in Dosely writes the phone's IANA timezone (for example
+`Asia/Kolkata`) to your profile. That is a coarse location — the region of
+the clock you use, not a GPS pin. A linked family member can see it, so
+their screens show your reminder times on your clock. Dosely also records
+`last_seen_at` on the profile, which is when this signed-in app last
+updated that profile, and a snapshot of whether this phone currently
+allows notifications, exact alarms, and battery exemption, plus how many
+alarms are armed. A linked family member can see that snapshot. It is
+there so they are not left reading "no alerts" as "all is well" when the
+phone cannot actually ring.
 
 **A notification token for your phone, if you are signed in.** So that Dosely
 can alert the person you have chosen to share with, it stores the identifier
@@ -65,7 +70,10 @@ information, and it is the name of a clock zone, not a map position.
 **Label photos are never uploaded and never kept.** When you photograph a
 medicine label, the image is read on your device to extract the text, and the
 image file is deleted immediately afterwards. The photo does not leave your
-phone and is not stored by Dosely.
+phone and is not stored by Dosely. Before any of that text is sent for AI
+fill-in, this phone removes the patient's name, address, date of birth,
+prescription number, and prescriber. What is sent is the remaining label
+text — typically the medicine name, strength, and directions.
 
 **Voice input uses your device's speech recognition.** When you describe a
 dosage out loud, Dosely uses the speech recognition service built into your
@@ -91,8 +99,9 @@ is a separate switch, off unless you turn it on:
 
 - Cloud backup — store a copy of your medicines and dose history on
   Supabase, so they are not only on this phone.
-- AI fill-in — send the label text and your spoken description to Anthropic
-  to help fill in the reminder form.
+- AI fill-in — send the label text (with name, address, date of birth,
+  prescription number, and prescriber removed on this phone) and your spoken
+  description to Anthropic to help fill in the reminder form.
 - Voice input — use this phone's Google speech recogniser. The audio leaves
   the device.
 - Family sharing — a linked person will see your medicines and dose history.
@@ -135,10 +144,11 @@ input, as described above.
 
 **Anthropic** receives the text — and only the text — from a label scan and a
 voice description, when you have turned on AI fill-in and you use that
-feature on the review screen. It is used once, to turn that text into
-structured reminder fields for you to check and correct. Neither the photo
-nor the audio is sent. If you type the details in yourself instead, nothing
-is sent to Anthropic at all.
+feature on the review screen. Name, address, date of birth, prescription
+number, and prescriber are removed on this phone first. It is used once, to
+turn that text into structured reminder fields for you to check and correct.
+Neither the photo nor the audio is sent. If you type the details in yourself
+instead, nothing is sent to Anthropic at all.
 
 **Crash reporting** is included in the app but is switched off by default and
 sends nothing. If it is ever enabled in a future release, this policy will be
@@ -179,9 +189,11 @@ can see nothing at all.
 
 **What they can see once connected.** Your medicines, your schedules, and
 your dose history — including doses recorded as missed. They can also add
-and edit medicines for you. They can see your timezone, so reminder times
-match your clock. **You see the same medicine, schedule, and dose-history
-screens about yourself that they see about you.**
+and edit medicines for you. They cannot delete a medicine; only you can.
+They can see a history of who added or changed each medicine. They can see
+your timezone, so reminder times match your clock, and whether this phone
+is currently able to fire reminders. **You see the same medicine, schedule,
+and dose-history screens about yourself that they see about you.**
 
 Access runs one way only. Connecting lets them see your medicines; it does
 not let you see theirs — they may have prescriptions of their own that are

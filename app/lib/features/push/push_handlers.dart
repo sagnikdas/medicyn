@@ -6,8 +6,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/supabase_init.dart';
 import '../../data/local/database.dart';
 import '../../data/remote/sync_service.dart';
+import '../care/care_remote_refresh.dart';
 import '../care/dose_feed_screen.dart';
-import '../care/patient_reminders_screen.dart';
 import '../notification_engine/notification_service.dart';
 import 'push_events.dart';
 
@@ -23,13 +23,9 @@ import 'push_events.dart';
 /// no error reporter is attached — and takes the whole re-arm with it.
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  if (!shouldPullAndRearm(
-    event: message.data[pushEventKey],
-    rearm: message.data[pushRearmKey],
-    hasNotification: message.notification != null,
-  )) {
-    return;
-  }
+  // A `missed_dose` message carries a notification block, which Android draws
+  // itself; this handler fires for it too and has nothing to add.
+  if (message.data[pushEventKey] != pushEventDataChanged) return;
 
   WidgetsFlutterBinding.ensureInitialized();
   try {
@@ -64,6 +60,7 @@ Future<void> applyRemoteDataChange({AppDatabase? db}) async {
     // a pull that lost a version comparison — or failed silently, as pullAll is
     // designed to — leaves the alarms as they were with nothing to notice it.
     await NotificationService.instance.reconcile(database);
+    CareRemoteRefresh.instance.ping();
   } catch (_) {
     // Nothing here can be surfaced or retried from a background isolate. The
     // next app foreground runs the identical pull-and-reconcile, so a failure
@@ -73,15 +70,23 @@ Future<void> applyRemoteDataChange({AppDatabase? db}) async {
   }
 }
 
-/// Routes a tapped care-link message. Shared by the cold-start and
+/// The patient whose feed a missed-dose tap should open, or null when this
+/// message is not that tap.
+///
+/// Kept as a function so the cold-start (`getInitialMessage`) and
+/// already-running (`onMessageOpenedApp`) paths cannot disagree, and so a
+/// renamed data key fails a test rather than opening nothing with no error.
+String? careAlertPatientIdFromData(Map<String, dynamic> data) {
+  if (data[pushEventKey] != pushEventMissedDose) return null;
+  final id = data[pushPatientIdKey];
+  if (id is! String || id.isEmpty) return null;
+  return id;
+}
+
+/// Routes a tapped missed-dose message. Shared by the cold-start and
 /// already-running paths so they cannot drift.
 void handleCareAlertTap(RemoteMessage message) {
-  final patientId = message.data[pushPatientIdKey];
-  if (patientId == null || patientId.isEmpty) return;
-  switch (message.data[pushEventKey]) {
-    case pushEventMissedDose:
-      openFeedForPatient(patientId);
-    case pushEventDataChanged:
-      openPatientReminders(patientId);
-  }
+  final patientId = careAlertPatientIdFromData(message.data);
+  if (patientId == null) return;
+  openFeedForPatient(patientId);
 }

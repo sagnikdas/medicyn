@@ -11,6 +11,7 @@ import '../consent/consent_service.dart';
 import 'care_service.dart';
 import 'dose_feed_screen.dart';
 import 'patient_reminders_screen.dart';
+import 'setup_health_panel.dart';
 
 /// Connecting one person who takes medicines with one person who helps them.
 ///
@@ -40,6 +41,7 @@ class _CareScreenState extends State<CareScreen> {
   CareLink? _link;
   String? _otherName;
   CareClaimant? _claimant;
+  CareProfile? _patientProfile;
   bool _loading = true;
   String? _error;
   Timer? _poll;
@@ -77,11 +79,16 @@ class _CareScreenState extends State<CareScreen> {
           link.isPatient(_myId)) {
         claimant = await CareService.instance.claimedLinkClaimant(link.id);
       }
+      CareProfile? patientProfile;
+      if (link != null && link.status == CareLinkStatus.active) {
+        patientProfile = await CareService.instance.profile(link.patientId);
+      }
       if (!mounted) return;
       setState(() {
         _link = link;
         _otherName = name;
         _claimant = claimant;
+        _patientProfile = patientProfile;
         _loading = false;
         _error = null;
       });
@@ -466,21 +473,23 @@ class _CareScreenState extends State<CareScreen> {
         ),
         if (!amPatient) ...[
           const SizedBox(height: 12),
-          FilledButton.icon(
+          FilledButton.tonalIcon(
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute(
                 builder: (_) => PatientRemindersScreen(
                   patientId: _link!.patientId,
-                  db: widget.db,
                   patientName: _otherName,
+                  db: widget.db,
                 ),
               ),
             ),
-            icon: const Icon(Icons.edit_calendar_outlined),
-            label: const Text('Add or change a reminder'),
+            icon: const Icon(Icons.medication_outlined),
+            label: const Text('Their reminders'),
           ),
         ],
-        const SizedBox(height: 12),
+        const SizedBox(height: 28),
+        SetupHealthPanel(profile: _patientProfile, viewingOwnData: amPatient),
+        const SizedBox(height: 28),
         OutlinedButton(
           onPressed: _disconnect,
           child: const Text('Disconnect'),

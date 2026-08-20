@@ -13,13 +13,15 @@ import '../../data/local/database.dart';
 import '../../data/local/tables.dart';
 import 'notification_actions.dart';
 import 'notification_ids.dart';
+import 'device_health.dart';
 import 'schedule_validation.dart';
 
 // v4: Bumped again to ensure sound and alarm settings are applied fresh.
 // New channel ID forces a fresh channel with sound enabled for everyone.
 const String reminderChannelId = 'dosely_reminders_v4';
 const String reminderChannelName = 'Medicine Alarms';
-const String reminderChannelDescription = 'Critical alerts for your medication schedule.';
+const String reminderChannelDescription =
+    'Critical alerts for your medication schedule.';
 
 /// A care alert is not an alarm and must not share the alarm channel: that
 /// channel loops its sound until the notification is dismissed, which is right
@@ -42,13 +44,23 @@ const String actionSnooze = 'snooze';
 const String _redactedReminderTitle = 'Medicine reminder';
 const String _redactedReminderBody = 'Time to take your dose';
 
+/// Care alerts default to private: the recipient does not need the drug name
+/// on a locked phone. Unlike the patient's own reminder, there is no opt-in
+/// to show it — a care alert is not something you act on through the lock
+/// screen. Must match the FCM `visibility: "PRIVATE"` in
+/// `supabase/functions/notify-care/fcm.ts`, which is the path Android draws
+/// itself when the app is backgrounded or dead.
+const NotificationVisibility careAlertLockScreenVisibility =
+    NotificationVisibility.private;
+
 /// Title, body and lock-screen visibility for a medicine reminder.
 ///
 /// A locked phone is readable by anyone in the room, so the named copy is
 /// only used when the user has opted in. Kept as a top-level function so
 /// the redacted vs named strings can be tested without the notification
 /// plugin.
-({String title, String body, NotificationVisibility visibility}) reminderLockScreenCopy({
+({String title, String body, NotificationVisibility visibility})
+reminderLockScreenCopy({
   required bool showMedicineOnLockScreen,
   required String drugName,
   required String strength,
@@ -78,7 +90,8 @@ class NotificationService {
   NotificationService._();
   static final NotificationService instance = NotificationService._();
 
-  final FlutterLocalNotificationsPlugin _plugin = FlutterLocalNotificationsPlugin();
+  final FlutterLocalNotificationsPlugin _plugin =
+      FlutterLocalNotificationsPlugin();
   bool _initialized = false;
 
   /// Every-X-hours schedules keep this many upcoming doses armed at once.
@@ -106,14 +119,19 @@ class NotificationService {
       tz.setLocalLocation(tz.getLocation('UTC'));
     }
 
-    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const androidSettings = AndroidInitializationSettings(
+      '@mipmap/ic_launcher',
+    );
     const iosSettings = DarwinInitializationSettings(
       requestAlertPermission: false,
       requestBadgePermission: false,
       requestSoundPermission: false,
       requestCriticalPermission: true,
     );
-    const settings = InitializationSettings(android: androidSettings, iOS: iosSettings);
+    const settings = InitializationSettings(
+      android: androidSettings,
+      iOS: iosSettings,
+    );
 
     await _plugin.initialize(
       settings: settings,
@@ -131,8 +149,10 @@ class NotificationService {
   /// exist — so waiting until we need it means losing the first one, which is
   /// the one most likely to matter.
   Future<void> _createCareAlertChannel() async {
-    final android = _plugin.resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin>();
+    final android = _plugin
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
     if (android == null) return;
     await android.createNotificationChannel(
       const AndroidNotificationChannel(
@@ -157,24 +177,29 @@ class NotificationService {
 
   Future<bool> requestPermissions() async {
     if (Platform.isIOS) {
-      final ios = _plugin.resolvePlatformSpecificImplementation<
-          IOSFlutterLocalNotificationsPlugin>();
+      final ios = _plugin
+          .resolvePlatformSpecificImplementation<
+            IOSFlutterLocalNotificationsPlugin
+          >();
       final granted = await ios?.requestPermissions(
-        alert: true, 
-        badge: true, 
+        alert: true,
+        badge: true,
         sound: true,
         critical: true,
       );
       return granted ?? false;
     }
-    
-    final android = _plugin.resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin>();
+
+    final android = _plugin
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
     if (android == null) return true;
 
-    final notifGranted = await android.requestNotificationsPermission() ?? false;
+    final notifGranted =
+        await android.requestNotificationsPermission() ?? false;
     final exactGranted = await android.requestExactAlarmsPermission() ?? false;
-    
+
     // Request ignoring battery optimizations to prevent the OS from killing alarms
     if (await Permission.ignoreBatteryOptimizations.isDenied) {
       await Permission.ignoreBatteryOptimizations.request();
@@ -183,7 +208,8 @@ class NotificationService {
     return notifGranted && exactGranted;
   }
 
-  NotificationDetails _details({required NotificationVisibility visibility}) => NotificationDetails(
+  NotificationDetails _details({required NotificationVisibility visibility}) =>
+      NotificationDetails(
         android: AndroidNotificationDetails(
           reminderChannelId,
           reminderChannelName,
@@ -198,8 +224,16 @@ class NotificationService {
           visibility: visibility,
           additionalFlags: Int32List.fromList(<int>[_flagInsistent]),
           actions: [
-            AndroidNotificationAction(actionTaken, 'Taken', showsUserInterface: true),
-            AndroidNotificationAction(actionSnooze, 'Snooze 10m', showsUserInterface: true),
+            AndroidNotificationAction(
+              actionTaken,
+              'Taken',
+              showsUserInterface: true,
+            ),
+            AndroidNotificationAction(
+              actionSnooze,
+              'Snooze 10m',
+              showsUserInterface: true,
+            ),
           ],
         ),
         iOS: DarwinNotificationDetails(
@@ -213,9 +247,8 @@ class NotificationService {
   /// Reads the lock-screen setting at schedule time. Android stores title,
   /// body and visibility on the alarm itself, so a later toggle only
   /// takes effect after the next reconcile.
-  Future<({String title, String body, NotificationVisibility visibility})> _copyFor(
-    Medicine medicine,
-  ) async {
+  Future<({String title, String body, NotificationVisibility visibility})>
+  _copyFor(Medicine medicine) async {
     await AppSettings.instance.init();
     return reminderLockScreenCopy(
       showMedicineOnLockScreen: AppSettings.instance.showMedicineOnLockScreen,
@@ -235,7 +268,14 @@ class NotificationService {
   /// device's alarms by the time it calls this.
   tz.TZDateTime? _nextInstanceOfTime(ClockTime time, {int? weekday}) {
     final now = tz.TZDateTime.now(tz.local);
-    var scheduled = tz.TZDateTime(tz.local, now.year, now.month, now.day, time.hour, time.minute);
+    var scheduled = tz.TZDateTime(
+      tz.local,
+      now.year,
+      now.month,
+      now.day,
+      time.hour,
+      time.minute,
+    );
 
     if (weekday != null) {
       final targetDartWeekday = weekday == 0 ? 7 : weekday;
@@ -286,7 +326,10 @@ class NotificationService {
       }
     }
     if (frequency == null) {
-      throw UnschedulableSchedule(schedule.id, 'unknown frequencyType "${schedule.frequencyType}"');
+      throw UnschedulableSchedule(
+        schedule.id,
+        'unknown frequencyType "${schedule.frequencyType}"',
+      );
     }
 
     if (!skipCancel) await cancelForSchedule(schedule);
@@ -347,7 +390,9 @@ class NotificationService {
         // a malformed entry ahead of a good one should not decide the
         // sequence, and should not fall back to 08:00 while a real time sits
         // behind it.
-        final anchor = times.isNotEmpty ? times.first : (label: '08:00', clock: (hour: 8, minute: 0));
+        final anchor = times.isNotEmpty
+            ? times.first
+            : (label: '08:00', clock: (hour: 8, minute: 0));
         final now = tz.TZDateTime.now(tz.local);
 
         var next = tz.TZDateTime(
@@ -417,14 +462,18 @@ class NotificationService {
   /// satisfies [shouldCancel]. Payloads without a decodable `scheduleId`
   /// (there shouldn't be any, but a plugin-internal or malformed one isn't
   /// impossible) are left alone rather than guessed at.
-  Future<void> _cancelWhere(bool Function(String scheduleId) shouldCancel) async {
+  Future<void> _cancelWhere(
+    bool Function(String scheduleId) shouldCancel,
+  ) async {
     final pending = await _plugin.pendingNotificationRequests();
     for (final request in pending) {
       final payload = request.payload;
       if (payload == null || payload.isEmpty) continue;
       String? scheduleId;
       try {
-        scheduleId = (jsonDecode(payload) as Map<String, dynamic>)['scheduleId'] as String?;
+        scheduleId =
+            (jsonDecode(payload) as Map<String, dynamic>)['scheduleId']
+                as String?;
       } catch (_) {
         continue;
       }
@@ -442,7 +491,10 @@ class NotificationService {
     await init();
     final copy = await _copyFor(medicine);
     await _plugin.zonedSchedule(
-      id: notificationIdFor(scheduleId, 'snooze-${DateTime.now().millisecondsSinceEpoch}'),
+      id: notificationIdFor(
+        scheduleId,
+        'snooze-${DateTime.now().millisecondsSinceEpoch}',
+      ),
       title: copy.title,
       body: copy.body,
       scheduledDate: tz.TZDateTime.now(tz.local).add(delay),
@@ -459,14 +511,12 @@ class NotificationService {
   /// when it is in front of the user. Without this, a caregiver sitting in the
   /// app is the one person who never hears that a dose was missed.
   ///
-  /// [patientId] rides along in the payload so a tap opens the right screen —
-  /// the dose feed for a missed dose, or their reminders when [openReminders]
-  /// is set. Care alerts never show a medicine name on a locked phone.
+  /// [patientId] rides along in the payload so a tap opens the right feed —
+  /// see `handleNotificationResponse`.
   Future<void> showCareAlert({
     required String title,
     required String body,
     String? patientId,
-    bool openReminders = false,
   }) async {
     await init();
     await _plugin.show(
@@ -483,14 +533,51 @@ class NotificationService {
           importance: Importance.high,
           priority: Priority.high,
           category: AndroidNotificationCategory.message,
-          visibility: NotificationVisibility.private,
+          visibility: careAlertLockScreenVisibility,
         ),
         iOS: DarwinNotificationDetails(presentAlert: true, presentSound: true),
       ),
-      payload: jsonEncode({
-        if (openReminders) 'careRemindersPatientId': patientId else 'careAlertPatientId': patientId,
-      }),
+      payload: jsonEncode({'careAlertPatientId': patientId}),
     );
+  }
+
+  /// What this phone currently reports about whether reminders can fire.
+  ///
+  /// Null when the platform cannot say — writing a guessed `false` would
+  /// tell a family the alarms are dead when we simply could not ask. Callers
+  /// skip the profile write in that case and leave the previous snapshot.
+  Future<DeviceHealthSnapshot?> readDeviceHealth() async {
+    try {
+      await init();
+      if (!Platform.isAndroid) {
+        // iOS is not shipping; do not invent a "notifications off" for a
+        // platform we have not asked.
+        final pending = await _plugin.pendingNotificationRequests();
+        return DeviceHealthSnapshot(
+          notificationsAllowed: true,
+          exactAlarmsAllowed: true,
+          batteryExemption: true,
+          armedAlarmCount: pending.length,
+          checkedAt: DateTime.now().toUtc(),
+        );
+      }
+      final android = _plugin.resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>();
+      if (android == null) return null;
+      final notifications = await android.areNotificationsEnabled() ?? true;
+      final exact = await android.canScheduleExactNotifications() ?? true;
+      final battery = await Permission.ignoreBatteryOptimizations.isGranted;
+      final pending = await _plugin.pendingNotificationRequests();
+      return DeviceHealthSnapshot(
+        notificationsAllowed: notifications,
+        exactAlarmsAllowed: exact,
+        batteryExemption: battery,
+        armedAlarmCount: pending.length,
+        checkedAt: DateTime.now().toUtc(),
+      );
+    } catch (_) {
+      return null;
+    }
   }
 
   /// Re-arms every active schedule and, first, sweeps away any armed alarm
@@ -522,7 +609,10 @@ class NotificationService {
         failures[sm.schedule.id] = error;
       }
     }
-    return ReconcileReport(armed: active.length - failures.length, failures: failures);
+    return ReconcileReport(
+      armed: active.length - failures.length,
+      failures: failures,
+    );
   }
 
   /// Re-arms from a short-lived database connection — for callers that do
