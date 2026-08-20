@@ -68,11 +68,23 @@ Future<void> applyRemoteDataChange({AppDatabase? db}) async {
   }
 }
 
+/// The patient whose feed a missed-dose tap should open, or null when this
+/// message is not that tap.
+///
+/// Kept as a function so the cold-start (`getInitialMessage`) and
+/// already-running (`onMessageOpenedApp`) paths cannot disagree, and so a
+/// renamed data key fails a test rather than opening nothing with no error.
+String? careAlertPatientIdFromData(Map<String, dynamic> data) {
+  if (data[pushEventKey] != pushEventMissedDose) return null;
+  final id = data[pushPatientIdKey];
+  if (id is! String || id.isEmpty) return null;
+  return id;
+}
+
 /// Routes a tapped missed-dose message. Shared by the cold-start and
 /// already-running paths so they cannot drift.
 void handleCareAlertTap(RemoteMessage message) {
-  if (message.data[pushEventKey] != pushEventMissedDose) return;
-  final patientId = message.data[pushPatientIdKey];
-  if (patientId == null || patientId.isEmpty) return;
+  final patientId = careAlertPatientIdFromData(message.data);
+  if (patientId == null) return;
   openFeedForPatient(patientId);
 }

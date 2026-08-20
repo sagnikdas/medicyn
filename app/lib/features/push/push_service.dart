@@ -3,6 +3,7 @@ import 'dart:io' show Platform;
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -33,6 +34,7 @@ class PushService {
   StreamSubscription<String>? _refreshSubscription;
   StreamSubscription<RemoteMessage>? _foregroundSubscription;
   StreamSubscription<RemoteMessage>? _openedSubscription;
+  bool _consumedLaunchMessage = false;
 
   /// Whether push is usable in this build at all. False means Firebase could
   /// not be initialized, which on Android means google-services.json was not
@@ -88,14 +90,31 @@ class PushService {
     _foregroundSubscription = FirebaseMessaging.onMessage.listen((message) {
       unawaited(_handleForeground(message, db));
     });
-    _openedSubscription = FirebaseMessaging.onMessageOpenedApp.listen(handleCareAlertTap);
+    _openedSubscription = FirebaseMessaging.onMessageOpenedApp.listen(
+      handleCareAlertTap,
+    );
 
     // A tap that cold-started the process is not delivered to the stream
     // above — it is waiting here instead, exactly as with a local
-    // notification's launch response.
+    // notification's launch response. Consumed once: signing out and back
+    // in rebuilds HomeScreen and would otherwise call getInitialMessage
+    // again, which Firebase still answers with the same launch message.
+    await _consumeLaunchMessage();
+  }
+
+  Future<void> _consumeLaunchMessage() async {
+    if (_consumedLaunchMessage) return;
+    _consumedLaunchMessage = true;
     try {
       final initial = await FirebaseMessaging.instance.getInitialMessage();
-      if (initial != null) handleCareAlertTap(initial);
+      if (initial == null) return;
+      // The navigator may not be attached on this microtask — the same
+      // deferral DoselyApp makes for a local-notification cold start. The
+      // feed is pushed onto the existing navigator, so a device-credential
+      // lock (if the phone has been away) still covers it until unlock.
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => handleCareAlertTap(initial),
+      );
     } catch (_) {
       // Not worth a failed launch.
     }
@@ -133,7 +152,9 @@ class PushService {
     // Only ever set up once. Doing it inside register rather than init is
     // deliberate: the stream fires with a *new* token, which is useless before
     // there is a session to attach it to.
-    _refreshSubscription ??= FirebaseMessaging.instance.onTokenRefresh.listen((token) {
+    _refreshSubscription ??= FirebaseMessaging.instance.onTokenRefresh.listen((
+      token,
+    ) {
       unawaited(_upsert(token));
     });
 
@@ -159,11 +180,14 @@ class PushService {
       // a security-definer function. The install id is what stops a different
       // phone that has only the token string from doing the same move. See the
       // device-token-possession migration.
-      await Supabase.instance.client.rpc('register_device_token', params: {
-        'p_token': token,
-        'p_platform': Platform.isIOS ? 'ios' : 'android',
-        'p_install_id': await _ensureInstallId(),
-      });
+      await Supabase.instance.client.rpc(
+        'register_device_token',
+        params: {
+          'p_token': token,
+          'p_platform': Platform.isIOS ? 'ios' : 'android',
+          'p_install_id': await _ensureInstallId(),
+        },
+      );
       _registeredToken = token;
     } catch (_) {
       // Best-effort. A device that fails to register receives no alerts, which
@@ -203,7 +227,10 @@ class PushService {
     final token = _registeredToken ?? await _currentTokenQuietly();
     if (token == null) return;
     try {
-      await Supabase.instance.client.from('device_tokens').delete().eq('token', token);
+      await Supabase.instance.client
+          .from('device_tokens')
+          .delete()
+          .eq('token', token);
     } catch (_) {
       // If it survives, the server's first send to it after the next person
       // signs in will move or prune it anyway — a re-registration reassigns
