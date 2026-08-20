@@ -173,6 +173,13 @@ export async function sendToToken(token: string, message: FcmMessage): Promise<S
               // missed one".
               channel_id: message.androidChannelId,
               default_sound: true,
+              // PRIVATE conceals the title and body on a secure lock screen.
+              // The caregiver does not need the medicine name to act through
+              // a locked phone; unlocking still shows the full message.
+              // Must match `careAlertLockScreenVisibility` in
+              // notification_service.dart (the foreground path, which this
+              // FCM block does not cover).
+              visibility: "PRIVATE",
             },
           }
           : {}),

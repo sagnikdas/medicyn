@@ -65,7 +65,10 @@ information, and it is the name of a clock zone, not a map position.
 **Label photos are never uploaded and never kept.** When you photograph a
 medicine label, the image is read on your device to extract the text, and the
 image file is deleted immediately afterwards. The photo does not leave your
-phone and is not stored by Dosely.
+phone and is not stored by Dosely. Before any of that text is sent for AI
+fill-in, this phone removes the patient's name, address, date of birth,
+prescription number, and prescriber. What is sent is the remaining label
+text — typically the medicine name, strength, and directions.
 
 **Voice input uses your device's speech recognition.** When you describe a
 dosage out loud, Dosely uses the speech recognition service built into your
@@ -91,8 +94,9 @@ is a separate switch, off unless you turn it on:
 
 - Cloud backup — store a copy of your medicines and dose history on
   Supabase, so they are not only on this phone.
-- AI fill-in — send the label text and your spoken description to Anthropic
-  to help fill in the reminder form.
+- AI fill-in — send the label text (with name, address, date of birth,
+  prescription number, and prescriber removed on this phone) and your spoken
+  description to Anthropic to help fill in the reminder form.
 - Voice input — use this phone's Google speech recogniser. The audio leaves
   the device.
 - Family sharing — a linked person will see your medicines and dose history.
@@ -135,10 +139,11 @@ input, as described above.
 
 **Anthropic** receives the text — and only the text — from a label scan and a
 voice description, when you have turned on AI fill-in and you use that
-feature on the review screen. It is used once, to turn that text into
-structured reminder fields for you to check and correct. Neither the photo
-nor the audio is sent. If you type the details in yourself instead, nothing
-is sent to Anthropic at all.
+feature on the review screen. Name, address, date of birth, prescription
+number, and prescriber are removed on this phone first. It is used once, to
+turn that text into structured reminder fields for you to check and correct.
+Neither the photo nor the audio is sent. If you type the details in yourself
+instead, nothing is sent to Anthropic at all.
 
 **Crash reporting** is included in the app but is switched off by default and
 sends nothing. If it is ever enabled in a future release, this policy will be
