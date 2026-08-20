@@ -136,4 +136,44 @@ void main() {
       );
     });
   });
+
+  group('reminderFromRow', () {
+    Map<String, dynamic> row() => {
+          'id': 'sched-1',
+          'medicine_id': 'med-1',
+          'frequency_type': 'daily',
+          'times': ['09:00', '21:00'],
+          'days_of_week': <int>[],
+          'interval_hours': null,
+          'active': true,
+          'created_at': '2026-08-18T08:00:00.000Z',
+          'updated_at': '2026-08-19T10:00:00.000Z',
+          'updated_by': caregiver,
+          'medicines': {
+            'id': 'med-1',
+            'drug_name': 'Metformin',
+            'strength': '500mg',
+            'form': 'tablet',
+            'dose_amount': '1 tablet',
+            'notes': '',
+            'created_at': '2026-08-18T08:00:00.000Z',
+            'updated_at': '2026-08-19T10:00:00.000Z',
+            'updated_by': caregiver,
+          },
+        };
+
+    test('unpacks a nested medicine and schedule', () {
+      final parsed = CareService.reminderFromRow(row());
+      expect(parsed, isNotNull);
+      expect(parsed!.medicine.drugName, 'Metformin');
+      expect(parsed.schedule.times, ['09:00', '21:00']);
+      expect(parsed.schedule.updatedBy, caregiver);
+    });
+
+    test('drops a schedule that cannot be armed', () {
+      final bad = row();
+      bad['frequency_type'] = 'hourly';
+      expect(CareService.reminderFromRow(bad), isNull);
+    });
+  });
 }

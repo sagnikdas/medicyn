@@ -53,12 +53,15 @@ Deno.test("missed_dose is only the patient's to raise", () => {
   });
 });
 
-Deno.test("data_changed is only the caregiver's to raise", () => {
+Deno.test("data_changed is either side of an active link", () => {
   const asCaregiver = authorizeNotify({ event: "data_changed", callerId: "caregiver-1", link });
   assertEquals(asCaregiver, { allow: true, event: "data_changed", link });
 
   const asPatient = authorizeNotify({ event: "data_changed", callerId: "patient-1", link });
-  assertEquals(asPatient, {
+  assertEquals(asPatient, { allow: true, event: "data_changed", link });
+
+  const asStranger = authorizeNotify({ event: "data_changed", callerId: "stranger", link });
+  assertEquals(asStranger, {
     allow: false,
     status: 200,
     body: { sent: 0, reason: "no_alarms_to_rearm" },

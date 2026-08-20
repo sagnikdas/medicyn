@@ -97,7 +97,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               const SizedBox(height: 12),
               OutlinedButton.icon(
                 onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const CareScreen()),
+                  MaterialPageRoute(builder: (_) => CareScreen(db: widget.db)),
                 ),
                 icon: const Icon(Icons.people_outline),
                 label: const Text('Connect with family'),

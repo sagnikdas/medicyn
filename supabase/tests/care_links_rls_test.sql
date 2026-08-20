@@ -379,14 +379,91 @@ select pg_temp.expect(
   'a caregiver cannot delete the parent''s dose logs'
 );
 
--- Caregiver writes to medicines/schedules must still be allowed — that is a
--- later phase, and tightening those policies here would take it away.
+-- Caregiver writes to medicines/schedules are allowed — that is Phase 2 —
+-- but deletion is the patient's alone. Deactivation (active = false) is an
+-- update, not a delete, and is still permitted; the app simply does not
+-- offer it on the caregiver screen.
 insert into schedules (id, medicine_id, user_id, frequency_type, times)
 values ('abababab-abab-abab-abab-abababababab',
         'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', :'parent', 'daily', '["21:00"]'::jsonb);
 select pg_temp.expect(
   (select count(*) from schedules where user_id = :'parent') = 2,
   'a caregiver can still add a schedule for the parent'
+);
+
+update medicines set notes = 'from Priya' where id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+select pg_temp.expect(
+  (select notes from medicines where id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa') = 'from Priya',
+  'a caregiver can edit the parent''s medicine'
+);
+select pg_temp.expect(
+  (select updated_by from medicines where id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa')
+    = :'child'::uuid,
+  'updated_by is the caller''s JWT, not a client-supplied id'
+);
+select pg_temp.expect(
+  (select count(*) from medicine_edits where medicine_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa') >= 1,
+  'an edit writes a history row'
+);
+select pg_temp.expect(
+  exists (
+    select 1 from medicine_edits
+     where medicine_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+       and actor_id = :'child'::uuid
+  ),
+  'the history row names the caregiver'
+);
+
+insert into medicines (id, user_id, drug_name, updated_by)
+values ('abab0000-aaaa-4aaa-8aaa-aaaaaaaaaaaa', :'parent', 'Telmisartan', :'parent');
+select pg_temp.expect(
+  (select updated_by from medicines where id = 'abab0000-aaaa-4aaa-8aaa-aaaaaaaaaaaa')
+    = :'child'::uuid,
+  'a forged updated_by is overwritten with the caller'
+);
+
+delete from medicines where user_id = :'parent';
+select pg_temp.expect(
+  (select count(*) from medicines where user_id = :'parent') = 3,
+  'a caregiver cannot delete the parent''s medicines'
+);
+delete from schedules where user_id = :'parent';
+select pg_temp.expect(
+  (select count(*) from schedules where user_id = :'parent') = 2,
+  'a caregiver cannot delete the parent''s schedules'
+);
+
+select pg_temp.expect_exception(
+  format(
+    $q$update medicines set user_id = %L where id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'$q$,
+    :'child'
+  ),
+  'cannot_reassign_owner',
+  'a caregiver cannot move the parent''s medicine onto their own account'
+);
+
+update profiles set notifications_allowed = false where user_id = :'parent';
+select pg_temp.expect(
+  (select notifications_allowed from profiles where user_id = :'parent') is null,
+  'setup-health stays unread until the owner reports it'
+);
+
+select pg_temp.become(:'parent');
+update profiles set
+  notifications_allowed = true,
+  exact_alarms_allowed = true,
+  battery_exemption = false,
+  armed_alarm_count = 2,
+  health_checked_at = now()
+where user_id = :'parent';
+select pg_temp.expect(
+  (select battery_exemption from profiles where user_id = :'parent') = false,
+  'the patient can write their own setup health'
+);
+select pg_temp.become(:'child');
+select pg_temp.expect(
+  (select battery_exemption from profiles where user_id = :'parent') = false,
+  'a confirmed caregiver can read the parent''s setup health'
 );
 
 -- ---------------------------------------------------------------------------

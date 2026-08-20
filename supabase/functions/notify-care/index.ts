@@ -7,10 +7,12 @@
 //     dose nobody answered, and pushed the log. The caregiver gets a visible
 //     notification. This is the alert the whole care link is for.
 //
-//   * `data_changed` — the caregiver edited the parent's medicines or
-//     schedules. The parent's device gets a *silent* data message, pulls, and
-//     re-arms its alarms. Without it a schedule change sits unapplied until
-//     the parent next opens the app, while the caregiver believes it is live.
+//   * `data_changed` — either side edited the parent's medicines or
+//     schedules. The *other* device gets a *silent* data message. On the
+//     parent's phone that means pull and re-arm; on the caregiver's it means
+//     refresh the remote list and attribution. There is still no notification
+//     block — PLAN.md's open question about what the parent is told is still
+//     open, and a lock-screen banner would also fight 4.3d.
 //
 // Why the *device* calls this rather than a Postgres trigger firing on the
 // insert: a trigger needs `pg_net`, which Supabase installs in the
@@ -228,19 +230,19 @@ async function announceMissedDoses(
   return json({ sent: doses.length, recipients: tokens.length, delivered });
 }
 
-/// The silent one. Only the caregiver can raise it, because the parent's device
-/// is the only one with alarms to re-arm — a change the parent made on their own
-/// phone is already applied there, and the caregiver's feed reads live from
-/// Postgres. Phase 2 widens this to carry attribution both ways.
+/// The silent one. Either side of an active link may raise it; the other
+/// person is the recipient. A change the parent made still needs to reach
+/// the caregiver's open list, and a change the caregiver made still needs to
+/// re-arm the parent's alarms.
 async function announceDataChange(
   admin: SupabaseClient,
   callerId: string,
   link: CareLinkRow,
 ): Promise<Response> {
-  if (link.caregiver_id !== callerId) {
+  const recipientId = callerId === link.patient_id ? link.caregiver_id : link.patient_id;
+  if (!recipientId) {
     return json({ sent: 0, reason: "no_alarms_to_rearm" });
   }
-  const recipientId = link.patient_id;
   const tokens = await tokensOf(admin, recipientId);
 
   // No `notification` block: the parent should not be told "your daughter

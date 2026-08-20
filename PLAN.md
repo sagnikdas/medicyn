@@ -5,7 +5,7 @@ something an elderly parent and one adult child in another city use together.
 Updated as work lands; the design rationale behind these choices lives in the
 Care Link spec artifact.
 
-**Last updated:** 2026-08-20 · `main` @ `86eef5c`
+**Last updated:** 2026-08-20 · Phase 2 on `feature/phase-2-caregiver-editing`
 
 ---
 
@@ -16,7 +16,7 @@ These are settled. Revisit them deliberately, not incidentally.
 | Decision | Choice |
 |---|---|
 | Pairing | **Exactly one caregiver to one parent.** Each person belongs to at most one live pair. |
-| Editing | **Either side can add or edit medicines.** |
+| Editing | **Either side can add or edit medicines. The caregiver cannot delete.** |
 | Visibility | **Full symmetry** — the parent sees exactly what the caregiver sees. |
 | Consent | Two steps. Possession of an invite code is never access; the parent confirms the named person. |
 | Roles | Never asked for. Whoever shows a code needs help, whoever types one in is giving it. |
@@ -38,6 +38,10 @@ These are settled. Revisit them deliberately, not incidentally.
 - A privacy policy (Art. 13 rewrite), consent, local-only, account deletion,
   and the Phase 4 technical leftovers (OCR redaction, private care alerts,
   device-credential unlock)
+
+**On this branch, not yet merged:** caregiver-side editing (remote writes
+under the patient's `user_id`, no delete), silent `data_changed` both ways,
+per-medicine change history, and setup health on the Care Screen.
 
 **Live on the hosted Supabase project** (`twybepxnqayypzljhcnx`): migrations
 applied, including the timestamp correction (2026-08-19, after both phones were
@@ -134,25 +138,26 @@ tap routing); the README lists the device steps.
       unlock — the tap must not put medicine names on the lock screen.
 
 The inbound direction cannot be verified end-to-end until Phase 2, because
-nothing yet produces a caregiver-side edit to push. The receiving half is
-testable now by inserting a `data_changed` push by hand.
+nothing yet produces a caregiver-side edit to push. Phase 2 is the screen
+that produces it.
 
-## Phase 2 — What push makes honest
+## Phase 2 — What push makes honest — **on this branch**
 
-- [ ] **Caregiver-side editing.** The database permits it and sync carries it;
-      no screen does it. Needs the review/edit form to write under the
-      patient's `user_id`, and attribution — "changed by Priya, Tuesday" — on
-      both phones
-- [ ] Notify the other side on a change — the silent push already exists
-      (`CareNotifier.dataChanged`, wired into sync and inert until an edit
-      belongs to someone other than the caller). Phase 2 widens the server's
-      rule so the *caregiver* is told about the parent's changes too, which is
-      what attribution needs
-- [ ] Per-medicine change history
-- [ ] **Setup health.** Whether the parent's phone can actually ring:
-      notifications allowed, exact alarms permitted, battery exemption
-      granted, alarms armed, last check-in. The device already knows all of
-      it; it needs syncing and a panel on the caregiver's side
+- [x] **Caregiver-side editing.** Care Screen → Their reminders. Writes go
+      straight to Supabase under the patient's `user_id`. This phone's Drift
+      file is not touched, so alarms cannot fire on the wrong device. Scan
+      and voice stay on the patient's phone — those would send a label under
+      the caregiver's Anthropic consent. Attribution — "changed by Priya,
+      Tuesday" — on both lists. `updated_by` is stamped from the JWT, not
+      the payload.
+- [x] Notify the other side on a change. `data_changed` is now either side
+      of an active link; the silent message goes to the other person. Still
+      no notification block (lock-screen / 4.3d, and the open question about
+      what the parent is told is still open).
+- [x] Per-medicine change history (`medicine_edits`, append-only, trigger)
+- [x] **Setup health.** Notifications, exact alarms, battery exemption,
+      armed count, last check-in. Written by the owner; shown on Care
+      Screen to both sides.
 
 Setup health matters more than it sounds. A skipped permission leaves the app
 looking perfectly healthy and simply never firing, so the caregiver stops
@@ -206,9 +211,6 @@ Answer these when the phase that needs them arrives, not before.
   per-medicine.
 - **What the parent is told when an alert fires.** Silence undercuts the
   symmetry promise; "we told your daughter" could read as being told off.
-- **Whether a caregiver can delete, or only add and edit.** Deletion is the
-  one write with no undo, and the most likely to be done by the wrong person
-  in a hurry.
 - **What happens when a link is broken and remade** — a sibling taking over.
   The dose history belongs to the parent's account and should survive it, but
   that has to be deliberate rather than incidental.
@@ -234,10 +236,10 @@ worth remembering.
   `expectedDoses` would compute today. Inventing occurrences that were never
   armed would tell a family their parent skipped medication that was never
   asked for. Silence beats a false alarm.
-- **A caregiver's edit does not re-arm the parent's alarms** until they open
-  the app. The push that fixes this is built (Phase 1) and inert, because no
-  screen produces a caregiver-side edit yet. Still do not tell anyone that
-  remote editing works — Phase 2 is what makes it true.
+- **A caregiver's edit re-arms the parent's alarms** via the silent
+  `data_changed` push (Phase 2). Residual: the parent's phone still has to
+  be reachable by FCM. If it is offline or force-stopped in a way that
+  drops data messages, the change sits until the next foreground pull.
 - **A missed dose is only noticed while the parent's app runs.** The sweep is
   device-side, on foreground, so a parent who does not open the app for two
   days generates no missed doses and therefore no alerts. This is the gap

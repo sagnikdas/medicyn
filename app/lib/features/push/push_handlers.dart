@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/supabase_init.dart';
 import '../../data/local/database.dart';
 import '../../data/remote/sync_service.dart';
+import '../care/care_remote_refresh.dart';
 import '../care/dose_feed_screen.dart';
 import '../notification_engine/notification_service.dart';
 import 'push_events.dart';
@@ -59,6 +60,7 @@ Future<void> applyRemoteDataChange({AppDatabase? db}) async {
     // a pull that lost a version comparison — or failed silently, as pullAll is
     // designed to — leaves the alarms as they were with nothing to notice it.
     await NotificationService.instance.reconcile(database);
+    CareRemoteRefresh.instance.ping();
   } catch (_) {
     // Nothing here can be surfaced or retried from a background isolate. The
     // next app foreground runs the identical pull-and-reconcile, so a failure

@@ -3,12 +3,15 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../data/local/database.dart';
 import '../auth/auth_service.dart';
 import '../consent/consent_purpose.dart';
 import '../consent/consent_screen.dart';
 import '../consent/consent_service.dart';
 import 'care_service.dart';
 import 'dose_feed_screen.dart';
+import 'patient_reminders_screen.dart';
+import 'setup_health_panel.dart';
 
 /// Connecting one person who takes medicines with one person who helps them.
 ///
@@ -22,7 +25,9 @@ import 'dose_feed_screen.dart';
 /// types one in is giving it. That falls out of the flow, so nobody has to
 /// answer a question about what they are.
 class CareScreen extends StatefulWidget {
-  const CareScreen({super.key});
+  const CareScreen({super.key, required this.db});
+
+  final AppDatabase db;
 
   @override
   State<CareScreen> createState() => _CareScreenState();
@@ -36,6 +41,7 @@ class _CareScreenState extends State<CareScreen> {
   CareLink? _link;
   String? _otherName;
   CareClaimant? _claimant;
+  CareProfile? _patientProfile;
   bool _loading = true;
   String? _error;
   Timer? _poll;
@@ -73,11 +79,16 @@ class _CareScreenState extends State<CareScreen> {
           link.isPatient(_myId)) {
         claimant = await CareService.instance.claimedLinkClaimant(link.id);
       }
+      CareProfile? patientProfile;
+      if (link != null && link.status == CareLinkStatus.active) {
+        patientProfile = await CareService.instance.profile(link.patientId);
+      }
       if (!mounted) return;
       setState(() {
         _link = link;
         _otherName = name;
         _claimant = claimant;
+        _patientProfile = patientProfile;
         _loading = false;
         _error = null;
       });
@@ -460,7 +471,25 @@ class _CareScreenState extends State<CareScreen> {
           icon: const Icon(Icons.checklist),
           label: Text(amPatient ? 'See what they see' : 'See their doses'),
         ),
-        const SizedBox(height: 12),
+        if (!amPatient) ...[
+          const SizedBox(height: 12),
+          FilledButton.tonalIcon(
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => PatientRemindersScreen(
+                  patientId: _link!.patientId,
+                  patientName: _otherName,
+                  db: widget.db,
+                ),
+              ),
+            ),
+            icon: const Icon(Icons.medication_outlined),
+            label: const Text('Their reminders'),
+          ),
+        ],
+        const SizedBox(height: 28),
+        SetupHealthPanel(profile: _patientProfile, viewingOwnData: amPatient),
+        const SizedBox(height: 28),
         OutlinedButton(
           onPressed: _disconnect,
           child: const Text('Disconnect'),
