@@ -36,7 +36,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -58,6 +58,10 @@ class AppDatabase extends _$AppDatabase {
           if (from < 3) {
             await m.createTable(doseLogContests);
           }
+          if (from < 4) {
+            await m.addColumn(medicines, medicines.tabletsRemaining);
+            await m.addColumn(medicines, medicines.tabletsPerDose);
+          }
         },
       );
 
@@ -68,6 +72,29 @@ class AppDatabase extends _$AppDatabase {
 
   Future<Medicine?> medicineById(String id) =>
       (select(medicines)..where((t) => t.id.equals(id))).getSingleOrNull();
+
+  /// Subtracts one dose from the bottle for [scheduleId]'s medicine.
+  ///
+  /// Leaves [Medicines.updatedAt] alone: a Taken is not an edit of the
+  /// reminder, and bumping the stamp would let a decrement overwrite a
+  /// caregiver's concurrent change to the name.
+  Future<void> decrementStockForSchedule(String scheduleId) async {
+    final schedule = await scheduleById(scheduleId);
+    if (schedule == null) return;
+    final medicine = await medicineById(schedule.medicineId);
+    if (medicine == null || medicine.tabletsRemaining == null) return;
+    final perDose = (medicine.tabletsPerDose == null || medicine.tabletsPerDose! < 1)
+        ? 1
+        : medicine.tabletsPerDose!;
+    final next = medicine.tabletsRemaining! - perDose;
+    final remaining = next < 0 ? 0 : next;
+    await (update(medicines)..where((t) => t.id.equals(medicine.id))).write(
+      MedicinesCompanion(
+        tabletsRemaining: Value(remaining),
+        pendingSync: const Value(true),
+      ),
+    );
+  }
 
   // --- Schedules -----------------------------------------------------------
 

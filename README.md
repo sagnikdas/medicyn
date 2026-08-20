@@ -606,6 +606,42 @@ pass so an already-announced miss does not confuse the result.
       had a live token. No `notification` title/body on those FCM
       messages — check the function logs if a banner appeared anyway.
 
+### Phase 3 — refill, call, silent device, every-X-hours (needs two phones)
+
+The migration and `notify-care` must be on the hosted project **before** the
+app build. Silent-device pings also need `CRON_SECRET` and an hourly
+schedule hitting `notify-care` with header `x-cron-secret`. From the repo
+(or this worktree):
+
+```
+cd ~/research/dosely-wt/p3   # or ~/research/dosely after this lands
+supabase link --project-ref twybepxnqayypzljhcnx --yes
+supabase db push --yes
+supabase secrets set CRON_SECRET=...   # once; do not rotate FCM_SERVICE_ACCOUNT
+supabase functions deploy notify-care --project-ref twybepxnqayypzljhcnx
+```
+
+Then schedule, in the Supabase dashboard or with a cron caller you control:
+
+`POST /functions/v1/notify-care` hourly, header `x-cron-secret: <CRON_SECRET>`,
+empty JSON body.
+
+- [ ] **Refill.** On the parent phone, edit a reminder, set Tablets left to
+      10 and twice daily. Take one. Remaining is 9. Set remaining to 10
+      again, take until the card says "About 5 days". Caregiver gets a
+      nameless "running low" ping (no drug on the lock screen).
+- [ ] **Call.** Both sides: Care screen → Add your number. Caregiver: raise
+      a missed dose, open the feed from the alert, tap Call. The dialer
+      shows the patient's number. The parent path can call the caregiver
+      the same way.
+- [ ] **Silent device.** Leave the parent app unopened for 25 hours (or set
+      `profiles.last_seen_at` back 25 hours and invoke the cron). Caregiver
+      gets "hasn't checked in", distinct from a missed dose. Care screen
+      shows the same warning on the health panel.
+- [ ] **Every-X-hours miss.** Parent: every 5 hours, first dose a few
+      minutes ago, ignore it past the 30-minute grace, foreground the app.
+      Feed shows Missed. Caregiver gets the usual missed-dose alert.
+
 ## Reliability notes
 
 - Notifications are the whole point of this app, so they've been tested

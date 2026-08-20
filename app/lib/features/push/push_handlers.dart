@@ -77,7 +77,12 @@ Future<void> applyRemoteDataChange({AppDatabase? db}) async {
 /// already-running (`onMessageOpenedApp`) paths cannot disagree, and so a
 /// renamed data key fails a test rather than opening nothing with no error.
 String? careAlertPatientIdFromData(Map<String, dynamic> data) {
-  if (data[pushEventKey] != pushEventMissedDose) return null;
+  final event = data[pushEventKey];
+  if (event != pushEventMissedDose &&
+      event != pushEventDeviceSilent &&
+      event != pushEventRefillLow) {
+    return null;
+  }
   final id = data[pushPatientIdKey];
   if (id is! String || id.isEmpty) return null;
   return id;

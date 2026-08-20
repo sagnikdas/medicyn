@@ -46,6 +46,17 @@ alarms are armed. A linked family member can see that snapshot. It is
 there so they are not left reading "no alerts" as "all is well" when the
 phone cannot actually ring.
 
+**A phone number, if you choose to share one with a linked family member.**
+Each person in a Care Link can store their own number so the other can tap
+Call on a missed-dose alert. Dosely does not read your contacts. The number
+lives only on that connection and is deleted with the account.
+
+**A record that a family alert was sent.** When Dosely notifies the person
+you share with — a missed dose, a running-low bottle, or that the other
+phone has not opened the app since yesterday — it records that it did so
+and when, so the same event is not sent twice. There is no in-app list of
+those alerts today.
+
 **A notification token for your phone, if you are signed in.** So that Dosely
 can alert the person you have chosen to share with, it stores the identifier
 Google's notification service uses to reach this install (an FCM token) and
@@ -55,10 +66,6 @@ are signed in and you use, or may use, family alerts. They are not
 advertising identifiers. We try to delete the token when you sign out; if
 that attempt fails, it is dropped when the token goes stale or when someone
 else signs in on the same phone.
-
-**A record that a family alert was sent.** When Dosely notifies the person
-you share with, it records that it did so and when, so the same missed dose
-is not sent twice. There is no in-app list of those alerts today.
 
 Dosely does **not** collect advertising identifiers, your contacts, your
 browsing activity, GPS location, or any other health information beyond what

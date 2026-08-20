@@ -9,7 +9,7 @@ export interface CareLinkRef {
   caregiver_id: string | null;
 }
 
-export type NotifyEvent = "missed_dose" | "data_changed";
+export type NotifyEvent = "missed_dose" | "data_changed" | "refill_low";
 
 export type NotifyAuthz =
   | { allow: true; event: NotifyEvent; link: CareLinkRef }
@@ -30,14 +30,14 @@ export function authorizeNotify(opts: {
   link: CareLinkRef | null | undefined;
 }): NotifyAuthz {
   const event = opts.event;
-  if (event !== "missed_dose" && event !== "data_changed") {
+  if (event !== "missed_dose" && event !== "data_changed" && event !== "refill_low") {
     return { allow: false, status: 400, body: { error: "unknown_event" } };
   }
   const link = opts.link;
   if (!link) {
     return { allow: false, status: 200, body: { sent: 0, reason: "no_active_link" } };
   }
-  if (event === "missed_dose" && link.patient_id !== opts.callerId) {
+  if ((event === "missed_dose" || event === "refill_low") && link.patient_id !== opts.callerId) {
     return { allow: false, status: 200, body: { sent: 0, reason: "caller_is_not_the_patient" } };
   }
   if (event === "data_changed") {

@@ -11,6 +11,7 @@ import '../consent/consent_service.dart';
 import 'care_service.dart';
 import 'dose_feed_screen.dart';
 import 'patient_reminders_screen.dart';
+import 'phone_dial.dart';
 import 'setup_health_panel.dart';
 
 /// Connecting one person who takes medicines with one person who helps them.
@@ -420,6 +421,21 @@ class _CareScreenState extends State<CareScreen> {
     );
   }
 
+  String? get _callPhone => dialablePhone(_link?.phoneToCall(_myId));
+
+  String? get _ownPhone => dialablePhone(_link?.ownPhone(_myId));
+
+  Future<void> _editOwnPhone() async {
+    final current = _link?.ownPhone(_myId) ?? '';
+    final next = await showDialog<String>(
+      context: context,
+      builder: (_) => _PhoneEntryDialog(initial: current),
+    );
+    if (next == null) return;
+    await _run(() => CareService.instance.setOwnPhone(next));
+    await _refresh();
+  }
+
   Widget _connected(bool amPatient) {
     final text = Theme.of(context).textTheme;
     final scheme = Theme.of(context).colorScheme;
@@ -471,8 +487,8 @@ class _CareScreenState extends State<CareScreen> {
           icon: const Icon(Icons.checklist),
           label: Text(amPatient ? 'See what they see' : 'See their doses'),
         ),
-        if (!amPatient) ...[
-          const SizedBox(height: 12),
+        const SizedBox(height: 12),
+        if (!amPatient)
           FilledButton.tonalIcon(
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute(
@@ -486,7 +502,20 @@ class _CareScreenState extends State<CareScreen> {
             icon: const Icon(Icons.medication_outlined),
             label: const Text('Their reminders'),
           ),
+        if (_callPhone != null) ...[
+          const SizedBox(height: 12),
+          FilledButton.tonalIcon(
+            onPressed: () => openDialer(_callPhone!),
+            icon: const Icon(Icons.phone),
+            label: const Text('Call them'),
+          ),
         ],
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
+          onPressed: _editOwnPhone,
+          icon: const Icon(Icons.contact_phone_outlined),
+          label: Text(_ownPhone == null ? 'Add your number' : 'Change your number'),
+        ),
         const SizedBox(height: 28),
         SetupHealthPanel(profile: _patientProfile, viewingOwnData: amPatient),
         const SizedBox(height: 28),
@@ -567,3 +596,64 @@ class _CodeEntryDialogState extends State<_CodeEntryDialog> {
     );
   }
 }
+
+class _PhoneEntryDialog extends StatefulWidget {
+  const _PhoneEntryDialog({required this.initial});
+  final String initial;
+
+  @override
+  State<_PhoneEntryDialog> createState() => _PhoneEntryDialogState();
+}
+
+class _PhoneEntryDialogState extends State<_PhoneEntryDialog> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initial);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Your number'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text(
+            'The other person can tap Call on a missed-dose alert to ring '
+            'this number. It is stored only on this connection.',
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _controller,
+            autofocus: true,
+            keyboardType: TextInputType.phone,
+            decoration: const InputDecoration(
+              labelText: 'Mobile number',
+              hintText: '+91…',
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(_controller.text.trim()),
+          child: const Text('Save'),
+        ),
+      ],
+    );
+  }
+}
+

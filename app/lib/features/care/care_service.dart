@@ -43,6 +43,8 @@ class CareLink {
     required this.status,
     this.inviteCode,
     this.expiresAt,
+    this.patientPhone,
+    this.caregiverPhone,
   });
 
   final String id;
@@ -55,11 +57,25 @@ class CareLink {
   final String? inviteCode;
   final DateTime? expiresAt;
 
+  /// Number the caregiver rings. Stored by the patient.
+  final String? patientPhone;
+
+  /// Number the patient rings. Stored by the caregiver.
+  final String? caregiverPhone;
+
   bool isPatient(String userId) => patientId == userId;
 
   /// The other person in the pair, from [userId]'s point of view. Null while
   /// an invite is still unclaimed.
   String? otherPartyId(String userId) => isPatient(userId) ? caregiverId : patientId;
+
+  /// The number [userId] should dial to reach the other person.
+  String? phoneToCall(String userId) =>
+      isPatient(userId) ? caregiverPhone : patientPhone;
+
+  /// The number [userId] themselves stored, so the form can show it back.
+  String? ownPhone(String userId) =>
+      isPatient(userId) ? patientPhone : caregiverPhone;
 
   static CareLink fromRow(Map<String, dynamic> row) => CareLink(
         id: row['id'] as String,
@@ -70,6 +86,8 @@ class CareLink {
         expiresAt: row['expires_at'] == null
             ? null
             : DateTime.parse(row['expires_at'] as String).toLocal(),
+        patientPhone: row['patient_phone'] as String?,
+        caregiverPhone: row['caregiver_phone'] as String?,
       );
 }
 
@@ -472,6 +490,16 @@ class CareService {
     }
   }
 
+  /// Stores this person's own number on the active link so the other side
+  /// can ring it. Pass empty to clear.
+  Future<void> setOwnPhone(String phone) async {
+    try {
+      await _client.rpc('set_own_care_phone', params: {'phone': phone});
+    } catch (e) {
+      throw CareLinkFailure(_describe(e));
+    }
+  }
+
   /// The patient's medicines and schedules, read from Supabase — not Drift.
   ///
   /// A caregiver's local database is *their* reminders. Writing the patient's
@@ -512,6 +540,8 @@ class CareService {
     required String strength,
     required String form,
     required String doseAmount,
+    int? tabletsRemaining,
+    int? tabletsPerDose,
     required String notes,
     required String frequencyType,
     required List<String> times,
@@ -534,6 +564,8 @@ class CareService {
         'strength': strength,
         'form': form,
         'dose_amount': doseAmount,
+        'tablets_remaining': tabletsRemaining,
+        'tablets_per_dose': tabletsPerDose,
         'notes': notes,
         'created_at': medicineCreated,
         'updated_at': stamp,
@@ -619,6 +651,8 @@ class CareService {
       form: (medicineRow['form'] as String?) ?? '',
       doseAmount: (medicineRow['dose_amount'] as String?) ?? '',
       notes: (medicineRow['notes'] as String?) ?? '',
+      tabletsRemaining: _asInt(medicineRow['tablets_remaining']),
+      tabletsPerDose: _asInt(medicineRow['tablets_per_dose']),
       createdAt: medicineCreated,
       updatedAt: medicineUpdated,
       updatedBy: medicineRow['updated_by'] as String?,
@@ -683,6 +717,12 @@ class CareService {
     }
     if (raw.contains('no_link_to_revoke')) {
       return 'That connection has already ended.';
+    }
+    if (raw.contains('no_active_link')) {
+      return "You're not connected to anyone right now.";
+    }
+    if (raw.contains('phone_too_long')) {
+      return 'That number is too long. Use a mobile number with the country code.';
     }
     if (raw.contains('not_authenticated')) {
       return 'Please sign in again.';

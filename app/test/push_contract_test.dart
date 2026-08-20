@@ -42,8 +42,12 @@ void main() {
       expect(functionSource, contains('"$pushEventMissedDose"'));
     });
 
-    test('the function knows the data-changed event by the name we send', () {
-      expect(functionSource, contains('"$pushEventDataChanged"'));
+    test('the function knows the refill-low event by the name we send', () {
+      expect(functionSource, contains('"$pushEventRefillLow"'));
+    });
+
+    test('the function knows the silent-device event by the name we send', () {
+      expect(functionSource, contains('"$pushEventDeviceSilent"'));
     });
 
     test('the function labels its messages with the key we read them by', () {
@@ -54,6 +58,8 @@ void main() {
         functionSource,
         contains('$pushEventKey: "$pushEventDataChanged"'),
       );
+      expect(functionSource, contains('$pushEventKey: "$pushEventRefillLow"'));
+      expect(functionSource, contains('$pushEventKey: "$pushEventDeviceSilent"'));
     });
 
     test('the function names the patient by the key the tap handler reads', () {

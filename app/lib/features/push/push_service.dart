@@ -128,6 +128,8 @@ class PushService {
         // a second one would not reach them.
         await applyRemoteDataChange(db: db);
       case pushEventMissedDose:
+      case pushEventDeviceSilent:
+      case pushEventRefillLow:
         // Android does not draw a notification message while the app is in the
         // foreground, so this does it — otherwise a caregiver sitting in the
         // app is the one person who never hears about a missed dose.

@@ -81,3 +81,15 @@ Deno.test("a claimed link with no caregiver cannot raise data_changed", () => {
     body: { sent: 0, reason: "no_alarms_to_rearm" },
   });
 });
+
+Deno.test("refill_low is only the patient's to raise", () => {
+  const asPatient = authorizeNotify({ event: "refill_low", callerId: "patient-1", link });
+  assertEquals(asPatient, { allow: true, event: "refill_low", link });
+
+  const asCaregiver = authorizeNotify({ event: "refill_low", callerId: "caregiver-1", link });
+  assertEquals(asCaregiver, {
+    allow: false,
+    status: 200,
+    body: { sent: 0, reason: "caller_is_not_the_patient" },
+  });
+});

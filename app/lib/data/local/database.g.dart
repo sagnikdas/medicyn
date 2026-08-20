@@ -63,6 +63,28 @@ class $MedicinesTable extends Medicines
     requiredDuringInsert: false,
     defaultValue: const Constant(''),
   );
+  static const VerificationMeta _tabletsRemainingMeta = const VerificationMeta(
+    'tabletsRemaining',
+  );
+  @override
+  late final GeneratedColumn<int> tabletsRemaining = GeneratedColumn<int>(
+    'tablets_remaining',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _tabletsPerDoseMeta = const VerificationMeta(
+    'tabletsPerDose',
+  );
+  @override
+  late final GeneratedColumn<int> tabletsPerDose = GeneratedColumn<int>(
+    'tablets_per_dose',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _notesMeta = const VerificationMeta('notes');
   @override
   late final GeneratedColumn<String> notes = GeneratedColumn<String>(
@@ -145,6 +167,8 @@ class $MedicinesTable extends Medicines
     strength,
     form,
     doseAmount,
+    tabletsRemaining,
+    tabletsPerDose,
     notes,
     createdAt,
     updatedAt,
@@ -193,6 +217,24 @@ class $MedicinesTable extends Medicines
       context.handle(
         _doseAmountMeta,
         doseAmount.isAcceptableOrUnknown(data['dose_amount']!, _doseAmountMeta),
+      );
+    }
+    if (data.containsKey('tablets_remaining')) {
+      context.handle(
+        _tabletsRemainingMeta,
+        tabletsRemaining.isAcceptableOrUnknown(
+          data['tablets_remaining']!,
+          _tabletsRemainingMeta,
+        ),
+      );
+    }
+    if (data.containsKey('tablets_per_dose')) {
+      context.handle(
+        _tabletsPerDoseMeta,
+        tabletsPerDose.isAcceptableOrUnknown(
+          data['tablets_per_dose']!,
+          _tabletsPerDoseMeta,
+        ),
       );
     }
     if (data.containsKey('notes')) {
@@ -263,6 +305,14 @@ class $MedicinesTable extends Medicines
         DriftSqlType.string,
         data['${effectivePrefix}dose_amount'],
       )!,
+      tabletsRemaining: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}tablets_remaining'],
+      ),
+      tabletsPerDose: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}tablets_per_dose'],
+      ),
       notes: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}notes'],
@@ -302,6 +352,8 @@ class Medicine extends DataClass implements Insertable<Medicine> {
   final String strength;
   final String form;
   final String doseAmount;
+  final int? tabletsRemaining;
+  final int? tabletsPerDose;
   final String notes;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -314,6 +366,8 @@ class Medicine extends DataClass implements Insertable<Medicine> {
     required this.strength,
     required this.form,
     required this.doseAmount,
+    this.tabletsRemaining,
+    this.tabletsPerDose,
     required this.notes,
     required this.createdAt,
     required this.updatedAt,
@@ -329,6 +383,12 @@ class Medicine extends DataClass implements Insertable<Medicine> {
     map['strength'] = Variable<String>(strength);
     map['form'] = Variable<String>(form);
     map['dose_amount'] = Variable<String>(doseAmount);
+    if (!nullToAbsent || tabletsRemaining != null) {
+      map['tablets_remaining'] = Variable<int>(tabletsRemaining);
+    }
+    if (!nullToAbsent || tabletsPerDose != null) {
+      map['tablets_per_dose'] = Variable<int>(tabletsPerDose);
+    }
     map['notes'] = Variable<String>(notes);
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
@@ -347,6 +407,12 @@ class Medicine extends DataClass implements Insertable<Medicine> {
       strength: Value(strength),
       form: Value(form),
       doseAmount: Value(doseAmount),
+      tabletsRemaining: tabletsRemaining == null && nullToAbsent
+          ? const Value.absent()
+          : Value(tabletsRemaining),
+      tabletsPerDose: tabletsPerDose == null && nullToAbsent
+          ? const Value.absent()
+          : Value(tabletsPerDose),
       notes: Value(notes),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
@@ -369,6 +435,8 @@ class Medicine extends DataClass implements Insertable<Medicine> {
       strength: serializer.fromJson<String>(json['strength']),
       form: serializer.fromJson<String>(json['form']),
       doseAmount: serializer.fromJson<String>(json['doseAmount']),
+      tabletsRemaining: serializer.fromJson<int?>(json['tabletsRemaining']),
+      tabletsPerDose: serializer.fromJson<int?>(json['tabletsPerDose']),
       notes: serializer.fromJson<String>(json['notes']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
@@ -386,6 +454,8 @@ class Medicine extends DataClass implements Insertable<Medicine> {
       'strength': serializer.toJson<String>(strength),
       'form': serializer.toJson<String>(form),
       'doseAmount': serializer.toJson<String>(doseAmount),
+      'tabletsRemaining': serializer.toJson<int?>(tabletsRemaining),
+      'tabletsPerDose': serializer.toJson<int?>(tabletsPerDose),
       'notes': serializer.toJson<String>(notes),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
@@ -401,6 +471,8 @@ class Medicine extends DataClass implements Insertable<Medicine> {
     String? strength,
     String? form,
     String? doseAmount,
+    Value<int?> tabletsRemaining = const Value.absent(),
+    Value<int?> tabletsPerDose = const Value.absent(),
     String? notes,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -413,6 +485,12 @@ class Medicine extends DataClass implements Insertable<Medicine> {
     strength: strength ?? this.strength,
     form: form ?? this.form,
     doseAmount: doseAmount ?? this.doseAmount,
+    tabletsRemaining: tabletsRemaining.present
+        ? tabletsRemaining.value
+        : this.tabletsRemaining,
+    tabletsPerDose: tabletsPerDose.present
+        ? tabletsPerDose.value
+        : this.tabletsPerDose,
     notes: notes ?? this.notes,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
@@ -429,6 +507,12 @@ class Medicine extends DataClass implements Insertable<Medicine> {
       doseAmount: data.doseAmount.present
           ? data.doseAmount.value
           : this.doseAmount,
+      tabletsRemaining: data.tabletsRemaining.present
+          ? data.tabletsRemaining.value
+          : this.tabletsRemaining,
+      tabletsPerDose: data.tabletsPerDose.present
+          ? data.tabletsPerDose.value
+          : this.tabletsPerDose,
       notes: data.notes.present ? data.notes.value : this.notes,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
@@ -448,6 +532,8 @@ class Medicine extends DataClass implements Insertable<Medicine> {
           ..write('strength: $strength, ')
           ..write('form: $form, ')
           ..write('doseAmount: $doseAmount, ')
+          ..write('tabletsRemaining: $tabletsRemaining, ')
+          ..write('tabletsPerDose: $tabletsPerDose, ')
           ..write('notes: $notes, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
@@ -465,6 +551,8 @@ class Medicine extends DataClass implements Insertable<Medicine> {
     strength,
     form,
     doseAmount,
+    tabletsRemaining,
+    tabletsPerDose,
     notes,
     createdAt,
     updatedAt,
@@ -481,6 +569,8 @@ class Medicine extends DataClass implements Insertable<Medicine> {
           other.strength == this.strength &&
           other.form == this.form &&
           other.doseAmount == this.doseAmount &&
+          other.tabletsRemaining == this.tabletsRemaining &&
+          other.tabletsPerDose == this.tabletsPerDose &&
           other.notes == this.notes &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt &&
@@ -495,6 +585,8 @@ class MedicinesCompanion extends UpdateCompanion<Medicine> {
   final Value<String> strength;
   final Value<String> form;
   final Value<String> doseAmount;
+  final Value<int?> tabletsRemaining;
+  final Value<int?> tabletsPerDose;
   final Value<String> notes;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
@@ -508,6 +600,8 @@ class MedicinesCompanion extends UpdateCompanion<Medicine> {
     this.strength = const Value.absent(),
     this.form = const Value.absent(),
     this.doseAmount = const Value.absent(),
+    this.tabletsRemaining = const Value.absent(),
+    this.tabletsPerDose = const Value.absent(),
     this.notes = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -522,6 +616,8 @@ class MedicinesCompanion extends UpdateCompanion<Medicine> {
     this.strength = const Value.absent(),
     this.form = const Value.absent(),
     this.doseAmount = const Value.absent(),
+    this.tabletsRemaining = const Value.absent(),
+    this.tabletsPerDose = const Value.absent(),
     this.notes = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -537,6 +633,8 @@ class MedicinesCompanion extends UpdateCompanion<Medicine> {
     Expression<String>? strength,
     Expression<String>? form,
     Expression<String>? doseAmount,
+    Expression<int>? tabletsRemaining,
+    Expression<int>? tabletsPerDose,
     Expression<String>? notes,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
@@ -551,6 +649,8 @@ class MedicinesCompanion extends UpdateCompanion<Medicine> {
       if (strength != null) 'strength': strength,
       if (form != null) 'form': form,
       if (doseAmount != null) 'dose_amount': doseAmount,
+      if (tabletsRemaining != null) 'tablets_remaining': tabletsRemaining,
+      if (tabletsPerDose != null) 'tablets_per_dose': tabletsPerDose,
       if (notes != null) 'notes': notes,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
@@ -567,6 +667,8 @@ class MedicinesCompanion extends UpdateCompanion<Medicine> {
     Value<String>? strength,
     Value<String>? form,
     Value<String>? doseAmount,
+    Value<int?>? tabletsRemaining,
+    Value<int?>? tabletsPerDose,
     Value<String>? notes,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
@@ -581,6 +683,8 @@ class MedicinesCompanion extends UpdateCompanion<Medicine> {
       strength: strength ?? this.strength,
       form: form ?? this.form,
       doseAmount: doseAmount ?? this.doseAmount,
+      tabletsRemaining: tabletsRemaining ?? this.tabletsRemaining,
+      tabletsPerDose: tabletsPerDose ?? this.tabletsPerDose,
       notes: notes ?? this.notes,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -608,6 +712,12 @@ class MedicinesCompanion extends UpdateCompanion<Medicine> {
     }
     if (doseAmount.present) {
       map['dose_amount'] = Variable<String>(doseAmount.value);
+    }
+    if (tabletsRemaining.present) {
+      map['tablets_remaining'] = Variable<int>(tabletsRemaining.value);
+    }
+    if (tabletsPerDose.present) {
+      map['tablets_per_dose'] = Variable<int>(tabletsPerDose.value);
     }
     if (notes.present) {
       map['notes'] = Variable<String>(notes.value);
@@ -641,6 +751,8 @@ class MedicinesCompanion extends UpdateCompanion<Medicine> {
           ..write('strength: $strength, ')
           ..write('form: $form, ')
           ..write('doseAmount: $doseAmount, ')
+          ..write('tabletsRemaining: $tabletsRemaining, ')
+          ..write('tabletsPerDose: $tabletsPerDose, ')
           ..write('notes: $notes, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
@@ -2283,6 +2395,8 @@ typedef $$MedicinesTableCreateCompanionBuilder =
       Value<String> strength,
       Value<String> form,
       Value<String> doseAmount,
+      Value<int?> tabletsRemaining,
+      Value<int?> tabletsPerDose,
       Value<String> notes,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
@@ -2298,6 +2412,8 @@ typedef $$MedicinesTableUpdateCompanionBuilder =
       Value<String> strength,
       Value<String> form,
       Value<String> doseAmount,
+      Value<int?> tabletsRemaining,
+      Value<int?> tabletsPerDose,
       Value<String> notes,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
@@ -2361,6 +2477,16 @@ class $$MedicinesTableFilterComposer
 
   ColumnFilters<String> get doseAmount => $composableBuilder(
     column: $table.doseAmount,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get tabletsRemaining => $composableBuilder(
+    column: $table.tabletsRemaining,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get tabletsPerDose => $composableBuilder(
+    column: $table.tabletsPerDose,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -2454,6 +2580,16 @@ class $$MedicinesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get tabletsRemaining => $composableBuilder(
+    column: $table.tabletsRemaining,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get tabletsPerDose => $composableBuilder(
+    column: $table.tabletsPerDose,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get notes => $composableBuilder(
     column: $table.notes,
     builder: (column) => ColumnOrderings(column),
@@ -2508,6 +2644,16 @@ class $$MedicinesTableAnnotationComposer
 
   GeneratedColumn<String> get doseAmount => $composableBuilder(
     column: $table.doseAmount,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get tabletsRemaining => $composableBuilder(
+    column: $table.tabletsRemaining,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get tabletsPerDose => $composableBuilder(
+    column: $table.tabletsPerDose,
     builder: (column) => column,
   );
 
@@ -2590,6 +2736,8 @@ class $$MedicinesTableTableManager
                 Value<String> strength = const Value.absent(),
                 Value<String> form = const Value.absent(),
                 Value<String> doseAmount = const Value.absent(),
+                Value<int?> tabletsRemaining = const Value.absent(),
+                Value<int?> tabletsPerDose = const Value.absent(),
                 Value<String> notes = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
@@ -2603,6 +2751,8 @@ class $$MedicinesTableTableManager
                 strength: strength,
                 form: form,
                 doseAmount: doseAmount,
+                tabletsRemaining: tabletsRemaining,
+                tabletsPerDose: tabletsPerDose,
                 notes: notes,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
@@ -2618,6 +2768,8 @@ class $$MedicinesTableTableManager
                 Value<String> strength = const Value.absent(),
                 Value<String> form = const Value.absent(),
                 Value<String> doseAmount = const Value.absent(),
+                Value<int?> tabletsRemaining = const Value.absent(),
+                Value<int?> tabletsPerDose = const Value.absent(),
                 Value<String> notes = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
@@ -2631,6 +2783,8 @@ class $$MedicinesTableTableManager
                 strength: strength,
                 form: form,
                 doseAmount: doseAmount,
+                tabletsRemaining: tabletsRemaining,
+                tabletsPerDose: tabletsPerDose,
                 notes: notes,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
