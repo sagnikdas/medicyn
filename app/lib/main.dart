@@ -12,6 +12,8 @@ import 'core/supabase_init.dart';
 import 'core/theme.dart';
 import 'data/local/database.dart';
 import 'features/auth/sign_in_screen.dart';
+import 'features/consent/consent_screen.dart';
+import 'features/consent/consent_service.dart';
 import 'features/notification_engine/notification_actions.dart';
 import 'features/notification_engine/notification_service.dart';
 import 'features/onboarding/onboarding_screen.dart';
@@ -100,9 +102,9 @@ class _DoselyAppState extends State<DoselyApp> {
 }
 
 /// Shows onboarding once, on first launch only, before anything else —
-/// including sign-in. Once the user finishes or skips it, the persisted
-/// flag (see AppSettings.hasSeenOnboarding) means this gate goes straight
-/// to `_AuthGate` on every later launch.
+/// including consent and sign-in. Once the user finishes or skips it, the
+/// persisted flag (see AppSettings.hasSeenOnboarding) means this gate goes
+/// straight to `_ConsentGate` on every later launch.
 class _OnboardingGate extends StatelessWidget {
   const _OnboardingGate();
 
@@ -112,12 +114,33 @@ class _OnboardingGate extends StatelessWidget {
       listenable: AppSettings.instance,
       builder: (context, _) {
         if (AppSettings.instance.hasSeenOnboarding) {
-          return const _AuthGate();
+          return const _ConsentGate();
         }
         // No navigation needed here: OnboardingScreen persists the flag via
         // AppSettings, and that change alone triggers this ListenableBuilder
-        // to rebuild into _AuthGate.
+        // to rebuild into _ConsentGate.
         return const OnboardingScreen();
+      },
+    );
+  }
+}
+
+/// Shows the consent screen until the user has recorded a choice — including
+/// on existing installs that already skipped onboarding. After Continue the
+/// persisted flag (see AppSettings.hasRecordedConsents) means this gate goes
+/// straight to `_AuthGate`.
+class _ConsentGate extends StatelessWidget {
+  const _ConsentGate();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: AppSettings.instance,
+      builder: (context, _) {
+        if (AppSettings.instance.hasRecordedConsents) {
+          return const _AuthGate();
+        }
+        return const ConsentScreen();
       },
     );
   }
@@ -141,6 +164,7 @@ class _AuthGate extends StatefulWidget {
 class _AuthGateState extends State<_AuthGate> {
   AppDatabase? _db;
   String? _userId;
+  String? _syncedConsentUserId;
 
   @override
   void dispose() {
@@ -160,6 +184,7 @@ class _AuthGateState extends State<_AuthGate> {
     final open = _db;
     _db = null;
     _userId = null;
+    _syncedConsentUserId = null;
     unawaited(open?.close());
   }
 
@@ -172,6 +197,10 @@ class _AuthGateState extends State<_AuthGate> {
         if (user == null) {
           _releaseDatabase();
           return const SignInScreen();
+        }
+        if (_syncedConsentUserId != user.id) {
+          _syncedConsentUserId = user.id;
+          unawaited(ConsentService.instance.syncToServer());
         }
         return HomeScreen(db: _databaseFor(user.id));
       },

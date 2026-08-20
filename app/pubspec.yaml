@@ -35,6 +35,8 @@ dependencies:
   permission_handler: ^13.0.1
   sentry_flutter: ^9.26.0
   shared_preferences: ^2.5.5
+  # SHA-256 of the on-screen consent sentences stored with the Art. 7 record.
+  crypto: ^3.0.7
   # Direct so the sqlite3mc native-assets hook below applies. drift_flutter
   # already pulled this in; encryption needs SQLite3MultipleCiphers, not the
   # default unencrypted SQLite (and not sqlcipher_flutter_libs 0.7.0+eol).

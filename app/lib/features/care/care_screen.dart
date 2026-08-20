@@ -4,6 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../auth/auth_service.dart';
+import '../consent/consent_purpose.dart';
+import '../consent/consent_screen.dart';
+import '../consent/consent_service.dart';
 import 'care_service.dart';
 import 'dose_feed_screen.dart';
 
@@ -107,9 +110,28 @@ class _CareScreenState extends State<CareScreen> {
     }
   }
 
-  Future<void> _invite() => _run(CareService.instance.createInvite);
+  Future<bool> _ensureCareShareConsent() async {
+    if (ConsentService.instance.isGranted(ConsentPurpose.careShare)) return true;
+    final granted = await showDialog<bool>(
+      context: context,
+      builder: (_) => const CareShareConsentDialog(),
+    );
+    if (granted == true) {
+      await ConsentService.instance.setGranted(ConsentPurpose.careShare, true);
+      return true;
+    }
+    return false;
+  }
+
+  Future<void> _invite() async {
+    if (!await _ensureCareShareConsent()) return;
+    if (!mounted) return;
+    await _run(CareService.instance.createInvite);
+  }
 
   Future<void> _enterCode() async {
+    if (!await _ensureCareShareConsent()) return;
+    if (!mounted) return;
     final code = await showDialog<String>(
       context: context,
       builder: (_) => const _CodeEntryDialog(),

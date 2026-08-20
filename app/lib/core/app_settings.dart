@@ -27,6 +27,11 @@ class AppSettings extends ChangeNotifier {
   static const _themeModeKey = 'theme_mode';
   static const _hasSeenOnboardingKey = 'has_seen_onboarding';
   static const _showMedicineOnLockScreenKey = 'show_medicine_on_lock_screen';
+  static const _hasRecordedConsentsKey = 'has_recorded_consents';
+  static const _consentCloudBackupKey = 'consent_cloud_backup';
+  static const _consentAnthropicParseKey = 'consent_anthropic_parse';
+  static const _consentGoogleSpeechKey = 'consent_google_speech';
+  static const _consentCareShareKey = 'consent_care_share';
 
   /// Elderly-friendly text sizing, as a scale factor the Settings slider
   /// drives directly. It scales every screen's text (and, since buttons and
@@ -62,6 +67,26 @@ class AppSettings extends ChangeNotifier {
   bool _showMedicineOnLockScreen = false;
   bool get showMedicineOnLockScreen => _showMedicineOnLockScreen;
 
+  /// False until the consent screen's Continue is tapped — including on
+  /// existing installs that already skipped onboarding. Implied consent is
+  /// never grandfathered.
+  bool _hasRecordedConsents = false;
+  bool get hasRecordedConsents => _hasRecordedConsents;
+
+  /// All four default off / unticked. Local-only until sign-in; the device
+  /// is what the gates read.
+  bool _consentCloudBackup = false;
+  bool get consentCloudBackup => _consentCloudBackup;
+
+  bool _consentAnthropicParse = false;
+  bool get consentAnthropicParse => _consentAnthropicParse;
+
+  bool _consentGoogleSpeech = false;
+  bool get consentGoogleSpeech => _consentGoogleSpeech;
+
+  bool _consentCareShare = false;
+  bool get consentCareShare => _consentCareShare;
+
   bool _loaded = false;
 
   Future<void> init() async {
@@ -77,6 +102,11 @@ class AppSettings extends ChangeNotifier {
     );
     _hasSeenOnboarding = prefs.getBool(_hasSeenOnboardingKey) ?? false;
     _showMedicineOnLockScreen = prefs.getBool(_showMedicineOnLockScreenKey) ?? false;
+    _hasRecordedConsents = prefs.getBool(_hasRecordedConsentsKey) ?? false;
+    _consentCloudBackup = prefs.getBool(_consentCloudBackupKey) ?? false;
+    _consentAnthropicParse = prefs.getBool(_consentAnthropicParseKey) ?? false;
+    _consentGoogleSpeech = prefs.getBool(_consentGoogleSpeechKey) ?? false;
+    _consentCareShare = prefs.getBool(_consentCareShareKey) ?? false;
     _loaded = true;
   }
 
@@ -131,5 +161,52 @@ class AppSettings extends ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_showMedicineOnLockScreenKey, value);
+  }
+
+  Future<void> setHasRecordedConsents() async {
+    _hasRecordedConsents = true;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_hasRecordedConsentsKey, true);
+  }
+
+  Future<void> setConsentCloudBackup(bool value) =>
+      _setConsentFlag(() => _consentCloudBackup = value, _consentCloudBackupKey, value, _consentCloudBackup);
+
+  Future<void> setConsentAnthropicParse(bool value) =>
+      _setConsentFlag(() => _consentAnthropicParse = value, _consentAnthropicParseKey, value, _consentAnthropicParse);
+
+  Future<void> setConsentGoogleSpeech(bool value) =>
+      _setConsentFlag(() => _consentGoogleSpeech = value, _consentGoogleSpeechKey, value, _consentGoogleSpeech);
+
+  Future<void> setConsentCareShare(bool value) =>
+      _setConsentFlag(() => _consentCareShare = value, _consentCareShareKey, value, _consentCareShare);
+
+  Future<void> _setConsentFlag(
+    void Function() assign,
+    String key,
+    bool value,
+    bool current,
+  ) async {
+    assign();
+    if (value != current) notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(key, value);
+  }
+
+  /// Clears in-memory state so a test can call [init] against a fresh
+  /// SharedPreferences mock. Not used in production.
+  @visibleForTesting
+  void resetForTest() {
+    _loaded = false;
+    _textScale = minTextScale;
+    _themeMode = ThemeMode.system;
+    _hasSeenOnboarding = false;
+    _showMedicineOnLockScreen = false;
+    _hasRecordedConsents = false;
+    _consentCloudBackup = false;
+    _consentAnthropicParse = false;
+    _consentGoogleSpeech = false;
+    _consentCareShare = false;
   }
 }
