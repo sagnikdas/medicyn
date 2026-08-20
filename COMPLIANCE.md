@@ -519,12 +519,13 @@ exposure closed), and 2.7 (one predicate). The largest are 1.3 (consent flow),
 
 ---
 
-## Status against `feature/phase-2` (2026-08-20)
+## Status against `feature/phase-4` (2026-08-20)
 
 The body of this plan still describes the codebase as audited on 2026-08-19.
 Closed items are **not** rewritten above. This table is the live tracker and
 should be updated when a phase (or a Phase 1-style blocker) closes. Phase 2
-lives on `feature/phase-2` until that branch is merged to `main`.
+landed on `main` as #47. Phase 4 technical leftovers (4.3c–e) live on this
+branch until it is merged to `main`.
 
 | # | Change the application needs | Kind | Status | Notes |
 |---|---|---|---|---|
@@ -554,20 +555,18 @@ lives on `feature/phase-2` until that branch is merged to `main`.
 | 4.2 | BAAs (Supabase Team+HIPAA add-on; Anthropic; no BAA for platform speech) | Paper | **Deferred** | |
 | 4.3a | Encrypt local medical database | App | **Done** — #33 | sqlite3mc hooks + Keystore, not the EOL `sqlcipher_flutter_libs` package the plan named. |
 | 4.3b | Session in Keystore / Keychain | App | **Done** — #29 | |
-| 4.3c | Automatic logoff / device-credential re-unlock | App | **Todo** (HIPAA) | `timebox` / `inactivity_timeout` still commented in `config.toml`. Prefer device unlock over a 15-minute logout. |
-| 4.3d | Lock-screen names: setting, default private for *care* alerts | App | **Partial** — #30 | Patient reminders default private with an opt-in. Care alerts are still public / unspecified visibility. |
-| 4.3e | Redact OCR (name, address, DoB, Rx) on-device before `parse-medicine` | App | **Todo** (do before any Anthropic BAA) | Still sends up to 4,000 characters of raw label text. |
+| 4.3c | Automatic logoff / device-credential re-unlock | App | **Done** — #51 | Device PIN / pattern / biometric after two minutes in the background. No 15-minute session kill. Phones with no screen lock are left usable. |
+| 4.3d | Lock-screen names: setting, default private for *care* alerts | App | **Done** — #30, #50 | Patient reminders default private with an opt-in. Care alerts are `NotificationVisibility.private` (foreground and FCM). Deploy `notify-care` for the FCM field to reach devices. |
+| 4.3e | Redact OCR (name, address, DoB, Rx) on-device before `parse-medicine` | App | **Done** — #49 | Name, address, DoB, Rx, and prescriber stripped before `parse-medicine`. Medicine name / strength / directions kept. |
 | 4.3f | Certificate pinning (network security config exists for no-cleartext) | App | **Todo** (low) | `networkSecurityConfig` already forbids cleartext (#22). Pinning is not done. |
 | 4.4 | Written HIPAA policies, MFA on admin accounts, key rotation | Paper | **Deferred** | |
 
-**Counts:** Phases 1 and 2 are closed on this branch. 16 items done (or done differently); 1 partial (4.3d); remaining application work is 4.3 leftovers; 8 Phase 3 paperwork/store items; HIPAA 4.1–4.2 and 4.4 deferred.
+**Counts:** Phases 1 and 2 are closed on `main`. 4.3a–e are closed on this branch. Remaining application work is 4.3f (pinning, low). 8 Phase 3 paperwork/store items live on `feature/phase-3`. HIPAA 4.1–4.2 and 4.4 deferred.
 
 ### Remaining work, in order
 
-Do not start Phase 4 (except 4.3e, which is cheap and shrinks Anthropic’s blast radius) until Phase 3 can ship.
-
 1. **Phase 1 blockers:** closed (#22, #33, #34, #37–#41). Overlay-install on the Galaxy M33 still pending.
-2. **Phase 2 honesty:** closed on `feature/phase-2` (#41, #43–#46). Optional leftover from 2.7: auto-revoke stale `claimed` links.
-3. **Phase 3:** DPIA, ROPA, DPAs, transfers (consider EU region), breach register, MHMD policy, Play Data Safety.
-4. **When useful, not when a term sheet appears:** 4.3e OCR redaction; 4.3d private care-alert lock screen; 4.3c device-credential unlock; 4.3f pinning.
+2. **Phase 2 honesty:** closed on `main` (#47). Optional leftover from 2.7: auto-revoke stale `claimed` links.
+3. **Phase 3 operator leftover:** accept DPAs in vendor consoles; decide EU-region vs SCC paperwork; appoint Art. 27 representative (or delay EEA listing); paste Play Data Safety; host public policy/deletion/MHMD URLs. Documents are on `feature/phase-3` (#48).
+4. **Phase 4 leftovers on this branch:** 4.3f certificate pinning (low; needs backup pins and a rotation plan — Let's Encrypt leaf pins will break the app).
 5. **When a B2B/HIPAA deal exists:** 4.1 access log, 4.2 BAAs, 4.4 written Security Rule policies.
