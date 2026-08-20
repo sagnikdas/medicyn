@@ -62,7 +62,7 @@ class EncryptedDatabaseOpener {
           hexKey: hexKey,
         );
       case PlaintextMigrationDecision.deleteLeftover:
-        await _deleteSqliteSidecars(plaintext);
+        await deleteSqliteSidecars(plaintext);
       case PlaintextMigrationDecision.leaveAlone:
         break;
     }
@@ -169,7 +169,7 @@ Future<void> migratePlaintextDatabase({
       throw StateError('Encryption produced no database file');
     }
     await tmp.rename(encrypted.path);
-    await _deleteSqliteSidecars(plaintext);
+    await deleteSqliteSidecars(plaintext);
   } catch (_) {
     try {
       if (await tmp.exists()) await tmp.delete();
@@ -178,14 +178,39 @@ Future<void> migratePlaintextDatabase({
   }
 }
 
-Future<void> _deleteSqliteSidecars(File db) async {
+/// Deletes [db] and the SQLite `-wal` / `-shm` / `-journal` sidecars next
+/// to it. Does not touch any other file — in particular not another
+/// account's `dosely-<id>.sqlite`, not leftover `dosely.sqlite`, and not
+/// the Keystore encryption key (another account on this phone still needs
+/// it).
+Future<void> deleteSqliteSidecars(File db) async {
   for (final suffix in const ['', '-wal', '-shm', '-journal']) {
     final file = File('${db.path}$suffix');
     try {
       if (await file.exists()) await file.delete();
     } catch (_) {
       // Leaving a sidecar is worse for privacy than for correctness; the
-      // next successful open retries. Never delete [encrypted] from here.
+      // next successful open retries. Never delete a *different* database
+      // from here.
     }
+  }
+}
+
+/// Removes this account's encrypted database from [documentsDirectory]
+/// (the app documents dir by default). Safe to call after sign-out, once
+/// AuthGate has closed the open connection. Does not delete other
+/// accounts' files on a shared phone.
+Future<void> wipeEncryptedDatabaseForUser(
+  String userId, {
+  Future<Directory> Function()? documentsDirectory,
+}) async {
+  final docs = await (documentsDirectory ?? getApplicationDocumentsDirectory)();
+  final db = File(p.join(docs.path, encryptedDatabaseFileName(userId)));
+  // The file may still be closing on some platforms after sign-out. A few
+  // short retries beat leaving the medical rows on disk.
+  for (var attempt = 0; attempt < 5; attempt++) {
+    await deleteSqliteSidecars(db);
+    if (!await db.exists()) return;
+    await Future<void>.delayed(Duration(milliseconds: 40 * (attempt + 1)));
   }
 }

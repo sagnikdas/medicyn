@@ -134,11 +134,18 @@ is for.
 
 ## Deleting your data
 
-To delete everything, email the contact address at the top of this policy
-from the address you signed in with, and your account and all associated
-medicines, schedules, and dose history will be permanently deleted.
-Uninstalling the app removes the copy on your phone but does not by itself
-delete the backup.
+Signed-in users can delete their account in the app: open **Settings** and
+tap **Delete account**. You will be asked twice, so it cannot happen by
+accident.
+
+If you cannot open the app, email **sagnikd91@gmail.com** from the Google
+address you signed in with, or use this page:
+
+https://github.com/sagnikdas/dosely/blob/main/docs/delete-account.md
+
+That deletes your account, the cloud backup, any family link, and
+notification tokens. Uninstalling the app removes the copy on your phone
+but does not by itself delete the backup.
 
 ## Children
 
