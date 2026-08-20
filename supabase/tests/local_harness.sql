@@ -21,6 +21,7 @@
 --     -f supabase/migrations/20260820170000_consents.sql \
 --     -f supabase/migrations/20260820180000_dose_log_contests.sql \
 --     -f supabase/migrations/20260820190000_retention_prune.sql \
+--     -f supabase/migrations/20260820200000_caregiver_editing.sql \
 --     -f supabase/tests/care_links_rls_test.sql
 --
 -- and the push tables' own assertions, which need a fresh database because

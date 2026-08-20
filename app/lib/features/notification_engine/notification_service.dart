@@ -13,6 +13,7 @@ import '../../data/local/database.dart';
 import '../../data/local/tables.dart';
 import 'notification_actions.dart';
 import 'notification_ids.dart';
+import 'device_health.dart';
 import 'schedule_validation.dart';
 
 // v4: Bumped again to ensure sound and alarm settings are applied fresh.
@@ -538,6 +539,45 @@ class NotificationService {
       ),
       payload: jsonEncode({'careAlertPatientId': patientId}),
     );
+  }
+
+  /// What this phone currently reports about whether reminders can fire.
+  ///
+  /// Null when the platform cannot say — writing a guessed `false` would
+  /// tell a family the alarms are dead when we simply could not ask. Callers
+  /// skip the profile write in that case and leave the previous snapshot.
+  Future<DeviceHealthSnapshot?> readDeviceHealth() async {
+    try {
+      await init();
+      if (!Platform.isAndroid) {
+        // iOS is not shipping; do not invent a "notifications off" for a
+        // platform we have not asked.
+        final pending = await _plugin.pendingNotificationRequests();
+        return DeviceHealthSnapshot(
+          notificationsAllowed: true,
+          exactAlarmsAllowed: true,
+          batteryExemption: true,
+          armedAlarmCount: pending.length,
+          checkedAt: DateTime.now().toUtc(),
+        );
+      }
+      final android = _plugin.resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>();
+      if (android == null) return null;
+      final notifications = await android.areNotificationsEnabled() ?? true;
+      final exact = await android.canScheduleExactNotifications() ?? true;
+      final battery = await Permission.ignoreBatteryOptimizations.isGranted;
+      final pending = await _plugin.pendingNotificationRequests();
+      return DeviceHealthSnapshot(
+        notificationsAllowed: notifications,
+        exactAlarmsAllowed: exact,
+        batteryExemption: battery,
+        armedAlarmCount: pending.length,
+        checkedAt: DateTime.now().toUtc(),
+      );
+    } catch (_) {
+      return null;
+    }
   }
 
   /// Re-arms every active schedule and, first, sweeps away any armed alarm

@@ -34,12 +34,17 @@ Dosely never sees or stores your Google password. Signing in with Google is
 account** and keep reminders on this phone only. Backup and family sharing
 need a Google account later.
 
-**Your timezone and last-seen time, if you sign in.** On sign-in Dosely
-writes the phone's IANA timezone (for example `Asia/Kolkata`) to your
-profile. That is a coarse location — the region of the clock you use, not a
-GPS pin. A linked family member can see it, so their screens show your
-reminder times on your clock. Dosely also records `last_seen_at` on the
-profile, which is when this signed-in app last updated that profile.
+**Your timezone, last-seen time, and whether reminders can fire, if you
+sign in.** On sign-in Dosely writes the phone's IANA timezone (for example
+`Asia/Kolkata`) to your profile. That is a coarse location — the region of
+the clock you use, not a GPS pin. A linked family member can see it, so
+their screens show your reminder times on your clock. Dosely also records
+`last_seen_at` on the profile, which is when this signed-in app last
+updated that profile, and a snapshot of whether this phone currently
+allows notifications, exact alarms, and battery exemption, plus how many
+alarms are armed. A linked family member can see that snapshot. It is
+there so they are not left reading "no alerts" as "all is well" when the
+phone cannot actually ring.
 
 **A notification token for your phone, if you are signed in.** So that Dosely
 can alert the person you have chosen to share with, it stores the identifier
@@ -184,9 +189,11 @@ can see nothing at all.
 
 **What they can see once connected.** Your medicines, your schedules, and
 your dose history — including doses recorded as missed. They can also add
-and edit medicines for you. They can see your timezone, so reminder times
-match your clock. **You see the same medicine, schedule, and dose-history
-screens about yourself that they see about you.**
+and edit medicines for you. They cannot delete a medicine; only you can.
+They can see a history of who added or changed each medicine. They can see
+your timezone, so reminder times match your clock, and whether this phone
+is currently able to fire reminders. **You see the same medicine, schedule,
+and dose-history screens about yourself that they see about you.**
 
 Access runs one way only. Connecting lets them see your medicines; it does
 not let you see theirs — they may have prescriptions of their own that are

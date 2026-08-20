@@ -94,7 +94,10 @@ class DataExportService {
     try {
       final rows = await client
           .from('profiles')
-          .select('display_name, timezone, last_seen_at')
+          .select(
+            'display_name, timezone, last_seen_at, notifications_allowed, '
+            'exact_alarms_allowed, battery_exemption, armed_alarm_count, health_checked_at',
+          )
           .eq('user_id', userId)
           .limit(1)
           .timeout(_networkTimeout);
@@ -115,6 +118,17 @@ class DataExportService {
       export['care_alerts'] = [for (final r in rows) Map<String, dynamic>.from(r)];
     } catch (_) {
       gaps.add('care_alerts');
+    }
+
+    try {
+      final rows = await client
+          .from('medicine_edits')
+          .select()
+          .eq('owner_id', userId)
+          .timeout(_networkTimeout);
+      export['medicine_edits'] = [for (final r in rows) Map<String, dynamic>.from(r)];
+    } catch (_) {
+      gaps.add('medicine_edits');
     }
 
     if (gaps.isNotEmpty) metadata['remote_gaps'] = gaps;

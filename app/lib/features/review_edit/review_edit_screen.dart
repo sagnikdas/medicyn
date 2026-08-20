@@ -7,9 +7,13 @@ import 'package:flutter/services.dart';
 import '../../core/ids.dart';
 import '../../data/local/database.dart';
 import '../../data/local/tables.dart';
+import '../../data/remote/care_notifier.dart';
 import '../../data/remote/medicine_parser.dart';
 import '../../data/remote/sync_service.dart';
 import '../auth/auth_service.dart';
+import '../care/care_remote_refresh.dart';
+import '../care/care_service.dart';
+import '../care/change_history_screen.dart';
 import '../consent/consent_purpose.dart';
 import '../consent/consent_service.dart';
 import '../history/dose_history_screen.dart';
@@ -34,12 +38,19 @@ class ReviewEditScreen extends StatefulWidget {
     this.transcript = '',
     this.existing,
     required this.db,
+    this.forPatientId,
   });
 
   final String ocrText;
   final String transcript;
   final ScheduleWithMedicine? existing;
   final AppDatabase db;
+
+  /// When set to someone other than the signed-in user, save writes to
+  /// Supabase under that id and does not arm alarms on this phone. Scan and
+  /// voice are skipped — those would send the patient's label under the
+  /// caregiver's Anthropic consent.
+  final String? forPatientId;
 
   @override
   State<ReviewEditScreen> createState() => _ReviewEditScreenState();
@@ -68,6 +79,12 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
   static const _dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
   bool get _isEditing => widget.existing != null;
+
+  bool get _forSomeoneElse {
+    final them = widget.forPatientId;
+    final me = AuthService.instance.currentUser?.id;
+    return them != null && me != null && them != me;
+  }
 
   @override
   void initState() {
@@ -108,13 +125,14 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
       setState(() => _loadState = _LoadState.ready);
       return;
     }
-    if (!shouldParseMedicine(
+    if (_forSomeoneElse ||
+        !shouldParseMedicine(
       anthropicGranted: ConsentService.instance.isGranted(ConsentPurpose.anthropicParse),
       ocrText: widget.ocrText,
       transcript: widget.transcript,
     )) {
-      // Empty capture, or Anthropic consent not given — same empty/manual
-      // form, and the parse-medicine edge function is never called.
+      // Empty capture, Anthropic not granted, or editing someone else's
+      // record — same empty/manual form, and parse-medicine is never called.
       setState(() => _loadState = _LoadState.ready);
       return;
     }
@@ -187,6 +205,14 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
     );
   }
 
+  void _viewChangeHistory() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ChangeHistoryScreen(medicineId: widget.existing!.medicine.id),
+      ),
+    );
+  }
+
   Future<void> _addTime() async {
     final picked = await showTimePicker(context: context, initialTime: TimeOfDay.now());
     if (picked == null) return;
@@ -234,6 +260,49 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
   Future<void> _save() async {
     setState(() => _saving = true);
     try {
+      if (_forSomeoneElse) {
+        await _saveRemote();
+      } else {
+        await _saveLocal();
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not save: $e')),
+      );
+    }
+  }
+
+  Future<void> _saveRemote() async {
+    final patientId = widget.forPatientId!;
+    final medicineId = _isEditing ? widget.existing!.medicine.id : newUuid();
+    final scheduleId = _isEditing ? widget.existing!.schedule.id : newUuid();
+    final savedAt = DateTime.now();
+    await CareService.instance.savePatientReminder(
+      patientId: patientId,
+      medicineId: medicineId,
+      scheduleId: scheduleId,
+      drugName: _drugNameController.text.trim(),
+      strength: _strengthController.text.trim(),
+      form: _formController.text.trim(),
+      doseAmount: _doseAmountController.text.trim(),
+      notes: _notesController.text.trim(),
+      frequencyType: _frequency.name,
+      times: _times,
+      daysOfWeek: _frequency == FrequencyType.specificDays ? (_daysOfWeek.toList()..sort()) : const [],
+      intervalHours: _frequency == FrequencyType.everyXHours ? _enteredIntervalHours : null,
+      savedAt: savedAt,
+      medicineCreatedAt: widget.existing?.medicine.createdAt,
+      scheduleCreatedAt: widget.existing?.schedule.createdAt,
+    );
+    unawaited(CareNotifier.instance.dataChanged());
+    CareRemoteRefresh.instance.ping();
+    if (!mounted) return;
+    Navigator.of(context).pop(true);
+  }
+
+  Future<void> _saveLocal() async {
       final medicineId = _isEditing ? widget.existing!.medicine.id : newUuid();
       final scheduleId = _isEditing ? widget.existing!.schedule.id : newUuid();
       // One timestamp for both rows, so a medicine and its schedule saved
@@ -312,23 +381,30 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
       // must not hold the Save button hostage to network conditions —
       // retries with backoff inside the client can otherwise take upwards
       // of 10+ seconds per row before this UI-blocking await gives up.
-      unawaited(SyncService(widget.db).syncAll());
+      unawaited(() async {
+        final sync = SyncService(widget.db);
+        await sync.syncAll();
+        if (sync.pushedEdits) {
+          await CareNotifier.instance.dataChanged();
+        }
+      }());
 
       if (!mounted) return;
       Navigator.of(context).popUntil((route) => route.isFirst);
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _saving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not save: $e')),
-      );
-    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(_isEditing ? 'Edit reminder' : 'Review reminder')),
+      appBar: AppBar(
+        title: Text(
+          _isEditing
+              ? 'Edit reminder'
+              : _forSomeoneElse
+                  ? 'Add a reminder'
+                  : 'Review reminder',
+        ),
+      ),
       body: SafeArea(child: _body()),
     );
   }
@@ -371,6 +447,15 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
+        if (_forSomeoneElse)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: Text(
+              'This saves on their account. Their phone will re-arm the alarm. '
+              'Fill it in by hand — scan and voice stay on their phone.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ),
         if (_confidence != null)
           Padding(
             padding: const EdgeInsets.only(bottom: 16),
@@ -483,14 +568,26 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
           const SizedBox(height: 20),
           const Divider(),
           const SizedBox(height: 8),
-          OutlinedButton.icon(
-            onPressed: _viewHistory,
-            icon: const Icon(Icons.history),
-            label: const Text('View history'),
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size.fromHeight(48),
+          if (!_forSomeoneElse)
+            OutlinedButton.icon(
+              onPressed: _viewHistory,
+              icon: const Icon(Icons.history),
+              label: const Text('View dose history'),
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size.fromHeight(48),
+              ),
             ),
-          ),
+          if (AuthService.instance.currentUser != null) ...[
+            if (!_forSomeoneElse) const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: _viewChangeHistory,
+              icon: const Icon(Icons.edit_note),
+              label: const Text('What changed'),
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size.fromHeight(48),
+              ),
+            ),
+          ],
         ],
         const SizedBox(height: 28),
         FilledButton(

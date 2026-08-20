@@ -1,5 +1,10 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../../data/local/database.dart';
+import '../notification_engine/device_health.dart';
+import '../notification_engine/schedule_validation.dart';
 
 /// Where a link is in its life. Mirrors the `care_link_status` enum in
 /// Postgres — see the care_links migration for what each state permits.
@@ -100,7 +105,17 @@ class CareClaimant {
 
 /// Who someone is, as far as the other side of a link can see.
 class CareProfile {
-  const CareProfile({required this.userId, this.displayName, this.timezone});
+  const CareProfile({
+    required this.userId,
+    this.displayName,
+    this.timezone,
+    this.lastSeenAt,
+    this.notificationsAllowed,
+    this.exactAlarmsAllowed,
+    this.batteryExemption,
+    this.armedAlarmCount,
+    this.healthCheckedAt,
+  });
 
   final String userId;
   final String? displayName;
@@ -108,6 +123,54 @@ class CareProfile {
   /// IANA identifier, e.g. "Asia/Kolkata". Null on a profile written before
   /// this was captured, or where the device wouldn't say.
   final String? timezone;
+
+  /// When this signed-in app last wrote the profile. The caregiver's
+  /// "last check-in".
+  final DateTime? lastSeenAt;
+
+  final bool? notificationsAllowed;
+  final bool? exactAlarmsAllowed;
+  final bool? batteryExemption;
+  final int? armedAlarmCount;
+  final DateTime? healthCheckedAt;
+
+  /// True when any of the things that actually make a reminder fire is off.
+  bool get remindersMayNotFire {
+    if (notificationsAllowed == false) return true;
+    if (exactAlarmsAllowed == false) return true;
+    if (batteryExemption == false) return true;
+    if (armedAlarmCount == 0) return true;
+    return false;
+  }
+}
+
+/// One row of per-medicine change history. Append-only; the database writes
+/// it, not the client.
+class MedicineEdit {
+  const MedicineEdit({
+    required this.id,
+    required this.medicineId,
+    required this.ownerId,
+    this.actorId,
+    required this.summary,
+    required this.createdAt,
+  });
+
+  final String id;
+  final String medicineId;
+  final String ownerId;
+  final String? actorId;
+  final String summary;
+  final DateTime createdAt;
+
+  static MedicineEdit fromRow(Map<String, dynamic> row) => MedicineEdit(
+        id: row['id'] as String,
+        medicineId: row['medicine_id'] as String,
+        ownerId: row['owner_id'] as String,
+        actorId: row['actor_id'] as String?,
+        summary: row['summary'] as String? ?? '',
+        createdAt: DateTime.parse(row['created_at'] as String),
+      );
 }
 
 /// One recorded response to a dose reminder.
@@ -268,7 +331,11 @@ class CareService {
     try {
       final rows = await _client
           .from('profiles')
-          .select('user_id, display_name, timezone')
+          .select(
+            'user_id, display_name, timezone, last_seen_at, '
+            'notifications_allowed, exact_alarms_allowed, battery_exemption, '
+            'armed_alarm_count, health_checked_at',
+          )
           .eq('user_id', userId)
           .limit(1);
       if (rows.isEmpty) return null;
@@ -277,6 +344,12 @@ class CareService {
         userId: row['user_id'] as String,
         displayName: row['display_name'] as String?,
         timezone: row['timezone'] as String?,
+        lastSeenAt: _asDate(row['last_seen_at']),
+        notificationsAllowed: row['notifications_allowed'] as bool?,
+        exactAlarmsAllowed: row['exact_alarms_allowed'] as bool?,
+        batteryExemption: row['battery_exemption'] as bool?,
+        armedAlarmCount: _asInt(row['armed_alarm_count']),
+        healthCheckedAt: _asDate(row['health_checked_at']),
       );
     } catch (_) {
       return null;
@@ -399,6 +472,188 @@ class CareService {
     }
   }
 
+  /// The patient's medicines and schedules, read from Supabase — not Drift.
+  ///
+  /// A caregiver's local database is *their* reminders. Writing the patient's
+  /// schedules there would arm alarms on the wrong phone. Row-level security
+  /// is what decides whether this returns anything.
+  Future<List<ScheduleWithMedicine>> patientReminders(String patientId) async {
+    try {
+      final rows = await _client
+          .from('schedules')
+          .select(
+            'id, medicine_id, user_id, frequency_type, times, days_of_week, '
+            'interval_hours, active, created_at, updated_at, updated_by, '
+            'medicines!inner(id, drug_name, strength, form, dose_amount, notes, '
+            'created_at, updated_at, updated_by)',
+          )
+          .eq('user_id', patientId)
+          .eq('active', true);
+      final out = <ScheduleWithMedicine>[];
+      for (final row in rows) {
+        final parsed = reminderFromRow(Map<String, dynamic>.from(row));
+        if (parsed != null) out.add(parsed);
+      }
+      out.sort((a, b) => b.schedule.updatedAt.compareTo(a.schedule.updatedAt));
+      return out;
+    } catch (e) {
+      throw CareLinkFailure(_describe(e));
+    }
+  }
+
+  /// Writes a medicine and its schedule under [patientId]. Does not arm
+  /// alarms on this phone — that is the patient's device's job, via the
+  /// silent `data_changed` push.
+  Future<void> savePatientReminder({
+    required String patientId,
+    required String medicineId,
+    required String scheduleId,
+    required String drugName,
+    required String strength,
+    required String form,
+    required String doseAmount,
+    required String notes,
+    required String frequencyType,
+    required List<String> times,
+    required List<int> daysOfWeek,
+    required int? intervalHours,
+    required DateTime savedAt,
+    DateTime? medicineCreatedAt,
+    DateTime? scheduleCreatedAt,
+  }) async {
+    final caller = _userId;
+    if (caller == null) throw const CareLinkFailure('Please sign in again.');
+    final stamp = _isoUtc(savedAt);
+    final medicineCreated = _isoUtc(medicineCreatedAt ?? savedAt);
+    final scheduleCreated = _isoUtc(scheduleCreatedAt ?? savedAt);
+    try {
+      await _client.from('medicines').upsert({
+        'id': medicineId,
+        'user_id': patientId,
+        'drug_name': drugName,
+        'strength': strength,
+        'form': form,
+        'dose_amount': doseAmount,
+        'notes': notes,
+        'created_at': medicineCreated,
+        'updated_at': stamp,
+        'updated_by': caller,
+      });
+      await _client.from('schedules').upsert({
+        'id': scheduleId,
+        'medicine_id': medicineId,
+        'user_id': patientId,
+        'frequency_type': frequencyType,
+        'times': times,
+        'days_of_week': daysOfWeek,
+        'interval_hours': intervalHours,
+        'active': true,
+        'created_at': scheduleCreated,
+        'updated_at': stamp,
+        'updated_by': caller,
+      });
+    } catch (e) {
+      throw CareLinkFailure(_describe(e));
+    }
+  }
+
+  /// Newest first. Both sides of an active link may read; nobody inserts
+  /// from the client — a trigger does.
+  Future<List<MedicineEdit>> medicineEdits(String medicineId) async {
+    try {
+      final rows = await _client
+          .from('medicine_edits')
+          .select('id, medicine_id, owner_id, actor_id, summary, created_at')
+          .eq('medicine_id', medicineId)
+          .order('created_at', ascending: false)
+          .limit(100);
+      return rows.map((r) => MedicineEdit.fromRow(Map<String, dynamic>.from(r))).toList();
+    } catch (e) {
+      throw CareLinkFailure(_describe(e));
+    }
+  }
+
+  /// Writes this phone's permission / armed-count snapshot onto the caller's
+  /// own profile. Safe to skip: a missed report leaves the previous one.
+  Future<void> reportOwnDeviceHealth(DeviceHealthSnapshot health) async {
+    final user = _client.auth.currentUser;
+    if (user == null) return;
+    try {
+      await _client.from('profiles').update({
+        'notifications_allowed': health.notificationsAllowed,
+        'exact_alarms_allowed': health.exactAlarmsAllowed,
+        'battery_exemption': health.batteryExemption,
+        'armed_alarm_count': health.armedAlarmCount,
+        'health_checked_at': _isoUtc(health.checkedAt),
+        'last_seen_at': _isoUtc(health.checkedAt),
+      }).eq('user_id', user.id);
+    } catch (_) {
+      // Same as upsertOwnProfile: never block a foreground on this.
+    }
+  }
+
+  /// Turns a PostgREST schedule+medicine row into the same shape the home
+  /// list uses. Null when the schedule cannot be armed — skip it rather
+  /// than crash the caregiver's list.
+  @visibleForTesting
+  static ScheduleWithMedicine? reminderFromRow(Map<String, dynamic> row) {
+    final medicineRow = (row['medicines'] as Map?)?.cast<String, dynamic>();
+    if (medicineRow == null) return null;
+    final fields = sanitiseScheduleFields(
+      frequencyType: row['frequency_type'] as String?,
+      times: (row['times'] as List?)?.whereType<String>().toList() ?? const [],
+      daysOfWeek: (row['days_of_week'] as List?)?.whereType<num>().map((e) => e.toInt()).toList() ??
+          const [],
+      intervalHours: _asInt(row['interval_hours']),
+    );
+    if (fields == null) return null;
+    final medicineUpdated = _asDate(medicineRow['updated_at']) ?? DateTime.fromMillisecondsSinceEpoch(0);
+    final scheduleUpdated = _asDate(row['updated_at']) ?? medicineUpdated;
+    final medicineCreated = _asDate(medicineRow['created_at']) ?? medicineUpdated;
+    final scheduleCreated = _asDate(row['created_at']) ?? scheduleUpdated;
+    final medicine = Medicine(
+      id: medicineRow['id'] as String,
+      drugName: (medicineRow['drug_name'] as String?) ?? 'Medicine',
+      strength: (medicineRow['strength'] as String?) ?? '',
+      form: (medicineRow['form'] as String?) ?? '',
+      doseAmount: (medicineRow['dose_amount'] as String?) ?? '',
+      notes: (medicineRow['notes'] as String?) ?? '',
+      createdAt: medicineCreated,
+      updatedAt: medicineUpdated,
+      updatedBy: medicineRow['updated_by'] as String?,
+      pendingSync: false,
+      deleted: false,
+    );
+    final schedule = Schedule(
+      id: row['id'] as String,
+      medicineId: medicine.id,
+      frequencyType: fields.frequency.name,
+      times: fields.times,
+      daysOfWeek: fields.daysOfWeek,
+      intervalHours: fields.intervalHours,
+      active: row['active'] as bool? ?? true,
+      createdAt: scheduleCreated,
+      updatedAt: scheduleUpdated,
+      updatedBy: row['updated_by'] as String? ?? medicine.updatedBy,
+      pendingSync: false,
+      deleted: false,
+    );
+    return ScheduleWithMedicine(schedule, medicine);
+  }
+
+  static DateTime? _asDate(Object? value) {
+    if (value is! String || value.isEmpty) return null;
+    return DateTime.tryParse(value);
+  }
+
+  static int? _asInt(Object? value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return null;
+  }
+
+  static String _isoUtc(DateTime value) => value.toUtc().toIso8601String();
+
   /// Turns the database's error codes into something worth reading. The
   /// codes are raised by the lifecycle functions; anything unrecognised is
   /// reported as a connection problem, which is what it almost always is.
@@ -430,6 +685,9 @@ class CareService {
     }
     if (raw.contains('not_authenticated')) {
       return 'Please sign in again.';
+    }
+    if (raw.contains('cannot_reassign_owner')) {
+      return 'That reminder belongs to their account and cannot be moved.';
     }
     return 'Could not reach the server. Check your connection and try again.';
   }

@@ -1,5 +1,5 @@
 // Who may raise which notify-care event. Extracted so the branches the
-// audit found untested — patient-only missed_dose, caregiver-only
+// audit found untested — patient-only missed_dose, either-side
 // data_changed, no active link, unknown event, missing bearer — can be
 // asserted without standing up FCM or a database.
 
@@ -40,8 +40,18 @@ export function authorizeNotify(opts: {
   if (event === "missed_dose" && link.patient_id !== opts.callerId) {
     return { allow: false, status: 200, body: { sent: 0, reason: "caller_is_not_the_patient" } };
   }
-  if (event === "data_changed" && link.caregiver_id !== opts.callerId) {
-    return { allow: false, status: 200, body: { sent: 0, reason: "no_alarms_to_rearm" } };
+  if (event === "data_changed") {
+    const isPatient = link.patient_id === opts.callerId;
+    const isCaregiver = link.caregiver_id === opts.callerId;
+    // Either side may tell the other. A claimed (unconfirmed) link has no
+    // caregiver yet, so there is nobody to notify — same quiet zero as
+    // before, not an error, because the app calls this after every save.
+    if (!isPatient && !isCaregiver) {
+      return { allow: false, status: 200, body: { sent: 0, reason: "no_alarms_to_rearm" } };
+    }
+    if (!link.caregiver_id) {
+      return { allow: false, status: 200, body: { sent: 0, reason: "no_alarms_to_rearm" } };
+    }
   }
   return { allow: true, event, link };
 }

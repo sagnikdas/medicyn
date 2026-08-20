@@ -538,6 +538,74 @@ deliberate and must stay; the feed opens after unlock, not on the lock
 screen. The medicine name must not appear on the lock screen (care alerts
 are `PRIVATE`).
 
+### Phase 2 — caregiver editing (needs two phones)
+
+The migration and `notify-care` must be on the hosted project **before** the
+app build that uses them. A save against an old schema fails every write; a
+save against an old function still drops the parent's `data_changed`. From
+the repo (or this worktree), once:
+
+```
+cd ~/research/dosely-wt/p2   # or ~/research/dosely after this lands
+supabase link --project-ref twybepxnqayypzljhcnx --yes
+supabase db push --yes
+supabase functions deploy notify-care --project-ref twybepxnqayypzljhcnx
+```
+
+`FCM_SERVICE_ACCOUNT` is already set; do not rotate it for this. Then install
+this build on both phones (`google-services.json` is gitignored — copy it into
+`app/android/app/` if this tree does not already have it):
+
+```
+cd ~/research/dosely-wt/p2/app
+cp ~/research/dosely/app/android/app/google-services.json android/app/
+flutter run
+```
+
+Automated checks, optional but cheap:
+
+```
+cd ~/research/dosely-wt/p2/app && flutter test
+deno test --config supabase/functions/notify-care/deno.json \
+  supabase/functions/notify-care/
+```
+
+The RLS assertions for caregiver add/edit, no-delete, JWT-stamped
+`updated_by`, history rows, and setup-health read/write are in
+`supabase/tests/care_links_rls_test.sql`. They need every migration applied
+(see `supabase/tests/local_harness.sql`).
+
+Missed-dose grace is still **30 minutes**. Use a **fresh** reminder for each
+pass so an already-announced miss does not confuse the result.
+
+- [ ] **Caregiver adds, parent re-arms.** Caregiver: Settings → Connect with
+      family → Their reminders → Add reminder. Fill in by hand (no camera,
+      no voice). Set a time a few minutes out. Save. The parent phone must
+      show **no** notification and **no** medicine name on the lock screen.
+      After the silent push (or the next parent foreground), Home lists the
+      new reminder, attributed to the caregiver, and the alarm fires at the
+      time you set.
+- [ ] **Parent edits, caregiver sees it.** Change a time on the parent
+      phone. Caregiver Their reminders shows the new time. Parent card:
+      "Changed by you, …". Caregiver card: "Changed by [parent], …". Still
+      no lock-screen banner.
+- [ ] **No caregiver delete.** Their reminders has no delete control.
+      Parent Home still offers Stop / Delete, and that is what actually
+      removes the row.
+- [ ] **What changed.** Open the reminder on either phone → What changed.
+      Both sides see the same history, newest first, naming who wrote it.
+- [ ] **Setup health.** On the parent phone, deny notifications (or skip
+      battery exemption). Foreground Dosely so it reports. Caregiver Care
+      screen: the flag reads No, and the warning that reminders may not be
+      firing. Parent Care screen shows the same panel.
+- [ ] **Manual form only.** The caregiver add path never opens the camera
+      or the voice screen.
+- [ ] **`care_alerts`.** After a caregiver save, a new `data_changed` row
+      exists for the **parent** as recipient. After a parent save, one
+      exists for the **caregiver**. `delivered_count` ≥ 1 if that phone
+      had a live token. No `notification` title/body on those FCM
+      messages — check the function logs if a banner appeared anyway.
+
 ## Reliability notes
 
 - Notifications are the whole point of this app, so they've been tested

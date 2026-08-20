@@ -49,11 +49,9 @@ class CareNotifier {
 
   /// Announces that this device has pushed an edit to medicines or schedules.
   ///
-  /// The server drops it unless the caller is the *caregiver* of the link —
-  /// the patient's phone is the only one with alarms to re-arm, and a change
-  /// the patient made is already applied on their own device. So today this is
-  /// a no-op in practice: caregiver-side editing is Phase 2. It is wired now so
-  /// that when the edit form lands, the rails under it already work.
+  /// Either side of an active link may raise it. The server delivers a silent
+  /// data message to the other person: the parent re-arms, the caregiver
+  /// refreshes the remote list. There is still no visible notification.
   Future<void> dataChanged() async {
     await _invoke({pushEventKey: pushEventDataChanged});
   }
