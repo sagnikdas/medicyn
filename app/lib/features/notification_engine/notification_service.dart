@@ -459,12 +459,14 @@ class NotificationService {
   /// when it is in front of the user. Without this, a caregiver sitting in the
   /// app is the one person who never hears that a dose was missed.
   ///
-  /// [patientId] rides along in the payload so a tap opens the right feed —
-  /// see `handleNotificationResponse`.
+  /// [patientId] rides along in the payload so a tap opens the right screen —
+  /// the dose feed for a missed dose, or their reminders when [openReminders]
+  /// is set. Care alerts never show a medicine name on a locked phone.
   Future<void> showCareAlert({
     required String title,
     required String body,
     String? patientId,
+    bool openReminders = false,
   }) async {
     await init();
     await _plugin.show(
@@ -481,10 +483,13 @@ class NotificationService {
           importance: Importance.high,
           priority: Priority.high,
           category: AndroidNotificationCategory.message,
+          visibility: NotificationVisibility.private,
         ),
         iOS: DarwinNotificationDetails(presentAlert: true, presentSound: true),
       ),
-      payload: jsonEncode({'careAlertPatientId': patientId}),
+      payload: jsonEncode({
+        if (openReminders) 'careRemindersPatientId': patientId else 'careAlertPatientId': patientId,
+      }),
     );
   }
 

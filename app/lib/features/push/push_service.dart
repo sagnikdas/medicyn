@@ -104,10 +104,25 @@ class PushService {
   Future<void> _handleForeground(RemoteMessage message, AppDatabase db) async {
     switch (message.data[pushEventKey]) {
       case pushEventDataChanged:
-        // Passing the app's own database matters: the foreground UI is driven
-        // by `.watch()` streams on this connection, and a pull written through
-        // a second one would not reach them.
-        await applyRemoteDataChange(db: db);
+        if (shouldPullAndRearm(
+          event: message.data[pushEventKey],
+          rearm: message.data[pushRearmKey],
+          hasNotification: message.notification != null,
+        )) {
+          // Passing the app's own database matters: the foreground UI is driven
+          // by `.watch()` streams on this connection, and a pull written through
+          // a second one would not reach them.
+          await applyRemoteDataChange(db: db);
+          return;
+        }
+        final notification = message.notification;
+        if (notification == null) return;
+        await NotificationService.instance.showCareAlert(
+          title: notification.title ?? 'A reminder was changed',
+          body: notification.body ?? 'Open Dosely to see what changed.',
+          patientId: message.data[pushPatientIdKey],
+          openReminders: true,
+        );
       case pushEventMissedDose:
         // Android does not draw a notification message while the app is in the
         // foreground, so this does it — otherwise a caregiver sitting in the

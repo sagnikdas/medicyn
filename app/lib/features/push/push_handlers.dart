@@ -7,6 +7,7 @@ import '../../core/supabase_init.dart';
 import '../../data/local/database.dart';
 import '../../data/remote/sync_service.dart';
 import '../care/dose_feed_screen.dart';
+import '../care/patient_reminders_screen.dart';
 import '../notification_engine/notification_service.dart';
 import 'push_events.dart';
 
@@ -22,9 +23,13 @@ import 'push_events.dart';
 /// no error reporter is attached — and takes the whole re-arm with it.
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  // A `missed_dose` message carries a notification block, which Android draws
-  // itself; this handler fires for it too and has nothing to add.
-  if (message.data[pushEventKey] != pushEventDataChanged) return;
+  if (!shouldPullAndRearm(
+    event: message.data[pushEventKey],
+    rearm: message.data[pushRearmKey],
+    hasNotification: message.notification != null,
+  )) {
+    return;
+  }
 
   WidgetsFlutterBinding.ensureInitialized();
   try {
@@ -68,11 +73,15 @@ Future<void> applyRemoteDataChange({AppDatabase? db}) async {
   }
 }
 
-/// Routes a tapped missed-dose message. Shared by the cold-start and
+/// Routes a tapped care-link message. Shared by the cold-start and
 /// already-running paths so they cannot drift.
 void handleCareAlertTap(RemoteMessage message) {
-  if (message.data[pushEventKey] != pushEventMissedDose) return;
   final patientId = message.data[pushPatientIdKey];
   if (patientId == null || patientId.isEmpty) return;
-  openFeedForPatient(patientId);
+  switch (message.data[pushEventKey]) {
+    case pushEventMissedDose:
+      openFeedForPatient(patientId);
+    case pushEventDataChanged:
+      openPatientReminders(patientId);
+  }
 }

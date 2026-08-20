@@ -48,6 +48,22 @@ void main() {
     test('the function names the patient by the key the tap handler reads', () {
       expect(functionSource, contains('$pushPatientIdKey:'));
     });
+
+    test('the function labels a re-arm with the key the device reads', () {
+      expect(functionSource, contains('$pushRearmKey: "$pushRearmYes"'));
+      expect(functionSource, contains('$pushRearmKey: "$pushRearmNo"'));
+    });
+
+    test('the caregiver-facing change ping names no medicine', () {
+      // The visible data_changed copy is composed in data_change.ts and must
+      // stay generic: a lock-screen alert that quoted a drug name would be
+      // the Phase 2 path recreating the 4.3d care-alert exposure.
+      final dataChange = File('${repoRoot.path}/supabase/functions/notify-care/data_change.ts')
+          .readAsStringSync();
+      expect(dataChange, contains('A reminder was changed'));
+      expect(dataChange, contains('Open Dosely to see what changed.'));
+      expect(dataChange, isNot(contains('drug_name')));
+    });
   });
 
   group('care-alert channel id', () {

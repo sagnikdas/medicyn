@@ -3,12 +3,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../data/local/database.dart';
 import '../auth/auth_service.dart';
 import '../consent/consent_purpose.dart';
 import '../consent/consent_screen.dart';
 import '../consent/consent_service.dart';
 import 'care_service.dart';
 import 'dose_feed_screen.dart';
+import 'patient_reminders_screen.dart';
 
 /// Connecting one person who takes medicines with one person who helps them.
 ///
@@ -22,7 +24,9 @@ import 'dose_feed_screen.dart';
 /// types one in is giving it. That falls out of the flow, so nobody has to
 /// answer a question about what they are.
 class CareScreen extends StatefulWidget {
-  const CareScreen({super.key});
+  const CareScreen({super.key, required this.db});
+
+  final AppDatabase db;
 
   @override
   State<CareScreen> createState() => _CareScreenState();
@@ -460,6 +464,22 @@ class _CareScreenState extends State<CareScreen> {
           icon: const Icon(Icons.checklist),
           label: Text(amPatient ? 'See what they see' : 'See their doses'),
         ),
+        if (!amPatient) ...[
+          const SizedBox(height: 12),
+          FilledButton.icon(
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => PatientRemindersScreen(
+                  patientId: _link!.patientId,
+                  db: widget.db,
+                  patientName: _otherName,
+                ),
+              ),
+            ),
+            icon: const Icon(Icons.edit_calendar_outlined),
+            label: const Text('Add or change a reminder'),
+          ),
+        ],
         const SizedBox(height: 12),
         OutlinedButton(
           onPressed: _disconnect,

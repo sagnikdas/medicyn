@@ -8,17 +8,15 @@ import '../../data/local/tables.dart';
 import '../../data/remote/care_notifier.dart';
 import '../../data/remote/sync_service.dart';
 import '../auth/auth_service.dart';
-import '../capture_ocr/ocr_capture_screen.dart';
 import '../care/care_service.dart';
-import '../consent/consent_purpose.dart';
-import '../consent/consent_service.dart';
+import '../care/reminder_attribution.dart';
 import '../notification_engine/missed_doses.dart';
 import '../notification_engine/notification_service.dart';
 import '../notification_engine/schedule_validation.dart';
 import '../push/push_service.dart';
+import '../review_edit/capture_flow.dart';
 import '../review_edit/review_edit_screen.dart';
 import '../settings/settings_screen.dart';
-import '../voice_capture/voice_capture_screen.dart';
 
 enum _ReminderDisposition { stop, deleteHistory }
 
@@ -31,6 +29,8 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
+  String? _otherPartyId;
+  String? _otherPartyName;
   @override
   void initState() {
     super.initState();
@@ -101,6 +101,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     await const MissedDoseDetector().sweep(widget.db);
     if (sync == null) return;
     await sync.syncAll();
+    unawaited(_refreshAttribution());
 
     // Care alerts name dose-log ids the server reads back. Without cloud
     // backup there is no push, so there is nothing to announce.
@@ -123,34 +124,50 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (missed.isNotEmpty) {
       unawaited(CareNotifier.instance.missedDoses(missed));
     }
-    // Wired now, inert until Phase 2: the server sends this only when the
-    // caller is the *caregiver*, and caregiver-side editing has no screen yet.
-    // See CareNotifier.dataChanged.
     if (sync.pushedEdits) {
       unawaited(CareNotifier.instance.dataChanged());
     }
   }
 
-  Future<void> _startCapture() async {
-    final ocrText = await Navigator.of(context).push<String>(
-      MaterialPageRoute(builder: (_) => const OcrCaptureScreen()),
-    );
-    if (ocrText == null || !mounted) return;
-
-    var transcript = '';
-    if (ConsentService.instance.isGranted(ConsentPurpose.googleSpeech)) {
-      final spoken = await Navigator.of(context).push<String>(
-        MaterialPageRoute(builder: (_) => const VoiceCaptureScreen()),
-      );
-      if (spoken == null || !mounted) return;
-      transcript = spoken;
+  Future<void> _refreshAttribution() async {
+    final me = AuthService.instance.currentUser?.id;
+    if (me == null) return;
+    try {
+      final link = await CareService.instance.currentLink();
+      if (link == null || link.status != CareLinkStatus.active) {
+        if (!mounted) return;
+        setState(() {
+          _otherPartyId = null;
+          _otherPartyName = null;
+        });
+        return;
+      }
+      final other = link.otherPartyId(me);
+      final name = other == null ? null : await CareService.instance.displayName(other);
+      if (!mounted) return;
+      setState(() {
+        _otherPartyId = other;
+        _otherPartyName = name;
+      });
+    } catch (_) {
+      // A missing name only costs the attribution line, not the list.
     }
+  }
 
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => ReviewEditScreen(ocrText: ocrText, transcript: transcript, db: widget.db),
-      ),
+  String? _attributionFor(ScheduleWithMedicine item) {
+    final me = AuthService.instance.currentUser?.id;
+    if (me == null) return null;
+    final change = latestReminderChange(item.medicine, item.schedule);
+    return reminderChangedByLine(
+      ownerUserId: me,
+      updatedBy: change.updatedBy,
+      updatedAt: change.updatedAt,
+      actorDisplayName: change.updatedBy == _otherPartyId ? _otherPartyName : null,
     );
+  }
+
+  Future<void> _startCapture() async {
+    await pushCaptureThenReview(context: context, db: widget.db);
   }
 
   Future<void> _edit(ScheduleWithMedicine item) => Navigator.of(context).push(
@@ -210,6 +227,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (choice == _ReminderDisposition.stop) {
       await NotificationService.instance.cancelForSchedule(item.schedule);
       await widget.db.deactivateSchedule(item.schedule.id, by: by);
+      _syncThenNotify();
       return;
     }
 
@@ -221,8 +239,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (AuthService.instance.currentUser == null) return;
     final sync = SyncService(widget.db);
     unawaited(
-      sync.tryDeleteRemoteMedicine(item.medicine.id).whenComplete(sync.syncAll),
+      sync.tryDeleteRemoteMedicine(item.medicine.id).whenComplete(() async {
+        await sync.syncAll();
+        if (sync.pushedEdits) await CareNotifier.instance.dataChanged();
+      }),
     );
+  }
+
+  void _syncThenNotify() {
+    if (AuthService.instance.currentUser == null) return;
+    final sync = SyncService(widget.db);
+    unawaited(() async {
+      await sync.syncAll();
+      if (sync.pushedEdits) await CareNotifier.instance.dataChanged();
+    }());
   }
 
   @override
@@ -260,6 +290,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               return _ReminderCard(
                 item: item,
                 db: widget.db,
+                attribution: _attributionFor(item),
                 onTap: () => _edit(item),
                 onDelete: () => _delete(item),
               );
@@ -304,11 +335,18 @@ class _EmptyState extends StatelessWidget {
 }
 
 class _ReminderCard extends StatelessWidget {
-  const _ReminderCard({required this.item, required this.db, required this.onTap, required this.onDelete});
+  const _ReminderCard({
+    required this.item,
+    required this.db,
+    required this.onTap,
+    required this.onDelete,
+    this.attribution,
+  });
   final ScheduleWithMedicine item;
   final AppDatabase db;
   final VoidCallback onTap;
   final VoidCallback onDelete;
+  final String? attribution;
 
   String _describe() {
     final s = item.schedule;
@@ -354,6 +392,10 @@ class _ReminderCard extends StatelessWidget {
                       Text(medicine.doseAmount, style: Theme.of(context).textTheme.bodyMedium),
                     const SizedBox(height: 4),
                     Text(_describe(), style: Theme.of(context).textTheme.bodySmall),
+                    if (attribution != null) ...[
+                      const SizedBox(height: 4),
+                      Text(attribution!, style: Theme.of(context).textTheme.bodySmall),
+                    ],
                     _SnoozeStatus(db: db, scheduleId: item.schedule.id),
                   ],
                 ),

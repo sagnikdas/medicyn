@@ -1,5 +1,5 @@
 // Who may raise which notify-care event. Extracted so the branches the
-// audit found untested — patient-only missed_dose, caregiver-only
+// audit found untested — patient-only missed_dose, either party on
 // data_changed, no active link, unknown event, missing bearer — can be
 // asserted without standing up FCM or a database.
 
@@ -40,8 +40,11 @@ export function authorizeNotify(opts: {
   if (event === "missed_dose" && link.patient_id !== opts.callerId) {
     return { allow: false, status: 200, body: { sent: 0, reason: "caller_is_not_the_patient" } };
   }
-  if (event === "data_changed" && link.caregiver_id !== opts.callerId) {
-    return { allow: false, status: 200, body: { sent: 0, reason: "no_alarms_to_rearm" } };
+  if (event === "data_changed") {
+    const onLink = opts.callerId === link.patient_id || opts.callerId === link.caregiver_id;
+    if (!onLink || !link.caregiver_id) {
+      return { allow: false, status: 200, body: { sent: 0, reason: "caller_not_on_link" } };
+    }
   }
   return { allow: true, event, link };
 }

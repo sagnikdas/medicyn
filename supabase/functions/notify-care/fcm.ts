@@ -173,6 +173,10 @@ export async function sendToToken(token: string, message: FcmMessage): Promise<S
               // missed one".
               channel_id: message.androidChannelId,
               default_sound: true,
+              // Locked phones are readable by anyone in the room. Care alerts
+              // are PRIVATE so the shade hides the body until the device is
+              // unlocked — the recipient does not need to act on them instantly.
+              visibility: "PRIVATE",
             },
           }
           : {}),

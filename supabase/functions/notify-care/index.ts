@@ -7,10 +7,12 @@
 //     dose nobody answered, and pushed the log. The caregiver gets a visible
 //     notification. This is the alert the whole care link is for.
 //
-//   * `data_changed` — the caregiver edited the parent's medicines or
-//     schedules. The parent's device gets a *silent* data message, pulls, and
-//     re-arms its alarms. Without it a schedule change sits unapplied until
-//     the parent next opens the app, while the caregiver believes it is live.
+//   * `data_changed` — either side edited the parent's medicines or
+//     schedules. The other phone is told:
+//       - caregiver wrote → silent data message to the parent (pull, re-arm)
+//       - parent wrote    → visible, PRIVATE ping to the caregiver, with no
+//         medicine name. Their local database is a different person's file
+//         and must not pull.
 //
 // Why the *device* calls this rather than a Postgres trigger firing on the
 // insert: a trigger needs `pg_net`, which Supabase installs in the
@@ -27,6 +29,7 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
 import { authorizeNotify, bearerToken, CareLinkRef } from "./authorize.ts";
+import { DATA_CHANGED_BODY, DATA_CHANGED_TITLE, planDataChange } from "./data_change.ts";
 import { FcmConfigError, FcmMessage, sendToToken } from "./fcm.ts";
 
 // Must match `careAlertChannelId` in
@@ -228,32 +231,45 @@ async function announceMissedDoses(
   return json({ sent: doses.length, recipients: tokens.length, delivered });
 }
 
-/// The silent one. Only the caregiver can raise it, because the parent's device
-/// is the only one with alarms to re-arm — a change the parent made on their own
-/// phone is already applied there, and the caregiver's feed reads live from
-/// Postgres. Phase 2 widens this to carry attribution both ways.
+/// Either side of an active link. The caregiver's write is a silent re-arm of
+/// the parent's alarms; the parent's write is a visible ping to the caregiver
+/// that names no medicine — lock-screen copy must not.
 async function announceDataChange(
   admin: SupabaseClient,
   callerId: string,
   link: CareLinkRow,
 ): Promise<Response> {
-  if (link.caregiver_id !== callerId) {
-    return json({ sent: 0, reason: "no_alarms_to_rearm" });
-  }
-  const recipientId = link.patient_id;
-  const tokens = await tokensOf(admin, recipientId);
+  const plan = planDataChange(callerId, link);
+  if (!plan.send) return json({ sent: 0, reason: plan.reason });
 
-  // No `notification` block: the parent should not be told "your daughter
-  // changed something" by a system notification they cannot act on. The app
-  // pulls and re-arms; PLAN.md's open question about what the parent is told
-  // is deliberately still open.
-  const delivered = await deliver(admin, tokens, {
-    data: { event: "data_changed", changedBy: callerId },
-  });
+  const tokens = await tokensOf(admin, plan.recipientId);
+  const message: FcmMessage = plan.silent
+    ? {
+      data: {
+        event: "data_changed",
+        changedBy: callerId,
+        rearm: "true",
+      },
+    }
+    : {
+      notification: {
+        title: DATA_CHANGED_TITLE,
+        body: DATA_CHANGED_BODY,
+      },
+      androidChannelId: CARE_ALERT_CHANNEL_ID,
+      data: {
+        event: "data_changed",
+        changedBy: callerId,
+        rearm: "false",
+        patientId: link.patient_id,
+      },
+    };
+
+  const delivered = await deliver(admin, tokens, message);
 
   const { error } = await admin.from("care_alerts").insert({
     link_id: link.id,
-    recipient_id: recipientId,
+    recipient_id: plan.recipientId,
     kind: "data_changed",
     delivered_count: delivered,
   });

@@ -1,6 +1,9 @@
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../data/local/database.dart';
+import 'patient_reminder.dart';
+
 /// Where a link is in its life. Mirrors the `care_link_status` enum in
 /// Postgres — see the care_links migration for what each state permits.
 enum CareLinkStatus {
@@ -228,6 +231,8 @@ class CareService {
 
   String? get _userId => _client.auth.currentUser?.id;
 
+  static const _networkTimeout = Duration(seconds: 8);
+
   /// Records the signed-in user's name and timezone, so the other side has
   /// something to show besides an opaque id, and so a shared view can render
   /// times in the zone the person actually lives in. Safe to call on every
@@ -282,6 +287,82 @@ class CareService {
       return null;
     }
   }
+
+  /// The patient's active reminders, read live from Postgres.
+  ///
+  /// Not the local Drift file: a caregiver's encrypted database is a different
+  /// person's medicines, and writing these rows into it would mix them. Row-
+  /// level security is what decides whether this returns anything.
+  Future<List<PatientReminder>> patientReminders(String userId) async {
+    try {
+      final rows = await _client
+          .from('schedules')
+          .select(
+            'id, medicine_id, frequency_type, times, days_of_week, interval_hours, '
+            'active, created_at, updated_at, updated_by, '
+            'medicines!inner(id, drug_name, strength, form, dose_amount, notes, '
+            'created_at, updated_at, updated_by)',
+          )
+          .eq('user_id', userId)
+          .eq('active', true)
+          .order('updated_at', ascending: false)
+          .timeout(_networkTimeout);
+      final parsed = <PatientReminder>[];
+      for (final row in rows) {
+        final reminder = PatientReminder.tryParse(row);
+        if (reminder != null) parsed.add(reminder);
+      }
+      return parsed;
+    } catch (e) {
+      throw CareLinkFailure(_describe(e));
+    }
+  }
+
+  /// Inserts or updates a reminder that belongs to [patientId], attributed to
+  /// the signed-in caregiver. Does not touch the local database.
+  Future<void> savePatientReminder({
+    required String patientId,
+    required Medicine medicine,
+    required Schedule schedule,
+  }) async {
+    if (_userId == null) {
+      throw const CareLinkFailure('Please sign in again.');
+    }
+    try {
+      await _client.from('medicines').upsert({
+        'id': medicine.id,
+        'user_id': patientId,
+        'drug_name': medicine.drugName,
+        'strength': medicine.strength,
+        'form': medicine.form,
+        'dose_amount': medicine.doseAmount,
+        'notes': medicine.notes,
+        'created_at': _isoUtc(medicine.createdAt),
+        'updated_at': _isoUtc(medicine.updatedAt),
+        'updated_by': medicine.updatedBy,
+      }).timeout(_networkTimeout);
+
+      await _client.from('schedules').upsert({
+        'id': schedule.id,
+        'medicine_id': schedule.medicineId,
+        'user_id': patientId,
+        'frequency_type': schedule.frequencyType,
+        'times': schedule.times,
+        'days_of_week': schedule.daysOfWeek,
+        'interval_hours': schedule.intervalHours,
+        'active': schedule.active,
+        'created_at': _isoUtc(schedule.createdAt),
+        'updated_at': _isoUtc(schedule.updatedAt),
+        'updated_by': schedule.updatedBy,
+      }).timeout(_networkTimeout);
+    } catch (e) {
+      throw CareLinkFailure(_describe(e));
+    }
+  }
+
+  /// Same encoding [SyncService.isoUtc] uses: a local DateTime must carry its
+  /// offset or Postgres reads it as UTC and the other phone sees a shifted time.
+  static String _isoUtc(DateTime value) => value.toUtc().toIso8601String();
 
   /// Dose activity for [userId], newest first — the other half of a link's
   /// point.

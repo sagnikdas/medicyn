@@ -400,11 +400,41 @@ one thing:
 |---|---|---|
 | Parent → caregiver | **Visible** alert: "Amma missed a dose" | The alert the care link is for. Arrives while someone can still act on it. |
 | Caregiver → parent | **Silent** data message | Wakes the parent's app to pull and re-arm its alarms after the caregiver changed a schedule. |
+| Parent → caregiver | **Visible, PRIVATE** ping: "A reminder was changed" | Tells the caregiver the parent edited something. Names no medicine. Must not pull into the caregiver's local database. |
 
 The silent direction is the one that's easy to forget and expensive to omit:
 without it, a schedule the caregiver changed doesn't reach the parent's alarms
 until they next open the app — which could be a week — while the caregiver
 believes the change is live.
+
+A visible change ping to the caregiver is the other half of attribution. It
+must stay generic: a lock-screen alert that quoted a drug name would put
+someone else's medicines on a phone that is often in a shared room.
+
+Redeploy `notify-care` after this lands. The previously deployed function
+refused `data_changed` unless the caller was the caregiver, so a parent's
+edit never rang anyone.
+
+### Caregiver editing (Phase 2)
+
+Family → **Add or change a reminder** writes the patient's rows in Postgres
+and never into the caregiver's encrypted `dosely-<uid>.sqlite`. Caregivers
+can add and edit; they cannot delete. After a save, both phones show
+"Changed by Priya, Tuesday" when the last writer was not the patient.
+
+**Device tests for this slice:**
+
+1. Caregiver adds a reminder for the parent. The parent's phone, still in
+   a pocket, pulls and arms it (silent `data_changed`, `rearm=true`).
+2. Parent edits a reminder. The caregiver gets "A reminder was changed" /
+   "Open Dosely to see what changed." — no drug name, lock-screen PRIVATE.
+   Tapping it opens the parent's reminder list, not the dose feed.
+3. Both phones show "Changed by \<name\>, \<weekday\>" on a card the other
+   person last edited.
+4. The caregiver list has no delete control. The parent still has Stop
+   reminding / Delete medicine and history.
+5. After a caregiver save, the caregiver's own home list is unchanged —
+   the patient's medicines did not land in the caregiver's local file.
 
 Both go through the `notify-care` edge function. The **device** calls it
 rather than a Postgres trigger firing on the insert: a trigger needs `pg_net`
@@ -529,7 +559,8 @@ anyone but its owner, not even by a confirmed caregiver.
 - **Push is never in the firing path either.** A reminder is armed by the
   device's own exact alarms and fires whether or not FCM, Supabase, or the
   network exist. Push only carries news *between* two phones: a missed dose to
-  the caregiver, and a schedule change back to the parent. Losing it degrades
+  the caregiver, a schedule change back to the parent, and a nameless ping
+  the other way when the parent edits. Losing it degrades
   the care link; it cannot stop a reminder.
 
 ## Test data
