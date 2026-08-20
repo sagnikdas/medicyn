@@ -20,6 +20,8 @@ import '../review_edit/review_edit_screen.dart';
 import '../settings/settings_screen.dart';
 import '../voice_capture/voice_capture_screen.dart';
 
+enum _ReminderDisposition { stop, deleteHistory }
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, required this.db});
   final AppDatabase db;
@@ -151,22 +153,69 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         ),
       );
 
-  Future<void> _delete(Schedule schedule) async {
-    final confirmed = await showDialog<bool>(
+  Future<void> _delete(ScheduleWithMedicine item) async {
+    final choice = await showDialog<_ReminderDisposition>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Remove this reminder?'),
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Stop reminding, or delete?'),
+        content: const SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Stop reminding me: reminders for this medicine will stop. '
+                'Your dose history is kept. A linked family member can still '
+                'see that history.',
+              ),
+              SizedBox(height: 16),
+              Text(
+                'Delete this medicine and its history: the medicine, its '
+                'reminder, and its dose history are removed from this phone '
+                'and from the cloud backup. A linked family member will no '
+                'longer see them. This cannot be undone.',
+              ),
+            ],
+          ),
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Remove')),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, _ReminderDisposition.stop),
+            child: const Text('Stop reminding me'),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(dialogContext).colorScheme.error,
+            ),
+            onPressed: () =>
+                Navigator.pop(dialogContext, _ReminderDisposition.deleteHistory),
+            child: const Text('Delete medicine and history'),
+          ),
         ],
       ),
     );
-    if (confirmed != true) return;
-    await NotificationService.instance.cancelForSchedule(schedule);
-    await widget.db.deactivateSchedule(
-      schedule.id,
-      by: AuthService.instance.currentUser?.id,
+    if (choice == null) return;
+
+    final by = AuthService.instance.currentUser?.id;
+    if (choice == _ReminderDisposition.stop) {
+      await NotificationService.instance.cancelForSchedule(item.schedule);
+      await widget.db.deactivateSchedule(item.schedule.id, by: by);
+      return;
+    }
+
+    final related = await widget.db.schedulesForMedicine(item.medicine.id);
+    for (final schedule in related) {
+      await NotificationService.instance.cancelForSchedule(schedule);
+    }
+    await widget.db.deleteMedicineAndHistory(item.medicine.id, by: by);
+    if (AuthService.instance.currentUser == null) return;
+    final sync = SyncService(widget.db);
+    unawaited(
+      sync.tryDeleteRemoteMedicine(item.medicine.id).whenComplete(sync.syncAll),
     );
   }
 
@@ -206,7 +255,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 item: item,
                 db: widget.db,
                 onTap: () => _edit(item),
-                onDelete: () => _delete(item.schedule),
+                onDelete: () => _delete(item),
               );
             },
           );
@@ -305,7 +354,7 @@ class _ReminderCard extends StatelessWidget {
               ),
               IconButton(
                 icon: const Icon(Icons.delete_outline),
-                tooltip: 'Remove reminder',
+                tooltip: 'Stop or delete',
                 onPressed: onDelete,
               ),
             ],

@@ -81,7 +81,11 @@ class AppDatabase extends _$AppDatabase {
     final query = select(schedules).join([
       innerJoin(medicines, medicines.id.equalsExp(schedules.medicineId)),
     ])
-      ..where(schedules.active.equals(true) & schedules.deleted.equals(false));
+      ..where(
+        schedules.active.equals(true) &
+            schedules.deleted.equals(false) &
+            medicines.deleted.equals(false),
+      );
     return query.watch().map(
           (rows) => rows
               .map((r) => ScheduleWithMedicine(
@@ -96,7 +100,11 @@ class AppDatabase extends _$AppDatabase {
     final query = select(schedules).join([
       innerJoin(medicines, medicines.id.equalsExp(schedules.medicineId)),
     ])
-      ..where(schedules.active.equals(true) & schedules.deleted.equals(false));
+      ..where(
+        schedules.active.equals(true) &
+            schedules.deleted.equals(false) &
+            medicines.deleted.equals(false),
+      );
     final rows = await query.get();
     return rows
         .map((r) => ScheduleWithMedicine(
@@ -105,6 +113,9 @@ class AppDatabase extends _$AppDatabase {
             ))
         .toList();
   }
+
+  Future<List<Schedule>> schedulesForMedicine(String medicineId) =>
+      (select(schedules)..where((t) => t.medicineId.equals(medicineId))).get();
 
   /// Turning a reminder off is an edit like any other, so it has to carry a
   /// fresh [Schedules.updatedAt]. Without one it loses every version
@@ -119,6 +130,46 @@ class AppDatabase extends _$AppDatabase {
           updatedBy: Value(by),
         ),
       );
+
+  /// Removes this medicine's dose history and tombstones the medicine and its
+  /// schedules. The rows stay locally with [Medicines.deleted] /
+  /// [Schedules.deleted] set so a later pull cannot resurrect them before the
+  /// server `DELETE` lands. Dose logs are hard-deleted: history must actually
+  /// go, and there is no tombstone column on that table.
+  Future<void> deleteMedicineAndHistory(String medicineId, {String? by}) async {
+    final now = DateTime.now();
+    final related = await schedulesForMedicine(medicineId);
+    final scheduleIds = [for (final s in related) s.id];
+    await transaction(() async {
+      if (scheduleIds.isNotEmpty) {
+        final logs = await (select(doseLogs)
+              ..where((t) => t.scheduleId.isIn(scheduleIds)))
+            .get();
+        final logIds = [for (final l in logs) l.id];
+        if (logIds.isNotEmpty) {
+          await (delete(doseLogContests)..where((t) => t.doseLogId.isIn(logIds))).go();
+        }
+        await (delete(doseLogs)..where((t) => t.scheduleId.isIn(scheduleIds))).go();
+        await (update(schedules)..where((t) => t.medicineId.equals(medicineId))).write(
+          SchedulesCompanion(
+            deleted: const Value(true),
+            active: const Value(false),
+            pendingSync: const Value(true),
+            updatedAt: Value(now),
+            updatedBy: Value(by),
+          ),
+        );
+      }
+      await (update(medicines)..where((t) => t.id.equals(medicineId))).write(
+        MedicinesCompanion(
+          deleted: const Value(true),
+          pendingSync: const Value(true),
+          updatedAt: Value(now),
+          updatedBy: Value(by),
+        ),
+      );
+    });
+  }
 
   // --- Dose logs -----------------------------------------------------------
 
@@ -323,24 +374,79 @@ class AppDatabase extends _$AppDatabase {
   }
 
   /// Writes remote rows that won the version comparison, in one batch rather
-  /// than a statement per row.
+  /// than a statement per row. A local tombstone is never overwritten: pull
+  /// runs before push on cold start, and restoring the pre-delete server copy
+  /// would put a "removed" medicine back on this phone.
   Future<void> applyRemoteMedicines(List<MedicinesCompanion> rows) async {
     if (rows.isEmpty) return;
-    await batch((b) => b.insertAllOnConflictUpdate(medicines, rows));
+    final tombstoned = await _deletedMedicineIds();
+    final accepted = [
+      for (final row in rows)
+        if (!_isTombstoned(_companionId(row.id), tombstoned)) row,
+    ];
+    if (accepted.isEmpty) return;
+    await batch((b) => b.insertAllOnConflictUpdate(medicines, accepted));
   }
 
   Future<void> applyRemoteSchedules(List<SchedulesCompanion> rows) async {
     if (rows.isEmpty) return;
-    await batch((b) => b.insertAllOnConflictUpdate(schedules, rows));
+    final tombstonedSchedules = await _deletedScheduleIds();
+    final tombstonedMedicines = await _deletedMedicineIds();
+    final accepted = <SchedulesCompanion>[];
+    for (final row in rows) {
+      if (_isTombstoned(_companionId(row.id), tombstonedSchedules)) continue;
+      if (_isTombstoned(_companionId(row.medicineId), tombstonedMedicines)) {
+        continue;
+      }
+      accepted.add(row);
+    }
+    if (accepted.isEmpty) return;
+    await batch((b) => b.insertAllOnConflictUpdate(schedules, accepted));
   }
 
   Future<void> applyRemoteDoseLogs(List<DoseLogsCompanion> rows) async {
     if (rows.isEmpty) return;
-    await batch((b) => b.insertAll(doseLogs, rows, mode: InsertMode.insertOrIgnore));
+    final blocked = await _scheduleIdsHiddenFromRemoteDoseLogs();
+    final accepted = [
+      for (final row in rows)
+        if (!_isTombstoned(_companionId(row.scheduleId), blocked)) row,
+    ];
+    if (accepted.isEmpty) return;
+    await batch((b) => b.insertAll(doseLogs, accepted, mode: InsertMode.insertOrIgnore));
   }
 
   Future<void> applyRemoteDoseLogContests(List<DoseLogContestsCompanion> rows) async {
     if (rows.isEmpty) return;
     await batch((b) => b.insertAllOnConflictUpdate(doseLogContests, rows));
   }
+
+  Future<Set<String>> _deletedMedicineIds() async {
+    final rows = await (select(medicines)..where((t) => t.deleted.equals(true))).get();
+    return {for (final r in rows) r.id};
+  }
+
+  Future<Set<String>> _deletedScheduleIds() async {
+    final rows = await (select(schedules)..where((t) => t.deleted.equals(true))).get();
+    return {for (final r in rows) r.id};
+  }
+
+  /// Dose history for a locally deleted schedule, or for any schedule of a
+  /// deleted medicine, must not come back from the server. Local dose logs
+  /// were hard-deleted; insert-or-ignore would otherwise restore them.
+  Future<Set<String>> _scheduleIdsHiddenFromRemoteDoseLogs() async {
+    final deletedSchedules = await _deletedScheduleIds();
+    final deletedMedicines = await _deletedMedicineIds();
+    if (deletedMedicines.isEmpty) return deletedSchedules;
+    final fromDeletedMedicines =
+        await (select(schedules)..where((t) => t.medicineId.isIn(deletedMedicines))).get();
+    return {
+      ...deletedSchedules,
+      for (final s in fromDeletedMedicines) s.id,
+    };
+  }
+
+  static String? _companionId(Value<String> id) => id.present ? id.value : null;
+
+  static bool _isTombstoned(String? id, Set<String> tombstoned) =>
+      id != null && tombstoned.contains(id);
 }
