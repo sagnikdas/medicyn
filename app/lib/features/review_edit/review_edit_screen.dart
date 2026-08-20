@@ -10,6 +10,8 @@ import '../../data/local/tables.dart';
 import '../../data/remote/medicine_parser.dart';
 import '../../data/remote/sync_service.dart';
 import '../auth/auth_service.dart';
+import '../consent/consent_purpose.dart';
+import '../consent/consent_service.dart';
 import '../history/dose_history_screen.dart';
 import '../notification_engine/notification_service.dart';
 import '../notification_engine/schedule_validation.dart';
@@ -106,7 +108,13 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
       setState(() => _loadState = _LoadState.ready);
       return;
     }
-    if (widget.ocrText.isEmpty && widget.transcript.isEmpty) {
+    if (!shouldParseMedicine(
+      anthropicGranted: ConsentService.instance.isGranted(ConsentPurpose.anthropicParse),
+      ocrText: widget.ocrText,
+      transcript: widget.transcript,
+    )) {
+      // Empty capture, or Anthropic consent not given — same empty/manual
+      // form, and the parse-medicine edge function is never called.
       setState(() => _loadState = _LoadState.ready);
       return;
     }

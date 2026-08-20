@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/app_settings.dart';
 import '../../core/google_auth_config.dart';
 import '../care/care_service.dart';
+import '../consent/consent_service.dart';
 import '../push/push_service.dart';
 
 /// Raised when Google sign-in doesn't produce a session. [message] is
@@ -97,6 +98,7 @@ class AuthService {
       // which is a degraded link rather than a failed sign-in, and every
       // foreground retries it.
       unawaited(PushService.instance.registerToken());
+      unawaited(ConsentService.instance.syncToServer());
     } on GoogleSignInFailure {
       rethrow;
     } on GoogleSignInException catch (e) {

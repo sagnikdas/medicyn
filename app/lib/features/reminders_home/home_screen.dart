@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../core/app_settings.dart';
 import '../../data/local/database.dart';
 import '../../data/local/tables.dart';
 import '../../data/remote/care_notifier.dart';
@@ -9,6 +10,8 @@ import '../../data/remote/sync_service.dart';
 import '../auth/auth_service.dart';
 import '../capture_ocr/ocr_capture_screen.dart';
 import '../care/care_service.dart';
+import '../consent/consent_purpose.dart';
+import '../consent/consent_service.dart';
 import '../notification_engine/missed_doses.dart';
 import '../notification_engine/notification_service.dart';
 import '../notification_engine/schedule_validation.dart';
@@ -91,6 +94,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (sync == null) return;
     await sync.syncAll();
 
+    // Care alerts name dose-log ids the server reads back. Without cloud
+    // backup there is no push, so there is nothing to announce.
+    if (!AppSettings.instance.consentCloudBackup) return;
+
     // After the push, never before it: the alert names dose-log ids, and the
     // server reads those rows back to compose what the family is told. Telling
     // it about a dose that is still only on this phone would have it find
@@ -122,10 +129,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
     if (ocrText == null || !mounted) return;
 
-    final transcript = await Navigator.of(context).push<String>(
-      MaterialPageRoute(builder: (_) => const VoiceCaptureScreen()),
-    );
-    if (transcript == null || !mounted) return;
+    var transcript = '';
+    if (ConsentService.instance.isGranted(ConsentPurpose.googleSpeech)) {
+      final spoken = await Navigator.of(context).push<String>(
+        MaterialPageRoute(builder: (_) => const VoiceCaptureScreen()),
+      );
+      if (spoken == null || !mounted) return;
+      transcript = spoken;
+    }
 
     await Navigator.of(context).push(
       MaterialPageRoute(
