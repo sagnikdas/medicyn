@@ -370,6 +370,57 @@ void main() {
       expect(store.data[DatabaseKeyStore.ownerUserIdName], 'user-a');
     });
   });
+
+  group('wipeEncryptedDatabaseForUser', () {
+    test('deletes this account file and sidecars, and leaves others alone', () async {
+      final docs = await Directory.systemTemp.createTemp('dosely-wipe');
+      addTearDown(() async {
+        await docs.delete(recursive: true);
+      });
+
+      const userA = '11111111-1111-1111-1111-111111111111';
+      const userB = '22222222-2222-2222-2222-222222222222';
+      final target = File('${docs.path}/${encryptedDatabaseFileName(userA)}');
+      final wal = File('${target.path}-wal');
+      final shm = File('${target.path}-shm');
+      final journal = File('${target.path}-journal');
+      final other = File('${docs.path}/${encryptedDatabaseFileName(userB)}');
+      final leftover = File('${docs.path}/$plaintextDatabaseFileName');
+
+      await target.writeAsString('a-db');
+      await wal.writeAsString('a-wal');
+      await shm.writeAsString('a-shm');
+      await journal.writeAsString('a-journal');
+      await other.writeAsString('b-db');
+      await leftover.writeAsString('legacy');
+
+      await wipeEncryptedDatabaseForUser(
+        userA,
+        documentsDirectory: () async => docs,
+      );
+
+      expect(await target.exists(), isFalse);
+      expect(await wal.exists(), isFalse);
+      expect(await shm.exists(), isFalse);
+      expect(await journal.exists(), isFalse);
+      expect(await other.exists(), isTrue);
+      expect(await leftover.exists(), isTrue);
+      expect(await other.readAsString(), 'b-db');
+      expect(await leftover.readAsString(), 'legacy');
+    });
+
+    test('does not throw when the file is already gone', () async {
+      final docs = await Directory.systemTemp.createTemp('dosely-wipe-missing');
+      addTearDown(() async {
+        await docs.delete(recursive: true);
+      });
+
+      await wipeEncryptedDatabaseForUser(
+        '33333333-3333-3333-3333-333333333333',
+        documentsDirectory: () async => docs,
+      );
+    });
+  });
 }
 
 bool _sqlite3HasCipher() {

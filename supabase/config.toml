@@ -427,3 +427,12 @@ enabled = true
 verify_jwt = true
 import_map = "./functions/notify-care/deno.json"
 entrypoint = "./functions/notify-care/index.ts"
+
+# Deletes the signed-in caller. `verify_jwt` is belt-and-braces: the function
+# validates the caller against the auth server itself, because the publishable
+# key satisfies the gateway and this must not delete anyone on that alone.
+[functions.delete_account]
+enabled = true
+verify_jwt = true
+import_map = "./functions/delete_account/deno.json"
+entrypoint = "./functions/delete_account/index.ts"

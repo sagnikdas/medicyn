@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../../core/account_deletion.dart';
 import '../../core/app_settings.dart';
 import '../../core/privacy_policy.dart';
+import '../../data/local/encrypted_database.dart';
 import '../auth/auth_service.dart';
 import '../care/care_screen.dart';
 import '../consent/consent_purpose.dart';
@@ -198,6 +200,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 onPressed: () => _confirmSignOut(context),
                 child: const Text('Sign out'),
               ),
+              const SizedBox(height: 12),
+              OutlinedButton(
+                onPressed: () => _confirmDeleteAccount(context),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Theme.of(context).colorScheme.error,
+                ),
+                child: const Text('Delete account'),
+              ),
             ],
             const SizedBox(height: 12),
             TextButton(
@@ -260,6 +270,133 @@ class _SettingsScreenState extends State<SettingsScreen> {
     // button — both mean "no".
     if (confirmed != true) return;
     await AuthService.instance.signOut();
+    navigator.popUntil((r) => r.isFirst);
+  }
+
+  /// Two dialogs on purpose: Delete account sits at the bottom of Settings
+  /// next to Sign out, and a single tap must not erase the Google-linked
+  /// backup. The second step is another explicit "Delete my account"
+  /// (error-coloured) rather than typing a phrase — easier to read and
+  /// hit for the people this app is for.
+  Future<void> _confirmDeleteAccount(BuildContext context) async {
+    final navigator = Navigator.of(context);
+    final explained = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete your account?'),
+        content: const SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'This permanently deletes your Google-linked backup, your '
+                'medicines, your dose history, and any family link. This '
+                'cannot be undone.',
+              ),
+              SizedBox(height: 16),
+              Text('If you cannot use the app, you can also request deletion at:'),
+              SizedBox(height: 8),
+              SelectableText(deleteAccountWebUrl),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Continue'),
+          ),
+        ],
+      ),
+    );
+    if (explained != true) return;
+    if (!context.mounted) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Permanently delete?'),
+        content: const Text(
+          'Your account and all of this data will be deleted now. This cannot '
+          'be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(dialogContext).colorScheme.error,
+            ),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Delete my account'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    // Captured before sign-out: AuthGate closes the database when the
+    // session ends, and wipe must still know which per-user file to remove.
+    final userId = AuthService.instance.currentUser?.id;
+    if (userId == null || userId.isEmpty) return;
+
+    if (!context.mounted) return;
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const PopScope(
+        canPop: false,
+        child: AlertDialog(
+          content: Row(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 20),
+              Expanded(child: Text('Deleting your account…')),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    Object? failure;
+    try {
+      await requestServerAccountDeletion();
+    } catch (e) {
+      failure = e;
+    }
+
+    if (navigator.canPop()) navigator.pop();
+
+    if (failure != null) {
+      if (!context.mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Could not delete account'),
+          content: Text('$failure'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    // Sign out first so AuthGate closes the open database, then wipe this
+    // account's file. Wiping while the connection is still open fails on
+    // some platforms. The Keystore encryption key is left in place —
+    // another account on this phone still needs it.
+    await AuthService.instance.signOut();
+    await wipeEncryptedDatabaseForUser(userId);
     navigator.popUntil((r) => r.isFirst);
   }
 }
