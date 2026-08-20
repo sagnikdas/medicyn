@@ -3,9 +3,9 @@
 The working plan for turning Dosely from a single-user pill reminder into
 something an elderly parent and one adult child in another city use together.
 Updated as work lands; the design rationale behind these choices lives in the
-Care Link spec artifact.
+Care Link spec artifact. How the app makes money is in `MONETIZE.md`, not here.
 
-**Last updated:** 2026-08-20 · Phase 2 on `feature/phase-2-caregiver-editing`
+**Last updated:** 2026-08-20 · Phase 2 on `main` (#54)
 
 ---
 
@@ -38,10 +38,9 @@ These are settled. Revisit them deliberately, not incidentally.
 - A privacy policy (Art. 13 rewrite), consent, local-only, account deletion,
   and the Phase 4 technical leftovers (OCR redaction, private care alerts,
   device-credential unlock)
-
-**On this branch, not yet merged:** caregiver-side editing (remote writes
-under the patient's `user_id`, no delete), silent `data_changed` both ways,
-per-medicine change history, and setup health on the Care Screen.
+- Caregiver editing (remote writes under the patient's `user_id`, no delete),
+  silent `data_changed` both ways, per-medicine change history, and setup
+  health on the Care Screen (#54)
 
 **Live on the hosted Supabase project** (`twybepxnqayypzljhcnx`): migrations
 applied, including the timestamp correction (2026-08-19, after both phones were
@@ -137,11 +136,11 @@ tap routing); the README lists the device steps.
       later sign-in. A device-credential lock still covers the feed until
       unlock — the tap must not put medicine names on the lock screen.
 
-The inbound direction cannot be verified end-to-end until Phase 2, because
-nothing yet produces a caregiver-side edit to push. Phase 2 is the screen
-that produces it.
+The inbound direction could not be verified end-to-end until Phase 2 produced
+a caregiver-side edit. That screen exists on `main` (#54); hardware
+verification of inbound re-arm is the remaining check.
 
-## Phase 2 — What push makes honest — **on this branch**
+## Phase 2 — What push makes honest — **done**
 
 - [x] **Caregiver-side editing.** Care Screen → Their reminders. Writes go
       straight to Supabase under the patient's `user_id`. This phone's Drift
