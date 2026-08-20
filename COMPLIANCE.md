@@ -542,14 +542,14 @@ landed on `main` as #47.
 | 2.5 | “Remove this reminder” still only sets `active = false` | App | **Done** — #45 | **Stop reminding me** keeps history. **Delete medicine and history** tombstones locally and `DELETE`s the medicine in Postgres so the family feed drops it. |
 | 2.6 | Retention TTLs + prune job (`dose_logs` 24m, `care_alerts` 12m, revoked links 12m, tokens 90d) | Backend | **Done** — #44 | `prune_expired_data()` on hosted `twybepxnqayypzljhcnx`. pg_cron job `prune-expired-data` at 03:20 UTC. Local 24-month dose-log prune on bootstrap. |
 | 2.7 | Revoked caregiver must not read `care_alerts`; expire stale claimed links | DB | **Done** — #23, #24 | Caregiver read requires `status = 'active'`. Confirm checks `expires_at`. Lazy auto-revoke of stale `claimed` rows is not implemented. |
-| 3.1 | DPIA | Paper | **Todo** | Mandatory. Lift `PLAN.md` known gaps. |
-| 3.2 | Processor DPAs (Supabase, Anthropic, Google FCM / Sign-In) | Paper | **Todo** | Speech recogniser is a Google controller — consent or `onDevice: true`. |
-| 3.3 | Document (or eliminate) Singapore + US transfers; TIA / SCCs / DPF | Paper + infra | **Todo** | Cleanest code-adjacent move: recreate the project in an EU/UK region. |
-| 3.4 | Record of processing — `COMPLIANCE/ROPA.md` | Paper | **Todo** | Art. 30; small-org exemption does not apply. |
-| 3.5 | Breach plan, register, reachable contact; backfill timezone-corruption incident | Paper | **Todo** | |
-| 3.6 | Decide EEA distribution; Art. 27 representative if yes; privacy contact (no DPO required) | Paper | **Todo** | |
-| 3.7 | Separate Washington MHMD consumer health data policy | Docs | **Todo** | Second consent before sharing. |
-| 3.8 | Play Data Safety + Health apps declaration + `USE_FULL_SCREEN_INTENT` | Store | **Todo** | After 2.1 so the form matches the policy. |
+| 3.1 | DPIA | Paper | **Done (document)** — `COMPLIANCE/DPIA.md` | Mandatory WP248 assessment. Operator: re-read before Play release. |
+| 3.2 | Processor DPAs (Supabase, Anthropic, Google FCM / Sign-In) | Paper | **Partial** — `COMPLIANCE/DPA.md` | Tracker and console links. No DPA has been accepted in a vendor console yet. Speech is a Google controller — no DPA. |
+| 3.3 | Document (or eliminate) Singapore + US transfers; TIA / SCCs / DPF | Paper + infra | **Partial** — `COMPLIANCE/TRANSFERS.md` | TIA written. Database still `ap-southeast-1`. SCCs/DPF not executed. Recreating the project in an EU/UK region is still the cleanest fix. |
+| 3.4 | Record of processing — `COMPLIANCE/ROPA.md` | Paper | **Done (document)** — `COMPLIANCE/ROPA.md` | Art. 30; small-org exemption does not apply. |
+| 3.5 | Breach plan, register, reachable contact; backfill timezone-corruption incident | Paper | **Done (document)** — `COMPLIANCE/BREACH.md` | Register includes B-2026-08-19-A (naive timestamps) and B-2026-08-19-B (fabricated missed doses). Contact: sagnikd91@gmail.com. |
+| 3.6 | Decide EEA distribution; Art. 27 representative if yes; privacy contact (no DPO required) | Paper | **Partial** — `COMPLIANCE/SCOPE.md` | EEA/UK distribution is intended. No DPO. Privacy contact is the controller email. Art. 27 representative **not appointed** — required before an EEA Play listing. |
+| 3.7 | Separate Washington MHMD consumer health data policy | Docs | **Done (document)** — `docs/MHMD.md` | Names Supabase, Anthropic, Google; second consent before sharing. Still needs a *public* URL (repo is private). |
+| 3.8 | Play Data Safety + Health apps declaration + `USE_FULL_SCREEN_INTENT` | Store | **Partial** — `COMPLIANCE/PLAY-DATA-SAFETY.md` | Form answers written to match the policy. `USE_FULL_SCREEN_INTENT` is already in the manifest. Operator must paste into Play Console. Play still needs public policy/deletion URLs. |
 | 4.1 | Append-only `phi_access_log` + “who looked” screen | App + DB | **Deferred** | HIPAA track. Also useful for FTC HBNR / MHMD. Start when a B2B deal exists. |
 | 4.2 | BAAs (Supabase Team+HIPAA add-on; Anthropic; no BAA for platform speech) | Paper | **Deferred** | |
 | 4.3a | Encrypt local medical database | App | **Done** — #33 | sqlite3mc hooks + Keystore, not the EOL `sqlcipher_flutter_libs` package the plan named. |
@@ -560,14 +560,14 @@ landed on `main` as #47.
 | 4.3f | Certificate pinning (network security config exists for no-cleartext) | App | **Todo** (low) | `networkSecurityConfig` already forbids cleartext (#22). Pinning is not done. |
 | 4.4 | Written HIPAA policies, MFA on admin accounts, key rotation | Paper | **Deferred** | |
 
-**Counts:** Phases 1 and 2 are closed on `main`. 16 items done (or done differently); 1 partial (4.3d); remaining application work is 4.3 leftovers; 8 Phase 3 paperwork/store items; HIPAA 4.1–4.2 and 4.4 deferred.
+**Counts:** Phases 1 and 2 are closed on `main`. Phase 3 paperwork pack is on this branch: 3.1 / 3.4 / 3.5 / 3.7 are documents; 3.2 / 3.3 / 3.6 / 3.8 wait on operator actions (sign DPAs, region or SCCs, Art. 27 representative, Play Console paste). 1 partial leftover from earlier (4.3d). HIPAA 4.1–4.2 and 4.4 deferred.
 
 ### Remaining work, in order
 
-Do not start Phase 4 (except 4.3e, which is cheap and shrinks Anthropic’s blast radius) until Phase 3 can ship.
+Do not start Phase 4 (except 4.3e, which is cheap and shrinks Anthropic’s blast radius) until Phase 3's *operator* actions can ship.
 
 1. **Phase 1 blockers:** closed (#22, #33, #34, #37–#41). Overlay-install on the Galaxy M33 still pending.
-2. **Phase 2 honesty:** closed on `main` (#47, from #41 and #43–#46). Optional leftover from 2.7: auto-revoke stale `claimed` links.
-3. **Phase 3:** DPIA, ROPA, DPAs, transfers (consider EU region), breach register, MHMD policy, Play Data Safety.
+2. **Phase 2 honesty:** closed on `main` (#47). Optional leftover from 2.7: auto-revoke stale `claimed` links.
+3. **Phase 3 operator leftover:** accept DPAs in vendor consoles; decide EU-region vs SCC paperwork; appoint Art. 27 representative (or delay EEA listing); paste Play Data Safety; host public policy/deletion/MHMD URLs.
 4. **When useful, not when a term sheet appears:** 4.3e OCR redaction; 4.3d private care-alert lock screen; 4.3c device-credential unlock; 4.3f pinning.
 5. **When a B2B/HIPAA deal exists:** 4.1 access log, 4.2 BAAs, 4.4 written Security Rule policies.
