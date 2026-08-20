@@ -5,7 +5,7 @@ something an elderly parent and one adult child in another city use together.
 Updated as work lands; the design rationale behind these choices lives in the
 Care Link spec artifact.
 
-**Last updated:** 2026-08-19 · `main` @ `da2488d`, plus the Phase 1 push branch
+**Last updated:** 2026-08-20 · `main` @ `86eef5c`
 
 ---
 
@@ -33,26 +33,15 @@ These are settled. Revisit them deliberately, not incidentally.
 - The linking flow: invite, claim, confirm, disconnect
 - The adherence feed — what happened with someone's medicines, punctuality first
 - Missed-dose detection, written on the device that owns the reminders
-- A privacy policy draft, and the app name capitalised
+- Push in both directions: `device_tokens` + `care_alerts`, `notify-care`, FCM
+  registration, and the inbound silent message that pulls and re-arms
+- A privacy policy (Art. 13 rewrite), consent, local-only, account deletion,
+  and the Phase 4 technical leftovers (OCR redaction, private care alerts,
+  device-credential unlock)
 
-**On the Phase 1 branch, not yet merged:** push in both directions —
-`device_tokens` + `care_alerts`, the `notify-care` edge function, FCM
-registration and refresh on the client, and the inbound silent message that
-pulls and re-arms. Plus two fixes push turned from quiet wrongness into a
-wrong notification on a family member's phone: retroactive missed doses
-(below), and client timestamps that reached Postgres with no UTC offset —
-every dose time and every `updated_at` was shifted by the writing device's
-offset, so a 09:00 reminder read back as 14:30 to the other side. The
-device was always right; only what the *other* person saw was wrong. A
-migration corrects the existing history, shifting each row by its owner's
-recorded timezone.
-
-**Live on the hosted Supabase project** (`twybepxnqayypzljhcnx`): all six
-migrations applied, including the timestamp correction (2026-08-19, after both
-phones were on a build that sends UTC — it reported 14/19 daily doses landing
-on a time their schedule names, the other five being doses recorded before a
-schedule was edited and `taken` logs stamped from the snooze fallback rather
-than a clock time). Both edge functions deployed. Google provider configured
+**Live on the hosted Supabase project** (`twybepxnqayypzljhcnx`): migrations
+applied, including the timestamp correction (2026-08-19, after both phones were
+on a build that sends UTC). Edge functions deployed. Google provider configured
 with the Web and Android client IDs; email sign-in and the custom SMTP sender
 both disabled.
 
@@ -60,9 +49,9 @@ both disabled.
 sign-in): Android app registered for `com.sagnikdas.dosely`, and the service
 account stored as the `FCM_SERVICE_ACCOUNT` secret.
 
-**Verification:** `flutter analyze` clean, `flutter test` 81/81, 34 adversarial
-RLS assertions against a scratch Postgres (16 care-link, 18 push), and 6 Deno
-tests over the stale-token rule. Phase 0's device testing is done — see below.
+**Verification:** Phase 0's device testing is done — see below. Phase 1's happy
+path was verified on two phones on 2026-08-19. Four accident cases still need
+hardware; they are listed under Phase 1 and in the README.
 
 ---
 
@@ -124,18 +113,25 @@ through a security-definer function — the same shape as the link lifecycle.
 - [x] Already-announced doses are never announced again — three earlier alerts
       stayed at three across repeated foregrounds
 
-**Not yet exercised.** None of these blocks the phase; each is a distinct
-failure mode that only shows up under a specific accident.
+**Not yet exercised on hardware.** None of these blocks the phase; each is a
+distinct failure mode that only shows up under a specific accident. The
+mechanisms are covered by tests (unique index, token possession, `isStale`,
+tap routing); the README lists the device steps.
 
 - [ ] Two devices signed into one account announce a missed dose **once**
-      (`care_alerts` is the de-duplication; check for a single row)
+      (`care_alerts` unique on `(link_id, dose_log_id)`; `push_rls_test.sql`)
 - [ ] Sign out on one phone, sign in as the other account, confirm the first
-      account's alerts stop arriving there — the reason `device_tokens` is
-      keyed by the token rather than a surrogate id
+      account's alerts stop arriving there — `unregisterToken` runs before
+      the session is cleared; `register_device_token` moves the row only
+      with the same install id
 - [ ] Uninstall the caregiver's app, raise an alert, confirm the token is
-      pruned rather than retried forever
-- [ ] The cold-start tap path specifically (`getInitialMessage`), as opposed to
-      the app-alive one that was tested
+      pruned rather than retried forever (`fcm_test.ts` `isStale`)
+- [ ] The cold-start tap path specifically (`getInitialMessage`), as opposed
+      to the app-alive one that was tested. The message is now consumed
+      once and opened after the first frame, same deferral as a local
+      notification, so it does not race the navigator or replay on a
+      later sign-in. A device-credential lock still covers the feed until
+      unlock — the tap must not put medicine names on the lock screen.
 
 The inbound direction cannot be verified end-to-end until Phase 2, because
 nothing yet produces a caregiver-side edit to push. The receiving half is

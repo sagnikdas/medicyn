@@ -509,6 +509,35 @@ the same shape the care-link lifecycle uses. `supabase/tests/push_rls_test.sql`
 asserts it, along with the rule that a device token is never readable by
 anyone but its owner, not even by a confirmed caregiver.
 
+### Phase 1 accident cases (still need a real phone)
+
+The happy path was verified on two phones. These four were not. Automated
+tests cover the mechanism; they cannot cover FCM, uninstall, or a second
+physical device.
+
+**Two devices, one account, one alert.** Sign the same Google account into
+two phones. Let a reminder go missed. `care_alerts` must gain **one** row
+for that dose, and the caregiver phone must ring once. The unique index on
+`(link_id, dose_log_id)` is the lock; `notify-care` claims before send.
+
+**Handed-back phone.** On the caregiver phone, sign out, then sign in as
+the parent. Raise a missed dose for the original caregiver account. This
+phone must stay silent. Sign-out deletes this install's token before the
+session ends; a later registration moves the row only when the install id
+matches.
+
+**Uninstall prunes the token.** Uninstall the caregiver app. Raise a missed
+dose. `notify-care` should delete the token when FCM answers 404 /
+UNREGISTERED, not retry it forever. `delivered_count` may be 0 on that
+send; the next send must not keep targeting the dead token.
+
+**Cold-start tap.** Force-stop Dosely on the caregiver phone. Raise a
+missed dose, tap the notification on the lock screen (unlock the *phone*
+first if asked). Dosely may then ask for the device PIN — that cover is
+deliberate and must stay; the feed opens after unlock, not on the lock
+screen. The medicine name must not appear on the lock screen (care alerts
+are `PRIVATE`).
+
 ## Reliability notes
 
 - Notifications are the whole point of this app, so they've been tested
