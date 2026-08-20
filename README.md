@@ -511,32 +511,53 @@ anyone but its owner, not even by a confirmed caregiver.
 
 ### Phase 1 accident cases (still need a real phone)
 
+Overlay-install this branch on the caregiver phone (`google-services.json`
+copied into the worktree). There is no `notify-care` change to deploy. A
+miss only counts after **30 minutes** unanswered, and the same dose will
+not ring twice — use a fresh reminder for each run.
+
 The happy path was verified on two phones. These four were not. Automated
 tests cover the mechanism; they cannot cover FCM, uninstall, or a second
 physical device.
 
-**Two devices, one account, one alert.** Sign the same Google account into
-two phones. Let a reminder go missed. `care_alerts` must gain **one** row
-for that dose, and the caregiver phone must ring once. The unique index on
-`(link_id, dose_log_id)` is the lock; `notify-care` claims before send.
+**Two devices, one account, one alert.**
 
-**Handed-back phone.** On the caregiver phone, sign out, then sign in as
-the parent. Raise a missed dose for the original caregiver account. This
-phone must stay silent. Sign-out deletes this install's token before the
-session ends; a later registration moves the row only when the install id
-matches.
+1. Sign the same Google account into two phones that can both reach
+   `notify-care`.
+2. Let a reminder go 30 minutes past due without tapping Taken, then open
+   Dosely on a patient-role device so it can sweep.
+3. Pass: `care_alerts` gains **one** row for that dose; the caregiver
+   phone rings once, not twice.
 
-**Uninstall prunes the token.** Uninstall the caregiver app. Raise a missed
-dose. `notify-care` should delete the token when FCM answers 404 /
-UNREGISTERED, not retry it forever. `delivered_count` may be 0 on that
-send; the next send must not keep targeting the dead token.
+**Handed-back phone.**
 
-**Cold-start tap.** Force-stop Dosely on the caregiver phone. Raise a
-missed dose, tap the notification on the lock screen (unlock the *phone*
-first if asked). Dosely may then ask for the device PIN — that cover is
-deliberate and must stay; the feed opens after unlock, not on the lock
-screen. The medicine name must not appear on the lock screen (care alerts
-are `PRIVATE`).
+1. On the caregiver phone, sign out, then sign in as the parent.
+2. Raise a missed dose that should alert the *original* caregiver account.
+3. Pass: this phone stays silent. Sign-out deletes this install's token
+   before the session ends; a later registration moves the row only when
+   the install id matches.
+
+**Uninstall prunes the token.**
+
+1. Uninstall the caregiver app.
+2. Raise a missed dose.
+3. Pass: `notify-care` deletes the token when FCM answers 404 /
+   UNREGISTERED. `delivered_count` may be 0 on that send; a later send
+   must not keep targeting the dead token.
+
+**Cold-start tap** (the path this PR changes).
+
+1. Care Link is active. Caregiver phone has a PIN.
+2. Force-stop Dosely on the caregiver phone (not just Home).
+3. Raise a missed dose from the patient phone.
+4. On the locked caregiver phone the shade must **not** show the medicine
+   name (care alerts are `PRIVATE`).
+5. Unlock the *phone* if asked, tap the notification.
+6. If Dosely then asks for the device PIN, authenticate — that cover is
+   deliberate. The feed must not appear on the lock screen.
+7. After unlock, the parent's dose feed opens.
+8. Sign out and sign back in as the same caregiver: the feed must **not**
+   open again by itself (the launch message must not replay).
 
 ## Reliability notes
 
