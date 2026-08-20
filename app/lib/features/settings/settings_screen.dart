@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/app_settings.dart';
+import '../../core/privacy_policy.dart';
 import '../auth/auth_service.dart';
 import '../care/care_screen.dart';
 import '../notification_engine/notification_service.dart';
@@ -171,6 +172,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 child: const Text('Sign out'),
               ),
             ],
+            const SizedBox(height: 12),
+            TextButton(
+              onPressed: openPrivacyPolicy,
+              child: const Text('Privacy policy'),
+            ),
           ],
         ),
       ),

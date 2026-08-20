@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/app_settings.dart';
+import '../../core/privacy_policy.dart';
 import 'auth_service.dart';
 
 /// Google sign-in, or local-only so reminders work without an account.
@@ -76,6 +77,17 @@ class _SignInScreenState extends State<SignInScreen> {
                 const SizedBox(height: 16),
                 Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
               ],
+              const SizedBox(height: 20),
+              TextButton(
+                onPressed: openPrivacyPolicy,
+                child: Text(
+                  'Privacy policy',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.primary,
+                    decoration: TextDecoration.underline,
+                  ),
+                ),
+              ),
             ],
           ),
         ),
