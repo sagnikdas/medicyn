@@ -67,7 +67,7 @@ class _ConsentScreenState extends State<ConsentScreen> {
                   ],
                   const SizedBox(height: 16),
                   TextButton(
-                    onPressed: openPrivacyPolicy,
+                    onPressed: () => openPrivacyPolicy(context),
                     child: Text(
                       'Privacy policy',
                       style: text.titleMedium?.copyWith(

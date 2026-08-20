@@ -4,15 +4,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('privacyPolicyUrl is the published GitHub policy', () {
-    expect(
-      privacyPolicyUrl,
-      'https://github.com/sagnikdas/dosely/blob/main/PRIVACY.md',
-    );
+  test('the in-app policy is the bundled markdown, not a private GitHub URL', () {
+    expect(privacyPolicyAsset, 'assets/PRIVACY.md');
   });
 
-  testWidgets('sign-in screen offers a Privacy policy control', (tester) async {
+  testWidgets('tapping Privacy policy on sign-in opens the bundled policy', (tester) async {
     await tester.pumpWidget(const MaterialApp(home: SignInScreen()));
-    expect(find.widgetWithText(TextButton, 'Privacy policy'), findsOneWidget);
+    await tester.tap(find.widgetWithText(TextButton, 'Privacy policy'));
+    await tester.pumpAndSettle();
+    expect(find.byType(PrivacyPolicyScreen), findsOneWidget);
+    expect(find.textContaining('Sagnik Das'), findsWidgets);
+    expect(find.textContaining('sagnikd91@gmail.com'), findsWidgets);
   });
 }

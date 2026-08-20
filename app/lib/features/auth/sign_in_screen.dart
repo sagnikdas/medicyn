@@ -79,7 +79,7 @@ class _SignInScreenState extends State<SignInScreen> {
               ],
               const SizedBox(height: 20),
               TextButton(
-                onPressed: openPrivacyPolicy,
+                onPressed: () => openPrivacyPolicy(context),
                 child: Text(
                   'Privacy policy',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
