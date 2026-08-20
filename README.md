@@ -478,6 +478,63 @@ Three things to look at, in order:
    means the service account is missing or malformed; `push_failed` lines
    carry FCM's own reason per token.
 
+### Lock-screen copy on care alerts
+
+A care alert is not something you act on through a locked phone, so the
+medicine name must not render there. Patient reminders are a separate
+setting (off by default, opt-in in Settings). Care alerts have no such
+opt-in: they are always `PRIVATE`.
+
+Two paths draw the same alert, and both have to be checked. Android draws
+an FCM notification itself when the caregiver's app is backgrounded or
+dead — that path lives in `notify-care` (`visibility: "PRIVATE"`). When
+the app is in the foreground, Android refuses to draw the FCM
+notification, and `NotificationService.showCareAlert` draws it locally
+instead (`NotificationVisibility.private`). Deploying the function does
+not exercise the second path; overlay-installing the app does not
+exercise the first.
+
+Automated coverage of the strings and the FCM field:
+
+```
+cd app
+flutter test test/reminder_lock_screen_test.dart test/push_contract_test.dart
+```
+
+The rest needs two phones (or a phone and an emulator), two Google
+accounts with an **active Care Link**, and a **PIN / pattern / biometric**
+on the caregiver device — `PRIVATE` is a no-op on an unsecured lock
+screen. Overlay-install the current app on the caregiver phone. Deploy
+`notify-care` from this tree first:
+
+```
+supabase functions deploy notify-care --project-ref twybepxnqayypzljhcnx
+```
+
+**Rails.** Sign the caregiver in, open Dosely once, accept notification
+permission. `device_tokens` must have a row for that account. Empty means
+this phone will never get a push.
+
+**Background / killed (FCM).** Leave Dosely on the caregiver phone and
+lock it. On the patient's phone, let a reminder fall 30 minutes past due
+(the missed-dose grace) without tapping Taken, then open Dosely so it can
+sweep, sync, and call `notify-care`. On the locked caregiver phone the
+shade may show the app name or “new notification”, but not the medicine.
+Unlock: the full body (`… missed a dose` and the medicine) is still there.
+
+**Foreground (local notification).** Keep Dosely open on the caregiver
+phone, lock the screen, and trigger another **new** missed dose the same
+way. Same expectation: redacted on the lock screen, full text after
+unlock.
+
+**If nothing arrives.** The same dose will not ring twice — `care_alerts`
+de-duplicates on `(link, dose)`. You need a fresh missed log. Then, in
+order: no new `care_alerts` row means the patient's phone never reached
+`notify-care` (cloud backup consent off, the dose not synced, or the
+sweep has not run); `delivered_count = 0` means the function ran but FCM
+did not deliver (stale token); function logs as in “Checking it works”
+above.
+
 ### Stale tokens
 
 An FCM token dies when the app is uninstalled, its data is cleared, or FCM
@@ -508,6 +565,43 @@ security-definer function, and no insert/update policy on the table at all —
 the same shape the care-link lifecycle uses. `supabase/tests/push_rls_test.sql`
 asserts it, along with the rule that a device token is never readable by
 anyone but its owner, not even by a confirmed caregiver.
+
+## Phase 4 device checks
+
+The Dart tests below are the cheap half. Overlay-install on a real phone
+is the other half — the Galaxy M33 still pending from earlier phases.
+
+**OCR redaction (4.3e).** Name, address, date of birth, Rx number, and
+prescriber must leave the phone as `[redacted]` before `parse-medicine`
+runs. Drug name, strength, directions, quantity, and expiry must survive.
+
+```
+cd app
+flutter test test/label_redactor_test.dart
+```
+
+On the phone: photograph a real pharmacy label (AI fill-in consent on).
+The review form should still fill the medicine. A label that is only
+medicine + directions should parse as before — no false redaction of
+`Rx only` or `Generic Name`.
+
+**Care-alert lock screen (4.3d).** Documented under Push, “Lock-screen
+copy on care alerts”. Needs `notify-care` deployed and two phones.
+
+**Device-credential unlock (4.3c).** After two minutes in the background,
+Dosely covers the reminders and asks for the PIN / pattern / fingerprint
+already on the phone — not a new password, and not a session kill. Cold
+start does not prompt. A phone with no screen lock never prompts.
+
+```
+cd app
+flutter test test/device_lock_test.dart
+```
+
+On a phone with a PIN: background Dosely for more than two minutes,
+resume, authenticate, confirm reminders return. Background for about
+thirty seconds and resume: no extra unlock. Repeat on a phone with no
+screen lock: the app stays usable.
 
 ## Reliability notes
 
