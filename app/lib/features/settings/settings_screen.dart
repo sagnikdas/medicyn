@@ -211,8 +211,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ],
             const SizedBox(height: 12),
             TextButton(
-              onPressed: openPrivacyPolicy,
-              child: const Text('Privacy policy'),
+              onPressed: () => openPrivacyPolicy(context),
+              child: Text(
+                'Privacy policy',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.primary,
+                  decoration: TextDecoration.underline,
+                ),
+              ),
             ),
           ],
         ),
