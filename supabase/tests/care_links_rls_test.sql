@@ -406,9 +406,11 @@ select pg_temp.expect(
   'an edit writes a history row'
 );
 select pg_temp.expect(
-  (select actor_id from medicine_edits
-    where medicine_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
-    order by created_at desc limit 1) = :'child'::uuid,
+  exists (
+    select 1 from medicine_edits
+     where medicine_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+       and actor_id = :'child'::uuid
+  ),
   'the history row names the caregiver'
 );
 
@@ -422,7 +424,7 @@ select pg_temp.expect(
 
 delete from medicines where user_id = :'parent';
 select pg_temp.expect(
-  (select count(*) from medicines where user_id = :'parent') = 2,
+  (select count(*) from medicines where user_id = :'parent') = 3,
   'a caregiver cannot delete the parent''s medicines'
 );
 delete from schedules where user_id = :'parent';

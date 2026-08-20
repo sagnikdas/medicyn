@@ -553,6 +553,7 @@ class CareService {
         'updated_by': caller,
       });
     } catch (e) {
+      debugPrint('[dosely] savePatientReminder failed: $e');
       throw CareLinkFailure(_describe(e));
     }
   }
