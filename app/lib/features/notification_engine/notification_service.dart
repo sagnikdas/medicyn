@@ -14,6 +14,7 @@ import '../../data/local/tables.dart';
 import 'notification_actions.dart';
 import 'notification_ids.dart';
 import 'device_health.dart';
+import 'interval_dose_sequence.dart';
 import 'schedule_validation.dart';
 
 // v4: Bumped again to ensure sound and alarm settings are applied fresh.
@@ -40,6 +41,7 @@ const String careAlertChannelDescription =
 
 const String actionTaken = 'taken';
 const String actionSnooze = 'snooze';
+const String actionCareCall = 'care_call';
 
 const String _redactedReminderTitle = 'Medicine reminder';
 const String _redactedReminderBody = 'Time to take your dose';
@@ -101,12 +103,6 @@ class NotificationService {
   /// Seven would do — the eighth step is slack so a schedule whose weekday
   /// is valid but whose time has already passed today still resolves.
   static const int _maxWeekdaySearchDays = 8;
-
-  /// A ceiling on the walk that finds the first every-X-hours slot. With an
-  /// interval validated to 1..24 the walk covers at most a day either way, so
-  /// this is unreachable in practice and exists only to make the loop
-  /// provably finite.
-  static const int _everyXHoursMaxSearchSteps = 64;
 
   Future<void> init() async {
     if (_initialized) return;
@@ -386,56 +382,67 @@ class NotificationService {
           );
         }
 
-        // The anchor is the first *parseable* time, not simply the first —
-        // a malformed entry ahead of a good one should not decide the
-        // sequence, and should not fall back to 08:00 while a real time sits
-        // behind it.
+        // The origin is the first *parseable* time on the calendar day this
+        // definition started — the same lattice [expectedDoses] walks, so a
+        // miss and an alarm cannot disagree about when a dose was due.
         final anchor = times.isNotEmpty
             ? times.first
             : (label: '08:00', clock: (hour: 8, minute: 0));
         final now = tz.TZDateTime.now(tz.local);
-
-        var next = tz.TZDateTime(
-          tz.local,
-          now.year,
-          now.month,
-          now.day,
+        final defined = schedule.updatedAt.toLocal();
+        final origin = DateTime(
+          defined.year,
+          defined.month,
+          defined.day,
           anchor.clock.hour,
           anchor.clock.minute,
         );
-
-        // Walk back to the start of today's sequence so a slot already past
-        // is still covered, then forward to the first one still ahead. Both
-        // walks move by a whole interval, which validation has guaranteed is
-        // at least an hour, so both terminate; the step ceilings are there
-        // for the case where that guarantee is ever weakened.
-        var steps = 0;
-        while (next.isAfter(now) && steps++ < _everyXHoursMaxSearchSteps) {
-          final prev = next.subtract(Duration(hours: interval));
-          if (prev.isBefore(now)) break;
-          next = prev;
-        }
-
-        steps = 0;
-        while (!next.isAfter(now) && steps++ < _everyXHoursMaxSearchSteps) {
-          next = next.add(Duration(hours: interval));
-        }
-        if (!next.isAfter(now)) break;
-
         final windowEnd = now.add(Duration(days: _everyXHoursWindowDays));
-        var index = 0;
-        while (next.isBefore(windowEnd) && index < _everyXHoursMaxOccurrences) {
+        final sequence = intervalDoseSequence(
+          origin: origin,
+          intervalHours: interval,
+          from: DateTime(
+            now.year,
+            now.month,
+            now.day,
+            now.hour,
+            now.minute,
+            now.second,
+            now.millisecond,
+          ),
+          to: DateTime(
+            windowEnd.year,
+            windowEnd.month,
+            windowEnd.day,
+            windowEnd.hour,
+            windowEnd.minute,
+            windowEnd.second,
+            windowEnd.millisecond,
+          ),
+          maxOccurrences: _everyXHoursMaxOccurrences,
+          includeFrom: false,
+        );
+
+        for (var index = 0; index < sequence.length; index++) {
+          final when = sequence[index];
           await _plugin.zonedSchedule(
             id: notificationIdFor(schedule.id, 'slot-$index'),
             title: copy.title,
             body: copy.body,
-            scheduledDate: next,
+            scheduledDate: tz.TZDateTime(
+              tz.local,
+              when.year,
+              when.month,
+              when.day,
+              when.hour,
+              when.minute,
+              when.second,
+              when.millisecond,
+            ),
             notificationDetails: details,
             androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
             payload: _payload(schedule.id, anchor.label),
           );
-          next = next.add(Duration(hours: interval));
-          index++;
         }
         break;
 
@@ -512,20 +519,23 @@ class NotificationService {
   /// app is the one person who never hears that a dose was missed.
   ///
   /// [patientId] rides along in the payload so a tap opens the right feed —
-  /// see `handleNotificationResponse`.
+  /// see `handleNotificationResponse`. [callPhone], when set, adds a Call
+  /// action that opens the dialer without needing the feed first.
   Future<void> showCareAlert({
     required String title,
     required String body,
     String? patientId,
+    String? callPhone,
   }) async {
     await init();
+    final phone = callPhone;
     await _plugin.show(
       // A fresh id per alert, so a second missed dose does not overwrite the
       // first while the caregiver is reading it.
       id: DateTime.now().millisecondsSinceEpoch.remainder(1 << 31),
       title: title,
       body: body,
-      notificationDetails: const NotificationDetails(
+      notificationDetails: NotificationDetails(
         android: AndroidNotificationDetails(
           careAlertChannelId,
           careAlertChannelName,
@@ -534,10 +544,22 @@ class NotificationService {
           priority: Priority.high,
           category: AndroidNotificationCategory.message,
           visibility: careAlertLockScreenVisibility,
+          actions: [
+            if (phone != null && phone.isNotEmpty)
+              const AndroidNotificationAction(
+                actionCareCall,
+                'Call',
+                showsUserInterface: true,
+                cancelNotification: false,
+              ),
+          ],
         ),
-        iOS: DarwinNotificationDetails(presentAlert: true, presentSound: true),
+        iOS: const DarwinNotificationDetails(presentAlert: true, presentSound: true),
       ),
-      payload: jsonEncode({'careAlertPatientId': patientId}),
+      payload: jsonEncode({
+        'careAlertPatientId': patientId,
+        if (phone != null && phone.isNotEmpty) 'careAlertCallPhone': phone,
+      }),
     );
   }
 

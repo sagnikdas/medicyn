@@ -56,6 +56,12 @@ class CareNotifier {
     await _invoke({pushEventKey: pushEventDataChanged});
   }
 
+  /// Announces that a tracked bottle on this device would last five days or
+  /// fewer. The server de-duplicates to one ping per link per day.
+  Future<void> refillLow() async {
+    await _invoke({pushEventKey: pushEventRefillLow});
+  }
+
   Future<void> _invoke(Map<String, dynamic> body) async {
     if (_client.auth.currentUser == null) return;
     try {

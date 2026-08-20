@@ -1,5 +1,6 @@
 import '../../data/local/database.dart';
 import '../../data/local/tables.dart';
+import 'interval_dose_sequence.dart';
 import 'schedule_validation.dart';
 
 /// When a schedule *should* have gone off, over a window of the recent past.
@@ -11,18 +12,10 @@ import 'schedule_validation.dart';
 /// never was, and tells a family in another city that their parent skipped
 /// their medication.
 ///
-/// ## Why every-X-hours is deliberately excluded
-///
-/// Daily and specific-days schedules name a fixed clock time, so their past
-/// occurrences are reconstructible exactly. Every-X-hours is not: the alarm
-/// scheduler re-anchors the sequence to *today's* anchor time each time it
-/// runs, so for an interval that doesn't divide 24 the lattice armed
-/// yesterday is not the one this function would compute today. Rather than
-/// guess, it returns nothing for those schedules, and they are simply never
-/// reported as missed.
-///
-/// Fixing that properly means the alarm path and this function sharing one
-/// definition of the sequence. Until then, silence beats a false alarm.
+/// Every-X-hours shares [intervalDoseSequence] with the alarm scheduler,
+/// originating at the first parseable time on the calendar day the current
+/// definition started (`updatedAt`). As-needed still yields nothing: there
+/// is nothing to miss.
 List<DateTime> expectedDoses(
   Schedule schedule, {
   required DateTime from,
@@ -48,6 +41,25 @@ List<DateTime> expectedDoses(
         onDays: schedule.daysOfWeek.toSet(),
       );
     case FrequencyType.everyXHours:
+      final interval = schedulableIntervalHours(schedule.intervalHours);
+      if (interval == null) return const [];
+      final times = schedulableTimes(schedule.times);
+      if (times.isEmpty) return const [];
+      final defined = schedule.updatedAt;
+      final clock = times.first.clock;
+      final origin = DateTime(
+        defined.year,
+        defined.month,
+        defined.day,
+        clock.hour,
+        clock.minute,
+      );
+      return intervalDoseSequence(
+        origin: origin,
+        intervalHours: interval,
+        from: from,
+        to: to,
+      );
     case FrequencyType.asNeeded:
       return const [];
   }

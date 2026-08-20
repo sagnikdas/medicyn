@@ -14,13 +14,18 @@
 //     block — PLAN.md's open question about what the parent is told is still
 //     open, and a lock-screen banner would also fight 4.3d.
 //
-// Why the *device* calls this rather than a Postgres trigger firing on the
-// insert: a trigger needs `pg_net`, which Supabase installs in the
-// `extensions` schema that every security-definer function here deliberately
-// excludes from its search_path, plus a service key stored in the database.
-// It would buy nothing today either — missed doses are only ever produced by
-// the parent's own device (see MissedDoseDetector), so there is no second
-// writer for a trigger to catch.
+//   * `refill_low`   — the parent's device decremented a tracked bottle
+//     past the five-day mark. The caregiver gets a visible ping that names
+//     no medicine.
+//   * `device_silent` — a scheduled job, not a device, because the whole
+//     point is that the patient's app did not run. Gated by `CRON_SECRET`.
+//
+// Why the *device* calls missed_dose / data_changed / refill_low rather than
+// a Postgres trigger firing on the insert: a trigger needs `pg_net`, which
+// Supabase installs in the `extensions` schema that every security-definer
+// function here deliberately excludes from its search_path, plus a service
+// key stored in the database. Silent-device is the exception that *must* be
+// server-side: the patient's app is not running.
 //
 // Notification *content* is read from the database here, never taken from the
 // request. The client sends dose-log ids and nothing else, so what a family is
@@ -70,7 +75,9 @@ Deno.serve(async (req: Request) => {
   }
 
   const jwt = bearerToken(req.headers.get("Authorization"));
-  if (!jwt) return json({ error: "not_authenticated" }, 401);
+  const cronSecret = Deno.env.get("CRON_SECRET");
+  const cronHeader = req.headers.get("x-cron-secret");
+  const isCron = Boolean(cronSecret) && cronHeader === cronSecret;
 
   // Validated against the auth server rather than by decoding `sub` out of the
   // JWT. The gateway's `verify_jwt` already checks the signature, but this
@@ -80,6 +87,21 @@ Deno.serve(async (req: Request) => {
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
+
+  if (isCron) {
+    try {
+      return await announceSilentDevices(admin);
+    } catch (err) {
+      if (err instanceof FcmConfigError) {
+        console.error(`fcm_config_error: ${err.message}`);
+        return json({ error: "push_not_configured" }, 500);
+      }
+      console.error(`notify_failed: ${err}`);
+      return json({ error: "notify_failed" }, 500);
+    }
+  }
+
+  if (!jwt) return json({ error: "not_authenticated" }, 401);
   const { data: userData, error: userError } = await admin.auth.getUser(jwt);
   const caller = userData?.user;
   if (userError || !caller) return json({ error: "not_authenticated" }, 401);
@@ -111,6 +133,9 @@ Deno.serve(async (req: Request) => {
   try {
     if (authz.event === "missed_dose") {
       return await announceMissedDoses(admin, caller.id, authz.link, body.doseLogIds);
+    }
+    if (authz.event === "refill_low") {
+      return await announceRefillLow(admin, caller.id, authz.link);
     }
     return await announceDataChange(admin, caller.id, authz.link);
   } catch (err) {
@@ -262,6 +287,115 @@ async function announceDataChange(
   if (error) console.error(`care_alerts_insert_failed: ${error.message}`);
 
   return json({ sent: 1, recipients: tokens.length, delivered });
+}
+
+/// The caregiver-facing "the bottle is running out" ping. Copy names no
+/// medicine: a lock-screen banner that quoted a drug would recreate the
+/// care-alert exposure. De-duplicated to one ping per link per UTC day.
+async function announceRefillLow(
+  admin: SupabaseClient,
+  callerId: string,
+  link: CareLinkRow,
+): Promise<Response> {
+  if (link.patient_id !== callerId) {
+    return json({ sent: 0, reason: "caller_is_not_the_patient" });
+  }
+  const recipientId = link.caregiver_id;
+  if (!recipientId) return json({ sent: 0, reason: "no_caregiver" });
+
+  const { data: claimed, error: claimError } = await admin
+    .from("care_alerts")
+    .insert({
+      link_id: link.id,
+      recipient_id: recipientId,
+      kind: "refill_low",
+    })
+    .select("id");
+  if (claimError) {
+    // Unique index on (link, UTC day) — already told them today.
+    if (claimError.code === "23505") {
+      return json({ sent: 0, reason: "already_announced" });
+    }
+    console.error(`care_alerts_claim_failed: ${claimError.message}`);
+    return json({ error: "claim_failed" }, 500);
+  }
+  if (!claimed || claimed.length === 0) {
+    return json({ sent: 0, reason: "already_announced" });
+  }
+
+  const [patient, tokens] = await Promise.all([
+    profileOf(admin, link.patient_id),
+    tokensOf(admin, recipientId),
+  ]);
+  const who = patient.displayName ?? "Someone you help";
+  const delivered = await deliver(admin, tokens, {
+    notification: {
+      title: `${who}'s medicine is running low`,
+      body: "Open Dosely to see which one. About five days of tablets left.",
+    },
+    androidChannelId: CARE_ALERT_CHANNEL_ID,
+    data: {
+      event: "refill_low",
+      patientId: link.patient_id,
+    },
+  });
+  await admin.from("care_alerts").update({ delivered_count: delivered }).eq("id", claimed[0].id);
+  return json({ sent: 1, recipients: tokens.length, delivered });
+}
+
+/// Server-side: the patient's app is not running, so it cannot tell anyone.
+/// Invoked with `x-cron-secret`, not a user JWT.
+async function announceSilentDevices(admin: SupabaseClient): Promise<Response> {
+  const { data: due, error } = await admin.rpc("silent_devices_due");
+  if (error) {
+    console.error(`silent_devices_due_failed: ${error.message}`);
+    return json({ error: "lookup_failed" }, 500);
+  }
+  const rows = (due ?? []) as Array<{
+    link_id: string;
+    patient_id: string;
+    caregiver_id: string;
+    last_seen_at: string | null;
+  }>;
+  let sent = 0;
+  let deliveredTotal = 0;
+  for (const row of rows) {
+    const { data: claimed, error: claimError } = await admin
+      .from("care_alerts")
+      .insert({
+        link_id: row.link_id,
+        recipient_id: row.caregiver_id,
+        kind: "device_silent",
+      })
+      .select("id");
+    if (claimError) {
+      if (claimError.code === "23505") continue;
+      console.error(`care_alerts_claim_failed: ${claimError.message}`);
+      continue;
+    }
+    if (!claimed || claimed.length === 0) continue;
+
+    const [patient, tokens] = await Promise.all([
+      profileOf(admin, row.patient_id),
+      tokensOf(admin, row.caregiver_id),
+    ]);
+    const who = patient.displayName ?? "Someone you help";
+    const delivered = await deliver(admin, tokens, {
+      notification: {
+        title: `${who}'s phone hasn't checked in`,
+        body: "It hasn't opened Dosely since yesterday. This is not a missed dose — their app did not run.",
+      },
+      androidChannelId: CARE_ALERT_CHANNEL_ID,
+      data: {
+        event: "device_silent",
+        patientId: row.patient_id,
+      },
+    });
+    await admin.from("care_alerts").update({ delivered_count: delivered }).eq("id", claimed[0].id);
+    sent += 1;
+    deliveredTotal += delivered;
+  }
+  return json({ sent, delivered: deliveredTotal });
 }
 
 /// Sends to every one of the recipient's devices and drops the tokens FCM says

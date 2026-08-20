@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -8,6 +9,7 @@ import '../../core/ids.dart';
 import '../../data/local/database.dart';
 import '../../data/local/tables.dart';
 import '../care/dose_feed_screen.dart';
+import '../care/phone_dial.dart';
 import '../dose_confirm/dose_confirm_screen.dart';
 import 'notification_service.dart';
 
@@ -50,6 +52,14 @@ void handleNotificationResponse(NotificationResponse response) async {
   // is tapped through FirebaseMessaging instead.
   final careAlertPatientId = payload['careAlertPatientId'] as String?;
   if (careAlertPatientId != null && careAlertPatientId.isNotEmpty) {
+    if (actionId == actionCareCall) {
+      final phone = payload['careAlertCallPhone'] as String?;
+      final dialable = dialablePhone(phone);
+      if (dialable != null) {
+        unawaited(openDialer(dialable));
+      }
+      return;
+    }
     openFeedForPatient(careAlertPatientId);
     return;
   }
@@ -97,13 +107,14 @@ Future<void> recordDoseTaken(
   AppDatabase db, {
   required String scheduleId,
   required DateTime scheduledAt,
-}) {
-  return db.recordDoseAction(
+}) async {
+  await db.recordDoseAction(
     id: newUuid(),
     scheduleId: scheduleId,
     scheduledAt: scheduledAt,
     action: DoseAction.taken,
   );
+  await db.decrementStockForSchedule(scheduleId);
 }
 
 /// Logs the snooze, then arms a one-off reminder [delay] out.

@@ -556,6 +556,46 @@ select pg_temp.expect(
   'confirming a still-valid claimed link succeeds and clears expiry'
 );
 
+-- Phase 3: each side stores the number the other rings; a stale last_seen
+-- is what silent-device detection watches.
+select pg_temp.become(:'parent');
+select set_own_care_phone('+919876543210');
+select pg_temp.expect(
+  (select patient_phone = '+919876543210'
+     from care_links
+    where id = current_setting('test.fresh_link_id')::uuid),
+  'the patient stores the number the caregiver rings'
+);
+select pg_temp.become(:'child');
+select set_own_care_phone('+911234567890');
+select pg_temp.expect(
+  (select caregiver_phone = '+911234567890'
+     from care_links
+    where id = current_setting('test.fresh_link_id')::uuid),
+  'the caregiver stores the number the patient rings'
+);
+
+reset role;
+update profiles
+   set last_seen_at = now() - interval '25 hours'
+ where user_id = :'parent'::uuid;
+select pg_temp.expect(
+  (select count(*) from silent_devices_due()) = 1,
+  'a patient quiet for 25 hours is due a silent-device ping'
+);
+update profiles set last_seen_at = now() where user_id = :'parent'::uuid;
+select pg_temp.expect(
+  (select count(*) from silent_devices_due()) = 0,
+  'a phone that checked in just now is not silent'
+);
+
+select pg_temp.become(:'child');
+select pg_temp.expect_exception(
+  $q$select * from silent_devices_due()$q$,
+  'permission denied',
+  'authenticated cannot enumerate silent devices'
+);
+
 -- ---------------------------------------------------------------------------
 -- claim rate limit
 -- ---------------------------------------------------------------------------

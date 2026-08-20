@@ -85,6 +85,18 @@ void main() {
 
       expect(link.otherPartyId(patient), isNull);
     });
+
+    test('the caregiver rings the patient number, and the other way around', () {
+      final link = CareLink.fromRow({
+        ...row(),
+        'patient_phone': '+919111111111',
+        'caregiver_phone': '+919222222222',
+      });
+
+      expect(link.phoneToCall(caregiver), '+919111111111');
+      expect(link.phoneToCall(patient), '+919222222222');
+      expect(link.ownPhone(patient), '+919111111111');
+    });
   });
 
   group('CareClaimant.tryParse', () {

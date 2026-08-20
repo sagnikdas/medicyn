@@ -67,6 +67,8 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
   final _strengthController = TextEditingController();
   final _formController = TextEditingController();
   final _doseAmountController = TextEditingController();
+  final _remainingController = TextEditingController();
+  final _perDoseController = TextEditingController();
   final _notesController = TextEditingController();
   final _intervalController = TextEditingController(text: '8');
 
@@ -114,6 +116,8 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
     _strengthController.dispose();
     _formController.dispose();
     _doseAmountController.dispose();
+    _remainingController.dispose();
+    _perDoseController.dispose();
     _notesController.dispose();
     _intervalController.dispose();
     super.dispose();
@@ -181,6 +185,12 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
     _formController.text = medicine.form;
     _doseAmountController.text = medicine.doseAmount;
     _notesController.text = medicine.notes;
+    if (medicine.tabletsRemaining != null) {
+      _remainingController.text = '${medicine.tabletsRemaining}';
+    }
+    if (medicine.tabletsPerDose != null) {
+      _perDoseController.text = '${medicine.tabletsPerDose}';
+    }
     // A row saved before these fields were validated can still be sitting in
     // the database, and `byName` throws rather than defaulting. Clean it on
     // the way into the form so editing a poisoned reminder is how it gets
@@ -248,6 +258,20 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
     return schedulableIntervalHours(parsed) == null ? null : parsed;
   }
 
+  int? _enteredRemaining() {
+    final raw = _remainingController.text.trim();
+    if (raw.isEmpty) return null;
+    return int.tryParse(raw);
+  }
+
+  int? _enteredPerDose() {
+    final raw = _perDoseController.text.trim();
+    if (raw.isEmpty) return null;
+    final parsed = int.tryParse(raw);
+    if (parsed == null || parsed < 1) return null;
+    return parsed;
+  }
+
   bool get _canSave {
     if (_drugNameController.text.trim().isEmpty) return false;
     if (_frequency == FrequencyType.asNeeded) return true;
@@ -287,6 +311,8 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
       strength: _strengthController.text.trim(),
       form: _formController.text.trim(),
       doseAmount: _doseAmountController.text.trim(),
+      tabletsRemaining: _enteredRemaining(),
+      tabletsPerDose: _enteredPerDose(),
       notes: _notesController.text.trim(),
       frequencyType: _frequency.name,
       times: _times,
@@ -317,6 +343,8 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
         form: Value(_formController.text.trim()),
         doseAmount: Value(_doseAmountController.text.trim()),
         notes: Value(_notesController.text.trim()),
+        tabletsRemaining: Value(_enteredRemaining()),
+        tabletsPerDose: Value(_enteredPerDose()),
         // insertOnConflictUpdate only touches columns present here — without
         // this, editing an already-synced medicine would silently leave
         // pendingSync at its old (false) value and the edit would never sync.
@@ -490,6 +518,34 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
         TextField(
           controller: _doseAmountController,
           decoration: const InputDecoration(labelText: 'Dose amount (e.g. 1 tablet)'),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _remainingController,
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                decoration: const InputDecoration(
+                  labelText: 'Tablets left',
+                  helperText: 'Leave blank to skip',
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: TextField(
+                controller: _perDoseController,
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                decoration: const InputDecoration(
+                  labelText: 'Tablets per dose',
+                  helperText: 'Defaults to 1',
+                ),
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 20),
         Text('Frequency', style: Theme.of(context).textTheme.titleSmall),

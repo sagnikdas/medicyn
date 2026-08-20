@@ -4,10 +4,20 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('careAlertPatientIdFromData', () {
-    test('returns the patient on a missed-dose tap', () {
+    test('returns the patient on a silent-device tap', () {
       expect(
         careAlertPatientIdFromData({
-          pushEventKey: pushEventMissedDose,
+          pushEventKey: pushEventDeviceSilent,
+          pushPatientIdKey: 'patient-1',
+        }),
+        'patient-1',
+      );
+    });
+
+    test('returns the patient on a refill-low tap', () {
+      expect(
+        careAlertPatientIdFromData({
+          pushEventKey: pushEventRefillLow,
           pushPatientIdKey: 'patient-1',
         }),
         'patient-1',

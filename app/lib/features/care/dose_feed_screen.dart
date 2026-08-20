@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:timezone/timezone.dart' as tz;
 
 import '../../core/app_navigation.dart';
+import '../auth/auth_service.dart';
 import 'care_service.dart';
+import 'phone_dial.dart';
 
 /// Opens [patientId]'s feed from outside the widget tree — a tapped missed-dose
 /// notification, whether it arrived as a push (see PushService) or was drawn
@@ -57,6 +59,7 @@ class _DoseFeedScreenState extends State<DoseFeedScreen> {
   List<DoseEvent>? _events;
   CareProfile? _profile;
   String? _error;
+  String? _callPhone;
 
   /// The patient's zone, resolved once. Falls back to the device's own when
   /// the profile has no usable identifier, which only costs correctness for
@@ -73,11 +76,17 @@ class _DoseFeedScreenState extends State<DoseFeedScreen> {
     try {
       final profile = await CareService.instance.profile(widget.patientId);
       final events = await CareService.instance.doseFeed(widget.patientId);
+      final link = await CareService.instance.currentLink();
+      final me = AuthService.instance.currentUser?.id;
+      final callPhone = (link != null && me != null)
+          ? dialablePhone(link.phoneToCall(me))
+          : null;
       if (!mounted) return;
       setState(() {
         _profile = profile;
         _patientZone = _resolveZone(profile?.timezone);
         _events = events;
+        _callPhone = callPhone;
         _error = null;
       });
     } on CareLinkFailure catch (e) {
@@ -124,6 +133,14 @@ class _DoseFeedScreenState extends State<DoseFeedScreen> {
                   ? 'Their doses'
                   : "$who's doses",
         ),
+        actions: [
+          if (_callPhone != null)
+            IconButton(
+              tooltip: 'Call',
+              icon: const Icon(Icons.phone),
+              onPressed: () => openDialer(_callPhone!),
+            ),
+        ],
       ),
       body: SafeArea(child: RefreshIndicator(onRefresh: _load, child: _body())),
     );

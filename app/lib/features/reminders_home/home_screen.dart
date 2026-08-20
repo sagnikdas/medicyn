@@ -20,6 +20,7 @@ import '../review_edit/review_edit_screen.dart';
 import '../settings/settings_screen.dart';
 import '../voice_capture/voice_capture_screen.dart';
 import 'reminder_copy.dart';
+import 'refill.dart';
 
 enum _ReminderDisposition { stop, deleteHistory }
 
@@ -131,6 +132,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
     if (sync.pushedEdits) {
       unawaited(CareNotifier.instance.dataChanged());
+    }
+    final items = await widget.db.activeSchedulesOnce();
+    if (anyRefillLow(items)) {
+      unawaited(CareNotifier.instance.refillLow());
     }
   }
 
@@ -373,6 +378,20 @@ class _ReminderCard extends StatelessWidget {
                       Text(medicine.doseAmount, style: Theme.of(context).textTheme.bodyMedium),
                     const SizedBox(height: 4),
                     Text(describeSchedule(item.schedule), style: Theme.of(context).textTheme.bodySmall),
+                    if (refillWarningLine(refillDaysLeft(
+                          tabletsRemaining: medicine.tabletsRemaining,
+                          tabletsPerDose: medicine.tabletsPerDose,
+                          schedules: [item.schedule],
+                        ))
+                        case final warning?) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        warning,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                      ),
+                    ],
                     if (attribution != null) ...[
                       const SizedBox(height: 4),
                       Text(attribution!, style: Theme.of(context).textTheme.bodySmall),

@@ -17,6 +17,7 @@ class SetupHealthPanel extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final who = viewingOwnData ? 'this phone' : (profile?.displayName ?? 'their phone');
     final warn = profile?.remindersMayNotFire == true;
+    final silent = _looksSilent(profile?.lastSeenAt);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -50,6 +51,25 @@ class SetupHealthPanel extends StatelessWidget {
               ),
             ),
           ),
+        if (silent)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: scheme.errorContainer,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Text(
+                  viewingOwnData
+                      ? 'This phone has not checked in for a day. Open Dosely so your family knows it is still on.'
+                      : 'Their phone has not checked in since yesterday. That is not a missed dose — the app did not run.',
+                  style: text.bodySmall?.copyWith(color: scheme.onErrorContainer),
+                ),
+              ),
+            ),
+          ),
         _row(context, 'Notifications allowed', describeHealthFlag(profile?.notificationsAllowed)),
         _row(context, 'Exact alarms allowed', describeHealthFlag(profile?.exactAlarmsAllowed)),
         _row(context, 'Battery exemption', describeHealthFlag(profile?.batteryExemption)),
@@ -74,4 +94,9 @@ class SetupHealthPanel extends StatelessWidget {
       ),
     );
   }
+}
+
+bool _looksSilent(DateTime? lastSeenAt, {DateTime? now}) {
+  if (lastSeenAt == null) return false;
+  return (now ?? DateTime.now()).difference(lastSeenAt) >= const Duration(hours: 24);
 }

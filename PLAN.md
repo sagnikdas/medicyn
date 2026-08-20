@@ -5,7 +5,7 @@ something an elderly parent and one adult child in another city use together.
 Updated as work lands; the design rationale behind these choices lives in the
 Care Link spec artifact. How the app makes money is in `MONETIZE.md`, not here.
 
-**Last updated:** 2026-08-20 · Phase 2 on `main` (#54)
+**Last updated:** 2026-08-20 · Phase 3 on `feature/phase-3-care-extras`
 
 ---
 
@@ -41,6 +41,10 @@ These are settled. Revisit them deliberately, not incidentally.
 - Caregiver editing (remote writes under the patient's `user_id`, no delete),
   silent `data_changed` both ways, per-medicine change history, and setup
   health on the Care Screen (#54)
+
+**On this branch, not yet merged:** refill tracking, a Call button on a
+missed-dose path, silent-device detection from `last_seen_at`, and
+every-X-hours missed doses on the same lattice the alarms use.
 
 **Live on the hosted Supabase project** (`twybepxnqayypzljhcnx`): migrations
 applied, including the timestamp correction (2026-08-19, after both phones were
@@ -162,20 +166,25 @@ Setup health matters more than it sounds. A skipped permission leaves the app
 looking perfectly healthy and simply never firing, so the caregiver stops
 worrying for the wrong reason — worse than having no app.
 
-## Phase 3 — Small and independent
+## Phase 3 — Small and independent — **on this branch**
 
 Good candidates for picking up in any order once Phase 1 exists.
 
-- [ ] **Refill tracking** — tablet count decrementing per dose, warning at
-      about five days left
-- [ ] **Call button** — one tap to phone, straight from a missed-dose alert
-- [ ] **Silent-device detection** — scheduled job over `last_seen_at`,
-      reporting "their phone hasn't checked in since yesterday". Distinct
-      from a missed dose, and the signal a device-side design can never
-      produce
-- [ ] **Every-X-hours missed detection** — currently excluded on purpose (see
-      Known gaps). Closing it means the alarm path and `expectedDoses`
-      sharing one definition of the sequence
+- [x] **Refill tracking** — tablet count decrementing per Taken on the
+      patient's phone, warning at about five days left. Caregiver sees the
+      same warning and can type a new count when they buy a bottle. A
+      nameless `refill_low` ping goes to the caregiver, one per link per day.
+- [x] **Call button** — each side stores their own number on the link.
+      Call sits on the Care screen, on the dose feed a missed-dose tap
+      opens, and as a notification action when the app drew the alert.
+- [x] **Silent-device detection** — `silent_devices_due()` over
+      `last_seen_at`; `notify-care` with `x-cron-secret` sends
+      `device_silent`. Distinct from a missed dose: this fires when the
+      app did not run. Schedule hourly once `CRON_SECRET` is set.
+- [x] **Every-X-hours missed detection** — `intervalDoseSequence` is
+      shared by the alarm scheduler and `expectedDoses`. Origin is the
+      first parseable time on the calendar day the current definition
+      started (`updatedAt`).
 
 ## Phase 4 — Shipping
 
@@ -229,21 +238,19 @@ worth remembering.
   member's phone. The residual cost is that editing a reminder loses any
   not-yet-recorded backfill before the edit; sweeps run on every foreground, so
   in practice almost nothing is lost, and silence beats a false alarm.
-- **Every-X-hours doses are never reported as missed.** The alarm scheduler
-  re-anchors that sequence to today's anchor time on every run, so for an
-  interval that does not divide 24, the slots armed yesterday are not the ones
-  `expectedDoses` would compute today. Inventing occurrences that were never
-  armed would tell a family their parent skipped medication that was never
-  asked for. Silence beats a false alarm.
+- **Every-X-hours doses share one lattice** between the alarm scheduler
+  and missed-dose detection (`intervalDoseSequence`). Residual: the origin
+  is the calendar day of `updatedAt`, so an edit still forfeits not-yet-
+  recorded backfill before it — the same `wasArmed` rule as daily reminders.
+- **A missed dose is only noticed while the parent's app runs.** The sweep is
+  device-side, on foreground, so a parent who does not open the app for two
+  days generates no missed doses and therefore no missed-dose alerts.
+  Silent-device detection covers the "the app did not run" case, which is
+  why a caregiver should never read "no missed-dose alerts" as "all is well".
 - **A caregiver's edit re-arms the parent's alarms** via the silent
   `data_changed` push (Phase 2). Residual: the parent's phone still has to
   be reachable by FCM. If it is offline or force-stopped in a way that
   drops data messages, the change sits until the next foreground pull.
-- **A missed dose is only noticed while the parent's app runs.** The sweep is
-  device-side, on foreground, so a parent who does not open the app for two
-  days generates no missed doses and therefore no alerts. This is the gap
-  Phase 3's silent-device detection covers, and it is the reason a caregiver
-  should never read "no alerts" as "all is well".
 - **A missed-dose alert waits for the parent's phone to have connectivity.**
   If there is no network when the sweep runs, the alert goes out on the next
   foreground that has one — it is not late by minutes, it is late by however

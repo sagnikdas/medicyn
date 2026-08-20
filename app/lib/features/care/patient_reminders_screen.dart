@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../data/local/database.dart';
 import '../auth/auth_service.dart';
 import '../reminders_home/reminder_copy.dart';
+import '../reminders_home/refill.dart';
 import '../review_edit/review_edit_screen.dart';
 import 'care_remote_refresh.dart';
 import 'care_service.dart';
@@ -170,6 +171,20 @@ class _PatientRemindersScreenState extends State<PatientRemindersScreen> {
                   ],
                   const SizedBox(height: 4),
                   Text(describeSchedule(item.schedule), style: Theme.of(context).textTheme.bodySmall),
+                  if (refillWarningLine(refillDaysLeft(
+                        tabletsRemaining: medicine.tabletsRemaining,
+                        tabletsPerDose: medicine.tabletsPerDose,
+                        schedules: [item.schedule],
+                      ))
+                      case final warning?) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      warning,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                  ],
                   if (attribution != null) ...[
                     const SizedBox(height: 4),
                     Text(attribution, style: Theme.of(context).textTheme.bodySmall),

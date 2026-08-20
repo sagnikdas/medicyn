@@ -15,6 +15,7 @@ void main() {
     List<int> days = const [],
     int? intervalHours,
     bool active = true,
+    DateTime? updatedAt,
   }) =>
       Schedule(
         id: '0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0',
@@ -25,7 +26,7 @@ void main() {
         intervalHours: intervalHours,
         active: active,
         createdAt: DateTime(2026, 8, 1),
-        updatedAt: DateTime(2026, 8, 1),
+        updatedAt: updatedAt ?? DateTime(2026, 8, 1),
         updatedBy: null,
         pendingSync: false,
         deleted: false,
@@ -154,19 +155,34 @@ void main() {
     });
   });
 
-  group('frequencies that are deliberately not reported', () {
-    test('every-x-hours yields nothing', () {
-      // The alarm scheduler re-anchors this sequence to today, so past
-      // occurrences are not reconstructible. Silence beats a false alarm.
+  group('every-x-hours shares the alarm lattice', () {
+    test('reports occurrences from the definition-day origin', () {
+      // Saved at 15:32 on the 8th with an 08:00 origin and a 5-hour step.
+      // 08:00 and 13:00 that day are before the definition, so wasArmed
+      // would drop them; expectedDoses still names them, and the sweep
+      // applies wasArmed afterwards.
       expect(
         expectedDoses(
-          schedule(frequency: FrequencyType.everyXHours, intervalHours: 5),
-          from: DateTime(2026, 8, 16),
-          to: DateTime(2026, 8, 19),
+          schedule(
+            frequency: FrequencyType.everyXHours,
+            intervalHours: 5,
+            times: const ['08:00'],
+            updatedAt: DateTime(2026, 8, 8, 15, 32),
+          ),
+          from: DateTime(2026, 8, 8, 15, 32),
+          to: DateTime(2026, 8, 9, 12, 0),
         ),
-        isEmpty,
+        [
+          DateTime(2026, 8, 8, 18, 0),
+          DateTime(2026, 8, 8, 23, 0),
+          DateTime(2026, 8, 9, 4, 0),
+          DateTime(2026, 8, 9, 9, 0),
+        ],
       );
     });
+  });
+
+  group('frequencies that are deliberately not reported', () {
 
     test('as-needed yields nothing', () {
       expect(

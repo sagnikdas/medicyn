@@ -192,6 +192,8 @@ class SyncService {
             'strength': m.strength,
             'form': m.form,
             'dose_amount': m.doseAmount,
+            'tablets_remaining': m.tabletsRemaining,
+            'tablets_per_dose': m.tabletsPerDose,
             'notes': m.notes,
             'created_at': isoUtc(m.createdAt),
             'updated_at': isoUtc(m.updatedAt),
@@ -318,6 +320,8 @@ class SyncService {
           form: Value((r['form'] as String?) ?? ''),
           doseAmount: Value((r['dose_amount'] as String?) ?? ''),
           notes: Value((r['notes'] as String?) ?? ''),
+          tabletsRemaining: Value(_asInt(r['tablets_remaining'])),
+          tabletsPerDose: Value(_asInt(r['tablets_per_dose'])),
           createdAt: Value(DateTime.parse(r['created_at'] as String)),
           updatedAt: Value(remoteStamp),
           updatedBy: Value(r['updated_by'] as String?),
@@ -445,4 +449,10 @@ class SyncService {
       // Best-effort — retried on the next pullAll() call.
     }
   }
+}
+
+int? _asInt(Object? value) {
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  return null;
 }

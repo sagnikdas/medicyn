@@ -20,6 +20,16 @@ const String pushEventMissedDose = 'missed_dose';
 /// they next open the app, while the caregiver believes the change is live.
 const String pushEventDataChanged = 'data_changed';
 
+/// Sent by a scheduled server job when the patient's phone has not checked
+/// in for a day. Distinct from a missed dose: this is the signal a device
+/// that is not running cannot produce.
+const String pushEventDeviceSilent = 'device_silent';
+
+/// Sent by the *patient's* device when a tracked bottle would last five
+/// days or fewer. Copy names no medicine — a lock-screen alert that quoted
+/// a drug would recreate the care-alert exposure.
+const String pushEventRefillLow = 'refill_low';
+
 /// The key every message's `data` map carries, naming which of the above it is.
 const String pushEventKey = 'event';
 

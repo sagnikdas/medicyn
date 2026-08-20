@@ -15,6 +15,10 @@ class Medicines extends Table {
   TextColumn get strength => text().withDefault(const Constant(''))();
   TextColumn get form => text().withDefault(const Constant(''))();
   TextColumn get doseAmount => text().withDefault(const Constant(''))();
+  // Null means the bottle is not being tracked. Taken decrements it on this
+  // device; a caregiver save of a new count is how a refill is logged.
+  IntColumn get tabletsRemaining => integer().nullable()();
+  IntColumn get tabletsPerDose => integer().nullable()();
   TextColumn get notes => text().withDefault(const Constant(''))();
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
   // Client-stamped, and compared against the server's copy to decide which
