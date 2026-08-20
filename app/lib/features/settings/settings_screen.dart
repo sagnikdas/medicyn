@@ -5,6 +5,8 @@ import '../../core/app_settings.dart';
 import '../../core/privacy_policy.dart';
 import '../auth/auth_service.dart';
 import '../care/care_screen.dart';
+import '../consent/consent_purpose.dart';
+import '../consent/consent_service.dart';
 import '../notification_engine/notification_service.dart';
 
 /// Deliberately sparse — there's almost nothing to configure by design.
@@ -119,6 +121,31 @@ class SettingsScreen extends StatelessWidget {
                 value: AppSettings.instance.showMedicineOnLockScreen,
                 onChanged: _setShowMedicineOnLockScreen,
               ),
+            ),
+            const SizedBox(height: 28),
+            Text('Manage what Dosely can do', style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 4),
+            Text(
+              'Turning any of these off takes effect straight away, the same as turning them on.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 8),
+            ListenableBuilder(
+              listenable: AppSettings.instance,
+              builder: (context, _) {
+                return Column(
+                  children: [
+                    for (final purpose in ConsentPurpose.values)
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(purpose.title),
+                        subtitle: Text(purpose.sentence),
+                        value: ConsentService.instance.isGranted(purpose),
+                        onChanged: (v) => ConsentService.instance.setGranted(purpose, v),
+                      ),
+                  ],
+                );
+              },
             ),
             const SizedBox(height: 28),
             OutlinedButton(

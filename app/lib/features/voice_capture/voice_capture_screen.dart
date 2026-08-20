@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
+import '../consent/consent_purpose.dart';
+import '../consent/consent_service.dart';
+
 /// Step 2 of the capture flow: speak the dosage/schedule instructions
 /// ("one tablet twice a day, morning and night") and get a transcript.
 ///
@@ -24,23 +27,27 @@ class VoiceCaptureScreen extends StatefulWidget {
 enum _Status { idle, initializing, listening, unavailable }
 
 class _VoiceCaptureScreenState extends State<VoiceCaptureScreen> {
-  final _speech = SpeechToText();
+  SpeechToText? _speech;
   _Status _status = _Status.idle;
   String _transcript = '';
   String? _errorMessage;
 
+  bool get _speechAllowed => ConsentService.instance.isGranted(ConsentPurpose.googleSpeech);
+
   @override
   void dispose() {
-    _speech.cancel();
+    _speech?.cancel();
     super.dispose();
   }
 
   Future<void> _startListening() async {
+    if (!_speechAllowed) return;
     setState(() {
       _status = _Status.initializing;
       _errorMessage = null;
     });
-    final available = await _speech.initialize(
+    _speech ??= SpeechToText();
+    final available = await _speech!.initialize(
       onStatus: (status) {
         if (status == 'done' || status == 'notListening') {
           setState(() => _status = _Status.idle);
@@ -70,14 +77,14 @@ class _VoiceCaptureScreenState extends State<VoiceCaptureScreen> {
       return;
     }
     setState(() => _status = _Status.listening);
-    await _speech.listen(
+    await _speech!.listen(
       onResult: (result) => setState(() => _transcript = result.recognizedWords),
       listenOptions: SpeechListenOptions(partialResults: true, cancelOnError: true),
     );
   }
 
   Future<void> _stopListening() async {
-    await _speech.stop();
+    await _speech?.stop();
     setState(() => _status = _Status.idle);
   }
 
@@ -122,7 +129,13 @@ class _VoiceCaptureScreenState extends State<VoiceCaptureScreen> {
                 ),
                 const SizedBox(height: 16),
               ],
-              if (_status == _Status.unavailable)
+              if (!_speechAllowed) ...[
+                Text(
+                  'Voice input is off. You can skip this and type the details on the next screen.',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodyLarge,
+                ),
+              ] else if (_status == _Status.unavailable)
                 OutlinedButton(
                   onPressed: () => openAppSettings(),
                   child: const Text('Open Settings'),

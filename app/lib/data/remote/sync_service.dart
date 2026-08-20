@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../features/notification_engine/schedule_validation.dart';
+import '../../core/app_settings.dart';
 import '../local/database.dart';
 
 /// Syncs local-first Drift rows with Supabase. Never in the reminder-firing
@@ -18,9 +19,10 @@ class SyncService {
   SupabaseClient get _client => Supabase.instance.client;
 
   Future<void> syncAll() async {
+    _pushedEdits = false;
+    if (!AppSettings.instance.consentCloudBackup) return;
     final user = _client.auth.currentUser;
     if (user == null) return;
-    _pushedEdits = false;
     await _syncMedicines(user.id);
     await _syncSchedules(user.id);
     await _syncDoseLogs(user.id);
@@ -42,6 +44,7 @@ class SyncService {
   /// Dose logs stay insert-only. Nothing ever edits one, so a log this
   /// device already has can only be identical.
   Future<void> pullAll() async {
+    if (!AppSettings.instance.consentCloudBackup) return;
     final user = _client.auth.currentUser;
     if (user == null) return;
     _schedulesChanged = false;
