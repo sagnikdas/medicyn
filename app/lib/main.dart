@@ -145,6 +145,7 @@ class _AuthGate extends StatefulWidget {
 class _AuthGateState extends State<_AuthGate> {
   AppDatabase? _db;
   String? _userId;
+  var _closing = false;
 
   @override
   void dispose() {
@@ -152,18 +153,36 @@ class _AuthGateState extends State<_AuthGate> {
     super.dispose();
   }
 
-  AppDatabase _databaseFor(String userId) {
+  /// Returns the open database for [userId], or null while a previous
+  /// connection is still closing. First sign-in after local-only *renames*
+  /// `dosely-local.sqlite`; that cannot happen while the local file is open.
+  AppDatabase? _databaseFor(String userId) {
     if (_db != null && _userId == userId) return _db!;
-    unawaited(_db?.close());
+    if (_db != null && !_closing) {
+      _closing = true;
+      unawaited(_closeThenRebuild());
+      return null;
+    }
+    if (_closing) return null;
     _userId = userId;
     _db = AppDatabase();
     return _db!;
+  }
+
+  Future<void> _closeThenRebuild() async {
+    final open = _db;
+    _db = null;
+    _userId = null;
+    await open?.close();
+    _closing = false;
+    if (mounted) setState(() {});
   }
 
   void _releaseDatabase() {
     final open = _db;
     _db = null;
     _userId = null;
+    _closing = false;
     unawaited(open?.close());
   }
 
@@ -176,14 +195,19 @@ class _AuthGateState extends State<_AuthGate> {
           stream: Supabase.instance.client.auth.onAuthStateChange,
           builder: (context, snapshot) {
             final user = Supabase.instance.client.auth.currentUser;
-            if (user != null) {
-              return HomeScreen(db: _databaseFor(user.id));
+            final owner = user?.id ??
+                (AppSettings.instance.localOnly ? localOwnerUserId : null);
+            if (owner == null) {
+              _releaseDatabase();
+              return const SignInScreen();
             }
-            if (AppSettings.instance.localOnly) {
-              return HomeScreen(db: _databaseFor(localOwnerUserId));
+            final db = _databaseFor(owner);
+            if (db == null) {
+              return const Scaffold(
+                body: Center(child: CircularProgressIndicator()),
+              );
             }
-            _releaseDatabase();
-            return const SignInScreen();
+            return HomeScreen(db: db);
           },
         );
       },
