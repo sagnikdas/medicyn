@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../core/account_deletion.dart';
 import '../../core/app_settings.dart';
 import '../../core/privacy_policy.dart';
+import '../../data/export/data_export_service.dart';
+import '../../data/local/database.dart';
 import '../../data/local/encrypted_database.dart';
 import '../auth/auth_service.dart';
 import '../care/care_screen.dart';
@@ -20,7 +22,9 @@ import '../notification_engine/notification_service.dart';
 /// unless the user overrides it here, and whether a locked phone may show
 /// which medicine is due.
 class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({super.key});
+  const SettingsScreen({super.key, required this.db});
+
+  final AppDatabase db;
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -29,6 +33,7 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   bool _signingIn = false;
   String? _signInError;
+  bool _exporting = false;
 
   bool get _signedIn => AuthService.instance.isSignedIn;
 
@@ -170,6 +175,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
             const SizedBox(height: 28),
+            Text('Your data', style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 4),
+            Text(
+              'This is a copy of the data Dosely holds about you (Art. 15/20). '
+              'Other requests are answered within one month (Art. 12(3)) by email '
+              'sagnikd91@gmail.com.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: _exporting ? null : _downloadMyData,
+              icon: _exporting
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.download_outlined),
+              label: Text(_exporting ? 'Preparing…' : 'Download my data'),
+            ),
+            const SizedBox(height: 28),
             Text('Manage what Dosely can do', style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 4),
             Text(
@@ -224,6 +250,35 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _downloadMyData() async {
+    if (_exporting) return;
+    setState(() => _exporting = true);
+    try {
+      final box = context.findRenderObject() as RenderBox?;
+      await DataExportService(widget.db).exportAndShare(
+        sharePositionOrigin:
+            box != null ? box.localToGlobal(Offset.zero) & box.size : null,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Could not export'),
+          content: Text('$e'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _exporting = false);
+    }
   }
 
   /// Already-armed alarms still carry the old title and visibility, so a

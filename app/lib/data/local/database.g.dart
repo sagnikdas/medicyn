@@ -1860,12 +1860,386 @@ class DoseLogsCompanion extends UpdateCompanion<DoseLog> {
   }
 }
 
+class $DoseLogContestsTable extends DoseLogContests
+    with TableInfo<$DoseLogContestsTable, DoseLogContest> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $DoseLogContestsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _doseLogIdMeta = const VerificationMeta(
+    'doseLogId',
+  );
+  @override
+  late final GeneratedColumn<String> doseLogId = GeneratedColumn<String>(
+    'dose_log_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES dose_logs (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _noteMeta = const VerificationMeta('note');
+  @override
+  late final GeneratedColumn<String> note = GeneratedColumn<String>(
+    'note',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  static const VerificationMeta _pendingSyncMeta = const VerificationMeta(
+    'pendingSync',
+  );
+  @override
+  late final GeneratedColumn<bool> pendingSync = GeneratedColumn<bool>(
+    'pending_sync',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("pending_sync" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    doseLogId,
+    note,
+    createdAt,
+    updatedAt,
+    pendingSync,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'dose_log_contests';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<DoseLogContest> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('dose_log_id')) {
+      context.handle(
+        _doseLogIdMeta,
+        doseLogId.isAcceptableOrUnknown(data['dose_log_id']!, _doseLogIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_doseLogIdMeta);
+    }
+    if (data.containsKey('note')) {
+      context.handle(
+        _noteMeta,
+        note.isAcceptableOrUnknown(data['note']!, _noteMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_noteMeta);
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    if (data.containsKey('pending_sync')) {
+      context.handle(
+        _pendingSyncMeta,
+        pendingSync.isAcceptableOrUnknown(
+          data['pending_sync']!,
+          _pendingSyncMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {doseLogId};
+  @override
+  DoseLogContest map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return DoseLogContest(
+      doseLogId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}dose_log_id'],
+      )!,
+      note: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}note'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      pendingSync: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}pending_sync'],
+      )!,
+    );
+  }
+
+  @override
+  $DoseLogContestsTable createAlias(String alias) {
+    return $DoseLogContestsTable(attachedDatabase, alias);
+  }
+}
+
+class DoseLogContest extends DataClass implements Insertable<DoseLogContest> {
+  final String doseLogId;
+  final String note;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final bool pendingSync;
+  const DoseLogContest({
+    required this.doseLogId,
+    required this.note,
+    required this.createdAt,
+    required this.updatedAt,
+    required this.pendingSync,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['dose_log_id'] = Variable<String>(doseLogId);
+    map['note'] = Variable<String>(note);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    map['pending_sync'] = Variable<bool>(pendingSync);
+    return map;
+  }
+
+  DoseLogContestsCompanion toCompanion(bool nullToAbsent) {
+    return DoseLogContestsCompanion(
+      doseLogId: Value(doseLogId),
+      note: Value(note),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+      pendingSync: Value(pendingSync),
+    );
+  }
+
+  factory DoseLogContest.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return DoseLogContest(
+      doseLogId: serializer.fromJson<String>(json['doseLogId']),
+      note: serializer.fromJson<String>(json['note']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      pendingSync: serializer.fromJson<bool>(json['pendingSync']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'doseLogId': serializer.toJson<String>(doseLogId),
+      'note': serializer.toJson<String>(note),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'pendingSync': serializer.toJson<bool>(pendingSync),
+    };
+  }
+
+  DoseLogContest copyWith({
+    String? doseLogId,
+    String? note,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    bool? pendingSync,
+  }) => DoseLogContest(
+    doseLogId: doseLogId ?? this.doseLogId,
+    note: note ?? this.note,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+    pendingSync: pendingSync ?? this.pendingSync,
+  );
+  DoseLogContest copyWithCompanion(DoseLogContestsCompanion data) {
+    return DoseLogContest(
+      doseLogId: data.doseLogId.present ? data.doseLogId.value : this.doseLogId,
+      note: data.note.present ? data.note.value : this.note,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      pendingSync: data.pendingSync.present
+          ? data.pendingSync.value
+          : this.pendingSync,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DoseLogContest(')
+          ..write('doseLogId: $doseLogId, ')
+          ..write('note: $note, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('pendingSync: $pendingSync')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(doseLogId, note, createdAt, updatedAt, pendingSync);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is DoseLogContest &&
+          other.doseLogId == this.doseLogId &&
+          other.note == this.note &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt &&
+          other.pendingSync == this.pendingSync);
+}
+
+class DoseLogContestsCompanion extends UpdateCompanion<DoseLogContest> {
+  final Value<String> doseLogId;
+  final Value<String> note;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<bool> pendingSync;
+  final Value<int> rowid;
+  const DoseLogContestsCompanion({
+    this.doseLogId = const Value.absent(),
+    this.note = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.pendingSync = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  DoseLogContestsCompanion.insert({
+    required String doseLogId,
+    required String note,
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.pendingSync = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : doseLogId = Value(doseLogId),
+       note = Value(note);
+  static Insertable<DoseLogContest> custom({
+    Expression<String>? doseLogId,
+    Expression<String>? note,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<bool>? pendingSync,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (doseLogId != null) 'dose_log_id': doseLogId,
+      if (note != null) 'note': note,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (pendingSync != null) 'pending_sync': pendingSync,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  DoseLogContestsCompanion copyWith({
+    Value<String>? doseLogId,
+    Value<String>? note,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<bool>? pendingSync,
+    Value<int>? rowid,
+  }) {
+    return DoseLogContestsCompanion(
+      doseLogId: doseLogId ?? this.doseLogId,
+      note: note ?? this.note,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      pendingSync: pendingSync ?? this.pendingSync,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (doseLogId.present) {
+      map['dose_log_id'] = Variable<String>(doseLogId.value);
+    }
+    if (note.present) {
+      map['note'] = Variable<String>(note.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (pendingSync.present) {
+      map['pending_sync'] = Variable<bool>(pendingSync.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DoseLogContestsCompanion(')
+          ..write('doseLogId: $doseLogId, ')
+          ..write('note: $note, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('pendingSync: $pendingSync, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
   late final $MedicinesTable medicines = $MedicinesTable(this);
   late final $SchedulesTable schedules = $SchedulesTable(this);
   late final $DoseLogsTable doseLogs = $DoseLogsTable(this);
+  late final $DoseLogContestsTable doseLogContests = $DoseLogContestsTable(
+    this,
+  );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -1874,6 +2248,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     medicines,
     schedules,
     doseLogs,
+    doseLogContests,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
@@ -1890,6 +2265,13 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         limitUpdateKind: UpdateKind.delete,
       ),
       result: [TableUpdate('dose_logs', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'dose_logs',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('dose_log_contests', kind: UpdateKind.delete)],
     ),
   ]);
 }
@@ -2906,6 +3288,26 @@ final class $$DoseLogsTableReferences
       manager.$state.copyWith(prefetchedData: [item]),
     );
   }
+
+  static MultiTypedResultKey<$DoseLogContestsTable, List<DoseLogContest>>
+  _doseLogContestsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.doseLogContests,
+    aliasName: 'dose_logs__id__dose_log_contests__dose_log_id',
+  );
+
+  $$DoseLogContestsTableProcessedTableManager get doseLogContestsRefs {
+    final manager = $$DoseLogContestsTableTableManager(
+      $_db,
+      $_db.doseLogContests,
+    ).filter((f) => f.doseLogId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _doseLogContestsRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
 }
 
 class $$DoseLogsTableFilterComposer
@@ -2968,6 +3370,31 @@ class $$DoseLogsTableFilterComposer
           ),
     );
     return composer;
+  }
+
+  Expression<bool> doseLogContestsRefs(
+    Expression<bool> Function($$DoseLogContestsTableFilterComposer f) f,
+  ) {
+    final $$DoseLogContestsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.doseLogContests,
+      getReferencedColumn: (t) => t.doseLogId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$DoseLogContestsTableFilterComposer(
+            $db: $db,
+            $table: $db.doseLogContests,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
   }
 }
 
@@ -3087,6 +3514,31 @@ class $$DoseLogsTableAnnotationComposer
     );
     return composer;
   }
+
+  Expression<T> doseLogContestsRefs<T extends Object>(
+    Expression<T> Function($$DoseLogContestsTableAnnotationComposer a) f,
+  ) {
+    final $$DoseLogContestsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.doseLogContests,
+      getReferencedColumn: (t) => t.doseLogId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$DoseLogContestsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.doseLogContests,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$DoseLogsTableTableManager
@@ -3102,7 +3554,7 @@ class $$DoseLogsTableTableManager
           $$DoseLogsTableUpdateCompanionBuilder,
           (DoseLog, $$DoseLogsTableReferences),
           DoseLog,
-          PrefetchHooks Function({bool scheduleId})
+          PrefetchHooks Function({bool scheduleId, bool doseLogContestsRefs})
         > {
   $$DoseLogsTableTableManager(_$AppDatabase db, $DoseLogsTable table)
     : super(
@@ -3163,7 +3615,358 @@ class $$DoseLogsTableTableManager
                 ),
               )
               .toList(),
-          prefetchHooksCallback: ({scheduleId = false}) {
+          prefetchHooksCallback:
+              ({scheduleId = false, doseLogContestsRefs = false}) {
+                return PrefetchHooks(
+                  db: db,
+                  explicitlyWatchedTables: [
+                    if (doseLogContestsRefs) db.doseLogContests,
+                  ],
+                  addJoins:
+                      <
+                        T extends TableManagerState<
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic
+                        >
+                      >(state) {
+                        if (scheduleId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.scheduleId,
+                                    referencedTable: $$DoseLogsTableReferences
+                                        ._scheduleIdTable(db),
+                                    referencedColumn: $$DoseLogsTableReferences
+                                        ._scheduleIdTable(db)
+                                        .id,
+                                  )
+                                  as T;
+                        }
+
+                        return state;
+                      },
+                  getPrefetchedDataCallback: (items) async {
+                    return [
+                      if (doseLogContestsRefs)
+                        await $_getPrefetchedData<
+                          DoseLog,
+                          $DoseLogsTable,
+                          DoseLogContest
+                        >(
+                          currentTable: table,
+                          referencedTable: $$DoseLogsTableReferences
+                              ._doseLogContestsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$DoseLogsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).doseLogContestsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.doseLogId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                    ];
+                  },
+                );
+              },
+        ),
+      );
+}
+
+typedef $$DoseLogsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $DoseLogsTable,
+      DoseLog,
+      $$DoseLogsTableFilterComposer,
+      $$DoseLogsTableOrderingComposer,
+      $$DoseLogsTableAnnotationComposer,
+      $$DoseLogsTableCreateCompanionBuilder,
+      $$DoseLogsTableUpdateCompanionBuilder,
+      (DoseLog, $$DoseLogsTableReferences),
+      DoseLog,
+      PrefetchHooks Function({bool scheduleId, bool doseLogContestsRefs})
+    >;
+typedef $$DoseLogContestsTableCreateCompanionBuilder =
+    DoseLogContestsCompanion Function({
+      required String doseLogId,
+      required String note,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<bool> pendingSync,
+      Value<int> rowid,
+    });
+typedef $$DoseLogContestsTableUpdateCompanionBuilder =
+    DoseLogContestsCompanion Function({
+      Value<String> doseLogId,
+      Value<String> note,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<bool> pendingSync,
+      Value<int> rowid,
+    });
+
+final class $$DoseLogContestsTableReferences
+    extends
+        BaseReferences<_$AppDatabase, $DoseLogContestsTable, DoseLogContest> {
+  $$DoseLogContestsTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $DoseLogsTable _doseLogIdTable(_$AppDatabase db) =>
+      db.doseLogs.createAlias('dose_log_contests__dose_log_id__dose_logs__id');
+
+  $$DoseLogsTableProcessedTableManager get doseLogId {
+    final $_column = $_itemColumn<String>('dose_log_id')!;
+
+    final manager = $$DoseLogsTableTableManager(
+      $_db,
+      $_db.doseLogs,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_doseLogIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$DoseLogContestsTableFilterComposer
+    extends Composer<_$AppDatabase, $DoseLogContestsTable> {
+  $$DoseLogContestsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get note => $composableBuilder(
+    column: $table.note,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get pendingSync => $composableBuilder(
+    column: $table.pendingSync,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$DoseLogsTableFilterComposer get doseLogId {
+    final $$DoseLogsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.doseLogId,
+      referencedTable: $db.doseLogs,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$DoseLogsTableFilterComposer(
+            $db: $db,
+            $table: $db.doseLogs,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$DoseLogContestsTableOrderingComposer
+    extends Composer<_$AppDatabase, $DoseLogContestsTable> {
+  $$DoseLogContestsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get note => $composableBuilder(
+    column: $table.note,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get pendingSync => $composableBuilder(
+    column: $table.pendingSync,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$DoseLogsTableOrderingComposer get doseLogId {
+    final $$DoseLogsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.doseLogId,
+      referencedTable: $db.doseLogs,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$DoseLogsTableOrderingComposer(
+            $db: $db,
+            $table: $db.doseLogs,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$DoseLogContestsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $DoseLogContestsTable> {
+  $$DoseLogContestsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get note =>
+      $composableBuilder(column: $table.note, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<bool> get pendingSync => $composableBuilder(
+    column: $table.pendingSync,
+    builder: (column) => column,
+  );
+
+  $$DoseLogsTableAnnotationComposer get doseLogId {
+    final $$DoseLogsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.doseLogId,
+      referencedTable: $db.doseLogs,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$DoseLogsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.doseLogs,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$DoseLogContestsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $DoseLogContestsTable,
+          DoseLogContest,
+          $$DoseLogContestsTableFilterComposer,
+          $$DoseLogContestsTableOrderingComposer,
+          $$DoseLogContestsTableAnnotationComposer,
+          $$DoseLogContestsTableCreateCompanionBuilder,
+          $$DoseLogContestsTableUpdateCompanionBuilder,
+          (DoseLogContest, $$DoseLogContestsTableReferences),
+          DoseLogContest,
+          PrefetchHooks Function({bool doseLogId})
+        > {
+  $$DoseLogContestsTableTableManager(
+    _$AppDatabase db,
+    $DoseLogContestsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$DoseLogContestsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$DoseLogContestsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$DoseLogContestsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> doseLogId = const Value.absent(),
+                Value<String> note = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<bool> pendingSync = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => DoseLogContestsCompanion(
+                doseLogId: doseLogId,
+                note: note,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                pendingSync: pendingSync,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String doseLogId,
+                required String note,
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<bool> pendingSync = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => DoseLogContestsCompanion.insert(
+                doseLogId: doseLogId,
+                note: note,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                pendingSync: pendingSync,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$DoseLogContestsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({doseLogId = false}) {
             return PrefetchHooks(
               db: db,
               explicitlyWatchedTables: [],
@@ -3183,16 +3986,18 @@ class $$DoseLogsTableTableManager
                       dynamic
                     >
                   >(state) {
-                    if (scheduleId) {
+                    if (doseLogId) {
                       state =
                           state.withJoin(
                                 currentTable: table,
-                                currentColumn: table.scheduleId,
-                                referencedTable: $$DoseLogsTableReferences
-                                    ._scheduleIdTable(db),
-                                referencedColumn: $$DoseLogsTableReferences
-                                    ._scheduleIdTable(db)
-                                    .id,
+                                currentColumn: table.doseLogId,
+                                referencedTable:
+                                    $$DoseLogContestsTableReferences
+                                        ._doseLogIdTable(db),
+                                referencedColumn:
+                                    $$DoseLogContestsTableReferences
+                                        ._doseLogIdTable(db)
+                                        .id,
                               )
                               as T;
                     }
@@ -3208,19 +4013,19 @@ class $$DoseLogsTableTableManager
       );
 }
 
-typedef $$DoseLogsTableProcessedTableManager =
+typedef $$DoseLogContestsTableProcessedTableManager =
     ProcessedTableManager<
       _$AppDatabase,
-      $DoseLogsTable,
-      DoseLog,
-      $$DoseLogsTableFilterComposer,
-      $$DoseLogsTableOrderingComposer,
-      $$DoseLogsTableAnnotationComposer,
-      $$DoseLogsTableCreateCompanionBuilder,
-      $$DoseLogsTableUpdateCompanionBuilder,
-      (DoseLog, $$DoseLogsTableReferences),
-      DoseLog,
-      PrefetchHooks Function({bool scheduleId})
+      $DoseLogContestsTable,
+      DoseLogContest,
+      $$DoseLogContestsTableFilterComposer,
+      $$DoseLogContestsTableOrderingComposer,
+      $$DoseLogContestsTableAnnotationComposer,
+      $$DoseLogContestsTableCreateCompanionBuilder,
+      $$DoseLogContestsTableUpdateCompanionBuilder,
+      (DoseLogContest, $$DoseLogContestsTableReferences),
+      DoseLogContest,
+      PrefetchHooks Function({bool doseLogId})
     >;
 
 class $AppDatabaseManager {
@@ -3232,4 +4037,6 @@ class $AppDatabaseManager {
       $$SchedulesTableTableManager(_db, _db.schedules);
   $$DoseLogsTableTableManager get doseLogs =>
       $$DoseLogsTableTableManager(_db, _db.doseLogs);
+  $$DoseLogContestsTableTableManager get doseLogContests =>
+      $$DoseLogContestsTableTableManager(_db, _db.doseLogContests);
 }
