@@ -5,16 +5,17 @@ import 'dart:typed_data' show Int32List;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest_all.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 
 import '../../core/app_settings.dart';
 import '../../data/local/database.dart';
 import '../../data/local/tables.dart';
-import 'notification_actions.dart';
-import 'notification_ids.dart';
 import 'device_health.dart';
 import 'interval_dose_sequence.dart';
+import 'notification_actions.dart';
+import 'notification_ids.dart';
 import 'schedule_validation.dart';
 
 // v4: Bumped again to ensure sound and alarm settings are applied fresh.
@@ -45,6 +46,27 @@ const String actionCareCall = 'care_call';
 
 const String _redactedReminderTitle = 'Medicine reminder';
 const String _redactedReminderBody = 'Time to take your dose';
+
+/// Prefs key for the last cold-start notification we already opened.
+/// [flutter_local_notifications] keeps returning that launch on later
+/// process starts (IDE Run, the launcher) until a different notification
+/// is tapped.
+const String handledNotificationLaunchPref = 'handled_notification_launch';
+
+/// Identity of a notification that cold-started the process. The civil date
+/// is included so tomorrow's tap of the same daily slot is a new event.
+String notificationLaunchFingerprint(
+  NotificationResponse response,
+  DateTime now,
+) {
+  final day = '${now.year}-${now.month}-${now.day}';
+  return '${response.id}|${response.actionId}|${response.payload}|$day';
+}
+
+bool shouldOpenFromLaunchDetails({
+  required String fingerprint,
+  required String? alreadyHandled,
+}) => alreadyHandled != fingerprint;
 
 /// Care alerts default to private: the recipient does not need the drug name
 /// on a locked phone. Unlike the patient's own reminder, there is no opt-in
@@ -165,10 +187,27 @@ class NotificationService {
   /// while the plugin is already listening (foreground, or backgrounded but
   /// alive) — a tap that launches the process from scratch is surfaced here
   /// instead, so callers should check this once at startup after [init].
+  ///
+  /// The plugin reports the *last* notification launch on every later start,
+  /// including Run from the IDE. We remember the one we already opened today
+  /// so a normal launch does not replay the Taken/Snooze screen.
   Future<NotificationResponse?> consumeLaunchNotificationResponse() async {
     final details = await _plugin.getNotificationAppLaunchDetails();
     if (details?.didNotificationLaunchApp != true) return null;
-    return details?.notificationResponse;
+    final response = details?.notificationResponse;
+    if (response == null) return null;
+
+    final fingerprint = notificationLaunchFingerprint(response, DateTime.now());
+    final prefs = await SharedPreferences.getInstance();
+    final already = prefs.getString(handledNotificationLaunchPref);
+    if (!shouldOpenFromLaunchDetails(
+      fingerprint: fingerprint,
+      alreadyHandled: already,
+    )) {
+      return null;
+    }
+    await prefs.setString(handledNotificationLaunchPref, fingerprint);
+    return response;
   }
 
   Future<bool> requestPermissions() async {
@@ -554,7 +593,10 @@ class NotificationService {
               ),
           ],
         ),
-        iOS: const DarwinNotificationDetails(presentAlert: true, presentSound: true),
+        iOS: const DarwinNotificationDetails(
+          presentAlert: true,
+          presentSound: true,
+        ),
       ),
       payload: jsonEncode({
         'careAlertPatientId': patientId,
@@ -583,8 +625,10 @@ class NotificationService {
           checkedAt: DateTime.now().toUtc(),
         );
       }
-      final android = _plugin.resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin>();
+      final android = _plugin
+          .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin
+          >();
       if (android == null) return null;
       final notifications = await android.areNotificationsEnabled() ?? true;
       final exact = await android.canScheduleExactNotifications() ?? true;

@@ -8,8 +8,7 @@ import '../../data/remote/sync_service.dart';
 
 /// Read-only view of a single schedule's dose history — every "Taken",
 /// "Snoozed", or "Missed" entry ever logged for it, newest first. Reached
-/// only from the edit form (see review_edit_screen.dart); there's no entry
-/// point from the home screen by design.
+/// from the edit form and from a historical row on the home calendar.
 ///
 /// The Taken/Missed/Snoozed label is never edited. A user who disagrees
 /// attaches a correction note instead.

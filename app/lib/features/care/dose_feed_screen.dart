@@ -2,7 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:timezone/timezone.dart' as tz;
 
 import '../../core/app_navigation.dart';
+import '../../data/local/database.dart';
+import '../../data/local/tables.dart';
 import '../auth/auth_service.dart';
+import '../reminders_home/day_dose_list.dart';
+import '../reminders_home/day_occurrences.dart';
+import '../reminders_home/dose_calendar.dart';
+import '../notification_engine/expected_doses.dart';
 import 'care_service.dart';
 import 'phone_dial.dart';
 
@@ -15,7 +21,8 @@ import 'phone_dial.dart';
 void openFeedForPatient(String patientId) {
   navigatorKey.currentState?.push(
     MaterialPageRoute(
-      builder: (_) => DoseFeedScreen(patientId: patientId, viewingOwnData: false),
+      builder: (_) =>
+          DoseFeedScreen(patientId: patientId, viewingOwnData: false),
     ),
   );
 }
@@ -57,9 +64,12 @@ class DoseFeedScreen extends StatefulWidget {
 
 class _DoseFeedScreenState extends State<DoseFeedScreen> {
   List<DoseEvent>? _events;
+  List<ScheduleWithMedicine> _reminders = const [];
   CareProfile? _profile;
   String? _error;
   String? _callPhone;
+  DateTime _selectedDay = calendarDay(DateTime.now());
+  bool _choseDay = false;
 
   /// The patient's zone, resolved once. Falls back to the device's own when
   /// the profile has no usable identifier, which only costs correctness for
@@ -76,23 +86,47 @@ class _DoseFeedScreenState extends State<DoseFeedScreen> {
     try {
       final profile = await CareService.instance.profile(widget.patientId);
       final events = await CareService.instance.doseFeed(widget.patientId);
+      var reminders = const <ScheduleWithMedicine>[];
+      try {
+        reminders = await CareService.instance.patientReminders(
+          widget.patientId,
+        );
+      } on CareLinkFailure {
+        // Feed still works without pending slots — logs are enough to paint
+        // taken/missed. Pending would be a guess from the viewer's clock.
+      }
       final link = await CareService.instance.currentLink();
       final me = AuthService.instance.currentUser?.id;
       final callPhone = (link != null && me != null)
           ? dialablePhone(link.phoneToCall(me))
           : null;
       if (!mounted) return;
+      final zone = _resolveZone(profile?.timezone);
       setState(() {
         _profile = profile;
-        _patientZone = _resolveZone(profile?.timezone);
+        _patientZone = zone;
         _events = events;
+        _reminders = reminders;
         _callPhone = callPhone;
         _error = null;
+        if (!_choseDay) {
+          _selectedDay = calendarDay(_nowThere(zone));
+        }
       });
     } on CareLinkFailure catch (e) {
       if (!mounted) return;
       setState(() => _error = e.message);
     }
+  }
+
+  DateTime _nowThere(tz.Location? zone) {
+    if (zone == null) return DateTime.now();
+    return tz.TZDateTime.from(DateTime.now(), zone);
+  }
+
+  WallClock? _wallClock(tz.Location? zone) {
+    if (zone == null) return null;
+    return (y, m, d, h, min) => tz.TZDateTime(zone, y, m, d, h, min);
   }
 
   static tz.Location? _resolveZone(String? identifier) {
@@ -130,8 +164,8 @@ class _DoseFeedScreenState extends State<DoseFeedScreen> {
           widget.viewingOwnData
               ? 'Your doses'
               : who == null
-                  ? 'Their doses'
-                  : "$who's doses",
+              ? 'Their doses'
+              : "$who's doses",
         ),
         actions: [
           if (_callPhone != null)
@@ -142,7 +176,9 @@ class _DoseFeedScreenState extends State<DoseFeedScreen> {
             ),
         ],
       ),
-      body: SafeArea(child: RefreshIndicator(onRefresh: _load, child: _body())),
+      body: SafeArea(
+        child: RefreshIndicator(onRefresh: _load, child: _body()),
+      ),
     );
   }
 
@@ -152,47 +188,135 @@ class _DoseFeedScreenState extends State<DoseFeedScreen> {
     if (events == null) {
       return const Center(child: CircularProgressIndicator());
     }
-    if (events.isEmpty) {
-      return _message(
-        widget.viewingOwnData
-            ? "Nothing yet. Once you start answering reminders, they'll show up here."
-            : "Nothing yet. Doses will appear here as they're answered.",
+
+    final zone = _patientZone;
+    final now = _nowThere(zone);
+    final clock = _wallClock(zone);
+    final records = _doseRecords(events, zone);
+    final rangeStart = _civilDate(now, now.year, now.month - 18, 1);
+    final rangeEnd = _civilDate(now, now.year, now.month + 6, 1);
+    final cellMarks = cellMarksForRange(
+      items: _reminders,
+      logs: records,
+      rangeStart: rangeStart,
+      rangeEnd: rangeEnd,
+      now: now,
+      wallClock: clock,
+    );
+    final calendarMarks = {
+      for (final e in cellMarks.entries)
+        DateTime(e.key.year, e.key.month, e.key.day): CalendarDayMarks(
+          taken: e.value.hasTaken,
+          pending: e.value.hasPending || e.value.hasUpcoming,
+          missed: e.value.hasMissed,
+          snoozed: e.value.hasSnoozed,
+          notRecorded: e.value.hasNotRecorded,
+        ),
+    };
+    final occurrences = occurrencesOnDay(
+      items: _reminders,
+      logs: records,
+      day: _selectedDay,
+      now: now,
+      wallClock: clock,
+    );
+    final open = [
+      for (final o in occurrences)
+        if (o.status == DayDoseStatus.pending ||
+            o.status == DayDoseStatus.upcoming ||
+            o.status == DayDoseStatus.notRecorded)
+          o,
+    ];
+    final dayEvents = [
+      for (final event in events)
+        if (isSameCalendarDay(_inPatientZone(event.scheduledAt), _selectedDay))
+          event,
+    ];
+    final adherence = weekAdherence(
+      items: _reminders,
+      logs: records,
+      now: now,
+      wallClock: clock,
+    );
+
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(8, 4, 8, 32),
+      children: [
+        DoseCalendar(
+          selectedDay: DateTime(
+            _selectedDay.year,
+            _selectedDay.month,
+            _selectedDay.day,
+          ),
+          now: DateTime(now.year, now.month, now.day, now.hour, now.minute),
+          marks: calendarMarks,
+          onSelectDay: (day) => setState(() {
+            _selectedDay = zone == null
+                ? day
+                : tz.TZDateTime(zone, day.year, day.month, day.day);
+            _choseDay = true;
+          }),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+          child: WeekAdherenceLine(
+            taken: adherence.taken,
+            expected: adherence.expected,
+          ),
+        ),
+        if (_zonesDiffer) _timezoneNote(),
+        DayDoseList(
+          day: _selectedDay,
+          now: now,
+          occurrences: open,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+        ),
+        for (final event in dayEvents)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+            child: _DoseEventCard(
+              event: event,
+              clockTime: _inPatientZone(event.scheduledAt),
+              patientId: widget.patientId,
+            ),
+          ),
+      ],
+    );
+  }
+
+  List<DoseRecord> _doseRecords(List<DoseEvent> events, tz.Location? zone) {
+    final out = <DoseRecord>[];
+    for (final event in events) {
+      final scheduleId = event.scheduleId;
+      if (scheduleId == null) continue;
+      DoseAction? action;
+      for (final value in DoseAction.values) {
+        if (value.name == event.action) action = value;
+      }
+      if (action == null) continue;
+      out.add(
+        DoseRecord(
+          scheduleId: scheduleId,
+          scheduledAt: zone == null
+              ? event.scheduledAt
+              : tz.TZDateTime.from(event.scheduledAt, zone),
+          loggedAt: zone == null
+              ? event.loggedAt
+              : tz.TZDateTime.from(event.loggedAt, zone),
+          action: action,
+        ),
       );
     }
+    return out;
+  }
 
-    final groups = _groupByDay(events);
-    return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-      itemCount: groups.length + (_zonesDiffer ? 1 : 0),
-      itemBuilder: (context, index) {
-        if (_zonesDiffer) {
-          if (index == 0) return _timezoneNote();
-          index -= 1;
-        }
-        final group = groups[index];
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(top: 16, bottom: 8),
-              child: Text(
-                group.label,
-                style: Theme.of(context).textTheme.titleSmall,
-              ),
-            ),
-            for (final event in group.events)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: _DoseEventCard(
-                  event: event,
-                  clockTime: _inPatientZone(event.scheduledAt),
-                  patientId: widget.patientId,
-                ),
-              ),
-          ],
-        );
-      },
-    );
+  DateTime _civilDate(DateTime template, int year, int month, int day) {
+    if (template is tz.TZDateTime) {
+      return tz.TZDateTime(template.location, year, month, day);
+    }
+    return DateTime(year, month, day);
   }
 
   Widget _timezoneNote() {
@@ -207,7 +331,11 @@ class _DoseFeedScreenState extends State<DoseFeedScreen> {
       ),
       child: Row(
         children: [
-          Icon(Icons.schedule, size: 18, color: Theme.of(context).colorScheme.outline),
+          Icon(
+            Icons.schedule,
+            size: 18,
+            color: Theme.of(context).colorScheme.outline,
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
@@ -236,42 +364,6 @@ class _DoseFeedScreenState extends State<DoseFeedScreen> {
       ],
     );
   }
-
-  List<_DayGroup> _groupByDay(List<DoseEvent> events) {
-    final groups = <_DayGroup>[];
-    for (final event in events) {
-      final local = _inPatientZone(event.scheduledAt);
-      final key = DateTime(local.year, local.month, local.day);
-      if (groups.isNotEmpty && groups.last.date == key) {
-        groups.last.events.add(event);
-      } else {
-        groups.add(_DayGroup(date: key, label: _dayLabel(key), events: [event]));
-      }
-    }
-    return groups;
-  }
-
-  String _dayLabel(DateTime day) {
-    // "Today" is relative to the patient's day, not the viewer's — otherwise
-    // a caregiver several hours ahead sees yesterday's doses under today.
-    final nowThere = _inPatientZone(DateTime.now());
-    final today = DateTime(nowThere.year, nowThere.month, nowThere.day);
-    final difference = today.difference(day).inDays;
-    if (difference == 0) return 'Today';
-    if (difference == 1) return 'Yesterday';
-    const months = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December',
-    ];
-    return '${day.day} ${months[day.month - 1]}';
-  }
-}
-
-class _DayGroup {
-  _DayGroup({required this.date, required this.label, required this.events});
-  final DateTime date;
-  final String label;
-  final List<DoseEvent> events;
 }
 
 class _DoseEventCard extends StatelessWidget {
@@ -294,13 +386,25 @@ class _DoseEventCard extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     switch (event.action) {
       case 'taken':
-        return (icon: Icons.check_circle, color: Colors.green.shade600, label: 'Taken');
+        return (
+          icon: Icons.check_circle,
+          color: Colors.green.shade600,
+          label: 'Taken',
+        );
       case 'snoozed':
-        return (icon: Icons.snooze, color: Colors.orange.shade700, label: 'Snoozed');
+        return (
+          icon: Icons.snooze,
+          color: Colors.orange.shade700,
+          label: 'Snoozed',
+        );
       case 'missed':
         return (icon: Icons.cancel, color: scheme.error, label: 'Missed');
       default:
-        return (icon: Icons.help_outline, color: scheme.outline, label: event.action);
+        return (
+          icon: Icons.help_outline,
+          color: scheme.outline,
+          label: event.action,
+        );
     }
   }
 

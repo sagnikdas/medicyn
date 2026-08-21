@@ -201,11 +201,17 @@ class DoseEvent {
     required this.drugName,
     required this.strength,
     required this.doseAmount,
+    this.scheduleId,
     this.source,
     this.recordedBy,
   });
 
   final String id;
+
+  /// The reminder this log belongs to. Null on a malformed row that
+  /// omitted it — the feed still renders; the calendar cannot match
+  /// the slot without it.
+  final String? scheduleId;
 
   /// When the dose was due, and when the person actually answered. Both are
   /// absolute instants, so the gap between them means the same thing from any
@@ -260,7 +266,7 @@ class DoseEvent {
 
   /// Sources the official app actually writes. Anything outside this set is
   /// worth a quiet note; `notification` on every Taken tap is not.
-  static const _deviceSources = {'notification', 'auto'};
+  static const _deviceSources = {'notification', 'auto', 'calendar'};
 
   /// A quiet line for the feed when this row wasn't a normal recording from
   /// the patient's own device. Null for ordinary Taken / Snooze / missed
@@ -282,6 +288,7 @@ class DoseEvent {
     final medicine = (schedule?['medicines'] as Map?)?.cast<String, dynamic>();
     return DoseEvent(
       id: row['id'] as String,
+      scheduleId: (row['schedule_id'] as String?) ?? (schedule?['id'] as String?),
       scheduledAt: DateTime.parse(row['scheduled_at'] as String),
       loggedAt: DateTime.parse(row['logged_at'] as String),
       action: row['action'] as String,
@@ -386,8 +393,8 @@ class CareService {
       final rows = await _client
           .from('dose_logs')
           .select(
-            'id, scheduled_at, logged_at, action, source, recorded_by, '
-            'schedules!inner(medicines!inner(drug_name, strength, dose_amount))',
+            'id, schedule_id, scheduled_at, logged_at, action, source, recorded_by, '
+            'schedules!inner(id, medicines!inner(drug_name, strength, dose_amount))',
           )
           .eq('user_id', userId)
           .order('scheduled_at', ascending: false)
