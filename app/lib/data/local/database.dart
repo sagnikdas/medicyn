@@ -104,15 +104,22 @@ class AppDatabase extends _$AppDatabase {
   Future<Schedule?> scheduleById(String id) =>
       (select(schedules)..where((t) => t.id.equals(id))).getSingleOrNull();
 
-  Stream<List<ScheduleWithMedicine>> watchActiveSchedules() {
+  Stream<List<ScheduleWithMedicine>> watchActiveSchedules() =>
+      watchSchedulesWithMedicines(activeOnly: true);
+
+  /// Same join as [schedulesWithMedicinesOnce], live. The calendar watches
+  /// inactive rows too, so a reminder that was stopped still paints its
+  /// history.
+  Stream<List<ScheduleWithMedicine>> watchSchedulesWithMedicines({
+    bool activeOnly = false,
+  }) {
     final query = select(schedules).join([
       innerJoin(medicines, medicines.id.equalsExp(schedules.medicineId)),
     ])
-      ..where(
-        schedules.active.equals(true) &
-            schedules.deleted.equals(false) &
-            medicines.deleted.equals(false),
-      );
+      ..where(schedules.deleted.equals(false) & medicines.deleted.equals(false));
+    if (activeOnly) {
+      query.where(schedules.active.equals(true));
+    }
     return query.watch().map(
           (rows) => rows
               .map((r) => ScheduleWithMedicine(
@@ -123,15 +130,24 @@ class AppDatabase extends _$AppDatabase {
         );
   }
 
-  Future<List<ScheduleWithMedicine>> activeSchedulesOnce() async {
+  Future<List<ScheduleWithMedicine>> activeSchedulesOnce() =>
+      schedulesWithMedicinesOnce(activeOnly: true);
+
+  /// Active and inactive, excluding deleted medicines/schedules.
+  ///
+  /// The calendar has to paint history for a reminder that was turned off,
+  /// so the default includes inactive rows. [activeOnly] keeps the alarm
+  /// and home-list filter without a second join.
+  Future<List<ScheduleWithMedicine>> schedulesWithMedicinesOnce({
+    bool activeOnly = false,
+  }) async {
     final query = select(schedules).join([
       innerJoin(medicines, medicines.id.equalsExp(schedules.medicineId)),
     ])
-      ..where(
-        schedules.active.equals(true) &
-            schedules.deleted.equals(false) &
-            medicines.deleted.equals(false),
-      );
+      ..where(schedules.deleted.equals(false) & medicines.deleted.equals(false));
+    if (activeOnly) {
+      query.where(schedules.active.equals(true));
+    }
     final rows = await query.get();
     return rows
         .map((r) => ScheduleWithMedicine(
@@ -227,6 +243,10 @@ class AppDatabase extends _$AppDatabase {
   Stream<List<DoseLog>> watchDoseLogsForSchedule(String scheduleId) =>
       (select(doseLogs)..where((t) => t.scheduleId.equals(scheduleId))).watch();
 
+  /// Every local log. The calendar needs the whole retained window to paint
+  /// month dots without a round-trip each time the visible month changes.
+  Stream<List<DoseLog>> watchDoseLogs() => select(doseLogs).watch();
+
   Stream<List<DoseLogWithContest>> watchDoseLogsWithContests(String scheduleId) {
     final query = select(doseLogs).join([
       leftOuterJoin(
@@ -299,6 +319,19 @@ class AppDatabase extends _$AppDatabase {
   /// for a missed-dose sweep rather than one per reminder.
   Future<List<DoseLog>> doseLogsSince(DateTime since) =>
       (select(doseLogs)..where((t) => t.loggedAt.isBiggerOrEqualValue(since))).get();
+
+  /// Logs whose [DoseLogs.scheduledAt] or [DoseLogs.loggedAt] falls in
+  /// `[from, to)`. Used to paint a month: a late answer can carry a
+  /// `scheduledAt` on another day, and matching only one column would
+  /// leave that cell blank.
+  Future<List<DoseLog>> doseLogsTouching(DateTime from, DateTime to) =>
+      (select(doseLogs)
+            ..where((t) =>
+                (t.scheduledAt.isBiggerOrEqualValue(from) &
+                    t.scheduledAt.isSmallerThanValue(to)) |
+                (t.loggedAt.isBiggerOrEqualValue(from) &
+                    t.loggedAt.isSmallerThanValue(to))))
+          .get();
 
   /// Ids of missed doses recorded since [since] that are known to be on the
   /// server.

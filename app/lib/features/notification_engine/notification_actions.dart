@@ -107,12 +107,14 @@ Future<void> recordDoseTaken(
   AppDatabase db, {
   required String scheduleId,
   required DateTime scheduledAt,
+  String source = 'notification',
 }) async {
   await db.recordDoseAction(
     id: newUuid(),
     scheduleId: scheduleId,
     scheduledAt: scheduledAt,
     action: DoseAction.taken,
+    source: source,
   );
   await db.decrementStockForSchedule(scheduleId);
 }

@@ -4,22 +4,26 @@ import 'package:flutter/material.dart';
 
 import '../../core/app_settings.dart';
 import '../../data/local/database.dart';
-import '../../data/local/tables.dart';
 import '../../data/remote/care_notifier.dart';
 import '../../data/remote/sync_service.dart';
 import '../auth/auth_service.dart';
 import '../capture_ocr/ocr_capture_screen.dart';
 import '../care/care_service.dart';
-import '../care/edit_attribution.dart';
 import '../consent/consent_purpose.dart';
 import '../consent/consent_service.dart';
+import '../history/dose_history_screen.dart';
 import '../notification_engine/missed_doses.dart';
+import '../notification_engine/notification_actions.dart';
 import '../notification_engine/notification_service.dart';
 import '../push/push_service.dart';
 import '../review_edit/review_edit_screen.dart';
 import '../settings/settings_screen.dart';
 import '../voice_capture/voice_capture_screen.dart';
-import 'reminder_copy.dart';
+import 'calendar_collapse_sliver.dart';
+import 'day_dose_list.dart';
+import 'day_occurrences.dart';
+import 'dose_calendar.dart';
+import 'medicines_list_screen.dart';
 import 'refill.dart';
 
 enum _ReminderDisposition { stop, deleteHistory }
@@ -34,15 +38,27 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Map<String, String> _names = {};
+  DateTime _selectedDay = calendarDay(DateTime.now());
+  Timer? _clock;
+  final _scroll = ScrollController();
+  bool _calendarMonth = false;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _bootstrap(requestPermissions: true);
+    // Upcoming → pending has to flip when the clock time passes, not only
+    // when the user comes back from another screen.
+    _clock = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (mounted) setState(() {});
+    });
   }
 
   @override
   void dispose() {
+    _clock?.cancel();
+    _scroll.dispose();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -162,9 +178,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _startCapture() async {
-    final ocrText = await Navigator.of(context).push<String>(
-      MaterialPageRoute(builder: (_) => const OcrCaptureScreen()),
-    );
+    final ocrText = await Navigator.of(
+      context,
+    ).push<String>(MaterialPageRoute(builder: (_) => const OcrCaptureScreen()));
     if (ocrText == null || !mounted) return;
 
     var transcript = '';
@@ -178,16 +194,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => ReviewEditScreen(ocrText: ocrText, transcript: transcript, db: widget.db),
+        builder: (_) => ReviewEditScreen(
+          ocrText: ocrText,
+          transcript: transcript,
+          db: widget.db,
+        ),
       ),
     );
   }
 
   Future<void> _edit(ScheduleWithMedicine item) => Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => ReviewEditScreen(existing: item, db: widget.db),
-        ),
-      );
+    MaterialPageRoute(
+      builder: (_) => ReviewEditScreen(existing: item, db: widget.db),
+    ),
+  );
 
   Future<void> _delete(ScheduleWithMedicine item) async {
     final choice = await showDialog<_ReminderDisposition>(
@@ -220,15 +240,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             child: const Text('Cancel'),
           ),
           TextButton(
-            onPressed: () => Navigator.pop(dialogContext, _ReminderDisposition.stop),
+            onPressed: () =>
+                Navigator.pop(dialogContext, _ReminderDisposition.stop),
             child: const Text('Stop reminding me'),
           ),
           TextButton(
             style: TextButton.styleFrom(
               foregroundColor: Theme.of(dialogContext).colorScheme.error,
             ),
-            onPressed: () =>
-                Navigator.pop(dialogContext, _ReminderDisposition.deleteHistory),
+            onPressed: () => Navigator.pop(
+              dialogContext,
+              _ReminderDisposition.deleteHistory,
+            ),
             child: const Text('Delete medicine and history'),
           ),
         ],
@@ -259,8 +282,27 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Dosely'),
+        title: const Text(
+          'Dosely',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
         actions: [
+          IconButton(
+            tooltip: 'My medicines',
+            icon: const Icon(Icons.medication_outlined),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => MedicinesListScreen(
+                  db: widget.db,
+                  names: _names,
+                  onAdd: _startCapture,
+                  onEdit: _edit,
+                  onDelete: _delete,
+                ),
+              ),
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.settings_outlined),
             onPressed: () => Navigator.of(context).push(
@@ -269,42 +311,132 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _startCapture,
-        icon: const Icon(Icons.add),
-        label: const Text('Add medicine'),
-      ),
       body: StreamBuilder<List<ScheduleWithMedicine>>(
-        stream: widget.db.watchActiveSchedules(),
-        builder: (context, snapshot) {
-          final items = snapshot.data ?? [];
-          if (items.isEmpty) {
-            return _EmptyState(onAdd: _startCapture);
-          }
-          return ListView.separated(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
-            itemCount: items.length,
-            separatorBuilder: (_, _) => const SizedBox(height: 12),
-            itemBuilder: (context, i) {
-              final item = items[i];
-              return _ReminderCard(
-                item: item,
-                db: widget.db,
-                attribution: editAttributionLine(
-                  updatedBy: item.schedule.updatedBy ?? item.medicine.updatedBy,
-                  updatedAt: item.schedule.updatedAt.isAfter(item.medicine.updatedAt)
-                      ? item.schedule.updatedAt
-                      : item.medicine.updatedAt,
-                  createdAt: item.medicine.createdAt,
-                  currentUserId: AuthService.instance.currentUser?.id,
-                  nameOf: (id) => _names[id],
-                ),
-                onTap: () => _edit(item),
-                onDelete: () => _delete(item),
+        stream: widget.db.watchSchedulesWithMedicines(),
+        builder: (context, scheduleSnap) {
+          return StreamBuilder<List<DoseLog>>(
+            stream: widget.db.watchDoseLogs(),
+            builder: (context, logSnap) {
+              return _calendarBody(
+                schedules: scheduleSnap.data ?? const [],
+                logs: logSnap.data ?? const [],
               );
             },
           );
         },
+      ),
+    );
+  }
+
+  Widget _calendarBody({
+    required List<ScheduleWithMedicine> schedules,
+    required List<DoseLog> logs,
+  }) {
+    final now = DateTime.now();
+    final records = <DoseRecord>[
+      for (final log in logs) ?DoseRecord.tryFromLog(log),
+    ];
+    final rangeStart = DateTime(now.year, now.month - 18, 1);
+    final rangeEnd = DateTime(now.year, now.month + 6, 1);
+    final cellMarks = cellMarksForRange(
+      items: schedules,
+      logs: records,
+      rangeStart: rangeStart,
+      rangeEnd: rangeEnd,
+      now: now,
+    );
+    final calendarMarks = {
+      for (final e in cellMarks.entries)
+        e.key: CalendarDayMarks(
+          taken: e.value.hasTaken,
+          pending: e.value.hasPending || e.value.hasUpcoming,
+          missed: e.value.hasMissed,
+          snoozed: e.value.hasSnoozed,
+          notRecorded: e.value.hasNotRecorded,
+        ),
+    };
+    final occurrences = occurrencesOnDay(
+      items: schedules,
+      logs: records,
+      day: _selectedDay,
+      now: now,
+    );
+    final adherence = weekAdherence(items: schedules, logs: records, now: now);
+
+    final month = _calendarMonth;
+
+    return CustomScrollView(
+      controller: _scroll,
+      physics: const BouncingScrollPhysics(
+        parent: AlwaysScrollableScrollPhysics(),
+      ),
+      slivers: [
+        HomeCalendarSliver(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(4, 4, 4, 0),
+            child: DoseCalendar(
+              selectedDay: _selectedDay,
+              now: now,
+              marks: calendarMarks,
+              monthExpanded: month,
+              onMonthExpandedChanged: _onMonthExpandedChanged,
+              onSelectDay: (day) => setState(() => _selectedDay = day),
+            ),
+          ),
+        ),
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+            child: WeekAdherenceLine(
+              taken: adherence.taken,
+              expected: adherence.expected,
+            ),
+          ),
+        ),
+        if (schedules.isEmpty)
+          SliverToBoxAdapter(child: _EmptyState(onAdd: _startCapture))
+        else
+          ...dayDoseSlivers(
+            day: _selectedDay,
+            now: now,
+            occurrences: occurrences,
+            onMarkTaken: _markTaken,
+            onOpenHistory: _openHistory,
+          ),
+      ],
+    );
+  }
+
+  void _onMonthExpandedChanged(bool expanded) {
+    setState(() => _calendarMonth = expanded);
+    if (!expanded || !_scroll.hasClients) return;
+    unawaited(
+      _scroll.animateTo(
+        0,
+        duration: const Duration(milliseconds: 280),
+        curve: Curves.easeOutCubic,
+      ),
+    );
+  }
+
+  Future<void> _markTaken(DayOccurrence occurrence) async {
+    await recordDoseTaken(
+      widget.db,
+      scheduleId: occurrence.item.schedule.id,
+      scheduledAt: occurrence.scheduledAt,
+      source: 'calendar',
+    );
+    if (AuthService.instance.currentUser == null) return;
+    unawaited(SyncService(widget.db).syncAll());
+  }
+
+  void _openHistory(DayOccurrence occurrence) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => DoseHistoryScreen(
+          scheduleId: occurrence.item.schedule.id,
+          db: widget.db,
+        ),
       ),
     );
   }
@@ -316,13 +448,19 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
+    return Align(
+      alignment: Alignment.topCenter,
       child: Padding(
-        padding: const EdgeInsets.all(32),
+        padding: const EdgeInsets.fromLTRB(32, 32, 32, 24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Icon(Icons.medication_outlined, size: 72, color: Theme.of(context).colorScheme.primary),
+            Icon(
+              Icons.medication_outlined,
+              size: 64,
+              color: Theme.of(context).colorScheme.primary,
+            ),
             const SizedBox(height: 16),
             Text(
               'No reminders yet',
@@ -331,167 +469,22 @@ class _EmptyState extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              'Scan a label or just speak the details — tap Add medicine to start.',
+              'Scan a label or speak the details to add the first one.',
               style: Theme.of(context).textTheme.bodyMedium,
               textAlign: TextAlign.center,
             ),
+            const SizedBox(height: 24),
+            FilledButton.icon(
+              onPressed: onAdd,
+              icon: const Icon(Icons.add),
+              label: const Text(
+                'Add medicine',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _ReminderCard extends StatelessWidget {
-  const _ReminderCard({
-    required this.item,
-    required this.db,
-    required this.onTap,
-    required this.onDelete,
-    this.attribution,
-  });
-  final ScheduleWithMedicine item;
-  final AppDatabase db;
-  final VoidCallback onTap;
-  final VoidCallback onDelete;
-  final String? attribution;
-
-  @override
-  Widget build(BuildContext context) {
-    final medicine = item.medicine;
-    final title = medicineTitle(medicine);
-    return Card(
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(title, style: Theme.of(context).textTheme.titleMedium),
-                    const SizedBox(height: 4),
-                    if (medicine.doseAmount.isNotEmpty)
-                      Text(medicine.doseAmount, style: Theme.of(context).textTheme.bodyMedium),
-                    const SizedBox(height: 4),
-                    Text(describeSchedule(item.schedule), style: Theme.of(context).textTheme.bodySmall),
-                    if (refillWarningLine(refillDaysLeft(
-                          tabletsRemaining: medicine.tabletsRemaining,
-                          tabletsPerDose: medicine.tabletsPerDose,
-                          schedules: [item.schedule],
-                        ))
-                        case final warning?) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        warning,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.error,
-                        ),
-                      ),
-                    ],
-                    if (attribution != null) ...[
-                      const SizedBox(height: 4),
-                      Text(attribution!, style: Theme.of(context).textTheme.bodySmall),
-                    ],
-                    _SnoozeStatus(db: db, scheduleId: item.schedule.id),
-                  ],
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.delete_outline),
-                tooltip: 'Stop or delete',
-                onPressed: onDelete,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Shows "Snoozed until HH:mm" under a reminder while its most recent dose
-/// log is an active (< 10 minutes old) snooze, then disappears on its own.
-///
-/// Polls rather than watches: the notification engine records Taken/Snooze
-/// through its own `AppDatabase` instance — often from a background isolate
-/// when the user snoozes straight from the notification tray — and those
-/// writes don't push to a `.watch()` stream on a different instance. See
-/// [AppDatabase.latestDoseLogOnce].
-class _SnoozeStatus extends StatefulWidget {
-  const _SnoozeStatus({required this.db, required this.scheduleId});
-  final AppDatabase db;
-  final String scheduleId;
-
-  @override
-  State<_SnoozeStatus> createState() => _SnoozeStatusState();
-}
-
-class _SnoozeStatusState extends State<_SnoozeStatus> {
-  /// While a snooze is on screen the countdown has to expire promptly, so it
-  /// is checked often. The rest of the time — which is almost all of the
-  /// time, for almost every card — a slower beat is enough to notice a
-  /// snooze made from the notification tray. The old fixed 15s ran per
-  /// visible card for as long as the app was open, so a list of eight
-  /// reminders meant ~32 database reads a minute to display nothing.
-  static const _activePollInterval = Duration(seconds: 15);
-  static const _idlePollInterval = Duration(minutes: 1);
-
-  Timer? _poll;
-  DateTime? _snoozedUntil;
-
-  @override
-  void initState() {
-    super.initState();
-    _tick();
-  }
-
-  @override
-  void dispose() {
-    _poll?.cancel();
-    super.dispose();
-  }
-
-  Future<void> _tick() async {
-    await _refresh();
-    if (!mounted) return;
-    _poll = Timer(
-      _snoozedUntil == null ? _idlePollInterval : _activePollInterval,
-      _tick,
-    );
-  }
-
-  Future<void> _refresh() async {
-    final log = await widget.db.latestDoseLogOnce(widget.scheduleId);
-    if (!mounted) return;
-    DateTime? until;
-    if (log != null && log.action == DoseAction.snoozed.name) {
-      final candidate = log.loggedAt.add(const Duration(minutes: 10));
-      if (candidate.isAfter(DateTime.now())) until = candidate;
-    }
-    if (until != _snoozedUntil) setState(() => _snoozedUntil = until);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final until = _snoozedUntil;
-    if (until == null) return const SizedBox.shrink();
-    final local = until.toLocal();
-    final label =
-        'Snoozed until ${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
-    final color = Theme.of(context).colorScheme.tertiary;
-    return Padding(
-      padding: const EdgeInsets.only(top: 4),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.snooze, size: 15, color: color),
-          const SizedBox(width: 4),
-          Text(label, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: color)),
-        ],
       ),
     );
   }

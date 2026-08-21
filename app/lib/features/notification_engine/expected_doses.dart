@@ -3,6 +3,20 @@ import '../../data/local/tables.dart';
 import 'interval_dose_sequence.dart';
 import 'schedule_validation.dart';
 
+/// Builds a civil wall time. The default is the device's local [DateTime].
+/// A caregiver viewing someone in another zone passes a constructor that
+/// yields `TZDateTime`s in that zone, so "08:00" is their morning, not ours.
+typedef WallClock = DateTime Function(
+  int year,
+  int month,
+  int day,
+  int hour,
+  int minute,
+);
+
+DateTime _localWallClock(int year, int month, int day, int hour, int minute) =>
+    DateTime(year, month, day, hour, minute);
+
 /// When a schedule *should* have gone off, over a window of the recent past.
 ///
 /// Separate from the code that arms alarms because the two questions differ:
@@ -20,8 +34,10 @@ List<DateTime> expectedDoses(
   Schedule schedule, {
   required DateTime from,
   required DateTime to,
+  WallClock? wallClock,
 }) {
   if (!schedule.active || schedule.times.isEmpty) return const [];
+  final clock = wallClock ?? _localWallClock;
 
   // A row stored before these fields were validated can still be here, and a
   // throw would abort the whole missed-dose sweep rather than skip one
@@ -31,7 +47,7 @@ List<DateTime> expectedDoses(
   if (frequency == null) return const [];
   switch (frequency) {
     case FrequencyType.daily:
-      return _atClockTimes(schedule.times, from: from, to: to);
+      return _atClockTimes(schedule.times, from: from, to: to, wallClock: clock);
     case FrequencyType.specificDays:
       if (schedule.daysOfWeek.isEmpty) return const [];
       return _atClockTimes(
@@ -39,6 +55,7 @@ List<DateTime> expectedDoses(
         from: from,
         to: to,
         onDays: schedule.daysOfWeek.toSet(),
+        wallClock: clock,
       );
     case FrequencyType.everyXHours:
       final interval = schedulableIntervalHours(schedule.intervalHours);
@@ -46,13 +63,13 @@ List<DateTime> expectedDoses(
       final times = schedulableTimes(schedule.times);
       if (times.isEmpty) return const [];
       final defined = schedule.updatedAt;
-      final clock = times.first.clock;
-      final origin = DateTime(
+      final first = times.first.clock;
+      final origin = clock(
         defined.year,
         defined.month,
         defined.day,
-        clock.hour,
-        clock.minute,
+        first.hour,
+        first.minute,
       );
       return intervalDoseSequence(
         origin: origin,
@@ -73,28 +90,29 @@ List<DateTime> _atClockTimes(
   required DateTime from,
   required DateTime to,
   Set<int>? onDays,
+  required WallClock wallClock,
 }) {
   if (!to.isAfter(from)) return const [];
 
   final occurrences = <DateTime>[];
   // Start from the calendar day `from` falls in, so a time earlier that same
   // day is still considered before being filtered by the window below.
-  var day = DateTime(from.year, from.month, from.day);
-  final lastDay = DateTime(to.year, to.month, to.day);
+  var day = wallClock(from.year, from.month, from.day, 0, 0);
+  final lastDay = wallClock(to.year, to.month, to.day, 0, 0);
 
   while (!day.isAfter(lastDay)) {
     // Dart's weekday runs Monday=1..Sunday=7; the app stores Sunday=0.
     final storedWeekday = day.weekday == DateTime.sunday ? 0 : day.weekday;
     if (onDays == null || onDays.contains(storedWeekday)) {
       for (final time in times) {
-        final at = _onDayAt(day, time);
+        final at = _onDayAt(day, time, wallClock);
         if (at == null) continue;
         // Half-open: an occurrence exactly at `to` has not happened yet.
         if (at.isBefore(from) || !at.isBefore(to)) continue;
         occurrences.add(at);
       }
     }
-    day = DateTime(day.year, day.month, day.day + 1);
+    day = wallClock(day.year, day.month, day.day + 1, 0, 0);
   }
 
   occurrences.sort();
@@ -104,7 +122,7 @@ List<DateTime> _atClockTimes(
 /// Parses "HH:mm" onto [day]. Returns null for anything malformed rather
 /// than throwing — one unparseable time should cost that one occurrence, not
 /// the whole sweep.
-DateTime? _onDayAt(DateTime day, String hhmm) {
+DateTime? _onDayAt(DateTime day, String hhmm, WallClock wallClock) {
   final parts = hhmm.split(':');
   if (parts.length != 2) return null;
   final hour = int.tryParse(parts[0]);
@@ -114,5 +132,5 @@ DateTime? _onDayAt(DateTime day, String hhmm) {
   // Constructing through the local-time constructor means a day that has no
   // such wall-clock time — the hour a DST jump skips — lands on the
   // neighbouring instant rather than failing.
-  return DateTime(day.year, day.month, day.day, hour, minute);
+  return wallClock(day.year, day.month, day.day, hour, minute);
 }

@@ -133,6 +133,29 @@ void main() {
       expect(e.attributionNote(patientId), 'Logged by someone else');
     });
 
+    test('is silent for a calendar-recorded taken', () {
+      expect(
+        DoseEvent.fromRow(row(
+          scheduledAt: '2026-08-18T08:00:00.000Z',
+          loggedAt: '2026-08-18T08:00:00.000Z',
+          source: 'calendar',
+          recordedBy: patientId,
+        )).attributionNote(patientId),
+        isNull,
+      );
+    });
+
+    test('unpacks schedule_id so the calendar can match a slot', () {
+      final e = DoseEvent.fromRow({
+        ...row(
+          scheduledAt: '2026-08-18T08:00:00.000Z',
+          loggedAt: '2026-08-18T08:00:00.000Z',
+        ),
+        'schedule_id': 'sched-1',
+      });
+      expect(e.scheduleId, 'sched-1');
+    });
+
     test('mentions an unusual source without cluttering a reminder tap', () {
       final e = DoseEvent.fromRow(row(
         scheduledAt: '2026-08-18T08:00:00.000Z',
