@@ -15,6 +15,7 @@ class MedicinesListScreen extends StatelessWidget {
     required this.onAdd,
     required this.onEdit,
     required this.onDelete,
+    this.embedded = false,
   });
 
   final AppDatabase db;
@@ -22,11 +23,14 @@ class MedicinesListScreen extends StatelessWidget {
   final VoidCallback onAdd;
   final Future<void> Function(ScheduleWithMedicine) onEdit;
   final Future<void> Function(ScheduleWithMedicine) onDelete;
+  final bool embedded;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('My medicines')),
+      appBar: embedded
+          ? null
+          : AppBar(title: const Text('My medicines')),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: onAdd,
         icon: const Icon(Icons.add),
@@ -36,13 +40,36 @@ class MedicinesListScreen extends StatelessWidget {
         stream: db.watchActiveSchedules(),
         builder: (context, snapshot) {
           final items = snapshot.data ?? [];
-          if (items.isEmpty) return _EmptyState(onAdd: onAdd);
+          if (items.isEmpty) {
+            return _EmptyState(onAdd: onAdd, embedded: embedded);
+          }
           return ListView.separated(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 96),
-            itemCount: items.length,
-            separatorBuilder: (_, _) => const SizedBox(height: 12),
+            padding: EdgeInsets.fromLTRB(20, embedded ? 24 : 16, 20, 96),
+            itemCount: items.length + (embedded ? 1 : 0),
+            separatorBuilder: (context, i) {
+              if (embedded && i == 0) return const SizedBox(height: 16);
+              return const SizedBox(height: 12);
+            },
             itemBuilder: (context, i) {
-              final item = items[i];
+              if (embedded && i == 0) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Your plan',
+                      style: Theme.of(context).textTheme.headlineSmall,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Everything you take, and when.',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                );
+              }
+              final item = items[embedded ? i - 1 : i];
               return ReminderCard(
                 item: item,
                 db: db,
@@ -67,8 +94,9 @@ class MedicinesListScreen extends StatelessWidget {
 }
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState({required this.onAdd});
+  const _EmptyState({required this.onAdd, this.embedded = false});
   final VoidCallback onAdd;
+  final bool embedded;
 
   @override
   Widget build(BuildContext context) {
@@ -78,11 +106,19 @@ class _EmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            if (embedded) ...[
+              Text(
+                'Your plan',
+                style: Theme.of(context).textTheme.headlineSmall,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+            ],
             Icon(Icons.medication_outlined, size: 64, color: Theme.of(context).colorScheme.primary),
             const SizedBox(height: 16),
             Text(
               'No reminders yet',
-              style: Theme.of(context).textTheme.titleMedium,
+              style: Theme.of(context).textTheme.headlineSmall,
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),

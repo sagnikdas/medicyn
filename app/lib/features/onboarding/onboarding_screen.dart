@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/app_settings.dart';
+import '../../core/widgets/dosely_chrome.dart';
 
 /// Shown once, before sign-in, on first launch only (see the
 /// `_OnboardingGate` in main.dart). Three plain-language pages explaining
@@ -76,6 +77,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   child: const Text('Skip'),
                 ),
               ),
+            ),
+            const Padding(
+              padding: EdgeInsets.only(bottom: 8),
+              child: DoselyBrandMark(compact: true),
             ),
             Expanded(
               child: PageView.builder(

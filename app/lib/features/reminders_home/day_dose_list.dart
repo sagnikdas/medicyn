@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/theme.dart';
 import 'day_dose_style.dart';
 import 'day_occurrences.dart';
 import 'reminder_copy.dart';
@@ -150,13 +151,14 @@ class _DayDoseColumn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final grouped = groupByDayPart(occurrences);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (showHeading) ...[
           Text(
             _dayHeading(day, now),
-            style: Theme.of(context).textTheme.titleMedium,
+            style: Theme.of(context).textTheme.headlineMedium,
           ),
           const SizedBox(height: 16),
         ],
@@ -172,16 +174,47 @@ class _DayDoseColumn extends StatelessWidget {
             ),
           )
         else
-          for (var i = 0; i < occurrences.length; i++) ...[
-            if (i > 0) const SizedBox(height: 12),
-            _DayDoseRow(
-              occurrence: occurrences[i],
-              day: day,
-              now: now,
-              onMarkTaken: onMarkTaken,
-              onOpenHistory: onOpenHistory,
-            ),
-          ],
+          for (final part in DayPart.values)
+            if (grouped[part]!.isNotEmpty) ...[
+              _DayPartHeader(part: part),
+              const SizedBox(height: 12),
+              for (var i = 0; i < grouped[part]!.length; i++) ...[
+                if (i > 0) const SizedBox(height: 8),
+                _DayDoseRow(
+                  occurrence: grouped[part]![i],
+                  day: day,
+                  now: now,
+                  onMarkTaken: onMarkTaken,
+                  onOpenHistory: onOpenHistory,
+                ),
+              ],
+              const SizedBox(height: 24),
+            ],
+      ],
+    );
+  }
+}
+
+class _DayPartHeader extends StatelessWidget {
+  const _DayPartHeader({required this.part});
+  final DayPart part;
+
+  @override
+  Widget build(BuildContext context) {
+    final (icon, label) = switch (part) {
+      DayPart.morning => (Icons.light_mode_outlined, 'Morning'),
+      DayPart.afternoon => (Icons.wb_sunny_outlined, 'Afternoon'),
+      DayPart.evening => (Icons.bedtime_outlined, 'Evening'),
+    };
+    return Row(
+      children: [
+        Icon(
+          icon,
+          size: 22,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
+        const SizedBox(width: 8),
+        Text(label, style: Theme.of(context).textTheme.headlineMedium),
       ],
     );
   }
@@ -253,63 +286,168 @@ class _DayDoseRowState extends State<_DayDoseRow> {
   Widget build(BuildContext context) {
     final occurrence = widget.occurrence;
     final status = occurrence.status;
-    final color = DayDoseStyle.color(context, status);
+    final scheme = Theme.of(context).colorScheme;
     final medicine = occurrence.item.medicine;
     final title = medicineTitle(medicine);
     final subtitle = _occurrenceSubtitle(occurrence);
+    final taken = status == DayDoseStatus.taken;
+    final notes = medicine.notes.trim();
+    final highlight = status == DayDoseStatus.pending ||
+        status == DayDoseStatus.upcoming ||
+        status == DayDoseStatus.snoozed;
 
-    return Card(
-      child: InkWell(
-        onTap: _canOpenHistory ? () => widget.onOpenHistory!(occurrence) : null,
-        borderRadius: BorderRadius.circular(20),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(DayDoseStyle.icon(status), color: color, size: 32),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      subtitle,
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      DayDoseStyle.label(status),
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: color,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    if (_canMarkTaken)
-                      TextButton(
-                        onPressed: _busy ? null : _markTaken,
-                        style: TextButton.styleFrom(
-                          minimumSize: const Size(120, 48),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
-                          ),
-                          alignment: Alignment.centerLeft,
-                          tapTargetSize: MaterialTapTargetSize.padded,
+    return Opacity(
+      opacity: taken ? 0.75 : 1,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: _canOpenHistory
+              ? () => widget.onOpenHistory!(occurrence)
+              : null,
+          borderRadius: BorderRadius.circular(12),
+          child: Ink(
+            decoration: BoxDecoration(
+              color: scheme.surfaceContainerLowest,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: DoselyTheme.ambientShadow,
+              border: highlight
+                  ? Border.all(color: scheme.primary.withValues(alpha: 0.2))
+                  : null,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  _StatusAvatar(status: status),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: Theme.of(context).textTheme.headlineMedium
+                              ?.copyWith(
+                                decoration: taken
+                                    ? TextDecoration.lineThrough
+                                    : null,
+                                color: taken
+                                    ? scheme.onSurfaceVariant
+                                    : scheme.onSurface,
+                              ),
                         ),
-                        child: const Text('Mark taken'),
+                        const SizedBox(height: 4),
+                        Text(
+                          subtitle,
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(color: scheme.onSurfaceVariant),
+                        ),
+                        if (notes.isNotEmpty && highlight) ...[
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: scheme.secondaryContainer,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              notes,
+                              style: Theme.of(context).textTheme.labelSmall
+                                  ?.copyWith(
+                                    color: scheme.onSecondaryContainer,
+                                  ),
+                            ),
+                          ),
+                        ],
+                        if (status == DayDoseStatus.missed ||
+                            status == DayDoseStatus.snoozed ||
+                            status == DayDoseStatus.notRecorded) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            DayDoseStyle.label(status),
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
+                                  color: DayDoseStyle.color(context, status),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  if (taken)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
                       ),
-                  ],
-                ),
+                      decoration: BoxDecoration(
+                        color: scheme.surfaceContainer,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        'Done',
+                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                          color: scheme.secondary,
+                        ),
+                      ),
+                    )
+                  else if (_canMarkTaken)
+                    IconButton(
+                      tooltip: 'Mark taken',
+                      onPressed: _busy ? null : _markTaken,
+                      icon: Icon(
+                        Icons.check,
+                        color: highlight ? scheme.primary : scheme.outline,
+                      ),
+                      style: IconButton.styleFrom(
+                        side: BorderSide(
+                          color: highlight ? scheme.primary : scheme.outlineVariant,
+                          width: 2,
+                        ),
+                        minimumSize: const Size(48, 48),
+                      ),
+                    ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _StatusAvatar extends StatelessWidget {
+  const _StatusAvatar({required this.status});
+  final DayDoseStatus status;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final taken = status == DayDoseStatus.taken;
+    return Container(
+      width: 48,
+      height: 48,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: taken
+            ? scheme.secondaryContainer
+            : status == DayDoseStatus.pending ||
+                  status == DayDoseStatus.upcoming
+            ? scheme.primary.withValues(alpha: 0.1)
+            : scheme.surfaceContainerHigh,
+      ),
+      child: Icon(
+        taken ? Icons.check : Icons.medication,
+        color: taken ||
+                status == DayDoseStatus.pending ||
+                status == DayDoseStatus.upcoming
+            ? scheme.primary
+            : scheme.onSurfaceVariant,
       ),
     );
   }

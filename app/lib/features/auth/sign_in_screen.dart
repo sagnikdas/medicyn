@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/app_settings.dart';
 import '../../core/privacy_policy.dart';
+import '../../core/widgets/dosely_chrome.dart';
 import 'auth_service.dart';
 
 /// Google sign-in, or local-only so reminders work without an account.
@@ -49,12 +50,15 @@ class _SignInScreenState extends State<SignInScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text('Dosely', style: Theme.of(context).textTheme.headlineMedium),
-              const SizedBox(height: 8),
+              const SizedBox(height: 24),
+              const DoselyBrandMark(),
+              const SizedBox(height: 32),
               Text(
                 'Sign in with Google to keep your reminders backed up and on '
                 'every device you use.',
-                style: Theme.of(context).textTheme.bodyMedium,
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
               const SizedBox(height: 28),
               FilledButton(

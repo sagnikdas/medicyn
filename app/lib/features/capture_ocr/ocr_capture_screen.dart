@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../core/widgets/dosely_chrome.dart';
+
 /// Step 1 of the capture flow: photograph the medicine label, run OCR
 /// on-device, then immediately delete the photo. Only the extracted text
 /// ever leaves this screen (and later, the device) — the image itself is
@@ -80,54 +82,101 @@ class _OcrCaptureScreenState extends State<OcrCaptureScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final busy =
+        _status == _Status.capturing || _status == _Status.recognizing;
     return Scaffold(
-      appBar: AppBar(title: const Text('Scan label')),
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.close),
+          tooltip: 'Close',
+          onPressed: () => Navigator.of(context).maybePop(),
+        ),
+        title: const DoselyBrandMark(compact: true),
+        centerTitle: true,
+      ),
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(28),
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Icon(
-                Icons.document_scanner_outlined,
-                size: 96,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-              const SizedBox(height: 24),
               Text(
-                'Point your camera at the medicine label',
+                'Scan Label',
                 textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.titleMedium,
+                style: Theme.of(context).textTheme.headlineSmall,
               ),
               const SizedBox(height: 8),
               Text(
-                'The photo stays on your device and is discarded after reading it.',
+                'Point your camera at the medicine label. Keep it steady.',
                 textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodySmall,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
               ),
-              const SizedBox(height: 28),
+              const SizedBox(height: 24),
+              Expanded(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: scheme.surfaceContainer,
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  child: CustomPaint(
+                    painter: _ViewfinderPainter(color: scheme.primaryContainer),
+                    child: Center(
+                      child: busy
+                          ? CircularProgressIndicator(color: scheme.primary)
+                          : Icon(
+                              Icons.document_scanner_outlined,
+                              size: 64,
+                              color: scheme.primaryContainer,
+                            ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              AmbientCard(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.lock_outline, color: scheme.primary),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'The photo stays on your device and is securely discarded immediately after reading it.',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
               if (_error != null) ...[
+                const SizedBox(height: 12),
                 Text(
                   _error!,
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                  style: TextStyle(color: scheme.error),
                 ),
-                const SizedBox(height: 16),
               ],
+              const SizedBox(height: 16),
               FilledButton.icon(
-                onPressed: _status == _Status.capturing || _status == _Status.recognizing ? null : _scan,
+                onPressed: busy ? null : _scan,
                 icon: _status == _Status.recognizing
                     ? const SizedBox(
                         height: 18,
                         width: 18,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : const Icon(Icons.camera_alt),
-                label: Text(_status == _Status.recognizing ? 'Reading label…' : 'Take photo'),
+                    : const Icon(Icons.photo_camera),
+                label: Text(
+                  _status == _Status.recognizing
+                      ? 'Reading label…'
+                      : 'Take photo',
+                ),
               ),
               const SizedBox(height: 12),
-              TextButton(
+              OutlinedButton(
                 onPressed: _status == _Status.recognizing ? null : _skip,
                 child: const Text('Skip — use voice only'),
               ),
@@ -137,4 +186,39 @@ class _OcrCaptureScreenState extends State<OcrCaptureScreen> {
       ),
     );
   }
+}
+
+class _ViewfinderPainter extends CustomPainter {
+  const _ViewfinderPainter({required this.color});
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 4
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+    const arm = 36.0;
+    const inset = 40.0;
+    final rect = Rect.fromLTWH(
+      inset,
+      inset,
+      size.width - inset * 2,
+      size.height - inset * 2,
+    );
+    // Four L-shaped corners.
+    canvas.drawLine(rect.topLeft, rect.topLeft + const Offset(arm, 0), paint);
+    canvas.drawLine(rect.topLeft, rect.topLeft + const Offset(0, arm), paint);
+    canvas.drawLine(rect.topRight, rect.topRight + const Offset(-arm, 0), paint);
+    canvas.drawLine(rect.topRight, rect.topRight + const Offset(0, arm), paint);
+    canvas.drawLine(rect.bottomLeft, rect.bottomLeft + const Offset(arm, 0), paint);
+    canvas.drawLine(rect.bottomLeft, rect.bottomLeft + const Offset(0, -arm), paint);
+    canvas.drawLine(rect.bottomRight, rect.bottomRight + const Offset(-arm, 0), paint);
+    canvas.drawLine(rect.bottomRight, rect.bottomRight + const Offset(0, -arm), paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _ViewfinderPainter oldDelegate) =>
+      oldDelegate.color != color;
 }

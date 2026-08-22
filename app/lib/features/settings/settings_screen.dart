@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/account_deletion.dart';
 import '../../core/app_settings.dart';
 import '../../core/privacy_policy.dart';
+import '../../core/widgets/dosely_chrome.dart';
 import '../../data/export/data_export_service.dart';
 import '../../data/local/database.dart';
 import '../../data/local/encrypted_database.dart';
@@ -22,9 +23,13 @@ import '../notification_engine/notification_service.dart';
 /// unless the user overrides it here, and whether a locked phone may show
 /// which medicine is due.
 class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({super.key, required this.db});
+  const SettingsScreen({super.key, required this.db, this.embedded = false});
 
   final AppDatabase db;
+
+  /// True when this screen is the Profile tab, so it draws the Stitch
+  /// header instead of a "Settings" app bar.
+  final bool embedded;
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -53,14 +58,60 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final email = AuthService.instance.currentUser?.email ?? '';
+    final name = email.contains('@') ? email.split('@').first : email;
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
+      appBar: widget.embedded
+          ? null
+          : AppBar(title: const Text('Settings')),
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
           children: [
-            if (_signedIn) ...[
-              Text('Signed in as', style: Theme.of(context).textTheme.bodySmall),
+            if (widget.embedded) ...[
+              const SizedBox(height: 8),
+              Center(
+                child: Column(
+                  children: [
+                    CircleAvatar(
+                      radius: 48,
+                      backgroundColor: Theme.of(
+                        context,
+                      ).colorScheme.secondaryContainer,
+                      foregroundColor: Theme.of(
+                        context,
+                      ).colorScheme.onSecondaryContainer,
+                      child: Text(
+                        (name.isEmpty ? 'D' : name.substring(0, 1))
+                            .toUpperCase(),
+                        style: Theme.of(context).textTheme.headlineLarge,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      _signedIn
+                          ? (name.isEmpty ? email : name)
+                          : 'On this phone',
+                      style: Theme.of(context).textTheme.headlineMedium,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _signedIn
+                          ? email
+                          : 'Reminders stay on this device until you sign in.',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 28),
+            ] else if (_signedIn) ...[
+              Text(
+                'Signed in as',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
               const SizedBox(height: 4),
               Text(email, style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 24),
@@ -79,32 +130,67 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const SizedBox(height: 12),
                 Text(
                   _signInError!,
-                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.error,
+                  ),
                 ),
               ],
               const SizedBox(height: 24),
             ],
-            Text('Family', style: Theme.of(context).textTheme.titleSmall),
-            const SizedBox(height: 4),
-            Text(
-              _signedIn
-                  ? 'Let one person help you keep track of your medicines — or help '
-                      'someone else with theirs.'
-                  : 'Family sharing needs a Google account.',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-            if (_signedIn) ...[
-              const SizedBox(height: 12),
-              OutlinedButton.icon(
-                onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => CareScreen(db: widget.db)),
-                ),
-                icon: const Icon(Icons.people_outline),
-                label: const Text('Connect with family'),
+            if (widget.embedded && !_signedIn) ...[
+              OutlinedButton(
+                onPressed: _signingIn ? null : _signInWithGoogle,
+                child: _signingIn
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Sign in with Google'),
               ),
+              if (_signInError != null) ...[
+                const SizedBox(height: 12),
+                Text(
+                  _signInError!,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.error,
+                  ),
+                ),
+              ],
+              const SizedBox(height: 24),
             ],
+            Text(
+              'Family',
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                color: Theme.of(context).colorScheme.primary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            IgnorePointer(
+              ignoring: !_signedIn,
+              child: Opacity(
+                opacity: _signedIn ? 1 : 0.6,
+                child: ProfileMenuRow(
+                  icon: Icons.people_outline,
+                  title: 'Connect with family',
+                  subtitle: _signedIn
+                      ? 'Let one person help you keep track of your medicines — or help someone else with theirs.'
+                      : 'Family sharing needs a Google account.',
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => CareScreen(db: widget.db),
+                    ),
+                  ),
+                ),
+              ),
+            ),
             const SizedBox(height: 24),
-            Text('Text size', style: Theme.of(context).textTheme.titleSmall),
+            Text(
+              'Appearance',
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                color: Theme.of(context).colorScheme.primary,
+              ),
+            ),
             const SizedBox(height: 4),
             Text(
               'Makes text and buttons throughout the app larger and easier to read.',

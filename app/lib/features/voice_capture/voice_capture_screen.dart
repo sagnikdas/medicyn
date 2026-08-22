@@ -93,79 +93,103 @@ class _VoiceCaptureScreenState extends State<VoiceCaptureScreen> {
   @override
   Widget build(BuildContext context) {
     final listening = _status == _Status.listening;
+    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
-      appBar: AppBar(title: const Text('Say the dosage & schedule')),
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.of(context).maybePop(),
+        ),
+      ),
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(28),
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              const SizedBox(height: 16),
+              Text(
+                'Say the dosage & schedule',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.headlineSmall,
+              ),
+              const SizedBox(height: 8),
               Text(
                 'e.g. "One tablet twice a day, morning and night, after food"',
                 textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-              const SizedBox(height: 28),
-              Container(
-                padding: const EdgeInsets.all(20),
-                constraints: const BoxConstraints(minHeight: 120),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surfaceContainerLow,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  _transcript.isEmpty ? (listening ? 'Listening…' : 'Tap the mic and speak') : _transcript,
-                  style: Theme.of(context).textTheme.bodyLarge,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: scheme.onSurfaceVariant,
                 ),
               ),
-              const SizedBox(height: 28),
+              const Spacer(),
               if (_errorMessage != null) ...[
                 Text(
                   _errorMessage!,
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                  style: TextStyle(color: scheme.error),
                 ),
                 const SizedBox(height: 16),
               ],
-              if (!_speechAllowed) ...[
+              if (!_speechAllowed)
                 Text(
                   'Voice input is off. You can skip this and type the details on the next screen.',
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.bodyLarge,
-                ),
-              ] else if (_status == _Status.unavailable)
+                )
+              else if (_status == _Status.unavailable)
                 OutlinedButton(
                   onPressed: () => openAppSettings(),
                   child: const Text('Open Settings'),
                 )
               else
-                Center(
-                  child: GestureDetector(
-                    onTap: listening ? _stopListening : _startListening,
-                    child: CircleAvatar(
-                      radius: 40,
-                      backgroundColor: listening
-                          ? Theme.of(context).colorScheme.error
-                          : Theme.of(context).colorScheme.primary,
-                      child: Icon(
-                        listening ? Icons.stop : Icons.mic,
-                        color: Theme.of(context).colorScheme.onPrimary,
-                        size: 32,
+                Column(
+                  children: [
+                    GestureDetector(
+                      onTap: listening ? _stopListening : _startListening,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        width: 128,
+                        height: 128,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: listening ? scheme.error : scheme.primary,
+                          boxShadow: [
+                            BoxShadow(
+                              color: (listening ? scheme.error : scheme.primary)
+                                  .withValues(alpha: 0.35),
+                              blurRadius: listening ? 24 : 12,
+                              spreadRadius: listening ? 8 : 0,
+                            ),
+                          ],
+                        ),
+                        child: Icon(
+                          listening ? Icons.stop : Icons.mic,
+                          color: scheme.onPrimary,
+                          size: 48,
+                        ),
                       ),
                     ),
-                  ),
+                    const SizedBox(height: 16),
+                    Text(
+                      _transcript.isEmpty
+                          ? (listening ? 'Listening…' : 'Tap the mic and speak')
+                          : _transcript,
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        color: scheme.primary,
+                      ),
+                    ),
+                  ],
                 ),
-              const SizedBox(height: 28),
+              const Spacer(),
               FilledButton(
-                onPressed: _transcript.isEmpty ? null : _done,
+                onPressed: _done,
                 child: const Text('Continue'),
               ),
               const SizedBox(height: 8),
               TextButton(
                 onPressed: () => Navigator.of(context).pop(''),
-                child: const Text('Skip'),
+                child: const Text('Type it instead'),
               ),
             ],
           ),

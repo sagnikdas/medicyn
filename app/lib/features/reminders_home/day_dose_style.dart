@@ -10,7 +10,7 @@ import 'day_occurrences.dart';
 class DayDoseStyle {
   DayDoseStyle._();
 
-  static const _taken = Color(0xFF2F6F5E);
+  static const _taken = Color(0xFF00685F);
   static const _pending = Color(0xFF3D6FA8);
 
   static Color color(BuildContext context, DayDoseStatus status) {

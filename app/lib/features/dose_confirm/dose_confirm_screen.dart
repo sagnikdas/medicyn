@@ -100,28 +100,61 @@ class _DoseConfirmScreenState extends State<DoseConfirmScreen> {
 
   Widget _body() {
     final medicine = _item!.medicine;
-    final title = medicine.strength.isEmpty ? medicine.drugName : '${medicine.drugName} ${medicine.strength}';
-    final body = medicine.doseAmount.isEmpty ? 'Time for your dose' : 'Take ${medicine.doseAmount}';
+    final title = medicine.strength.isEmpty
+        ? medicine.drugName
+        : '${medicine.drugName} ${medicine.strength}';
+    final body = medicine.doseAmount.isEmpty
+        ? 'Time for your dose'
+        : 'Take ${medicine.doseAmount}';
+    final scheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.all(28),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.medication, size: 72, color: Theme.of(context).colorScheme.primary),
-          const SizedBox(height: 20),
-          Text(title, style: Theme.of(context).textTheme.headlineSmall, textAlign: TextAlign.center),
-          const SizedBox(height: 8),
-          Text(body, style: Theme.of(context).textTheme.bodyLarge, textAlign: TextAlign.center),
-          const SizedBox(height: 40),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: scheme.primary,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              children: [
+                Text(
+                  'NEXT DOSE',
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: scheme.onPrimaryContainer,
+                    letterSpacing: 1,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  title,
+                  style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                    color: scheme.onPrimary,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  body,
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    color: scheme.inversePrimary,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
           FilledButton(
             onPressed: _submitting ? null : () => _respond(true),
-            style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(56)),
-            child: const Text('Taken'),
+            child: const Text('Mark as Taken'),
           ),
           const SizedBox(height: 12),
           OutlinedButton(
             onPressed: _submitting ? null : () => _respond(false),
-            style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(56)),
             child: const Text('Snooze 10m'),
           ),
         ],

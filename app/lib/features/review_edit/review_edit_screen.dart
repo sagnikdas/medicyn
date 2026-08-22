@@ -467,7 +467,28 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
           ),
         );
       case _LoadState.ready:
-        return _form();
+        return Column(
+          children: [
+            Expanded(child: _form()),
+            Material(
+              elevation: 8,
+              color: Theme.of(context).colorScheme.surface,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+                child: FilledButton(
+                  onPressed: _canSave && !_saving ? _save : null,
+                  child: _saving
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Text(_isEditing ? 'Save changes' : 'Save reminder'),
+                ),
+              ),
+            ),
+          ],
+        );
     }
   }
 
@@ -548,18 +569,29 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
           ],
         ),
         const SizedBox(height: 20),
-        Text('Frequency', style: Theme.of(context).textTheme.titleSmall),
+        Text(
+          'Frequency',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: Theme.of(context).colorScheme.secondary,
+          ),
+        ),
         const SizedBox(height: 8),
-        SegmentedButton<FrequencyType>(
-          segments: const [
-            ButtonSegment(value: FrequencyType.daily, label: Text('Daily')),
-            ButtonSegment(value: FrequencyType.specificDays, label: Text('Some days')),
-            ButtonSegment(value: FrequencyType.everyXHours, label: Text('Every X hrs')),
-            ButtonSegment(value: FrequencyType.asNeeded, label: Text('As needed')),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final option in FrequencyType.values)
+              ChoiceChip(
+                label: Text(switch (option) {
+                  FrequencyType.daily => 'Daily',
+                  FrequencyType.specificDays => 'Some days',
+                  FrequencyType.everyXHours => 'Every X hrs',
+                  FrequencyType.asNeeded => 'As needed',
+                }),
+                selected: _frequency == option,
+                onSelected: (_) => setState(() => _frequency = option),
+              ),
           ],
-          selected: {_frequency},
-          onSelectionChanged: (s) => setState(() => _frequency = s.first),
-          showSelectedIcon: false,
         ),
         const SizedBox(height: 16),
         if (_frequency == FrequencyType.specificDays) ...[
@@ -618,7 +650,7 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
         TextField(
           controller: _notesController,
           maxLines: 2,
-          decoration: const InputDecoration(labelText: 'Notes (optional)'),
+          decoration: const InputDecoration(labelText: 'Instructions (optional)'),
         ),
         if (_isEditing) ...[
           const SizedBox(height: 20),
@@ -645,13 +677,7 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
             ),
           ],
         ],
-        const SizedBox(height: 28),
-        FilledButton(
-          onPressed: _canSave && !_saving ? _save : null,
-          child: _saving
-              ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
-              : Text(_isEditing ? 'Save changes' : 'Save reminder'),
-        ),
+        const SizedBox(height: 12),
       ],
     );
   }
