@@ -10,6 +10,11 @@
 #   ./scripts/monkey.sh
 #   ./scripts/monkey.sh --build          # rebuild the debug APK first
 #   SESSIONS=5 EVENTS=3000 ./scripts/monkey.sh
+#
+# Each session force-stops, launches, and waits until MainActivity holds
+# focus before injecting. Otherwise a debug cold start (20s on a moto g22)
+# plus Home's notification / exact-alarm / battery dialogs produce a fake
+# ANR: "Application does not have a focused window".
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -19,6 +24,7 @@ APK="$APP_DIR/build/app/outputs/flutter-apk/app-debug.apk"
 SESSIONS="${SESSIONS:-3}"
 EVENTS="${EVENTS:-2000}"
 THROTTLE_MS="${THROTTLE_MS:-200}"
+FOCUS_WAIT_S="${FOCUS_WAIT_S:-90}"
 BUILD=0
 
 prepend_path() {
@@ -35,7 +41,7 @@ for arg in "$@"; do
   case "$arg" in
     --build) BUILD=1 ;;
     -h|--help)
-      sed -n '2,14p' "$0"
+      sed -n '2,17p' "$0"
       exit 0
       ;;
     *)
@@ -75,6 +81,54 @@ fi
 echo "installing $APK"
 adb install -r "$APK" >/dev/null
 
+# Runtime dialogs (camera, mic, POST_NOTIFICATIONS, exact alarms, battery
+# exemption) steal focus from MainActivity. Monkey then ANRs because the
+# package has no focused window. Grant what adb can; ignore API/OEM misses.
+grant_perm() {
+  adb shell pm grant "$PACKAGE" "$1" >/dev/null 2>&1 || true
+}
+grant_perm android.permission.CAMERA
+grant_perm android.permission.RECORD_AUDIO
+grant_perm android.permission.POST_NOTIFICATIONS
+adb shell appops set "$PACKAGE" SCHEDULE_EXACT_ALARM allow >/dev/null 2>&1 || true
+adb shell dumpsys deviceidle whitelist +"$PACKAGE" >/dev/null 2>&1 || true
+
+current_focus() {
+  adb shell dumpsys window 2>/dev/null | tr -d '\r' | grep 'mCurrentFocus=' || true
+}
+
+# Cold-start the activity, wait until it is displayed, then until it keeps
+# window focus for a few checks (so a post-frame permission sheet is not
+# still sitting on top).
+launch_and_wait() {
+  adb shell am force-stop "$PACKAGE" >/dev/null || true
+  adb shell input keyevent KEYCODE_WAKEUP >/dev/null || true
+  adb shell wm dismiss-keyguard >/dev/null || true
+  echo "waiting for first frame…"
+  if ! adb shell am start -W -n "${PACKAGE}/.MainActivity" \
+    -a android.intent.action.MAIN \
+    -c android.intent.category.LAUNCHER >/dev/null; then
+    echo "am start failed" >&2
+    return 1
+  fi
+  local got=0
+  local start=$SECONDS
+  while (( SECONDS - start < FOCUS_WAIT_S )); do
+    if current_focus | grep -q "$PACKAGE"; then
+      got=$((got + 1))
+      if (( got >= 6 )); then
+        return 0
+      fi
+    else
+      got=0
+    fi
+    sleep 0.5
+  done
+  echo "timed out waiting for a focused $PACKAGE window" >&2
+  current_focus >&2
+  return 1
+}
+
 OUT="$(mktemp -d "${TMPDIR:-/tmp}/dosely-monkey.XXXXXX")"
 echo "logs: $OUT"
 echo "warning: keep the phone unlocked. Monkey stays in $PACKAGE (no Home/Power)."
@@ -97,8 +151,11 @@ for i in $(seq 1 "$SESSIONS"); do
   session_log="$OUT/session-$i.log"
   echo
   echo "session $i/$SESSIONS — $EVENTS events"
-  adb shell am force-stop "$PACKAGE" >/dev/null || true
-  adb shell input keyevent KEYCODE_WAKEUP >/dev/null || true
+  if ! launch_and_wait; then
+    echo "SETUP FAIL in session $i — app never held window focus"
+    crashed=1
+    continue
+  fi
   adb logcat -c
   set +e
   adb shell monkey "${monkey_args[@]}" >"$session_log" 2>&1
