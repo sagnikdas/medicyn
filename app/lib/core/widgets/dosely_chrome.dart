@@ -164,32 +164,53 @@ class ProgressRing extends StatelessWidget {
   final double size;
   final double stroke;
 
+  /// Percent text drawn in the hole of the ring (`100%` at completion).
+  static String percentLabel(double fraction) =>
+      '${(fraction.clamp(0.0, 1.0) * 100).round()}%';
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final clamped = fraction.clamp(0.0, 1.0);
+    final box = MediaQuery.textScalerOf(context).scale(size).clamp(size, 80.0);
+    // Keep the digits inside the unpainted hole, not over the stroke.
+    final inner = (box - stroke * 2 - 8).clamp(16.0, box);
     return SizedBox(
-      width: size,
-      height: size,
+      width: box,
+      height: box,
       child: Stack(
         alignment: Alignment.center,
         children: [
-          CircularProgressIndicator(
-            value: 1,
-            strokeWidth: stroke,
-            color: scheme.secondaryContainer,
+          Positioned.fill(
+            child: CircularProgressIndicator(
+              value: 1,
+              strokeWidth: stroke,
+              color: scheme.secondaryContainer,
+            ),
           ),
-          CircularProgressIndicator(
-            value: clamped,
-            strokeWidth: stroke,
-            color: scheme.primary,
-            strokeCap: StrokeCap.round,
+          Positioned.fill(
+            child: CircularProgressIndicator(
+              value: clamped,
+              strokeWidth: stroke,
+              color: scheme.primary,
+              strokeCap: StrokeCap.round,
+            ),
           ),
-          Text(
-            '${(clamped * 100).round()}%',
-            style: Theme.of(
-              context,
-            ).textTheme.labelLarge?.copyWith(color: scheme.primary),
+          SizedBox(
+            width: inner,
+            height: inner,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                percentLabel(clamped),
+                maxLines: 1,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: scheme.onSurface,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
           ),
         ],
       ),

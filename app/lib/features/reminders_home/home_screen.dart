@@ -417,41 +417,9 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-              child: AmbientCard(
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Daily progress',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.titleLarge,
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '$takenCount of $expectedCount doses completed',
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.bodyMedium
-                                ?.copyWith(
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.onSurfaceVariant,
-                                ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    ProgressRing(
-                      fraction: expectedCount == 0
-                          ? 0
-                          : takenCount / expectedCount,
-                    ),
-                  ],
-                ),
+              child: DailyProgressCard(
+                taken: takenCount,
+                expected: expectedCount,
               ),
             ),
           ),
@@ -668,6 +636,55 @@ class _EmptyState extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Home "Daily progress" row: copy on the left, ring on the right.
+@visibleForTesting
+class DailyProgressCard extends StatelessWidget {
+  const DailyProgressCard({
+    super.key,
+    required this.taken,
+    required this.expected,
+  });
+
+  final int taken;
+  final int expected;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final fraction = expected == 0 ? 0.0 : taken / expected;
+    final copy = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Daily progress',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
+        const SizedBox(height: 4),
+        Text(
+          '$taken of $expected doses completed',
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+        ),
+      ],
+    );
+    return AmbientCard(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Expanded(child: copy),
+          const SizedBox(width: 12),
+          ProgressRing(fraction: fraction),
         ],
       ),
     );
