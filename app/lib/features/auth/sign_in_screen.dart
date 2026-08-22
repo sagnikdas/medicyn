@@ -4,6 +4,7 @@ import '../../core/app_settings.dart';
 import '../../core/privacy_policy.dart';
 import '../../core/widgets/dosely_chrome.dart';
 import '../../core/widgets/dosely_layout.dart';
+import '../../core/widgets/dosely_motion.dart';
 import 'auth_service.dart';
 
 /// Google sign-in, or local-only so reminders work without an account.
@@ -52,36 +53,52 @@ class _SignInScreenState extends State<SignInScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const SizedBox(height: 24),
-                const DoselyBrandMark(),
-                const SizedBox(height: 32),
-                Text(
-                  'Sign in with Google to keep your reminders backed up and on '
-                  'every device you use.',
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                DoselyFadeIn(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const SizedBox(height: 24),
+                      const DoselyBrandMark(),
+                      const SizedBox(height: 32),
+                      Text(
+                        'Sign in with Google to keep your reminders backed up and on '
+                        'every device you use.',
+                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: 28),
+                      FilledButton(
+                        onPressed: _busy ? null : _signInWithGoogle,
+                        child: DoselySwitcher(
+                          child: _busy
+                              ? const SizedBox(
+                                  key: ValueKey('busy'),
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Text(
+                                  'Continue with Google',
+                                  key: ValueKey('idle'),
+                                ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      OutlinedButton(
+                        onPressed: _busy ? null : _useWithoutAccount,
+                        child: const Text('Use without an account'),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Reminders stay on this phone. Backup and family sharing need Google later.',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
                   ),
-                ),
-                const SizedBox(height: 28),
-                FilledButton(
-                  onPressed: _busy ? null : _signInWithGoogle,
-                  child: _busy
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text('Continue with Google'),
-                ),
-                const SizedBox(height: 12),
-                OutlinedButton(
-                  onPressed: _busy ? null : _useWithoutAccount,
-                  child: const Text('Use without an account'),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Reminders stay on this phone. Backup and family sharing need Google later.',
-                  style: Theme.of(context).textTheme.bodySmall,
                 ),
                 if (_error != null) ...[
                   const SizedBox(height: 16),

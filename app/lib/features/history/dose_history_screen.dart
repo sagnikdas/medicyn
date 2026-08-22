@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../core/widgets/dosely_layout.dart';
+import '../../core/widgets/dosely_motion.dart';
 import '../../data/local/database.dart';
 import '../../data/local/tables.dart';
 import '../../data/remote/sync_service.dart';
@@ -39,16 +40,18 @@ class DoseHistoryScreen extends StatelessWidget {
                 snapshot.data!,
               )..sort((a, b) => b.log.scheduledAt.compareTo(a.log.scheduledAt));
               if (rows.isEmpty) {
-                return _EmptyState();
+                return DoselyFadeIn(child: _EmptyState());
               }
-              return ListView.separated(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-                itemCount: rows.length,
-                separatorBuilder: (_, _) => const SizedBox(height: 12),
-                itemBuilder: (context, i) => _DoseLogCard(
-                  log: rows[i].log,
-                  contest: rows[i].contest,
-                  db: db,
+              return DoselyFadeIn(
+                child: ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+                  itemCount: rows.length,
+                  separatorBuilder: (_, _) => const SizedBox(height: 12),
+                  itemBuilder: (context, i) => _DoseLogCard(
+                    log: rows[i].log,
+                    contest: rows[i].contest,
+                    db: db,
+                  ),
                 ),
               );
             },

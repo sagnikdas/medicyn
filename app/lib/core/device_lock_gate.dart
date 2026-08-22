@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app_settings.dart';
 import 'device_lock.dart';
+import 'motion.dart';
 
 /// Covers the app with an unlock screen after it has been in the background
 /// past [kDeviceLockGrace], then asks for the phone's existing PIN / pattern
@@ -103,40 +104,55 @@ class _DeviceLockGateState extends State<DeviceLockGate>
 
   @override
   Widget build(BuildContext context) {
-    if (!_locked) return widget.child;
     final scheme = Theme.of(context).colorScheme;
+    // Always stack so the navigator (and open database) stay mounted when
+    // the cover appears, and so AnimatedOpacity can fade the lock in.
     return Stack(
       fit: StackFit.expand,
       children: [
-        // Keep the tree (and the open database) alive under the cover.
-        Offstage(offstage: true, child: widget.child),
-        ColoredBox(
-          color: scheme.surface,
-          child: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.lock_outline, size: 48, color: scheme.primary),
-                  const SizedBox(height: 20),
-                  Text(
-                    'Unlock Dosely',
-                    style: Theme.of(context).textTheme.headlineSmall,
-                    textAlign: TextAlign.center,
+        Offstage(offstage: _locked, child: widget.child),
+        IgnorePointer(
+          ignoring: !_locked,
+          child: ExcludeSemantics(
+            excluding: !_locked,
+            child: AnimatedOpacity(
+              opacity: _locked ? 1 : 0,
+              duration: DoselyMotion.duration(context, DoselyMotion.fast),
+              curve: DoselyMotion.decelerate,
+              child: ColoredBox(
+                color: scheme.surface,
+                child: SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.lock_outline,
+                          size: 48,
+                          color: scheme.primary,
+                        ),
+                        const SizedBox(height: 20),
+                        Text(
+                          'Unlock Dosely',
+                          style: Theme.of(context).textTheme.headlineSmall,
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'Use the PIN, pattern, or fingerprint you already use on this phone.',
+                          style: Theme.of(context).textTheme.bodyLarge,
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 32),
+                        FilledButton(
+                          onPressed: _promptUnlock,
+                          child: const Text('Unlock'),
+                        ),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'Use the PIN, pattern, or fingerprint you already use on this phone.',
-                    style: Theme.of(context).textTheme.bodyLarge,
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 32),
-                  FilledButton(
-                    onPressed: _promptUnlock,
-                    child: const Text('Unlock'),
-                  ),
-                ],
+                ),
               ),
             ),
           ),

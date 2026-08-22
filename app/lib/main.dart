@@ -8,9 +8,11 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/app_navigation.dart';
 import 'core/app_settings.dart';
 import 'core/device_lock_gate.dart';
+import 'core/motion.dart';
 import 'core/sentry_config.dart';
 import 'core/supabase_init.dart';
 import 'core/theme.dart';
+import 'core/widgets/dosely_motion.dart';
 import 'data/local/database.dart';
 import 'data/local/database_encryption.dart';
 import 'features/auth/sign_in_screen.dart';
@@ -118,13 +120,15 @@ class _OnboardingGate extends StatelessWidget {
     return ListenableBuilder(
       listenable: AppSettings.instance,
       builder: (context, _) {
-        if (AppSettings.instance.hasSeenOnboarding) {
-          return const _ConsentGate();
-        }
         // No navigation needed here: OnboardingScreen persists the flag via
         // AppSettings, and that change alone triggers this ListenableBuilder
         // to rebuild into _ConsentGate.
-        return const OnboardingScreen();
+        return DoselySwitcher(
+          duration: DoselyMotion.medium,
+          child: AppSettings.instance.hasSeenOnboarding
+              ? const _ConsentGate(key: ValueKey('consent-gate'))
+              : const OnboardingScreen(key: ValueKey('onboarding')),
+        );
       },
     );
   }
@@ -135,17 +139,19 @@ class _OnboardingGate extends StatelessWidget {
 /// persisted flag (see AppSettings.hasRecordedConsents) means this gate goes
 /// straight to `_AuthGate`.
 class _ConsentGate extends StatelessWidget {
-  const _ConsentGate();
+  const _ConsentGate({super.key});
 
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
       listenable: AppSettings.instance,
       builder: (context, _) {
-        if (AppSettings.instance.hasRecordedConsents) {
-          return const _AuthGate();
-        }
-        return const ConsentScreen();
+        return DoselySwitcher(
+          duration: DoselyMotion.medium,
+          child: AppSettings.instance.hasRecordedConsents
+              ? const _AuthGate(key: ValueKey('auth-gate'))
+              : const ConsentScreen(key: ValueKey('consent')),
+        );
       },
     );
   }
@@ -163,7 +169,7 @@ class _ConsentGate extends StatelessWidget {
 /// the sentinel owner [localOwnerUserId] (`dosely-local.sqlite`); first
 /// sign-in on this phone adopts that file when the account has none yet.
 class _AuthGate extends StatefulWidget {
-  const _AuthGate();
+  const _AuthGate({super.key});
 
   @override
   State<_AuthGate> createState() => _AuthGateState();
@@ -227,21 +233,28 @@ class _AuthGateState extends State<_AuthGate> {
             final owner =
                 user?.id ??
                 (AppSettings.instance.localOnly ? localOwnerUserId : null);
+            final Widget child;
             if (owner == null) {
               _releaseDatabase();
-              return const SignInScreen();
+              child = const SignInScreen(key: ValueKey('sign-in'));
+            } else {
+              if (user != null && _syncedConsentUserId != user.id) {
+                _syncedConsentUserId = user.id;
+                unawaited(ConsentService.instance.syncToServer());
+              }
+              final db = _databaseFor(owner);
+              if (db == null) {
+                child = const Scaffold(
+                  key: ValueKey('loading'),
+                  body: Center(child: CircularProgressIndicator()),
+                );
+              } else {
+                // No key on AppShell: StreamBuilder rebuilds must update in
+                // place so the State that owns the open database is not reset.
+                child = AppShell(db: db);
+              }
             }
-            if (user != null && _syncedConsentUserId != user.id) {
-              _syncedConsentUserId = user.id;
-              unawaited(ConsentService.instance.syncToServer());
-            }
-            final db = _databaseFor(owner);
-            if (db == null) {
-              return const Scaffold(
-                body: Center(child: CircularProgressIndicator()),
-              );
-            }
-            return AppShell(db: db);
+            return DoselySwitcher(duration: DoselyMotion.medium, child: child);
           },
         );
       },

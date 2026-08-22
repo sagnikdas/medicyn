@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../core/motion.dart';
 import '../../core/theme.dart';
+import '../../core/widgets/dosely_motion.dart';
 import 'day_dose_style.dart';
 import 'day_occurrences.dart';
 import 'reminder_copy.dart';
@@ -46,13 +48,17 @@ class WeekAdherenceLine extends StatelessWidget {
         const SizedBox(height: 6),
         ClipRRect(
           borderRadius: BorderRadius.circular(2),
-          child: LinearProgressIndicator(
+          child: DoselyAnimatedValue(
             value: fraction,
-            minHeight: 4,
-            color: Theme.of(context).colorScheme.primary,
-            backgroundColor: Theme.of(
-              context,
-            ).colorScheme.surfaceContainerHighest,
+            duration: DoselyMotion.medium,
+            builder: (context, value) => LinearProgressIndicator(
+              value: value,
+              minHeight: 4,
+              color: Theme.of(context).colorScheme.primary,
+              backgroundColor: Theme.of(
+                context,
+              ).colorScheme.surfaceContainerHighest,
+            ),
           ),
         ),
       ],
@@ -119,13 +125,16 @@ List<Widget> dayDoseSlivers({
     SliverPadding(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
       sliver: SliverToBoxAdapter(
-        child: _DayDoseColumn(
-          day: day,
-          now: now,
-          occurrences: occurrences,
-          onMarkTaken: onMarkTaken,
-          onOpenHistory: onOpenHistory,
-          showHeading: showHeading,
+        child: DoselyFadeIn(
+          key: ValueKey(calendarDay(day)),
+          child: _DayDoseColumn(
+            day: day,
+            now: now,
+            occurrences: occurrences,
+            onMarkTaken: onMarkTaken,
+            onOpenHistory: onOpenHistory,
+            showHeading: showHeading,
+          ),
         ),
       ),
     ),
@@ -276,6 +285,7 @@ class _DayDoseRowState extends State<_DayDoseRow> {
   Future<void> _markTaken() async {
     final callback = widget.onMarkTaken;
     if (callback == null || _busy) return;
+    DoselyMotion.confirm(context);
     setState(() => _busy = true);
     try {
       await callback(widget.occurrence);
@@ -299,130 +309,155 @@ class _DayDoseRowState extends State<_DayDoseRow> {
         status == DayDoseStatus.upcoming ||
         status == DayDoseStatus.snoozed;
 
-    return Opacity(
-      opacity: taken ? 0.75 : 1,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: _canOpenHistory
-              ? () => widget.onOpenHistory!(occurrence)
-              : null,
-          borderRadius: BorderRadius.circular(12),
-          child: Ink(
-            decoration: BoxDecoration(
-              color: scheme.surfaceContainerLowest,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: DoselyTheme.ambientShadow,
-              border: highlight
-                  ? Border.all(color: scheme.primary.withValues(alpha: 0.2))
-                  : null,
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  _StatusAvatar(status: status),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          title,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.titleMedium
-                              ?.copyWith(
-                                decoration: taken
-                                    ? TextDecoration.lineThrough
-                                    : null,
-                                color: taken
-                                    ? scheme.onSurfaceVariant
-                                    : scheme.onSurface,
-                              ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          subtitle,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.bodyMedium
-                              ?.copyWith(color: scheme.onSurfaceVariant),
-                        ),
-                        if (notes.isNotEmpty && highlight) ...[
-                          const SizedBox(height: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 2,
+    return DoselyPressable(
+      enabled: _canOpenHistory || _canMarkTaken,
+      child: AnimatedOpacity(
+        duration: DoselyMotion.duration(context, DoselyMotion.medium),
+        curve: DoselyMotion.decelerate,
+        opacity: taken ? 0.75 : 1,
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: _canOpenHistory
+                ? () => widget.onOpenHistory!(occurrence)
+                : null,
+            borderRadius: BorderRadius.circular(12),
+            child: Ink(
+              decoration: BoxDecoration(
+                color: scheme.surfaceContainerLowest,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: DoselyTheme.ambientShadow,
+                border: highlight
+                    ? Border.all(color: scheme.primary.withValues(alpha: 0.2))
+                    : null,
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    _StatusAvatar(status: status),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          AnimatedDefaultTextStyle(
+                            duration: DoselyMotion.duration(
+                              context,
+                              DoselyMotion.fast,
                             ),
-                            decoration: BoxDecoration(
-                              color: scheme.secondaryContainer,
-                              borderRadius: BorderRadius.circular(20),
-                            ),
+                            curve: DoselyMotion.decelerate,
+                            style:
+                                Theme.of(
+                                  context,
+                                ).textTheme.titleMedium?.copyWith(
+                                  decoration: taken
+                                      ? TextDecoration.lineThrough
+                                      : TextDecoration.none,
+                                  color: taken
+                                      ? scheme.onSurfaceVariant
+                                      : scheme.onSurface,
+                                ) ??
+                                const TextStyle(),
                             child: Text(
-                              notes,
+                              title,
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context).textTheme.labelSmall
-                                  ?.copyWith(
-                                    color: scheme.onSecondaryContainer,
-                                  ),
                             ),
                           ),
-                        ],
-                        if (status == DayDoseStatus.missed ||
-                            status == DayDoseStatus.snoozed ||
-                            status == DayDoseStatus.notRecorded) ...[
                           const SizedBox(height: 4),
                           Text(
-                            DayDoseStyle.label(status),
-                            style: Theme.of(context).textTheme.bodySmall
-                                ?.copyWith(
-                                  color: DayDoseStyle.color(context, status),
-                                  fontWeight: FontWeight.w600,
-                                ),
+                            subtitle,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(color: scheme.onSurfaceVariant),
                           ),
+                          if (notes.isNotEmpty && highlight) ...[
+                            const SizedBox(height: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: scheme.secondaryContainer,
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                notes,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context).textTheme.labelSmall
+                                    ?.copyWith(
+                                      color: scheme.onSecondaryContainer,
+                                    ),
+                              ),
+                            ),
+                          ],
+                          if (status == DayDoseStatus.missed ||
+                              status == DayDoseStatus.snoozed ||
+                              status == DayDoseStatus.notRecorded) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              DayDoseStyle.label(status),
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    color: DayDoseStyle.color(context, status),
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                            ),
+                          ],
                         ],
-                      ],
-                    ),
-                  ),
-                  if (taken)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: scheme.surfaceContainer,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        'Done',
-                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                          color: scheme.secondary,
-                        ),
-                      ),
-                    )
-                  else if (_canMarkTaken)
-                    IconButton(
-                      tooltip: 'Mark taken',
-                      onPressed: _busy ? null : _markTaken,
-                      icon: Icon(
-                        Icons.check,
-                        color: highlight ? scheme.primary : scheme.outline,
-                      ),
-                      style: IconButton.styleFrom(
-                        side: BorderSide(
-                          color: highlight
-                              ? scheme.primary
-                              : scheme.outlineVariant,
-                          width: 2,
-                        ),
-                        minimumSize: const Size(48, 48),
                       ),
                     ),
-                ],
+                    DoselySwitcher(
+                      child: taken
+                          ? Container(
+                              key: const ValueKey('done'),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: scheme.surfaceContainer,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                'Done',
+                                style: Theme.of(context).textTheme.labelLarge
+                                    ?.copyWith(color: scheme.secondary),
+                              ),
+                            )
+                          : _canMarkTaken
+                          ? IconButton(
+                              key: const ValueKey('mark'),
+                              tooltip: 'Mark taken',
+                              onPressed: _busy ? null : _markTaken,
+                              icon: Icon(
+                                Icons.check,
+                                color: highlight
+                                    ? scheme.primary
+                                    : scheme.outline,
+                              ),
+                              style: IconButton.styleFrom(
+                                side: BorderSide(
+                                  color: highlight
+                                      ? scheme.primary
+                                      : scheme.outlineVariant,
+                                  width: 2,
+                                ),
+                                minimumSize: const Size(48, 48),
+                              ),
+                            )
+                          : const SizedBox(
+                              key: ValueKey('none'),
+                              width: 0,
+                              height: 48,
+                            ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -440,7 +475,9 @@ class _StatusAvatar extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final taken = status == DayDoseStatus.taken;
-    return Container(
+    return AnimatedContainer(
+      duration: DoselyMotion.duration(context, DoselyMotion.fast),
+      curve: DoselyMotion.decelerate,
       width: 48,
       height: 48,
       decoration: BoxDecoration(

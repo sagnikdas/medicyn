@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../core/motion.dart';
 import '../../core/widgets/dosely_layout.dart';
+import '../../core/widgets/dosely_motion.dart';
 import '../../data/local/database.dart';
 import '../notification_engine/notification_actions.dart';
 
@@ -90,9 +92,19 @@ class _DoseConfirmScreenState extends State<DoseConfirmScreen> {
       body: SafeArea(
         child: DoselyContent(
           child: Center(
-            child: _loading
-                ? const CircularProgressIndicator()
-                : (_notFound ? _notFoundView() : _body()),
+            child: DoselySwitcher(
+              child: _loading
+                  ? const CircularProgressIndicator(key: ValueKey('loading'))
+                  : (_notFound
+                        ? KeyedSubtree(
+                            key: const ValueKey('not-found'),
+                            child: _notFoundView(),
+                          )
+                        : DoselyFadeIn(
+                            key: const ValueKey('body'),
+                            child: _body(),
+                          )),
+            ),
           ),
         ),
       ),
@@ -169,7 +181,12 @@ class _DoseConfirmScreenState extends State<DoseConfirmScreen> {
           ),
           const SizedBox(height: 24),
           FilledButton(
-            onPressed: _submitting ? null : () => _respond(true),
+            onPressed: _submitting
+                ? null
+                : () {
+                    DoselyMotion.confirm(context);
+                    _respond(true);
+                  },
             child: const Text('Mark as Taken'),
           ),
           const SizedBox(height: 12),

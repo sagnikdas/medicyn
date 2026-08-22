@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../../core/motion.dart';
 import '../../core/theme.dart';
 import '../../core/widgets/dosely_chrome.dart';
+import '../../core/widgets/dosely_motion.dart';
 import '../../data/local/database.dart';
 import '../auth/auth_service.dart';
 import '../care/care_service.dart';
@@ -84,15 +86,22 @@ class _InsightsBody extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
       children: [
-        Text(
-          'Your health insights',
-          style: Theme.of(context).textTheme.titleLarge,
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'What actually happened with your medicines this week.',
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
+        DoselyFadeIn(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Your health insights',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'What actually happened with your medicines this week.',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
           ),
         ),
         const SizedBox(height: 24),
@@ -157,7 +166,9 @@ class _InsightsBody extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 24),
-              _WeekBars(days: days, now: now),
+              DoselyFadeIn(
+                child: _WeekBars(days: days, now: now),
+              ),
             ],
           ),
         ),
@@ -178,127 +189,154 @@ class _InsightsBody extends StatelessWidget {
               rate: morning.rate,
               expected: morning.expected,
             );
-            if (constraints.maxWidth < 420) {
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  streakCard,
-                  const SizedBox(height: 12),
-                  consistentCard,
-                ],
-              );
-            }
-            return Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(child: streakCard),
-                const SizedBox(width: 12),
-                Expanded(child: consistentCard),
-              ],
+            final pair = constraints.maxWidth < 420
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      streakCard,
+                      const SizedBox(height: 12),
+                      consistentCard,
+                    ],
+                  )
+                : Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(child: streakCard),
+                      const SizedBox(width: 12),
+                      Expanded(child: consistentCard),
+                    ],
+                  );
+            return DoselyFadeIn(
+              delay: const Duration(milliseconds: 40),
+              child: pair,
             );
           },
         ),
         const SizedBox(height: 16),
-        AmbientCard(
-          child: Row(
+        DoselyFadeIn(
+          delay: const Duration(milliseconds: 80),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              CircleAvatar(
-                backgroundColor: Theme.of(context).colorScheme.errorContainer,
-                foregroundColor: Theme.of(context).colorScheme.onErrorContainer,
-                child: const Icon(Icons.warning_amber_rounded),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              AmbientCard(
+                child: Row(
                   children: [
-                    Text(
-                      'Unanswered doses',
-                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
+                    CircleAvatar(
+                      backgroundColor: Theme.of(
+                        context,
+                      ).colorScheme.errorContainer,
+                      foregroundColor: Theme.of(
+                        context,
+                      ).colorScheme.onErrorContainer,
+                      child: const Icon(Icons.warning_amber_rounded),
                     ),
-                    Text(
-                      '$missed',
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                    Text(
-                      'This week',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.error,
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Unanswered doses',
+                            style: Theme.of(context).textTheme.labelLarge
+                                ?.copyWith(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
+                                ),
+                          ),
+                          Text(
+                            '$missed',
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
+                          Text(
+                            'This week',
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
+                                  color: Theme.of(context).colorScheme.error,
+                                ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
               ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 12),
-        AmbientCard(
-          child: Row(
-            children: [
-              CircleAvatar(
-                backgroundColor: Theme.of(
-                  context,
-                ).colorScheme.secondaryContainer,
-                foregroundColor: Theme.of(
-                  context,
-                ).colorScheme.onSecondaryContainer,
-                child: const Icon(Icons.medication_outlined),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              const SizedBox(height: 12),
+              AmbientCard(
+                child: Row(
                   children: [
-                    Text(
-                      'Doses taken',
-                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    CircleAvatar(
+                      backgroundColor: Theme.of(
+                        context,
+                      ).colorScheme.secondaryContainer,
+                      foregroundColor: Theme.of(
+                        context,
+                      ).colorScheme.onSecondaryContainer,
+                      child: const Icon(Icons.medication_outlined),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Doses taken',
+                            style: Theme.of(context).textTheme.labelLarge
+                                ?.copyWith(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
+                                ),
+                          ),
+                          Text(
+                            '${week.taken}',
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
+                          Text(
+                            'This week',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ],
                       ),
-                    ),
-                    Text(
-                      '${week.taken}',
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                    Text(
-                      'This week',
-                      style: Theme.of(context).textTheme.bodySmall,
                     ),
                   ],
                 ),
               ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 12),
-        AmbientCard(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              CircleAvatar(
-                backgroundColor: Theme.of(
-                  context,
-                ).colorScheme.surfaceContainerHighest,
-                foregroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
-                child: const Icon(Icons.info_outline),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
+              const SizedBox(height: 12),
+              AmbientCard(
+                child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Observation',
-                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
+                    CircleAvatar(
+                      backgroundColor: Theme.of(
+                        context,
+                      ).colorScheme.surfaceContainerHighest,
+                      foregroundColor: Theme.of(
+                        context,
+                      ).colorScheme.onSurfaceVariant,
+                      child: const Icon(Icons.info_outline),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      _observation(missedPart, missed),
-                      style: Theme.of(context).textTheme.bodyMedium,
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Observation',
+                            style: Theme.of(context).textTheme.labelLarge
+                                ?.copyWith(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
+                                ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _observation(missedPart, missed),
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -429,7 +467,9 @@ class _Bar extends StatelessWidget {
             alignment: Alignment.bottomCenter,
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 40),
-              child: Container(
+              child: AnimatedContainer(
+                duration: DoselyMotion.duration(context, DoselyMotion.slow),
+                curve: DoselyMotion.decelerate,
                 width: double.infinity,
                 height: h,
                 decoration: BoxDecoration(
@@ -508,11 +548,14 @@ class InsightsMostConsistentCard extends StatelessWidget {
             const SizedBox(height: 12),
             ClipRRect(
               borderRadius: BorderRadius.circular(4),
-              child: LinearProgressIndicator(
+              child: DoselyAnimatedValue(
                 value: rate,
-                minHeight: 8,
-                color: scheme.tertiary,
-                backgroundColor: scheme.surfaceContainerHigh,
+                builder: (context, value) => LinearProgressIndicator(
+                  value: value,
+                  minHeight: 8,
+                  color: scheme.tertiary,
+                  backgroundColor: scheme.surfaceContainerHigh,
+                ),
               ),
             ),
             const SizedBox(height: 8),

@@ -126,7 +126,7 @@ void main() {
     );
 
     await tester.tap(find.widgetWithText(TextButton, 'Month'));
-    await tester.pump();
+    await tester.pumpAndSettle();
     final monthH = tester.getSize(find.byType(DoseCalendar)).height;
     expect(
       monthH,
@@ -173,7 +173,7 @@ void main() {
     await tester.pumpWidget(harness(textScaler: scaler));
 
     await tester.tap(find.widgetWithText(TextButton, 'Month'));
-    await tester.pump();
+    await tester.pumpAndSettle();
 
     final calendar = find.byType(DoseCalendar);
     final context = tester.element(calendar);

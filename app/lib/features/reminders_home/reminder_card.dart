@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../core/theme.dart';
+import '../../core/widgets/dosely_motion.dart';
 import '../../data/local/database.dart';
 import '../../data/local/tables.dart';
 import 'refill.dart';
@@ -27,93 +28,95 @@ class ReminderCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final medicine = item.medicine;
     final title = medicineTitle(medicine);
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Ink(
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surfaceContainerLowest,
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: DoselyTheme.ambientShadow,
-          ),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 8, 16),
-            child: Row(
-              children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.primary.withValues(alpha: 0.1),
+    return DoselyPressable(
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Ink(
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surfaceContainerLowest,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: DoselyTheme.ambientShadow,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 8, 16),
+              child: Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.primary.withValues(alpha: 0.1),
+                    ),
+                    child: Icon(
+                      Icons.medication,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
                   ),
-                  child: Icon(
-                    Icons.medication,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: Theme.of(context).textTheme.titleMedium,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 4),
-                      if (medicine.doseAmount.isNotEmpty)
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                         Text(
-                          medicine.doseAmount,
+                          title,
+                          style: Theme.of(context).textTheme.titleMedium,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.bodyMedium,
                         ),
-                      const SizedBox(height: 4),
-                      Text(
-                        describeSchedule(item.schedule),
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                      if (refillWarningLine(
-                            refillDaysLeft(
-                              tabletsRemaining: medicine.tabletsRemaining,
-                              tabletsPerDose: medicine.tabletsPerDose,
-                              schedules: [item.schedule],
-                            ),
-                          )
-                          case final warning?) ...[
+                        const SizedBox(height: 4),
+                        if (medicine.doseAmount.isNotEmpty)
+                          Text(
+                            medicine.doseAmount,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
                         const SizedBox(height: 4),
                         Text(
-                          warning,
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(
-                                color: Theme.of(context).colorScheme.error,
-                              ),
-                        ),
-                      ],
-                      if (attribution != null) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          attribution!,
+                          describeSchedule(item.schedule),
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
+                        if (refillWarningLine(
+                              refillDaysLeft(
+                                tabletsRemaining: medicine.tabletsRemaining,
+                                tabletsPerDose: medicine.tabletsPerDose,
+                                schedules: [item.schedule],
+                              ),
+                            )
+                            case final warning?) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            warning,
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
+                                  color: Theme.of(context).colorScheme.error,
+                                ),
+                          ),
+                        ],
+                        if (attribution != null) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            attribution!,
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ],
+                        _SnoozeStatus(db: db, scheduleId: item.schedule.id),
                       ],
-                      _SnoozeStatus(db: db, scheduleId: item.schedule.id),
-                    ],
+                    ),
                   ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.delete_outline),
-                  tooltip: 'Stop or delete',
-                  onPressed: onDelete,
-                ),
-              ],
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline),
+                    tooltip: 'Stop or delete',
+                    onPressed: onDelete,
+                  ),
+                ],
+              ),
             ),
           ),
         ),

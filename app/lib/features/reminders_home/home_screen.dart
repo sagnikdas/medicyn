@@ -3,6 +3,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../core/app_settings.dart';
+import '../../core/motion.dart';
+import '../../core/widgets/dosely_chrome.dart';
+import '../../core/widgets/dosely_motion.dart';
 import '../../data/local/database.dart';
 import '../../data/remote/care_notifier.dart';
 import '../../data/remote/sync_service.dart';
@@ -18,7 +21,6 @@ import '../notification_engine/notification_service.dart';
 import '../push/push_service.dart';
 import '../review_edit/review_edit_screen.dart';
 import '../voice_capture/voice_capture_screen.dart';
-import '../../core/widgets/dosely_chrome.dart';
 import 'calendar_collapse_sliver.dart';
 import 'day_dose_list.dart';
 import 'day_occurrences.dart';
@@ -370,23 +372,25 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  greetingFor(now),
-                  style: Theme.of(context).textTheme.headlineSmall,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  isSameCalendarDay(_selectedDay, now)
-                      ? 'Your health schedule for today.'
-                      : 'Your health schedule for this day.',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+            child: DoselyFadeIn(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    greetingFor(now),
+                    style: Theme.of(context).textTheme.headlineSmall,
                   ),
-                ),
-              ],
+                  const SizedBox(height: 4),
+                  Text(
+                    isSameCalendarDay(_selectedDay, now)
+                        ? 'Your health schedule for today.'
+                        : 'Your health schedule for this day.',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -403,28 +407,41 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ),
           ),
         ),
-        if (next != null)
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-              child: _NextDoseCard(
-                occurrence: next,
-                onMarkTaken: () => _markTaken(next),
-              ),
-            ),
+        SliverToBoxAdapter(
+          child: AnimatedSize(
+            duration: DoselyMotion.duration(context, DoselyMotion.medium),
+            curve: DoselyMotion.decelerate,
+            alignment: Alignment.topCenter,
+            child: next == null
+                ? const SizedBox.shrink()
+                : Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                    child: DoselyFadeIn(
+                      child: _NextDoseCard(
+                        occurrence: next,
+                        onMarkTaken: () => _markTaken(next),
+                      ),
+                    ),
+                  ),
           ),
+        ),
         if (expectedCount > 0)
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-              child: DailyProgressCard(
-                taken: takenCount,
-                expected: expectedCount,
+              child: DoselyFadeIn(
+                delay: const Duration(milliseconds: 40),
+                child: DailyProgressCard(
+                  taken: takenCount,
+                  expected: expectedCount,
+                ),
               ),
             ),
           ),
         if (schedules.isEmpty)
-          SliverToBoxAdapter(child: _EmptyState(onAdd: _startCapture))
+          SliverToBoxAdapter(
+            child: DoselyFadeIn(child: _EmptyState(onAdd: _startCapture)),
+          )
         else
           ...dayDoseSlivers(
             day: _selectedDay,
@@ -443,13 +460,14 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     unawaited(
       _scroll.animateTo(
         0,
-        duration: const Duration(milliseconds: 280),
-        curve: Curves.easeOutCubic,
+        duration: DoselyMotion.duration(context, DoselyMotion.medium),
+        curve: DoselyMotion.standard,
       ),
     );
   }
 
   Future<void> _markTaken(DayOccurrence occurrence) async {
+    DoselyMotion.confirm(context);
     await recordDoseTaken(
       widget.db,
       scheduleId: occurrence.item.schedule.id,

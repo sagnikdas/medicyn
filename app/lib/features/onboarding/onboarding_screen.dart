@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../../core/app_settings.dart';
+import '../../core/motion.dart';
 import '../../core/widgets/dosely_chrome.dart';
 import '../../core/widgets/dosely_layout.dart';
+import '../../core/widgets/dosely_motion.dart';
 
 /// Shown once, before sign-in, on first launch only (see the
 /// `_OnboardingGate` in main.dart). Three plain-language pages explaining
@@ -65,8 +67,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       return;
     }
     _controller.nextPage(
-      duration: const Duration(milliseconds: 250),
-      curve: Curves.easeOut,
+      duration: DoselyMotion.duration(context, DoselyMotion.medium),
+      curve: DoselyMotion.decelerate,
     );
   }
 
@@ -108,7 +110,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   children: List.generate(
                     _pages.length,
                     (i) => AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
+                      duration: DoselyMotion.duration(
+                        context,
+                        DoselyMotion.fast,
+                      ),
+                      curve: DoselyMotion.decelerate,
                       margin: const EdgeInsets.symmetric(horizontal: 4),
                       width: i == _page ? 20 : 8,
                       height: 8,
@@ -158,16 +164,23 @@ class _OnboardingPageView extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
-                  page.icon,
-                  size: compact ? 64 : 120,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-                SizedBox(height: compact ? 16 : 32),
-                Text(
-                  page.headline,
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.headlineSmall,
+                DoselyFadeIn(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        page.icon,
+                        size: compact ? 64 : 120,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      SizedBox(height: compact ? 16 : 32),
+                      Text(
+                        page.headline,
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.headlineSmall,
+                      ),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 12),
                 Text(

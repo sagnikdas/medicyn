@@ -8,6 +8,7 @@ import 'package:permission_handler/permission_handler.dart';
 
 import '../../core/widgets/dosely_chrome.dart';
 import '../../core/widgets/dosely_layout.dart';
+import '../../core/widgets/dosely_motion.dart';
 
 /// Step 1 of the capture flow: photograph the medicine label, run OCR
 /// on-device, then immediately delete the photo. Only the extracted text
@@ -255,78 +256,92 @@ class _OcrCaptureScreenState extends State<OcrCaptureScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text(
-                  'Scan Label',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.headlineSmall,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Point your camera at the medicine label. Keep it steady.',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: scheme.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: 24),
                 Expanded(
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(24),
-                    child: ColoredBox(
-                      color: ready ? Colors.black : scheme.surfaceContainer,
-                      child: Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          if (ready)
-                            Positioned.fill(child: CameraPreview(camera))
-                          else
-                            Center(
-                              child: _opening
-                                  ? CircularProgressIndicator(
-                                      color: scheme.primary,
-                                    )
-                                  : Icon(
-                                      Icons.document_scanner_outlined,
-                                      size: 64,
-                                      color: scheme.primaryContainer,
-                                    ),
-                            ),
-                          CustomPaint(
-                            painter: _ViewfinderPainter(
+                  child: DoselyFadeIn(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          'Scan Label',
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.headlineSmall,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Point your camera at the medicine label. Keep it steady.',
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(color: scheme.onSurfaceVariant),
+                        ),
+                        const SizedBox(height: 24),
+                        Expanded(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(24),
+                            child: ColoredBox(
                               color: ready
-                                  ? Colors.white.withValues(alpha: 0.9)
-                                  : scheme.primaryContainer,
-                            ),
-                            child: const SizedBox.expand(),
-                          ),
-                          if (_status == _Status.recognizing)
-                            ColoredBox(
-                              color: Colors.black.withValues(alpha: 0.4),
-                              child: Center(
-                                child: CircularProgressIndicator(
-                                  color: scheme.primary,
-                                ),
+                                  ? Colors.black
+                                  : scheme.surfaceContainer,
+                              child: Stack(
+                                fit: StackFit.expand,
+                                children: [
+                                  if (ready)
+                                    Positioned.fill(
+                                      child: CameraPreview(camera),
+                                    )
+                                  else
+                                    Center(
+                                      child: _opening
+                                          ? CircularProgressIndicator(
+                                              color: scheme.primary,
+                                            )
+                                          : Icon(
+                                              Icons.document_scanner_outlined,
+                                              size: 64,
+                                              color: scheme.primaryContainer,
+                                            ),
+                                    ),
+                                  CustomPaint(
+                                    painter: _ViewfinderPainter(
+                                      color: ready
+                                          ? Colors.white.withValues(alpha: 0.9)
+                                          : scheme.primaryContainer,
+                                    ),
+                                    child: const SizedBox.expand(),
+                                  ),
+                                  if (_status == _Status.recognizing)
+                                    ColoredBox(
+                                      color: Colors.black.withValues(
+                                        alpha: 0.4,
+                                      ),
+                                      child: Center(
+                                        child: CircularProgressIndicator(
+                                          color: scheme.primary,
+                                        ),
+                                      ),
+                                    ),
+                                ],
                               ),
                             ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                AmbientCard(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(Icons.lock_outline, color: scheme.primary),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          'The photo stays on your device and is securely discarded immediately after reading it.',
-                          style: Theme.of(context).textTheme.bodySmall,
+                          ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 16),
+                        AmbientCard(
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Icon(Icons.lock_outline, color: scheme.primary),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  'The photo stays on your device and is securely discarded immediately after reading it.',
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 if (_error != null) ...[
@@ -340,17 +355,28 @@ class _OcrCaptureScreenState extends State<OcrCaptureScreen>
                 const SizedBox(height: 16),
                 FilledButton.icon(
                   onPressed: busy || _opening ? null : _scan,
-                  icon: _status == _Status.recognizing
-                      ? const SizedBox(
-                          height: 18,
-                          width: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.photo_camera),
-                  label: Text(
-                    _status == _Status.recognizing
-                        ? 'Reading label…'
-                        : 'Take photo',
+                  icon: DoselySwitcher(
+                    child: _status == _Status.recognizing
+                        ? const SizedBox(
+                            key: ValueKey('reading'),
+                            height: 18,
+                            width: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(
+                            Icons.photo_camera,
+                            key: ValueKey('camera'),
+                          ),
+                  ),
+                  label: DoselySwitcher(
+                    child: Text(
+                      _status == _Status.recognizing
+                          ? 'Reading label…'
+                          : 'Take photo',
+                      key: ValueKey(
+                        _status == _Status.recognizing ? 'reading' : 'take',
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 12),

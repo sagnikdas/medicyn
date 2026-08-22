@@ -5,7 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/ids.dart';
+import '../../core/motion.dart';
 import '../../core/widgets/dosely_layout.dart';
+import '../../core/widgets/dosely_motion.dart';
 import '../../data/local/database.dart';
 import '../../data/local/tables.dart';
 import '../../data/remote/care_notifier.dart';
@@ -472,9 +474,12 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
   }
 
   Widget _body() {
-    switch (_loadState) {
-      case _LoadState.loading:
-        return const Center(
+    return DoselySwitcher(
+      alignment: Alignment.topCenter,
+      duration: DoselyMotion.medium,
+      child: switch (_loadState) {
+        _LoadState.loading => const Center(
+          key: ValueKey(_LoadState.loading),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -483,9 +488,9 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
               Text('Reading the label and transcript…'),
             ],
           ),
-        );
-      case _LoadState.failed:
-        return Center(
+        ),
+        _LoadState.failed => Center(
+          key: const ValueKey(_LoadState.failed),
           child: Padding(
             padding: const EdgeInsets.all(28),
             child: Column(
@@ -502,31 +507,40 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
               ],
             ),
           ),
-        );
-      case _LoadState.ready:
-        return Column(
-          children: [
-            Expanded(child: _form()),
-            Material(
-              elevation: 8,
-              color: Theme.of(context).colorScheme.surface,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
-                child: FilledButton(
-                  onPressed: _canSave && !_saving ? _save : null,
-                  child: _saving
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : Text(_isEditing ? 'Save changes' : 'Save reminder'),
+        ),
+        _LoadState.ready => DoselyFadeIn(
+          key: const ValueKey(_LoadState.ready),
+          child: Column(
+            children: [
+              Expanded(child: _form()),
+              Material(
+                elevation: 8,
+                color: Theme.of(context).colorScheme.surface,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+                  child: FilledButton(
+                    onPressed: _canSave && !_saving ? _save : null,
+                    child: DoselySwitcher(
+                      child: _saving
+                          ? const SizedBox(
+                              key: ValueKey(true),
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Text(
+                              _isEditing ? 'Save changes' : 'Save reminder',
+                              key: const ValueKey(false),
+                            ),
+                    ),
+                  ),
                 ),
               ),
-            ),
-          ],
-        );
-    }
+            ],
+          ),
+        ),
+      },
+    );
   }
 
   Widget _fieldPair(Widget left, Widget right) {

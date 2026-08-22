@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/widgets/dosely_layout.dart';
+import '../../core/widgets/dosely_motion.dart';
 import '../../data/local/database.dart';
 import '../auth/auth_service.dart';
 import '../reminders_home/reminder_copy.dart';
@@ -128,91 +129,95 @@ class _PatientRemindersScreenState extends State<PatientRemindersScreen> {
       return const Center(child: CircularProgressIndicator());
     }
     if (items.isEmpty) {
-      return ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(28, 48, 28, 96),
-        children: const [
-          Text(
-            'No reminders yet. Add one by filling in the form — scan and '
-            'voice stay on their phone, because those send a label to a '
-            'service under their consent, not yours.',
-            textAlign: TextAlign.center,
-          ),
-        ],
+      return DoselyFadeIn(
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(28, 48, 28, 96),
+          children: const [
+            Text(
+              'No reminders yet. Add one by filling in the form — scan and '
+              'voice stay on their phone, because those send a label to a '
+              'service under their consent, not yours.',
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
       );
     }
-    return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
-      itemCount: items.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 12),
-      itemBuilder: (context, i) {
-        final item = items[i];
-        final medicine = item.medicine;
-        final attribution = editAttributionLine(
-          updatedBy: item.schedule.updatedBy ?? medicine.updatedBy,
-          updatedAt: item.schedule.updatedAt.isAfter(medicine.updatedAt)
-              ? item.schedule.updatedAt
-              : medicine.updatedAt,
-          createdAt: medicine.createdAt,
-          currentUserId: _me,
-          nameOf: (id) => _names[id],
-        );
-        return Card(
-          child: InkWell(
-            onTap: () => _open(existing: item),
-            borderRadius: BorderRadius.circular(20),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    medicineTitle(medicine),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  if (medicine.doseAmount.isNotEmpty) ...[
-                    const SizedBox(height: 4),
+    return DoselyFadeIn(
+      child: ListView.separated(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+        itemCount: items.length,
+        separatorBuilder: (_, _) => const SizedBox(height: 12),
+        itemBuilder: (context, i) {
+          final item = items[i];
+          final medicine = item.medicine;
+          final attribution = editAttributionLine(
+            updatedBy: item.schedule.updatedBy ?? medicine.updatedBy,
+            updatedAt: item.schedule.updatedAt.isAfter(medicine.updatedAt)
+                ? item.schedule.updatedAt
+                : medicine.updatedAt,
+            createdAt: medicine.createdAt,
+            currentUserId: _me,
+            nameOf: (id) => _names[id],
+          );
+          return Card(
+            child: InkWell(
+              onTap: () => _open(existing: item),
+              borderRadius: BorderRadius.circular(20),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                     Text(
-                      medicine.doseAmount,
-                      style: Theme.of(context).textTheme.bodyMedium,
+                      medicineTitle(medicine),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleMedium,
                     ),
-                  ],
-                  const SizedBox(height: 4),
-                  Text(
-                    describeSchedule(item.schedule),
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                  if (refillWarningLine(
-                        refillDaysLeft(
-                          tabletsRemaining: medicine.tabletsRemaining,
-                          tabletsPerDose: medicine.tabletsPerDose,
-                          schedules: [item.schedule],
-                        ),
-                      )
-                      case final warning?) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      warning,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.error,
+                    if (medicine.doseAmount.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        medicine.doseAmount,
+                        style: Theme.of(context).textTheme.bodyMedium,
                       ),
-                    ),
-                  ],
-                  if (attribution != null) ...[
+                    ],
                     const SizedBox(height: 4),
                     Text(
-                      attribution,
+                      describeSchedule(item.schedule),
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
+                    if (refillWarningLine(
+                          refillDaysLeft(
+                            tabletsRemaining: medicine.tabletsRemaining,
+                            tabletsPerDose: medicine.tabletsPerDose,
+                            schedules: [item.schedule],
+                          ),
+                        )
+                        case final warning?) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        warning,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                      ),
+                    ],
+                    if (attribution != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        attribution,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
                   ],
-                ],
+                ),
               ),
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 }

@@ -3,7 +3,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../core/motion.dart';
 import '../../core/widgets/dosely_layout.dart';
+import '../../core/widgets/dosely_motion.dart';
 import '../../data/local/database.dart';
 import '../auth/auth_service.dart';
 import '../consent/consent_purpose.dart';
@@ -215,13 +217,19 @@ class _CareScreenState extends State<CareScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                if (_loading)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 48),
-                    child: Center(child: CircularProgressIndicator()),
-                  )
-                else
-                  _body(),
+                DoselySwitcher(
+                  alignment: Alignment.topCenter,
+                  duration: DoselyMotion.medium,
+                  child: KeyedSubtree(
+                    key: ValueKey(_loading ? 'loading' : _link?.status),
+                    child: _loading
+                        ? const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 48),
+                            child: Center(child: CircularProgressIndicator()),
+                          )
+                        : _body(),
+                  ),
+                ),
                 if (_error != null) ...[
                   const SizedBox(height: 20),
                   Text(
@@ -262,27 +270,29 @@ class _CareScreenState extends State<CareScreen> {
 
   Widget _chooser() {
     final text = Theme.of(context).textTheme;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text('Connect with family', style: text.headlineSmall),
-        const SizedBox(height: 8),
-        Text(
-          'One person can help you keep track of your medicines — or you can '
-          'help someone else with theirs.',
-          style: text.bodyMedium,
-        ),
-        const SizedBox(height: 32),
-        FilledButton(
-          onPressed: _invite,
-          child: const Text('Ask someone to help me'),
-        ),
-        const SizedBox(height: 12),
-        OutlinedButton(
-          onPressed: _enterCode,
-          child: const Text("I'm helping someone"),
-        ),
-      ],
+    return DoselyFadeIn(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('Connect with family', style: text.headlineSmall),
+          const SizedBox(height: 8),
+          Text(
+            'One person can help you keep track of your medicines — or you can '
+            'help someone else with theirs.',
+            style: text.bodyMedium,
+          ),
+          const SizedBox(height: 32),
+          FilledButton(
+            onPressed: _invite,
+            child: const Text('Ask someone to help me'),
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton(
+            onPressed: _enterCode,
+            child: const Text("I'm helping someone"),
+          ),
+        ],
+      ),
     );
   }
 

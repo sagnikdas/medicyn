@@ -2,8 +2,10 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../core/motion.dart';
 import '../../core/widgets/dosely_chrome.dart';
 import '../../core/widgets/dosely_layout.dart';
+import '../../core/widgets/dosely_motion.dart';
 import '../../data/local/database.dart';
 import '../insights/insights_screen.dart';
 import '../reminders_home/home_screen.dart';
@@ -33,7 +35,7 @@ class _AppShellState extends State<AppShell> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: DoselyContent(
-        child: IndexedStack(
+        child: DoselyIndexedStack(
           index: _index,
           sizing: StackFit.expand,
           children: [
@@ -72,7 +74,11 @@ class _AppShellState extends State<AppShell> {
       ),
       bottomNavigationBar: DoselyBottomNav(
         index: _index,
-        onChanged: (i) => setState(() => _index = i),
+        onChanged: (i) {
+          if (i == _index) return;
+          DoselyMotion.selection(context);
+          setState(() => _index = i);
+        },
       ),
     );
   }

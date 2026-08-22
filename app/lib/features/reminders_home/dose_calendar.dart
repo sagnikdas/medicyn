@@ -2,6 +2,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../../core/motion.dart';
+
 /// Status chips for one calendar day. Booleans, not counts — the parent
 /// already rolled the day's doses up. Dots and semantics both read this.
 class CalendarDayMarks {
@@ -288,15 +290,23 @@ class _DoseCalendarState extends State<DoseCalendar> {
           ],
         ),
         const SizedBox(height: 4),
-        _WeekGrid(
-          days: days,
-          week: week,
-          selected: selected,
-          today: today,
-          visibleMonth: visibleMonth,
-          marks: marks,
-          onSelect: widget.onSelectDay,
-          collapseProgress: week ? 0 : widget.collapseProgress.clamp(0.0, 1.0),
+        AnimatedSize(
+          duration: DoselyMotion.duration(context, DoselyMotion.medium),
+          curve: DoselyMotion.decelerate,
+          alignment: Alignment.topCenter,
+          clipBehavior: Clip.hardEdge,
+          child: _WeekGrid(
+            days: days,
+            week: week,
+            selected: selected,
+            today: today,
+            visibleMonth: visibleMonth,
+            marks: marks,
+            onSelect: widget.onSelectDay,
+            collapseProgress: week
+                ? 0
+                : widget.collapseProgress.clamp(0.0, 1.0),
+          ),
         ),
       ],
     );
@@ -507,10 +517,12 @@ class _DayCell extends StatelessWidget {
               children: [
                 SizedBox.square(
                   dimension: circle,
-                  child: DecoratedBox(
+                  child: AnimatedContainer(
+                    duration: DoselyMotion.duration(context, DoselyMotion.fast),
+                    curve: DoselyMotion.decelerate,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: selected ? scheme.primary : null,
+                      color: selected ? scheme.primary : Colors.transparent,
                       border: !selected && isToday
                           ? Border.all(color: scheme.primary)
                           : null,
@@ -518,10 +530,16 @@ class _DayCell extends StatelessWidget {
                     child: Center(
                       child: FittedBox(
                         fit: BoxFit.scaleDown,
-                        child: Text(
-                          '${day.day}',
-                          maxLines: 1,
-                          style: text.bodyMedium?.copyWith(color: numberColor),
+                        child: AnimatedDefaultTextStyle(
+                          duration: DoselyMotion.duration(
+                            context,
+                            DoselyMotion.fast,
+                          ),
+                          curve: DoselyMotion.decelerate,
+                          style:
+                              text.bodyMedium?.copyWith(color: numberColor) ??
+                              TextStyle(color: numberColor),
+                          child: Text('${day.day}', maxLines: 1),
                         ),
                       ),
                     ),

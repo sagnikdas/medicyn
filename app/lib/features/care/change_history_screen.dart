@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/widgets/dosely_layout.dart';
+import '../../core/widgets/dosely_motion.dart';
 import '../auth/auth_service.dart';
 import 'care_service.dart';
 import 'edit_attribution.dart';
@@ -79,48 +80,52 @@ class _ChangeHistoryScreenState extends State<ChangeHistoryScreen> {
       return const Center(child: CircularProgressIndicator());
     }
     if (edits.isEmpty) {
-      return ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(28),
-        children: const [
-          Text(
-            'No changes recorded yet. Edits made after this update will show up here.',
-            textAlign: TextAlign.center,
-          ),
-        ],
+      return DoselyFadeIn(
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(28),
+          children: const [
+            Text(
+              'No changes recorded yet. Edits made after this update will show up here.',
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
       );
     }
-    return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-      itemCount: edits.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 8),
-      itemBuilder: (context, i) {
-        final edit = edits[i];
-        final who = edit.actorId == null
-            ? 'Someone'
-            : edit.actorId == _me
-            ? 'You'
-            : (_names[edit.actorId] ?? 'Someone');
-        return Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  edit.summary,
-                  style: Theme.of(context).textTheme.titleSmall,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '$who · ${describeRelativeDay(edit.createdAt)}',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ],
+    return DoselyFadeIn(
+      child: ListView.separated(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+        itemCount: edits.length,
+        separatorBuilder: (_, _) => const SizedBox(height: 8),
+        itemBuilder: (context, i) {
+          final edit = edits[i];
+          final who = edit.actorId == null
+              ? 'Someone'
+              : edit.actorId == _me
+              ? 'You'
+              : (_names[edit.actorId] ?? 'Someone');
+          return Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    edit.summary,
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '$who · ${describeRelativeDay(edit.createdAt)}',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ),
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 }
