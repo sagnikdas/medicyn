@@ -23,6 +23,23 @@ class GoogleSignInFailure implements Exception {
   String toString() => message;
 }
 
+/// Credential Manager reports a stale on-device Google account as `canceled`
+/// with `[16] Account reauth failed`, not as a configuration error. Treating
+/// that as a user backing out of the picker hides the only device-specific
+/// SSO failure we have seen (moto g22).
+bool googleSignInCanceledIsStaleAccount(GoogleSignInException e) {
+  if (e.code != GoogleSignInExceptionCode.canceled) return false;
+  final haystack = '${e.description ?? ''} ${e.details ?? ''}'.toLowerCase();
+  return haystack.contains('reauth') || haystack.contains('[16]');
+}
+
+/// True only when the picker was dismissed, not when GIS disguised a
+/// device/account failure as cancel.
+bool googleSignInIsUserCancellation(GoogleSignInException e) {
+  if (e.code != GoogleSignInExceptionCode.canceled) return false;
+  return !googleSignInCanceledIsStaleAccount(e);
+}
+
 /// Thin wrapper around Supabase Auth. Google is the only sign-in method —
 /// the previous email one-time-code flow was removed deliberately, along
 /// with the custom SMTP sender it depended on.
@@ -72,37 +89,30 @@ class AuthService {
     }
     try {
       await _ensureGoogleInitialized();
-      final account = await GoogleSignIn.instance.authenticate();
-      final idToken = account.authentication.idToken;
-      if (idToken == null) {
-        // Practically always a console misconfiguration rather than a
-        // transient fault: the native SDK only omits the ID token when the
-        // serverClientId it was given isn't a valid Web client for this
-        // project.
-        throw const GoogleSignInFailure(
-          "Google didn't return a sign-in token. The app's Google configuration looks incomplete.",
-        );
+      try {
+        await _authenticateAndExchange();
+      } on GoogleSignInException catch (e) {
+        // Credential Manager reports a stale on-device Google account as
+        // `canceled` with "[16] Account reauth failed". Clearing the GIS
+        // cache and prompting again is the only recovery that is still
+        // inside the app; if it still fails, show the real error instead
+        // of swallowing it as a user backing out of the picker.
+        if (googleSignInCanceledIsStaleAccount(e)) {
+          try {
+            await GoogleSignIn.instance.signOut();
+          } catch (_) {}
+          await _authenticateAndExchange();
+        } else {
+          rethrow;
+        }
       }
-      await _client.auth.signInWithIdToken(
-        provider: OAuthProvider.google,
-        idToken: idToken,
-      );
-      // Local-only is the unbundled path; a live Google session means
-      // backup and Care Link are available, so drop the flag.
-      await AppSettings.instance.setLocalOnly(false);
-      // Best-effort, and awaited only so the name is present by the time the
-      // first screen renders. A failure here costs a display name, not a
-      // session, so it never throws.
-      await CareService.instance.upsertOwnProfile();
-      // Not awaited: a device that fails to register receives no care alerts,
-      // which is a degraded link rather than a failed sign-in, and every
-      // foreground retries it.
-      unawaited(PushService.instance.registerToken());
-      unawaited(ConsentService.instance.syncToServer());
     } on GoogleSignInFailure {
       rethrow;
     } on GoogleSignInException catch (e) {
-      throw GoogleSignInFailure(_describe(e), isCancellation: e.code == GoogleSignInExceptionCode.canceled);
+      throw GoogleSignInFailure(
+        _describe(e),
+        isCancellation: googleSignInIsUserCancellation(e),
+      );
     } on AuthException catch (e) {
       // The token was fine but Supabase rejected it. Overwhelmingly this is
       // the Android OAuth client ID missing from the provider's authorized
@@ -113,6 +123,36 @@ class AuthService {
     } catch (e) {
       throw GoogleSignInFailure('Could not sign in with Google. Check your connection and try again. ($e)');
     }
+  }
+
+  Future<void> _authenticateAndExchange() async {
+    final account = await GoogleSignIn.instance.authenticate();
+    final idToken = account.authentication.idToken;
+    if (idToken == null) {
+      // Practically always a console misconfiguration rather than a
+      // transient fault: the native SDK only omits the ID token when the
+      // serverClientId it was given isn't a valid Web client for this
+      // project.
+      throw const GoogleSignInFailure(
+        "Google didn't return a sign-in token. The app's Google configuration looks incomplete.",
+      );
+    }
+    await _client.auth.signInWithIdToken(
+      provider: OAuthProvider.google,
+      idToken: idToken,
+    );
+    // Local-only is the unbundled path; a live Google session means
+    // backup and Care Link are available, so drop the flag.
+    await AppSettings.instance.setLocalOnly(false);
+    // Best-effort, and awaited only so the name is present by the time the
+    // first screen renders. A failure here costs a display name, not a
+    // session, so it never throws.
+    await CareService.instance.upsertOwnProfile();
+    // Not awaited: a device that fails to register receives no care alerts,
+    // which is a degraded link rather than a failed sign-in, and every
+    // foreground retries it.
+    unawaited(PushService.instance.registerToken());
+    unawaited(ConsentService.instance.syncToServer());
   }
 
   /// Runs [signInWithGoogle] and returns a message fit to show, or null on
@@ -133,6 +173,11 @@ class AuthService {
   static String _describe(GoogleSignInException e) {
     switch (e.code) {
       case GoogleSignInExceptionCode.canceled:
+        if (googleSignInCanceledIsStaleAccount(e)) {
+          return 'Google could not refresh the account saved on this phone. '
+              'Open Settings → Passwords & accounts, tap the Google account, '
+              'sign in again, then retry here.';
+        }
         return 'Sign-in cancelled.';
       case GoogleSignInExceptionCode.interrupted:
       case GoogleSignInExceptionCode.uiUnavailable:

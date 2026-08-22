@@ -30,22 +30,6 @@ class DayDoseStyle {
     }
   }
 
-  static IconData icon(DayDoseStatus status) {
-    switch (status) {
-      case DayDoseStatus.taken:
-        return Icons.check_circle;
-      case DayDoseStatus.pending:
-      case DayDoseStatus.upcoming:
-        return Icons.schedule;
-      case DayDoseStatus.snoozed:
-        return Icons.snooze;
-      case DayDoseStatus.missed:
-        return Icons.cancel;
-      case DayDoseStatus.notRecorded:
-        return Icons.help_outline;
-    }
-  }
-
   static String label(DayDoseStatus status) {
     switch (status) {
       case DayDoseStatus.taken:
