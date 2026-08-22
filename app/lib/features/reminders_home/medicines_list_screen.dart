@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/widgets/dosely_layout.dart';
+import '../../core/widgets/dosely_motion.dart';
 import '../../data/local/database.dart';
 import '../auth/auth_service.dart';
 import '../care/edit_attribution.dart';
@@ -41,53 +42,62 @@ class MedicinesListScreen extends StatelessWidget {
           builder: (context, snapshot) {
             final items = snapshot.data ?? [];
             if (items.isEmpty) {
-              return _EmptyState(onAdd: onAdd, embedded: embedded);
+              return DoselyFadeIn(
+                child: _EmptyState(onAdd: onAdd, embedded: embedded),
+              );
             }
-            return ListView.separated(
-              padding: EdgeInsets.fromLTRB(20, embedded ? 24 : 16, 20, 96),
-              itemCount: items.length + (embedded ? 1 : 0),
-              separatorBuilder: (context, i) {
-                if (embedded && i == 0) return const SizedBox(height: 16);
-                return const SizedBox(height: 12);
-              },
-              itemBuilder: (context, i) {
-                if (embedded && i == 0) {
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Your plan',
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Everything you take, and when.',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+            return DoselyFadeIn(
+              child: ListView.separated(
+                padding: EdgeInsets.fromLTRB(20, embedded ? 24 : 16, 20, 96),
+                itemCount: items.length + (embedded ? 1 : 0),
+                separatorBuilder: (context, i) {
+                  if (embedded && i == 0) return const SizedBox(height: 16);
+                  return const SizedBox(height: 12);
+                },
+                itemBuilder: (context, i) {
+                  if (embedded && i == 0) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Your plan',
+                          style: Theme.of(context).textTheme.titleLarge,
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 4),
+                        Text(
+                          'Everything you take, and when.',
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
+                              ),
+                        ),
+                      ],
+                    );
+                  }
+                  final item = items[embedded ? i - 1 : i];
+                  return ReminderCard(
+                    item: item,
+                    db: db,
+                    attribution: editAttributionLine(
+                      updatedBy:
+                          item.schedule.updatedBy ?? item.medicine.updatedBy,
+                      updatedAt:
+                          item.schedule.updatedAt.isAfter(
+                            item.medicine.updatedAt,
+                          )
+                          ? item.schedule.updatedAt
+                          : item.medicine.updatedAt,
+                      createdAt: item.medicine.createdAt,
+                      currentUserId: AuthService.instance.currentUser?.id,
+                      nameOf: (id) => names[id],
+                    ),
+                    onTap: () => onEdit(item),
+                    onDelete: () => onDelete(item),
                   );
-                }
-                final item = items[embedded ? i - 1 : i];
-                return ReminderCard(
-                  item: item,
-                  db: db,
-                  attribution: editAttributionLine(
-                    updatedBy:
-                        item.schedule.updatedBy ?? item.medicine.updatedBy,
-                    updatedAt:
-                        item.schedule.updatedAt.isAfter(item.medicine.updatedAt)
-                        ? item.schedule.updatedAt
-                        : item.medicine.updatedAt,
-                    createdAt: item.medicine.createdAt,
-                    currentUserId: AuthService.instance.currentUser?.id,
-                    nameOf: (id) => names[id],
-                  ),
-                  onTap: () => onEdit(item),
-                  onDelete: () => onDelete(item),
-                );
-              },
+                },
+              ),
             );
           },
         ),

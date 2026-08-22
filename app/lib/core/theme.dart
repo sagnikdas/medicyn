@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'widgets/dosely_motion.dart';
+
 /// Clinical Calm — the Stitch design system for Dosely.
 ///
 /// Tokens come from the "Dosely App Redesign" project (primary teal
@@ -84,6 +86,19 @@ class DoselyTheme {
       scaffoldBackgroundColor: scheme.surface,
       fontFamily: fontFamily,
       textTheme: text,
+      // InkSparkle uses a fragment shader; InkRipple is the same language
+      // on a 2018 phone as on a flagship, and still Material.
+      splashFactory: InkRipple.splashFactory,
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: {
+          TargetPlatform.android: DoselyPageTransitionsBuilder(),
+          TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+          TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
+          TargetPlatform.linux: DoselyPageTransitionsBuilder(),
+          TargetPlatform.windows: DoselyPageTransitionsBuilder(),
+          TargetPlatform.fuchsia: DoselyPageTransitionsBuilder(),
+        },
+      ),
       appBarTheme: AppBarTheme(
         backgroundColor: scheme.surface,
         foregroundColor: scheme.onSurface,

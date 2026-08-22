@@ -5,6 +5,7 @@ import '../../core/app_settings.dart';
 import '../../core/privacy_policy.dart';
 import '../../core/widgets/dosely_chrome.dart';
 import '../../core/widgets/dosely_layout.dart';
+import '../../core/widgets/dosely_motion.dart';
 import '../../data/export/data_export_service.dart';
 import '../../data/local/database.dart';
 import '../../data/local/encrypted_database.dart';
@@ -69,70 +70,88 @@ class _SettingsScreenState extends State<SettingsScreen> {
             children: [
               if (widget.embedded) ...[
                 const SizedBox(height: 8),
-                Center(
-                  child: Column(
-                    children: [
-                      CircleAvatar(
-                        radius: 48,
-                        backgroundColor: Theme.of(
-                          context,
-                        ).colorScheme.secondaryContainer,
-                        foregroundColor: Theme.of(
-                          context,
-                        ).colorScheme.onSecondaryContainer,
-                        child: Text(
-                          (name.isEmpty ? 'D' : name.substring(0, 1))
-                              .toUpperCase(),
+                DoselyFadeIn(
+                  child: Center(
+                    child: Column(
+                      children: [
+                        CircleAvatar(
+                          radius: 48,
+                          backgroundColor: Theme.of(
+                            context,
+                          ).colorScheme.secondaryContainer,
+                          foregroundColor: Theme.of(
+                            context,
+                          ).colorScheme.onSecondaryContainer,
+                          child: Text(
+                            (name.isEmpty ? 'D' : name.substring(0, 1))
+                                .toUpperCase(),
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          _signedIn
+                              ? (name.isEmpty ? email : name)
+                              : 'On this phone',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
                           style: Theme.of(context).textTheme.titleLarge,
                         ),
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        _signedIn
-                            ? (name.isEmpty ? email : name)
-                            : 'On this phone',
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        _signedIn
-                            ? email
-                            : 'Reminders stay on this device until you sign in.',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        const SizedBox(height: 4),
+                        Text(
+                          _signedIn
+                              ? email
+                              : 'Reminders stay on this device until you sign in.',
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
+                              ),
+                          textAlign: TextAlign.center,
                         ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
                 const SizedBox(height: 28),
               ] else if (_signedIn) ...[
-                Text(
-                  'Signed in as',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  email,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleMedium,
+                DoselyFadeIn(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Signed in as',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        email,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 24),
               ] else ...[
                 OutlinedButton(
                   onPressed: _signingIn ? null : _signInWithGoogle,
-                  child: _signingIn
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text('Sign in with Google'),
+                  child: DoselySwitcher(
+                    child: _signingIn
+                        ? const SizedBox(
+                            key: ValueKey(true),
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text(
+                            'Sign in with Google',
+                            key: ValueKey(false),
+                          ),
+                  ),
                 ),
                 if (_signInError != null) ...[
                   const SizedBox(height: 12),
@@ -148,13 +167,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
               if (widget.embedded && !_signedIn) ...[
                 OutlinedButton(
                   onPressed: _signingIn ? null : _signInWithGoogle,
-                  child: _signingIn
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text('Sign in with Google'),
+                  child: DoselySwitcher(
+                    child: _signingIn
+                        ? const SizedBox(
+                            key: ValueKey(true),
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text(
+                            'Sign in with Google',
+                            key: ValueKey(false),
+                          ),
+                  ),
                 ),
                 if (_signInError != null) ...[
                   const SizedBox(height: 12),
@@ -167,194 +192,222 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ],
                 const SizedBox(height: 24),
               ],
-              Text(
-                'Family',
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-              ),
-              const SizedBox(height: 8),
-              IgnorePointer(
-                ignoring: !_signedIn,
-                child: Opacity(
-                  opacity: _signedIn ? 1 : 0.6,
-                  child: ProfileMenuRow(
-                    icon: Icons.people_outline,
-                    title: 'Connect with family',
-                    subtitle: _signedIn
-                        ? 'Let one person help you keep track of your medicines — or help someone else with theirs.'
-                        : 'Family sharing needs a Google account.',
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => CareScreen(db: widget.db),
+              DoselyFadeIn(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'Family',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        color: Theme.of(context).colorScheme.primary,
                       ),
                     ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
-              Text(
-                'Appearance',
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                '100% is the default size. Drag right to make text and buttons larger.',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              const SizedBox(height: 4),
-              // Nothing previews the setting better than the screen you're on:
-              // the slider rescales the whole app live as it's dragged, this
-              // row included.
-              ListenableBuilder(
-                listenable: AppSettings.instance,
-                builder: (context, _) {
-                  final scale = AppSettings.instance.textScale;
-                  return Row(
-                    children: [
-                      Expanded(
-                        child: Slider(
-                          value: scale,
-                          min: AppSettings.minTextScale,
-                          max: AppSettings.maxTextScale,
-                          divisions: AppSettings.textScaleDivisions,
-                          label: AppSettings.textScaleLabel(scale),
-                          semanticFormatterCallback: (v) =>
-                              'Text size ${AppSettings.textScaleLabel(v)}',
-                          onChanged: (v) =>
-                              AppSettings.instance.setTextScale(v),
+                    const SizedBox(height: 8),
+                    IgnorePointer(
+                      ignoring: !_signedIn,
+                      child: Opacity(
+                        opacity: _signedIn ? 1 : 0.6,
+                        child: ProfileMenuRow(
+                          icon: Icons.people_outline,
+                          title: 'Connect with family',
+                          subtitle: _signedIn
+                              ? 'Let one person help you keep track of your medicines — or help someone else with theirs.'
+                              : 'Family sharing needs a Google account.',
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => CareScreen(db: widget.db),
+                            ),
+                          ),
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Text(
-                        AppSettings.textScaleLabel(scale),
-                        style: Theme.of(context).textTheme.titleSmall,
-                      ),
-                    ],
-                  );
-                },
-              ),
-              const SizedBox(height: 20),
-              Text('Theme', style: Theme.of(context).textTheme.titleSmall),
-              const SizedBox(height: 4),
-              Text(
-                'Follows your device by default. Choose Light or Dark to keep '
-                'the app on one of them.',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              const SizedBox(height: 12),
-              ListenableBuilder(
-                listenable: AppSettings.instance,
-                builder: (context, _) => SizedBox(
-                  width: double.infinity,
-                  child: SegmentedButton<ThemeMode>(
-                    segments: [
-                      for (final mode in ThemeMode.values)
-                        ButtonSegment(
-                          value: mode,
-                          label: Text(mode.label, maxLines: 1),
-                        ),
-                    ],
-                    selected: {AppSettings.instance.themeMode},
-                    onSelectionChanged: (s) =>
-                        AppSettings.instance.setThemeMode(s.first),
-                    showSelectedIcon: false,
-                    style: const ButtonStyle(
-                      visualDensity: VisualDensity.compact,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-              ListenableBuilder(
-                listenable: AppSettings.instance,
-                builder: (context, _) => SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Show medicine names on the lock screen'),
-                  subtitle: const Text(
-                    'Off by default. When off, a locked phone only says a dose is due — not which medicine.',
-                  ),
-                  value: AppSettings.instance.showMedicineOnLockScreen,
-                  onChanged: _setShowMedicineOnLockScreen,
-                ),
-              ),
-              const SizedBox(height: 28),
-              Text('Your data', style: Theme.of(context).textTheme.titleSmall),
-              const SizedBox(height: 4),
-              Text(
-                'This is a copy of the data Dosely holds about you (Art. 15/20). '
-                'Other requests are answered within one month (Art. 12(3)) by email '
-                'sagnikd91@gmail.com.',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              const SizedBox(height: 12),
-              OutlinedButton.icon(
-                onPressed: _exporting ? null : _downloadMyData,
-                icon: _exporting
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.download_outlined),
-                label: Text(_exporting ? 'Preparing…' : 'Download my data'),
-              ),
-              const SizedBox(height: 28),
-              Text(
-                'Manage what Dosely can do',
-                style: Theme.of(context).textTheme.titleSmall,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Turning any of these off takes effect straight away, the same as turning them on.',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              const SizedBox(height: 8),
-              ListenableBuilder(
-                listenable: AppSettings.instance,
-                builder: (context, _) {
-                  return Column(
-                    children: [
-                      for (final purpose in ConsentPurpose.values)
-                        SwitchListTile(
-                          contentPadding: EdgeInsets.zero,
-                          title: Text(purpose.title),
-                          subtitle: Text(purpose.sentence),
-                          value: ConsentService.instance.isGranted(purpose),
-                          onChanged: (v) =>
-                              ConsentService.instance.setGranted(purpose, v),
+                    const SizedBox(height: 24),
+                    Text(
+                      'Appearance',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '100% is the default size. Drag right to make text and buttons larger.',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                    const SizedBox(height: 4),
+                    // Nothing previews the setting better than the screen you're on:
+                    // the slider rescales the whole app live as it's dragged, this
+                    // row included.
+                    ListenableBuilder(
+                      listenable: AppSettings.instance,
+                      builder: (context, _) {
+                        final scale = AppSettings.instance.textScale;
+                        return Row(
+                          children: [
+                            Expanded(
+                              child: Slider(
+                                value: scale,
+                                min: AppSettings.minTextScale,
+                                max: AppSettings.maxTextScale,
+                                divisions: AppSettings.textScaleDivisions,
+                                label: AppSettings.textScaleLabel(scale),
+                                semanticFormatterCallback: (v) =>
+                                    'Text size ${AppSettings.textScaleLabel(v)}',
+                                onChanged: (v) =>
+                                    AppSettings.instance.setTextScale(v),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              AppSettings.textScaleLabel(scale),
+                              style: Theme.of(context).textTheme.titleSmall,
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      'Theme',
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Follows your device by default. Choose Light or Dark to keep '
+                      'the app on one of them.',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                    const SizedBox(height: 12),
+                    ListenableBuilder(
+                      listenable: AppSettings.instance,
+                      builder: (context, _) => SizedBox(
+                        width: double.infinity,
+                        child: SegmentedButton<ThemeMode>(
+                          segments: [
+                            for (final mode in ThemeMode.values)
+                              ButtonSegment(
+                                value: mode,
+                                label: Text(mode.label, maxLines: 1),
+                              ),
+                          ],
+                          selected: {AppSettings.instance.themeMode},
+                          onSelectionChanged: (s) =>
+                              AppSettings.instance.setThemeMode(s.first),
+                          showSelectedIcon: false,
+                          style: const ButtonStyle(
+                            visualDensity: VisualDensity.compact,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
                         ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    ListenableBuilder(
+                      listenable: AppSettings.instance,
+                      builder: (context, _) => SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text(
+                          'Show medicine names on the lock screen',
+                        ),
+                        subtitle: const Text(
+                          'Off by default. When off, a locked phone only says a dose is due — not which medicine.',
+                        ),
+                        value: AppSettings.instance.showMedicineOnLockScreen,
+                        onChanged: _setShowMedicineOnLockScreen,
+                      ),
+                    ),
+                    const SizedBox(height: 28),
+                    Text(
+                      'Your data',
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'This is a copy of the data Dosely holds about you (Art. 15/20). '
+                      'Other requests are answered within one month (Art. 12(3)) by email '
+                      'sagnikd91@gmail.com.',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      onPressed: _exporting ? null : _downloadMyData,
+                      icon: DoselySwitcher(
+                        child: _exporting
+                            ? const SizedBox(
+                                key: ValueKey(true),
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(
+                                Icons.download_outlined,
+                                key: ValueKey(false),
+                              ),
+                      ),
+                      label: Text(
+                        _exporting ? 'Preparing…' : 'Download my data',
+                      ),
+                    ),
+                    const SizedBox(height: 28),
+                    Text(
+                      'Manage what Dosely can do',
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Turning any of these off takes effect straight away, the same as turning them on.',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                    const SizedBox(height: 8),
+                    ListenableBuilder(
+                      listenable: AppSettings.instance,
+                      builder: (context, _) {
+                        return Column(
+                          children: [
+                            for (final purpose in ConsentPurpose.values)
+                              SwitchListTile(
+                                contentPadding: EdgeInsets.zero,
+                                title: Text(purpose.title),
+                                subtitle: Text(purpose.sentence),
+                                value: ConsentService.instance.isGranted(
+                                  purpose,
+                                ),
+                                onChanged: (v) => ConsentService.instance
+                                    .setGranted(purpose, v),
+                              ),
+                          ],
+                        );
+                      },
+                    ),
+                    if (_signedIn) ...[
+                      const SizedBox(height: 28),
+                      OutlinedButton(
+                        onPressed: () => _confirmSignOut(context),
+                        child: const Text('Sign out'),
+                      ),
+                      const SizedBox(height: 12),
+                      OutlinedButton(
+                        onPressed: () => _confirmDeleteAccount(context),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Theme.of(context).colorScheme.error,
+                        ),
+                        child: const Text('Delete account'),
+                      ),
                     ],
-                  );
-                },
-              ),
-              if (_signedIn) ...[
-                const SizedBox(height: 28),
-                OutlinedButton(
-                  onPressed: () => _confirmSignOut(context),
-                  child: const Text('Sign out'),
-                ),
-                const SizedBox(height: 12),
-                OutlinedButton(
-                  onPressed: () => _confirmDeleteAccount(context),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Theme.of(context).colorScheme.error,
-                  ),
-                  child: const Text('Delete account'),
-                ),
-              ],
-              const SizedBox(height: 12),
-              TextButton(
-                onPressed: () => openPrivacyPolicy(context),
-                child: Text(
-                  'Privacy policy',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.primary,
-                    decoration: TextDecoration.underline,
-                  ),
+                    const SizedBox(height: 12),
+                    TextButton(
+                      onPressed: () => openPrivacyPolicy(context),
+                      child: Text(
+                        'Privacy policy',
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(
+                              color: Theme.of(context).colorScheme.primary,
+                              decoration: TextDecoration.underline,
+                            ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../motion.dart';
 import '../theme.dart';
+import 'dosely_motion.dart';
 
 /// Greeting copy from the Stitch Today screen, keyed off the local hour.
 String greetingFor(DateTime now) {
@@ -141,12 +143,14 @@ class AmbientCard extends StatelessWidget {
       child: Padding(padding: padding, child: child),
     );
     if (onTap == null) return card;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: card,
+    return DoselyPressable(
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: card,
+        ),
       ),
     );
   }
@@ -170,49 +174,58 @@ class ProgressRing extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     final clamped = fraction.clamp(0.0, 1.0);
+    return DoselyAnimatedValue(
+      value: clamped,
+      builder: (context, animated) => _paint(context, animated),
+    );
+  }
+
+  Widget _paint(BuildContext context, double clamped) {
+    final scheme = Theme.of(context).colorScheme;
     final box = MediaQuery.textScalerOf(context).scale(size).clamp(size, 80.0);
     // Keep the digits inside the unpainted hole, not over the stroke.
     final inner = (box - stroke * 2 - 8).clamp(16.0, box);
-    return SizedBox(
-      width: box,
-      height: box,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Positioned.fill(
-            child: CircularProgressIndicator(
-              value: 1,
-              strokeWidth: stroke,
-              color: scheme.secondaryContainer,
+    return RepaintBoundary(
+      child: SizedBox(
+        width: box,
+        height: box,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Positioned.fill(
+              child: CircularProgressIndicator(
+                value: 1,
+                strokeWidth: stroke,
+                color: scheme.secondaryContainer,
+              ),
             ),
-          ),
-          Positioned.fill(
-            child: CircularProgressIndicator(
-              value: clamped,
-              strokeWidth: stroke,
-              color: scheme.primary,
-              strokeCap: StrokeCap.round,
+            Positioned.fill(
+              child: CircularProgressIndicator(
+                value: clamped,
+                strokeWidth: stroke,
+                color: scheme.primary,
+                strokeCap: StrokeCap.round,
+              ),
             ),
-          ),
-          SizedBox(
-            width: inner,
-            height: inner,
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text(
-                percentLabel(clamped),
-                maxLines: 1,
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  color: scheme.onSurface,
-                  fontWeight: FontWeight.w700,
+            SizedBox(
+              width: inner,
+              height: inner,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  percentLabel(clamped),
+                  maxLines: 1,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: scheme.onSurface,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -366,25 +379,34 @@ class _NavItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final color = selected
+        ? scheme.onPrimaryContainer
+        : scheme.onSurfaceVariant;
     final child = Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(
-          selected ? item.selected : item.icon,
-          size: 22,
-          color: selected ? scheme.onPrimaryContainer : scheme.onSurfaceVariant,
+        AnimatedSwitcher(
+          duration: DoselyMotion.duration(context, DoselyMotion.fast),
+          switchInCurve: DoselyMotion.decelerate,
+          child: Icon(
+            selected ? item.selected : item.icon,
+            key: ValueKey<bool>(selected),
+            size: 22,
+            color: color,
+          ),
         ),
         const SizedBox(height: 4),
         FittedBox(
           fit: BoxFit.scaleDown,
-          child: Text(
-            item.label,
-            maxLines: 1,
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: selected
-                  ? scheme.onPrimaryContainer
-                  : scheme.onSurfaceVariant,
-            ),
+          child: AnimatedDefaultTextStyle(
+            duration: DoselyMotion.duration(context, DoselyMotion.fast),
+            curve: DoselyMotion.decelerate,
+            style:
+                Theme.of(
+                  context,
+                ).textTheme.labelSmall?.copyWith(color: color) ??
+                TextStyle(color: color),
+            child: Text(item.label, maxLines: 1),
           ),
         ),
       ],
@@ -400,7 +422,8 @@ class _NavItem extends StatelessWidget {
           // height Scaffold offers the bottom bar — the full screen.
           heightFactor: 1,
           child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
+            duration: DoselyMotion.duration(context, DoselyMotion.fast),
+            curve: DoselyMotion.decelerate,
             padding: selected
                 ? const EdgeInsets.symmetric(horizontal: 10, vertical: 6)
                 : const EdgeInsets.symmetric(horizontal: 6, vertical: 6),

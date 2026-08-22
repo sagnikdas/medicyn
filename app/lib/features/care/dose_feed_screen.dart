@@ -3,6 +3,7 @@ import 'package:timezone/timezone.dart' as tz;
 
 import '../../core/app_navigation.dart';
 import '../../core/widgets/dosely_layout.dart';
+import '../../core/widgets/dosely_motion.dart';
 import '../../data/local/database.dart';
 import '../../data/local/tables.dart';
 import '../auth/auth_service.dart';
@@ -242,50 +243,52 @@ class _DoseFeedScreenState extends State<DoseFeedScreen> {
       wallClock: clock,
     );
 
-    return ListView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(8, 4, 8, 32),
-      children: [
-        DoseCalendar(
-          selectedDay: DateTime(
-            _selectedDay.year,
-            _selectedDay.month,
-            _selectedDay.day,
+    return DoselyFadeIn(
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(8, 4, 8, 32),
+        children: [
+          DoseCalendar(
+            selectedDay: DateTime(
+              _selectedDay.year,
+              _selectedDay.month,
+              _selectedDay.day,
+            ),
+            now: DateTime(now.year, now.month, now.day, now.hour, now.minute),
+            marks: calendarMarks,
+            onSelectDay: (day) => setState(() {
+              _selectedDay = zone == null
+                  ? day
+                  : tz.TZDateTime(zone, day.year, day.month, day.day);
+              _choseDay = true;
+            }),
           ),
-          now: DateTime(now.year, now.month, now.day, now.hour, now.minute),
-          marks: calendarMarks,
-          onSelectDay: (day) => setState(() {
-            _selectedDay = zone == null
-                ? day
-                : tz.TZDateTime(zone, day.year, day.month, day.day);
-            _choseDay = true;
-          }),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
-          child: WeekAdherenceLine(
-            taken: adherence.taken,
-            expected: adherence.expected,
-          ),
-        ),
-        if (_zonesDiffer) _timezoneNote(),
-        DayDoseList(
-          day: _selectedDay,
-          now: now,
-          occurrences: open,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-        ),
-        for (final event in dayEvents)
           Padding(
-            padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-            child: _DoseEventCard(
-              event: event,
-              clockTime: _inPatientZone(event.scheduledAt),
-              patientId: widget.patientId,
+            padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+            child: WeekAdherenceLine(
+              taken: adherence.taken,
+              expected: adherence.expected,
             ),
           ),
-      ],
+          if (_zonesDiffer) _timezoneNote(),
+          DayDoseList(
+            day: _selectedDay,
+            now: now,
+            occurrences: open,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+          ),
+          for (final event in dayEvents)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+              child: _DoseEventCard(
+                event: event,
+                clockTime: _inPatientZone(event.scheduledAt),
+                patientId: widget.patientId,
+              ),
+            ),
+        ],
+      ),
     );
   }
 

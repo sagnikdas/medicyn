@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
+import '../../core/motion.dart';
 import '../../core/widgets/dosely_layout.dart';
+import '../../core/widgets/dosely_motion.dart';
 import '../consent/consent_purpose.dart';
 import '../consent/consent_service.dart';
 
@@ -115,17 +117,24 @@ class _VoiceCaptureScreenState extends State<VoiceCaptureScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const SizedBox(height: 16),
-                Text(
-                  'Say the dosage & schedule',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.headlineSmall,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'e.g. "One tablet twice a day, morning and night, after food"',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: scheme.onSurfaceVariant,
+                DoselyFadeIn(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Say the dosage & schedule',
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.headlineSmall,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'e.g. "One tablet twice a day, morning and night, after food"',
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 const Spacer(),
@@ -154,7 +163,11 @@ class _VoiceCaptureScreenState extends State<VoiceCaptureScreen> {
                       GestureDetector(
                         onTap: listening ? _stopListening : _startListening,
                         child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
+                          duration: DoselyMotion.duration(
+                            context,
+                            DoselyMotion.fast,
+                          ),
+                          curve: DoselyMotion.decelerate,
                           width: 128,
                           height: 128,
                           decoration: BoxDecoration(

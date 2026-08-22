@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/privacy_policy.dart';
 import '../../core/widgets/dosely_layout.dart';
+import '../../core/widgets/dosely_motion.dart';
 import 'consent_purpose.dart';
 import 'consent_service.dart';
 
@@ -42,56 +43,65 @@ class _ConsentScreenState extends State<ConsentScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.fromLTRB(24, 28, 24, 12),
-                  children: [
-                    Text('What Dosely may do', style: text.headlineSmall),
-                    const SizedBox(height: 12),
-                    Text(
-                      'These are off unless you turn them on. You can change '
-                      'your mind later in Settings. Reminders still work on '
-                      'this phone either way.',
-                      style: text.bodyLarge,
-                    ),
-                    const SizedBox(height: 24),
-                    for (final purpose in ConsentPurpose.firstScreen) ...[
-                      SwitchListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: Text(purpose.title, style: text.titleMedium),
-                        subtitle: Padding(
-                          padding: const EdgeInsets.only(top: 4),
-                          child: Text(purpose.sentence, style: text.bodyMedium),
-                        ),
-                        value: _granted[purpose]!,
-                        onChanged: (v) => setState(() => _granted[purpose] = v),
+                child: DoselyFadeIn(
+                  child: ListView(
+                    padding: const EdgeInsets.fromLTRB(24, 28, 24, 12),
+                    children: [
+                      Text('What Dosely may do', style: text.headlineSmall),
+                      const SizedBox(height: 12),
+                      Text(
+                        'These are off unless you turn them on. You can change '
+                        'your mind later in Settings. Reminders still work on '
+                        'this phone either way.',
+                        style: text.bodyLarge,
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 24),
+                      for (final purpose in ConsentPurpose.firstScreen) ...[
+                        SwitchListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(purpose.title, style: text.titleMedium),
+                          subtitle: Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text(
+                              purpose.sentence,
+                              style: text.bodyMedium,
+                            ),
+                          ),
+                          value: _granted[purpose]!,
+                          onChanged: (v) =>
+                              setState(() => _granted[purpose] = v),
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+                      const SizedBox(height: 16),
+                      TextButton(
+                        onPressed: () => openPrivacyPolicy(context),
+                        child: Text(
+                          'Privacy policy',
+                          style: text.titleMedium?.copyWith(
+                            color: Theme.of(context).colorScheme.primary,
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                      ),
                     ],
-                    const SizedBox(height: 16),
-                    TextButton(
-                      onPressed: () => openPrivacyPolicy(context),
-                      child: Text(
-                        'Privacy policy',
-                        style: text.titleMedium?.copyWith(
-                          color: Theme.of(context).colorScheme.primary,
-                          decoration: TextDecoration.underline,
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
                 child: FilledButton(
                   onPressed: _saving ? null : _continue,
-                  child: _saving
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text('Continue'),
+                  child: DoselySwitcher(
+                    child: _saving
+                        ? const SizedBox(
+                            key: ValueKey('busy'),
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text('Continue', key: ValueKey('idle')),
+                  ),
                 ),
               ),
             ],
