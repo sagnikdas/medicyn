@@ -33,6 +33,7 @@ class _AppShellState extends State<AppShell> {
     return Scaffold(
       body: IndexedStack(
         index: _index,
+        sizing: StackFit.expand,
         children: [
           HomeScreen(
             key: _homeKey,

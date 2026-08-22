@@ -292,6 +292,12 @@ class DoselyBottomNav extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
             child: Row(
+              // Scaffold measures the bottom bar with maxHeight = the
+              // full screen. A Center (or a Column with mainAxisSize.max)
+              // inside that constraint expands to fill it, the bar eats
+              // the body, and Today renders as a blank page with the
+              // icons floating in the middle.
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 for (var i = 0; i < items.length; i++)
                   Expanded(
@@ -352,7 +358,11 @@ class _NavItem extends StatelessWidget {
       borderRadius: BorderRadius.circular(24),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 4),
-        child: Center(
+        child: Align(
+          alignment: Alignment.topCenter,
+          // Without heightFactor, Align (and Center) expand to the max
+          // height Scaffold offers the bottom bar — the full screen.
+          heightFactor: 1,
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
             padding: selected
