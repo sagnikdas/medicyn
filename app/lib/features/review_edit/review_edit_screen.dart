@@ -179,8 +179,9 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
     _daysOfWeek
       ..clear()
       ..addAll(schedulableDays(p.daysOfWeek));
-    if (p.intervalHours != null)
+    if (p.intervalHours != null) {
       _intervalController.text = '${p.intervalHours}';
+    }
     _confidence = p.confidence;
   }
 
@@ -208,8 +209,9 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
     _daysOfWeek
       ..clear()
       ..addAll(schedulableDays(schedule.daysOfWeek));
-    if (schedule.intervalHours != null)
+    if (schedule.intervalHours != null) {
       _intervalController.text = '${schedule.intervalHours}';
+    }
     // No AI parse happened, so there's no confidence score to show.
     _confidence = null;
   }
@@ -263,8 +265,9 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
     if (raw.isEmpty) return null; // falls back to the 8-hour default
     final parsed = int.tryParse(raw);
     if (parsed == null) return 'Enter a number of hours';
-    if (schedulableIntervalHours(parsed) == null)
+    if (schedulableIntervalHours(parsed) == null) {
       return 'Must be between 1 and 24 hours';
+    }
     return null;
   }
 
@@ -293,8 +296,9 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
     if (_drugNameController.text.trim().isEmpty) return false;
     if (_frequency == FrequencyType.asNeeded) return true;
     if (_times.isEmpty) return false;
-    if (_frequency == FrequencyType.specificDays && _daysOfWeek.isEmpty)
+    if (_frequency == FrequencyType.specificDays && _daysOfWeek.isEmpty) {
       return false;
+    }
     if (_intervalError != null) return false;
     return true;
   }

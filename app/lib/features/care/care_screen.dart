@@ -72,8 +72,9 @@ class _CareScreenState extends State<CareScreen> {
     _poll?.cancel();
     final status = _link?.status;
     // Only worth watching while the ball is in the other person's court.
-    if (status != CareLinkStatus.pending && status != CareLinkStatus.claimed)
+    if (status != CareLinkStatus.pending && status != CareLinkStatus.claimed) {
       return;
+    }
     _poll = Timer(_pollInterval, _refresh);
   }
 
@@ -133,8 +134,9 @@ class _CareScreenState extends State<CareScreen> {
   }
 
   Future<bool> _ensureCareShareConsent() async {
-    if (ConsentService.instance.isGranted(ConsentPurpose.careShare))
+    if (ConsentService.instance.isGranted(ConsentPurpose.careShare)) {
       return true;
+    }
     final granted = await showDialog<bool>(
       context: context,
       builder: (_) => const CareShareConsentDialog(),
