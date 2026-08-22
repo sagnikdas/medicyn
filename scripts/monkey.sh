@@ -21,6 +21,16 @@ EVENTS="${EVENTS:-2000}"
 THROTTLE_MS="${THROTTLE_MS:-200}"
 BUILD=0
 
+prepend_path() {
+  local dir="$1"
+  [[ -n "$dir" && -d "$dir" && ":$PATH:" != *":$dir:"* ]] || return 0
+  PATH="$dir:$PATH"
+}
+
+prepend_path "$HOME/Library/Android/sdk/platform-tools"
+prepend_path "${ANDROID_HOME:+$ANDROID_HOME/platform-tools}"
+prepend_path "${ANDROID_SDK_ROOT:+$ANDROID_SDK_ROOT/platform-tools}"
+
 for arg in "$@"; do
   case "$arg" in
     --build) BUILD=1 ;;

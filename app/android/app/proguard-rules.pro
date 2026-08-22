@@ -61,7 +61,7 @@
 # consumer rules; keep the package so a later DSN still works.
 -keep class io.sentry.** { *; }
 
-# Drift / sqlite (sqlcipher arrives transitively via drift_flutter).
+# Drift / sqlite (encryption is sqlite3mc, not sqlcipher_flutter_libs).
 -keep class androidx.sqlite.** { *; }
 -keep class io.requery.android.database.** { *; }
 -keep class net.sqlcipher.** { *; }

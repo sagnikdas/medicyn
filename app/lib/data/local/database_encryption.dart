@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
-/// The file `drift_flutter` wrote before encryption, under the app
-/// documents directory (`app_flutter/dosely.sqlite` on Android).
+/// The unencrypted file from before F-4, under the app documents directory
+/// (`app_flutter/dosely.sqlite` on Android).
 const plaintextDatabaseFileName = 'dosely.sqlite';
 
 /// First 16 bytes of an unencrypted SQLite database: `SQLite format 3\0`.
