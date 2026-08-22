@@ -104,6 +104,17 @@ reminderLockScreenCopy({
   );
 }
 
+/// Patient medicine alarms live on [reminderChannelId]. Care alerts must
+/// not be dismissed with them: that channel is a one-shot family ping,
+/// not a looping take-your-tablet sound.
+bool isPatientReminderNotification({required String? channelId}) {
+  if (channelId == careAlertChannelId) return false;
+  if (channelId == reminderChannelId) return true;
+  // Android 7 has no channel id. Patient alarms are the looping ones we
+  // must stop; skipping a care alert on API 24 is the rarer miss.
+  return channelId == null || channelId.isEmpty;
+}
+
 // Android's Notification.FLAG_INSISTENT: repeats the sound/vibration on loop
 // until the notification is dismissed or tapped, instead of playing once.
 const int _flagInsistent = 4;
@@ -678,6 +689,51 @@ class NotificationService {
     return ReconcileReport(
       armed: active.length - failures.length,
       failures: failures,
+    );
+  }
+
+  /// Stops a looping medicine alarm that is already on screen. [cancel] of
+  /// that notification id also drops the repeating AlarmManager entry, so
+  /// the caller must [reconcile] afterwards to put tonight's doses back.
+  ///
+  /// Care alerts are left alone. Missing-plugin hosts (widget tests) no-op.
+  Future<int> dismissActiveReminderNotifications() async {
+    try {
+      await init();
+      final showing = await _plugin.getActiveNotifications();
+      var dismissed = 0;
+      for (final n in showing) {
+        final id = n.id;
+        if (id == null) continue;
+        if (!isPatientReminderNotification(channelId: n.channelId)) continue;
+        await _plugin.cancel(id: id, tag: n.tag);
+        dismissed++;
+      }
+      return dismissed;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  /// Puts the looping alarm back if they opened the app, did not answer,
+  /// and left. Uses a distinct id from the repeating daily slot so
+  /// dismissing this one cannot drop tonight's schedule.
+  Future<void> ringDueDoseNow({
+    required String scheduleId,
+    required Medicine medicine,
+    required DateTime scheduledAt,
+  }) async {
+    await init();
+    final copy = await _copyFor(medicine);
+    final local = scheduledAt.toLocal();
+    final timeLabel =
+        '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
+    await _plugin.show(
+      id: notificationIdFor(scheduleId, 'due-$timeLabel'),
+      title: copy.title,
+      body: copy.body,
+      notificationDetails: _details(visibility: copy.visibility),
+      payload: _payload(scheduleId, timeLabel),
     );
   }
 

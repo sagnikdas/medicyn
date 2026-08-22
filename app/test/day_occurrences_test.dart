@@ -244,6 +244,41 @@ void main() {
     expect(next?.status, DayDoseStatus.pending);
   });
 
+  test('attentionDoses lists today due and yesterday missed, not upcoming', () {
+    final todayOccs = onDay(day: now);
+    final yesterdayOccs = onDay(
+      day: yesterday,
+      logs: [
+        record(
+          scheduledAt: DateTime(2026, 8, 20, 8, 0),
+          action: DoseAction.missed,
+        ),
+      ],
+    );
+    final attention = attentionDoses(
+      today: todayOccs,
+      yesterday: yesterdayOccs,
+    );
+    expect(
+      attention.map((o) => o.scheduledAt).toList(),
+      [
+        DateTime(2026, 8, 21, 8, 0),
+        DateTime(2026, 8, 20, 8, 0),
+        DateTime(2026, 8, 20, 20, 0),
+      ],
+    );
+    expect(attention.any((o) => o.status == DayDoseStatus.upcoming), isFalse);
+    expect(doseCanSnooze(attention.first.status), isTrue);
+    expect(doseStillRings(attention.first.status), isTrue);
+    expect(doseCanSnooze(DayDoseStatus.missed), isFalse);
+  });
+
+  test('nextUpcomingDose skips the due morning dose', () {
+    final next = nextUpcomingDose(onDay(day: now));
+    expect(next?.scheduledAt, DateTime(2026, 8, 21, 20, 0));
+    expect(next?.status, DayDoseStatus.upcoming);
+  });
+
   test('dayPartOf splits morning afternoon evening', () {
     expect(dayPartOf(DateTime(2026, 8, 21, 8, 0)), DayPart.morning);
     expect(dayPartOf(DateTime(2026, 8, 21, 13, 0)), DayPart.afternoon);

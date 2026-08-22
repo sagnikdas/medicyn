@@ -43,6 +43,10 @@ class _AppShellState extends State<AppShell> {
               key: _homeKey,
               db: widget.db,
               onAvatarTap: () => setState(() => _index = 3),
+              onNeedsAttention: () {
+                if (_index == 0) return;
+                setState(() => _index = 0);
+              },
               onNames: (names) {
                 if (!mounted) return;
                 setState(() => _names = names);

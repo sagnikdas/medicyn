@@ -11,14 +11,7 @@ import '../notification_engine/missed_doses.dart';
 /// a dose that was due and never answered — without inventing a missed
 /// row. [DayDoseStatus.missed] is only used when a missed log already
 /// exists; [notRecorded] is the honest past-tense of "nobody answered".
-enum DayDoseStatus {
-  taken,
-  pending,
-  upcoming,
-  snoozed,
-  missed,
-  notRecorded,
-}
+enum DayDoseStatus { taken, pending, upcoming, snoozed, missed, notRecorded }
 
 /// A dose log the calendar can reason about. Unknown [DoseLog.action]
 /// values are dropped rather than guessed — a string the enum does not
@@ -144,25 +137,27 @@ List<DayOccurrence> occurrencesOnDay({
     // schedule that is no longer firing.
     final live = schedule.active && !schedule.deleted && !item.medicine.deleted;
     if (!live) {
-      out.addAll(_occurrencesFromLogsOnly(
-        item: item,
-        logs: scheduleLogs,
-        day: onDay,
-        now: now,
-        snoozeWindow: snoozeWindow,
-      ));
+      out.addAll(
+        _occurrencesFromLogsOnly(
+          item: item,
+          logs: scheduleLogs,
+          day: onDay,
+          now: now,
+          snoozeWindow: snoozeWindow,
+        ),
+      );
       continue;
     }
 
-    final dues = expectedDoses(
-      schedule,
-      from: onDay,
-      to: dayEnd,
-      wallClock: wallClock,
-    )
-        .where((due) =>
-            MissedDoseDetector.wasArmed(due, definedAt: schedule.updatedAt))
-        .toList();
+    final dues =
+        expectedDoses(schedule, from: onDay, to: dayEnd, wallClock: wallClock)
+            .where(
+              (due) => MissedDoseDetector.wasArmed(
+                due,
+                definedAt: schedule.updatedAt,
+              ),
+            )
+            .toList();
     for (var i = 0; i < dues.length; i++) {
       final due = dues[i];
       final nextDue = i + 1 < dues.length ? dues[i + 1] : dayEnd;
@@ -176,12 +171,14 @@ List<DayOccurrence> occurrencesOnDay({
       final status = record != null
           ? _statusFromRecord(record, now, snoozeWindow)!
           : _statusWithoutLog(day: onDay, today: today, due: due, now: now);
-      out.add(DayOccurrence(
-        item: item,
-        scheduledAt: due,
-        status: status,
-        record: record,
-      ));
+      out.add(
+        DayOccurrence(
+          item: item,
+          scheduledAt: due,
+          status: status,
+          record: record,
+        ),
+      );
     }
   }
 
@@ -304,6 +301,70 @@ DayOccurrence? nextActionableDose(List<DayOccurrence> occs) {
   }).toList()..sort((a, b) => a.scheduledAt.compareTo(b.scheduledAt));
   return actionable.isEmpty ? null : actionable.first;
 }
+
+/// Doses to answer by opening the app, so nobody has to hunt the system
+/// notification shade while the alarm is still looping.
+///
+/// Today: due, snoozed, or already written missed. Yesterday: missed or
+/// unanswered, so last night is still on the list at breakfast.
+List<DayOccurrence> attentionDoses({
+  required List<DayOccurrence> today,
+  required List<DayOccurrence> yesterday,
+}) {
+  final out = <DayOccurrence>[];
+  for (final o in today) {
+    switch (o.status) {
+      case DayDoseStatus.pending:
+      case DayDoseStatus.snoozed:
+      case DayDoseStatus.missed:
+        out.add(o);
+      case DayDoseStatus.taken:
+      case DayDoseStatus.upcoming:
+      case DayDoseStatus.notRecorded:
+        break;
+    }
+  }
+  for (final o in yesterday) {
+    switch (o.status) {
+      case DayDoseStatus.missed:
+      case DayDoseStatus.notRecorded:
+        out.add(o);
+      case DayDoseStatus.taken:
+      case DayDoseStatus.pending:
+      case DayDoseStatus.upcoming:
+      case DayDoseStatus.snoozed:
+        break;
+    }
+  }
+  return out;
+}
+
+/// Upcoming later today — not already on the attention list.
+DayOccurrence? nextUpcomingDose(List<DayOccurrence> todayOccs) {
+  final upcoming =
+      todayOccs.where((o) => o.status == DayDoseStatus.upcoming).toList()
+        ..sort((a, b) => a.scheduledAt.compareTo(b.scheduledAt));
+  return upcoming.isEmpty ? null : upcoming.first;
+}
+
+bool doseCanSnooze(DayDoseStatus status) {
+  switch (status) {
+    case DayDoseStatus.pending:
+    case DayDoseStatus.snoozed:
+      return true;
+    case DayDoseStatus.taken:
+    case DayDoseStatus.upcoming:
+    case DayDoseStatus.missed:
+    case DayDoseStatus.notRecorded:
+      return false;
+  }
+}
+
+/// A looping alarm should start again if they leave without answering.
+bool doseStillRings(DayDoseStatus status) => doseCanSnooze(status);
+
+DateTime addCalendarDays(DateTime day, int days) =>
+    _civilAddDays(calendarDay(day), days);
 
 /// Taken vs expected for each day of the Sunday–Saturday week that
 /// contains [now]. Same scoring as [weekAdherence]: upcoming and future
@@ -445,12 +506,14 @@ List<DayOccurrence> _occurrencesFromLogsOnly({
     if (!isSameCalendarDay(log.scheduledAt, day)) continue;
     final status = _statusFromRecord(log, now, snoozeWindow);
     if (status == null) continue;
-    out.add(DayOccurrence(
-      item: item,
-      scheduledAt: log.scheduledAt,
-      status: status,
-      record: log,
-    ));
+    out.add(
+      DayOccurrence(
+        item: item,
+        scheduledAt: log.scheduledAt,
+        status: status,
+        record: log,
+      ),
+    );
   }
   return out;
 }
@@ -484,10 +547,10 @@ DoseRecord? _winningLog({
 }
 
 int _actionRank(DoseAction action) => switch (action) {
-      DoseAction.taken => 2,
-      DoseAction.missed => 1,
-      DoseAction.snoozed => 0,
-    };
+  DoseAction.taken => 2,
+  DoseAction.missed => 1,
+  DoseAction.snoozed => 0,
+};
 
 DayDoseStatus? _statusFromRecord(
   DoseRecord record,
