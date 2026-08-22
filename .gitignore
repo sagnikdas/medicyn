@@ -1,3 +1,4 @@
 .secrets/
 supabase/.temp/
 supabase/functions/*/deno.lock
+.cursor/mcp.json

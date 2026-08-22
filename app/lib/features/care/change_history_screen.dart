@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/widgets/dosely_layout.dart';
 import '../auth/auth_service.dart';
 import 'care_service.dart';
 import 'edit_attribution.dart';
@@ -31,7 +32,10 @@ class _ChangeHistoryScreenState extends State<ChangeHistoryScreen> {
   Future<void> _load() async {
     try {
       final edits = await CareService.instance.medicineEdits(widget.medicineId);
-      final ids = {for (final e in edits) if (e.actorId != null) e.actorId!};
+      final ids = {
+        for (final e in edits)
+          if (e.actorId != null) e.actorId!,
+      };
       final names = <String, String>{};
       for (final id in ids) {
         if (id == _me) continue;
@@ -54,7 +58,11 @@ class _ChangeHistoryScreenState extends State<ChangeHistoryScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('What changed')),
-      body: SafeArea(child: RefreshIndicator(onRefresh: _load, child: _body())),
+      body: SafeArea(
+        child: DoselyContent(
+          child: RefreshIndicator(onRefresh: _load, child: _body()),
+        ),
+      ),
     );
   }
 
@@ -91,15 +99,18 @@ class _ChangeHistoryScreenState extends State<ChangeHistoryScreen> {
         final who = edit.actorId == null
             ? 'Someone'
             : edit.actorId == _me
-                ? 'You'
-                : (_names[edit.actorId] ?? 'Someone');
+            ? 'You'
+            : (_names[edit.actorId] ?? 'Someone');
         return Card(
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(edit.summary, style: Theme.of(context).textTheme.titleSmall),
+                Text(
+                  edit.summary,
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
                 const SizedBox(height: 4),
                 Text(
                   '$who · ${describeRelativeDay(edit.createdAt)}',

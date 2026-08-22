@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../core/widgets/dosely_layout.dart';
 import '../../data/local/database.dart';
 import '../auth/auth_service.dart';
 import '../consent/consent_purpose.dart';
@@ -71,7 +72,8 @@ class _CareScreenState extends State<CareScreen> {
     _poll?.cancel();
     final status = _link?.status;
     // Only worth watching while the ball is in the other person's court.
-    if (status != CareLinkStatus.pending && status != CareLinkStatus.claimed) return;
+    if (status != CareLinkStatus.pending && status != CareLinkStatus.claimed)
+      return;
     _poll = Timer(_pollInterval, _refresh);
   }
 
@@ -79,7 +81,9 @@ class _CareScreenState extends State<CareScreen> {
     try {
       final link = await CareService.instance.currentLink();
       final otherId = link?.otherPartyId(_myId);
-      final name = otherId == null ? null : await CareService.instance.displayName(otherId);
+      final name = otherId == null
+          ? null
+          : await CareService.instance.displayName(otherId);
       CareClaimant? claimant;
       if (link != null &&
           link.status == CareLinkStatus.claimed &&
@@ -129,7 +133,8 @@ class _CareScreenState extends State<CareScreen> {
   }
 
   Future<bool> _ensureCareShareConsent() async {
-    if (ConsentService.instance.isGranted(ConsentPurpose.careShare)) return true;
+    if (ConsentService.instance.isGranted(ConsentPurpose.careShare))
+      return true;
     final granted = await showDialog<bool>(
       context: context,
       builder: (_) => const CareShareConsentDialog(),
@@ -175,7 +180,7 @@ class _CareScreenState extends State<CareScreen> {
         content: Text(
           link.status == CareLinkStatus.active
               ? '$who will no longer see your medicines or be able to change them. '
-                  'Your reminders stay exactly as they are.'
+                    'Your reminders stay exactly as they are.'
               : 'This invitation will be cancelled.',
         ),
         actions: [
@@ -202,26 +207,30 @@ class _CareScreenState extends State<CareScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Family')),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (_loading)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 48),
-                  child: Center(child: CircularProgressIndicator()),
-                )
-              else
-                _body(),
-              if (_error != null) ...[
-                const SizedBox(height: 20),
-                Text(
-                  _error!,
-                  style: TextStyle(color: Theme.of(context).colorScheme.error),
-                ),
+        child: DoselyContent(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (_loading)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 48),
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else
+                  _body(),
+                if (_error != null) ...[
+                  const SizedBox(height: 20),
+                  Text(
+                    _error!,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),
@@ -296,14 +305,18 @@ class _CareScreenState extends State<CareScreen> {
             color: scheme.surfaceContainerLow,
             borderRadius: BorderRadius.circular(20),
           ),
-          child: Center(
-            child: SelectableText(
-              // Spaced so it can be read aloud a digit at a time without
-              // losing your place.
-              code.split('').join(' '),
-              style: text.displaySmall?.copyWith(
-                fontWeight: FontWeight.w600,
-                letterSpacing: 2,
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: SelectableText(
+                // Spaced so it can be read aloud a digit at a time without
+                // losing your place.
+                code.split('').join(' '),
+                style: text.displaySmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 2,
+                ),
               ),
             ),
           ),
@@ -316,7 +329,10 @@ class _CareScreenState extends State<CareScreen> {
               SizedBox(
                 height: 16,
                 width: 16,
-                child: CircularProgressIndicator(strokeWidth: 2, color: scheme.outline),
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: scheme.outline,
+                ),
               ),
               const SizedBox(width: 10),
               Flexible(
@@ -333,7 +349,7 @@ class _CareScreenState extends State<CareScreen> {
           _inviteExpired
               ? 'This number has expired. Get a new one and read that instead.'
               : 'This number stops working after 15 minutes. You can always come '
-                  'back for a new one.',
+                    'back for a new one.',
           style: text.bodySmall,
           textAlign: TextAlign.center,
         ),
@@ -381,11 +397,7 @@ class _CareScreenState extends State<CareScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Icon(
-          Icons.person_add_alt_1,
-          size: 64,
-          color: scheme.primary,
-        ),
+        Icon(Icons.person_add_alt_1, size: 64, color: scheme.primary),
         const SizedBox(height: 20),
         Text('$who typed in your number', style: text.headlineSmall),
         const SizedBox(height: 8),
@@ -405,7 +417,12 @@ class _CareScreenState extends State<CareScreen> {
         const SizedBox(height: 28),
         FilledButton(
           onPressed: _confirm,
-          child: Text('Yes, connect with $who'),
+          child: Text(
+            'Yes, connect with $who',
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+          ),
         ),
         const SizedBox(height: 12),
         OutlinedButton(
@@ -475,9 +492,9 @@ class _CareScreenState extends State<CareScreen> {
         Text(
           amPatient
               ? '$who can see your medicines and when you take them, and can '
-                  'add or change a reminder for you.'
+                    'add or change a reminder for you.'
               : 'You can see $who\'s medicines and when they take them, and '
-                  'add or change a reminder for them.',
+                    'add or change a reminder for them.',
           style: text.bodyMedium,
         ),
         const SizedBox(height: 8),
@@ -530,15 +547,14 @@ class _CareScreenState extends State<CareScreen> {
         OutlinedButton.icon(
           onPressed: _editOwnPhone,
           icon: const Icon(Icons.contact_phone_outlined),
-          label: Text(_ownPhone == null ? 'Add your number' : 'Change your number'),
+          label: Text(
+            _ownPhone == null ? 'Add your number' : 'Change your number',
+          ),
         ),
         const SizedBox(height: 28),
         SetupHealthPanel(profile: _patientProfile, viewingOwnData: amPatient),
         const SizedBox(height: 28),
-        OutlinedButton(
-          onPressed: _disconnect,
-          child: const Text('Disconnect'),
-        ),
+        OutlinedButton(onPressed: _disconnect, child: const Text('Disconnect')),
       ],
     );
   }
@@ -590,9 +606,14 @@ class _CodeEntryDialogState extends State<_CodeEntryDialog> {
             keyboardType: TextInputType.number,
             textAlign: TextAlign.center,
             maxLength: 8,
-            style: Theme.of(context).textTheme.headlineMedium?.copyWith(letterSpacing: 8),
+            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+              letterSpacing: MediaQuery.sizeOf(context).width < 400 ? 2 : 8,
+            ),
             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            decoration: const InputDecoration(counterText: '', hintText: '00000000'),
+            decoration: const InputDecoration(
+              counterText: '',
+              hintText: '00000000',
+            ),
             onSubmitted: (v) {
               if (v.length == 8) Navigator.of(context).pop(v);
             },
@@ -605,7 +626,9 @@ class _CodeEntryDialogState extends State<_CodeEntryDialog> {
           child: const Text('Cancel'),
         ),
         TextButton(
-          onPressed: _complete ? () => Navigator.of(context).pop(_controller.text) : null,
+          onPressed: _complete
+              ? () => Navigator.of(context).pop(_controller.text)
+              : null,
           child: const Text('Connect'),
         ),
       ],
@@ -672,4 +695,3 @@ class _PhoneEntryDialogState extends State<_PhoneEntryDialog> {
     );
   }
 }
-

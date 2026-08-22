@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/widgets/dosely_layout.dart';
 import '../../data/local/database.dart';
 import '../notification_engine/notification_actions.dart';
 
@@ -47,7 +48,9 @@ class _DoseConfirmScreenState extends State<DoseConfirmScreen> {
 
   Future<void> _load() async {
     final schedule = await widget.db.scheduleById(widget.scheduleId);
-    final medicine = schedule == null ? null : await widget.db.medicineById(schedule.medicineId);
+    final medicine = schedule == null
+        ? null
+        : await widget.db.medicineById(schedule.medicineId);
     if (!mounted) return;
     if (schedule == null || medicine == null) {
       setState(() {
@@ -65,9 +68,17 @@ class _DoseConfirmScreenState extends State<DoseConfirmScreen> {
   Future<void> _respond(bool taken) async {
     setState(() => _submitting = true);
     if (taken) {
-      await recordDoseTaken(widget.db, scheduleId: widget.scheduleId, scheduledAt: widget.scheduledAt);
+      await recordDoseTaken(
+        widget.db,
+        scheduleId: widget.scheduleId,
+        scheduledAt: widget.scheduledAt,
+      );
     } else {
-      await recordDoseSnoozed(widget.db, scheduleId: widget.scheduleId, scheduledAt: widget.scheduledAt);
+      await recordDoseSnoozed(
+        widget.db,
+        scheduleId: widget.scheduleId,
+        scheduledAt: widget.scheduledAt,
+      );
     }
     if (!mounted) return;
     Navigator.of(context).maybePop();
@@ -77,8 +88,12 @@ class _DoseConfirmScreenState extends State<DoseConfirmScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
-        child: Center(
-          child: _loading ? const CircularProgressIndicator() : (_notFound ? _notFoundView() : _body()),
+        child: DoselyContent(
+          child: Center(
+            child: _loading
+                ? const CircularProgressIndicator()
+                : (_notFound ? _notFoundView() : _body()),
+          ),
         ),
       ),
     );
@@ -92,7 +107,10 @@ class _DoseConfirmScreenState extends State<DoseConfirmScreen> {
         children: [
           const Text('This reminder no longer exists.'),
           const SizedBox(height: 16),
-          FilledButton(onPressed: () => Navigator.of(context).maybePop(), child: const Text('Close')),
+          FilledButton(
+            onPressed: () => Navigator.of(context).maybePop(),
+            child: const Text('Close'),
+          ),
         ],
       ),
     );
@@ -100,28 +118,63 @@ class _DoseConfirmScreenState extends State<DoseConfirmScreen> {
 
   Widget _body() {
     final medicine = _item!.medicine;
-    final title = medicine.strength.isEmpty ? medicine.drugName : '${medicine.drugName} ${medicine.strength}';
-    final body = medicine.doseAmount.isEmpty ? 'Time for your dose' : 'Take ${medicine.doseAmount}';
+    final title = medicine.strength.isEmpty
+        ? medicine.drugName
+        : '${medicine.drugName} ${medicine.strength}';
+    final body = medicine.doseAmount.isEmpty
+        ? 'Time for your dose'
+        : 'Take ${medicine.doseAmount}';
+    final scheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.all(28),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.medication, size: 72, color: Theme.of(context).colorScheme.primary),
-          const SizedBox(height: 20),
-          Text(title, style: Theme.of(context).textTheme.headlineSmall, textAlign: TextAlign.center),
-          const SizedBox(height: 8),
-          Text(body, style: Theme.of(context).textTheme.bodyLarge, textAlign: TextAlign.center),
-          const SizedBox(height: 40),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: scheme.primary,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              children: [
+                Text(
+                  'NEXT DOSE',
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: scheme.onPrimaryContainer,
+                    letterSpacing: 1,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  title,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.headlineSmall?.copyWith(color: scheme.onPrimary),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  body,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyLarge?.copyWith(color: scheme.inversePrimary),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
           FilledButton(
             onPressed: _submitting ? null : () => _respond(true),
-            style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(56)),
-            child: const Text('Taken'),
+            child: const Text('Mark as Taken'),
           ),
           const SizedBox(height: 12),
           OutlinedButton(
             onPressed: _submitting ? null : () => _respond(false),
-            style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(56)),
             child: const Text('Snooze 10m'),
           ),
         ],

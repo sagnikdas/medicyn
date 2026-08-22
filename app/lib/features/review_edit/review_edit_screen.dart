@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/ids.dart';
+import '../../core/widgets/dosely_layout.dart';
 import '../../data/local/database.dart';
 import '../../data/local/tables.dart';
 import '../../data/remote/care_notifier.dart';
@@ -131,17 +132,22 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
     }
     if (_forSomeoneElse ||
         !shouldParseMedicine(
-      anthropicGranted: ConsentService.instance.isGranted(ConsentPurpose.anthropicParse),
-      ocrText: widget.ocrText,
-      transcript: widget.transcript,
-    )) {
+          anthropicGranted: ConsentService.instance.isGranted(
+            ConsentPurpose.anthropicParse,
+          ),
+          ocrText: widget.ocrText,
+          transcript: widget.transcript,
+        )) {
       // Empty capture, Anthropic not granted, or editing someone else's
       // record — same empty/manual form, and parse-medicine is never called.
       setState(() => _loadState = _LoadState.ready);
       return;
     }
     try {
-      final parsed = await MedicineParser().parse(ocrText: widget.ocrText, transcript: widget.transcript);
+      final parsed = await MedicineParser().parse(
+        ocrText: widget.ocrText,
+        transcript: widget.transcript,
+      );
       _applyParsed(parsed);
       setState(() {
         _loadState = _LoadState.ready;
@@ -173,7 +179,8 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
     _daysOfWeek
       ..clear()
       ..addAll(schedulableDays(p.daysOfWeek));
-    if (p.intervalHours != null) _intervalController.text = '${p.intervalHours}';
+    if (p.intervalHours != null)
+      _intervalController.text = '${p.intervalHours}';
     _confidence = p.confidence;
   }
 
@@ -195,12 +202,14 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
     // the database, and `byName` throws rather than defaulting. Clean it on
     // the way into the form so editing a poisoned reminder is how it gets
     // fixed, not another way to crash.
-    _frequency = frequencyTypeFromName(schedule.frequencyType) ?? FrequencyType.daily;
+    _frequency =
+        frequencyTypeFromName(schedule.frequencyType) ?? FrequencyType.daily;
     _times = schedulableTimes(schedule.times).map((t) => t.label).toList();
     _daysOfWeek
       ..clear()
       ..addAll(schedulableDays(schedule.daysOfWeek));
-    if (schedule.intervalHours != null) _intervalController.text = '${schedule.intervalHours}';
+    if (schedule.intervalHours != null)
+      _intervalController.text = '${schedule.intervalHours}';
     // No AI parse happened, so there's no confidence score to show.
     _confidence = null;
   }
@@ -210,7 +219,10 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
   void _viewHistory() {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => DoseHistoryScreen(scheduleId: widget.existing!.schedule.id, db: widget.db),
+        builder: (_) => DoseHistoryScreen(
+          scheduleId: widget.existing!.schedule.id,
+          db: widget.db,
+        ),
       ),
     );
   }
@@ -218,13 +230,17 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
   void _viewChangeHistory() {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => ChangeHistoryScreen(medicineId: widget.existing!.medicine.id),
+        builder: (_) =>
+            ChangeHistoryScreen(medicineId: widget.existing!.medicine.id),
       ),
     );
   }
 
   Future<void> _addTime() async {
-    final picked = await showTimePicker(context: context, initialTime: TimeOfDay.now());
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.now(),
+    );
     if (picked == null) return;
     final formatted =
         '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
@@ -247,7 +263,8 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
     if (raw.isEmpty) return null; // falls back to the 8-hour default
     final parsed = int.tryParse(raw);
     if (parsed == null) return 'Enter a number of hours';
-    if (schedulableIntervalHours(parsed) == null) return 'Must be between 1 and 24 hours';
+    if (schedulableIntervalHours(parsed) == null)
+      return 'Must be between 1 and 24 hours';
     return null;
   }
 
@@ -276,7 +293,8 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
     if (_drugNameController.text.trim().isEmpty) return false;
     if (_frequency == FrequencyType.asNeeded) return true;
     if (_times.isEmpty) return false;
-    if (_frequency == FrequencyType.specificDays && _daysOfWeek.isEmpty) return false;
+    if (_frequency == FrequencyType.specificDays && _daysOfWeek.isEmpty)
+      return false;
     if (_intervalError != null) return false;
     return true;
   }
@@ -292,9 +310,9 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _saving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not save: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not save: $e')));
     }
   }
 
@@ -316,8 +334,12 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
       notes: _notesController.text.trim(),
       frequencyType: _frequency.name,
       times: _times,
-      daysOfWeek: _frequency == FrequencyType.specificDays ? (_daysOfWeek.toList()..sort()) : const [],
-      intervalHours: _frequency == FrequencyType.everyXHours ? _enteredIntervalHours : null,
+      daysOfWeek: _frequency == FrequencyType.specificDays
+          ? (_daysOfWeek.toList()..sort())
+          : const [],
+      intervalHours: _frequency == FrequencyType.everyXHours
+          ? _enteredIntervalHours
+          : null,
       savedAt: savedAt,
       medicineCreatedAt: widget.existing?.medicine.createdAt,
       scheduleCreatedAt: widget.existing?.schedule.createdAt,
@@ -329,14 +351,15 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
   }
 
   Future<void> _saveLocal() async {
-      final medicineId = _isEditing ? widget.existing!.medicine.id : newUuid();
-      final scheduleId = _isEditing ? widget.existing!.schedule.id : newUuid();
-      // One timestamp for both rows, so a medicine and its schedule saved
-      // together can never end up on opposite sides of a version comparison.
-      final savedAt = DateTime.now();
-      final savedBy = AuthService.instance.currentUser?.id;
+    final medicineId = _isEditing ? widget.existing!.medicine.id : newUuid();
+    final scheduleId = _isEditing ? widget.existing!.schedule.id : newUuid();
+    // One timestamp for both rows, so a medicine and its schedule saved
+    // together can never end up on opposite sides of a version comparison.
+    final savedAt = DateTime.now();
+    final savedBy = AuthService.instance.currentUser?.id;
 
-      await widget.db.upsertMedicine(MedicinesCompanion.insert(
+    await widget.db.upsertMedicine(
+      MedicinesCompanion.insert(
         id: medicineId,
         drugName: _drugNameController.text.trim(),
         strength: Value(_strengthController.text.trim()),
@@ -351,29 +374,33 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
         pendingSync: const Value(true),
         updatedAt: Value(savedAt),
         updatedBy: Value(savedBy),
-      ));
+      ),
+    );
 
-      final schedule = Schedule(
-        id: scheduleId,
-        medicineId: medicineId,
-        frequencyType: _frequency.name,
-        times: _times,
-        daysOfWeek: _frequency == FrequencyType.specificDays ? (_daysOfWeek.toList()..sort()) : const [],
-        // An empty field still means "use the default", as before. A value
-        // that is present but out of range cannot reach here — _canSave
-        // blocks it — and is mapped to null rather than trusted if it ever
-        // does.
-        intervalHours: _frequency == FrequencyType.everyXHours
-            ? _enteredIntervalHours
-            : null,
-        active: true,
-        createdAt: DateTime.now(),
-        updatedAt: savedAt,
-        updatedBy: savedBy,
-        pendingSync: true,
-        deleted: false,
-      );
-      await widget.db.upsertSchedule(SchedulesCompanion.insert(
+    final schedule = Schedule(
+      id: scheduleId,
+      medicineId: medicineId,
+      frequencyType: _frequency.name,
+      times: _times,
+      daysOfWeek: _frequency == FrequencyType.specificDays
+          ? (_daysOfWeek.toList()..sort())
+          : const [],
+      // An empty field still means "use the default", as before. A value
+      // that is present but out of range cannot reach here — _canSave
+      // blocks it — and is mapped to null rather than trusted if it ever
+      // does.
+      intervalHours: _frequency == FrequencyType.everyXHours
+          ? _enteredIntervalHours
+          : null,
+      active: true,
+      createdAt: DateTime.now(),
+      updatedAt: savedAt,
+      updatedBy: savedBy,
+      pendingSync: true,
+      deleted: false,
+    );
+    await widget.db.upsertSchedule(
+      SchedulesCompanion.insert(
         id: scheduleId,
         medicineId: medicineId,
         frequencyType: _frequency.name,
@@ -385,40 +412,43 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
         pendingSync: const Value(true),
         updatedAt: Value(savedAt),
         updatedBy: Value(savedBy),
-      ));
+      ),
+    );
 
-      final medicine = await widget.db.medicineById(medicineId);
-      if (medicine != null) {
-        try {
-          await NotificationService.instance.scheduleForScheduleWithMedicine(
-            ScheduleWithMedicine(schedule, medicine),
+    final medicine = await widget.db.medicineById(medicineId);
+    if (medicine != null) {
+      try {
+        await NotificationService.instance.scheduleForScheduleWithMedicine(
+          ScheduleWithMedicine(schedule, medicine),
+        );
+      } catch (e) {
+        // The reminder is saved either way; a scheduling failure (e.g. the
+        // Android 12+ exact-alarm permission was revoked) shouldn't block
+        // the save or strand the spinner — surface it and move on.
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Saved, but the alarm could not be scheduled: $e'),
+            ),
           );
-        } catch (e) {
-          // The reminder is saved either way; a scheduling failure (e.g. the
-          // Android 12+ exact-alarm permission was revoked) shouldn't block
-          // the save or strand the spinner — surface it and move on.
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Saved, but the alarm could not be scheduled: $e')),
-            );
-          }
         }
       }
-      // Fire-and-forget: sync is backup/multi-device only, never the source
-      // of truth for the reminder itself (see SyncService's docs), so it
-      // must not hold the Save button hostage to network conditions —
-      // retries with backoff inside the client can otherwise take upwards
-      // of 10+ seconds per row before this UI-blocking await gives up.
-      unawaited(() async {
-        final sync = SyncService(widget.db);
-        await sync.syncAll();
-        if (sync.pushedEdits) {
-          await CareNotifier.instance.dataChanged();
-        }
-      }());
+    }
+    // Fire-and-forget: sync is backup/multi-device only, never the source
+    // of truth for the reminder itself (see SyncService's docs), so it
+    // must not hold the Save button hostage to network conditions —
+    // retries with backoff inside the client can otherwise take upwards
+    // of 10+ seconds per row before this UI-blocking await gives up.
+    unawaited(() async {
+      final sync = SyncService(widget.db);
+      await sync.syncAll();
+      if (sync.pushedEdits) {
+        await CareNotifier.instance.dataChanged();
+      }
+    }());
 
-      if (!mounted) return;
-      Navigator.of(context).popUntil((route) => route.isFirst);
+    if (!mounted) return;
+    Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
   @override
@@ -429,11 +459,11 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
           _isEditing
               ? 'Edit reminder'
               : _forSomeoneElse
-                  ? 'Add a reminder'
-                  : 'Review reminder',
+              ? 'Add a reminder'
+              : 'Review reminder',
         ),
       ),
-      body: SafeArea(child: _body()),
+      body: SafeArea(child: DoselyContent(child: _body())),
     );
   }
 
@@ -461,14 +491,56 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
                 const SizedBox(height: 16),
                 FilledButton(onPressed: _load, child: const Text('Try again')),
                 const SizedBox(height: 8),
-                OutlinedButton(onPressed: _continueManually, child: const Text('Fill in manually')),
+                OutlinedButton(
+                  onPressed: _continueManually,
+                  child: const Text('Fill in manually'),
+                ),
               ],
             ),
           ),
         );
       case _LoadState.ready:
-        return _form();
+        return Column(
+          children: [
+            Expanded(child: _form()),
+            Material(
+              elevation: 8,
+              color: Theme.of(context).colorScheme.surface,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+                child: FilledButton(
+                  onPressed: _canSave && !_saving ? _save : null,
+                  child: _saving
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Text(_isEditing ? 'Save changes' : 'Save reminder'),
+                ),
+              ),
+            ),
+          ],
+        );
     }
+  }
+
+  Widget _fieldPair(Widget left, Widget right) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < 360) {
+          return Column(children: [left, const SizedBox(height: 12), right]);
+        }
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: left),
+            const SizedBox(width: 12),
+            Expanded(child: right),
+          ],
+        );
+      },
+    );
   }
 
   Widget _form() {
@@ -497,69 +569,72 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
           decoration: const InputDecoration(labelText: 'Medicine name *'),
         ),
         const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: _strengthController,
-                decoration: const InputDecoration(labelText: 'Strength (e.g. 500mg)'),
-              ),
+        _fieldPair(
+          TextField(
+            controller: _strengthController,
+            decoration: const InputDecoration(
+              labelText: 'Strength (e.g. 500mg)',
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: TextField(
-                controller: _formController,
-                decoration: const InputDecoration(labelText: 'Form (tablet, syrup…)'),
-              ),
+          ),
+          TextField(
+            controller: _formController,
+            decoration: const InputDecoration(
+              labelText: 'Form (tablet, syrup…)',
             ),
-          ],
+          ),
         ),
         const SizedBox(height: 12),
         TextField(
           controller: _doseAmountController,
-          decoration: const InputDecoration(labelText: 'Dose amount (e.g. 1 tablet)'),
+          decoration: const InputDecoration(
+            labelText: 'Dose amount (e.g. 1 tablet)',
+          ),
         ),
         const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: _remainingController,
-                keyboardType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                decoration: const InputDecoration(
-                  labelText: 'Tablets left',
-                  helperText: 'Leave blank to skip',
-                ),
-              ),
+        _fieldPair(
+          TextField(
+            controller: _remainingController,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            decoration: const InputDecoration(
+              labelText: 'Tablets left',
+              helperText: 'Leave blank to skip',
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: TextField(
-                controller: _perDoseController,
-                keyboardType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                decoration: const InputDecoration(
-                  labelText: 'Tablets per dose',
-                  helperText: 'Defaults to 1',
-                ),
-              ),
+          ),
+          TextField(
+            controller: _perDoseController,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            decoration: const InputDecoration(
+              labelText: 'Tablets per dose',
+              helperText: 'Defaults to 1',
             ),
-          ],
+          ),
         ),
         const SizedBox(height: 20),
-        Text('Frequency', style: Theme.of(context).textTheme.titleSmall),
+        Text(
+          'Frequency',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: Theme.of(context).colorScheme.secondary,
+          ),
+        ),
         const SizedBox(height: 8),
-        SegmentedButton<FrequencyType>(
-          segments: const [
-            ButtonSegment(value: FrequencyType.daily, label: Text('Daily')),
-            ButtonSegment(value: FrequencyType.specificDays, label: Text('Some days')),
-            ButtonSegment(value: FrequencyType.everyXHours, label: Text('Every X hrs')),
-            ButtonSegment(value: FrequencyType.asNeeded, label: Text('As needed')),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final option in FrequencyType.values)
+              ChoiceChip(
+                label: Text(switch (option) {
+                  FrequencyType.daily => 'Daily',
+                  FrequencyType.specificDays => 'Some days',
+                  FrequencyType.everyXHours => 'Every X hrs',
+                  FrequencyType.asNeeded => 'As needed',
+                }),
+                selected: _frequency == option,
+                onSelected: (_) => setState(() => _frequency = option),
+              ),
           ],
-          selected: {_frequency},
-          onSelectionChanged: (s) => setState(() => _frequency = s.first),
-          showSelectedIcon: false,
         ),
         const SizedBox(height: 16),
         if (_frequency == FrequencyType.specificDays) ...[
@@ -570,7 +645,9 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
               return FilterChip(
                 label: Text(_dayLabels[i]),
                 selected: selected,
-                onSelected: (v) => setState(() => v ? _daysOfWeek.add(i) : _daysOfWeek.remove(i)),
+                onSelected: (v) => setState(
+                  () => v ? _daysOfWeek.add(i) : _daysOfWeek.remove(i),
+                ),
               );
             }),
           ),
@@ -597,7 +674,9 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
         ],
         if (_frequency != FrequencyType.asNeeded) ...[
           Text(
-            _frequency == FrequencyType.everyXHours ? 'First dose time' : 'Times',
+            _frequency == FrequencyType.everyXHours
+                ? 'First dose time'
+                : 'Times',
             style: Theme.of(context).textTheme.titleSmall,
           ),
           const SizedBox(height: 8),
@@ -608,9 +687,15 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
               for (final t in _times)
                 Chip(
                   label: Text(t),
-                  onDeleted: () => setState(() => _times = _times.where((x) => x != t).toList()),
+                  onDeleted: () => setState(
+                    () => _times = _times.where((x) => x != t).toList(),
+                  ),
                 ),
-              ActionChip(avatar: const Icon(Icons.add, size: 18), label: const Text('Add time'), onPressed: _addTime),
+              ActionChip(
+                avatar: const Icon(Icons.add, size: 18),
+                label: const Text('Add time'),
+                onPressed: _addTime,
+              ),
             ],
           ),
           const SizedBox(height: 16),
@@ -618,7 +703,9 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
         TextField(
           controller: _notesController,
           maxLines: 2,
-          decoration: const InputDecoration(labelText: 'Notes (optional)'),
+          decoration: const InputDecoration(
+            labelText: 'Instructions (optional)',
+          ),
         ),
         if (_isEditing) ...[
           const SizedBox(height: 20),
@@ -645,13 +732,7 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
             ),
           ],
         ],
-        const SizedBox(height: 28),
-        FilledButton(
-          onPressed: _canSave && !_saving ? _save : null,
-          child: _saving
-              ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
-              : Text(_isEditing ? 'Save changes' : 'Save reminder'),
-        ),
+        const SizedBox(height: 12),
       ],
     );
   }

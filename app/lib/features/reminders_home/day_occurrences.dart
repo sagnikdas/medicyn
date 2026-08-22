@@ -268,6 +268,171 @@ Map<DateTime, DayCellMarks> cellMarksForRange({
   return (taken: taken, expected: expected);
 }
 
+/// Morning before noon, afternoon until 17:00, evening after that.
+/// Used to group Today's schedule the way the Stitch design does.
+enum DayPart { morning, afternoon, evening }
+
+DayPart dayPartOf(DateTime scheduledAt) {
+  final hour = scheduledAt.toLocal().hour;
+  if (hour < 12) return DayPart.morning;
+  if (hour < 17) return DayPart.afternoon;
+  return DayPart.evening;
+}
+
+Map<DayPart, List<DayOccurrence>> groupByDayPart(List<DayOccurrence> occs) {
+  final grouped = {for (final part in DayPart.values) part: <DayOccurrence>[]};
+  for (final occurrence in occs) {
+    grouped[dayPartOf(occurrence.scheduledAt)]!.add(occurrence);
+  }
+  return grouped;
+}
+
+/// The next dose on [occs] the person can still answer — pending, due, or
+/// snoozed, earliest first. Taken/missed/unrecorded rows are skipped.
+DayOccurrence? nextActionableDose(List<DayOccurrence> occs) {
+  final actionable = occs.where((o) {
+    switch (o.status) {
+      case DayDoseStatus.pending:
+      case DayDoseStatus.upcoming:
+      case DayDoseStatus.snoozed:
+        return true;
+      case DayDoseStatus.taken:
+      case DayDoseStatus.missed:
+      case DayDoseStatus.notRecorded:
+        return false;
+    }
+  }).toList()..sort((a, b) => a.scheduledAt.compareTo(b.scheduledAt));
+  return actionable.isEmpty ? null : actionable.first;
+}
+
+/// Taken vs expected for each day of the Sunday–Saturday week that
+/// contains [now]. Same scoring as [weekAdherence]: upcoming and future
+/// days are not in the denominator.
+List<({DateTime day, int taken, int expected})> weekDayAdherence({
+  required List<ScheduleWithMedicine> items,
+  required List<DoseRecord> logs,
+  required DateTime now,
+  Duration grace = MissedDoseDetector.grace,
+  Duration snoozeWindow = const Duration(minutes: 10),
+  WallClock? wallClock,
+}) {
+  final today = calendarDay(now);
+  final storedWeekday = now.weekday == DateTime.sunday ? 0 : now.weekday;
+  final sunday = _civilAddDays(today, -storedWeekday);
+  final out = <({DateTime day, int taken, int expected})>[];
+  var day = sunday;
+  for (var i = 0; i < 7; i++) {
+    final occs = occurrencesOnDay(
+      items: items,
+      logs: logs,
+      day: day,
+      now: now,
+      grace: grace,
+      snoozeWindow: snoozeWindow,
+      wallClock: wallClock,
+    );
+    var taken = 0;
+    var expected = 0;
+    for (final o in occs) {
+      if (o.status == DayDoseStatus.taken) taken++;
+      if (o.status == DayDoseStatus.upcoming) continue;
+      if (calendarDay(o.scheduledAt).isAfter(today)) continue;
+      expected++;
+    }
+    out.add((day: day, taken: taken, expected: expected));
+    day = _civilAddDays(day, 1);
+  }
+  return out;
+}
+
+/// Consecutive calendar days, walking backwards from [now], on which every
+/// due dose was taken. Days with nothing expected are skipped rather than
+/// counted, so a gap in the schedule does not mint a streak.
+int consistencyStreak({
+  required List<ScheduleWithMedicine> items,
+  required List<DoseRecord> logs,
+  required DateTime now,
+  Duration grace = MissedDoseDetector.grace,
+  Duration snoozeWindow = const Duration(minutes: 10),
+  WallClock? wallClock,
+  int maxDays = 365,
+}) {
+  var streak = 0;
+  var day = calendarDay(now);
+  for (var i = 0; i < maxDays; i++) {
+    final occs = occurrencesOnDay(
+      items: items,
+      logs: logs,
+      day: day,
+      now: now,
+      grace: grace,
+      snoozeWindow: snoozeWindow,
+      wallClock: wallClock,
+    );
+    var taken = 0;
+    var expected = 0;
+    for (final o in occs) {
+      if (o.status == DayDoseStatus.taken) taken++;
+      if (o.status == DayDoseStatus.upcoming) continue;
+      if (calendarDay(o.scheduledAt).isAfter(calendarDay(now))) continue;
+      expected++;
+    }
+    if (expected == 0) {
+      day = _civilAddDays(day, -1);
+      continue;
+    }
+    if (taken < expected) break;
+    streak++;
+    day = _civilAddDays(day, -1);
+  }
+  return streak;
+}
+
+/// Which [DayPart] missed the most doses this week, or null when none did.
+DayPart? mostMissedDayPart({
+  required List<ScheduleWithMedicine> items,
+  required List<DoseRecord> logs,
+  required DateTime now,
+  Duration grace = MissedDoseDetector.grace,
+  Duration snoozeWindow = const Duration(minutes: 10),
+  WallClock? wallClock,
+}) {
+  final today = calendarDay(now);
+  final storedWeekday = now.weekday == DateTime.sunday ? 0 : now.weekday;
+  final sunday = _civilAddDays(today, -storedWeekday);
+  final counts = {for (final part in DayPart.values) part: 0};
+  var day = sunday;
+  for (var i = 0; i < 7; i++) {
+    final occs = occurrencesOnDay(
+      items: items,
+      logs: logs,
+      day: day,
+      now: now,
+      grace: grace,
+      snoozeWindow: snoozeWindow,
+      wallClock: wallClock,
+    );
+    for (final o in occs) {
+      if (o.status == DayDoseStatus.missed ||
+          o.status == DayDoseStatus.notRecorded) {
+        counts[dayPartOf(o.scheduledAt)] =
+            counts[dayPartOf(o.scheduledAt)]! + 1;
+      }
+    }
+    day = _civilAddDays(day, 1);
+  }
+  DayPart? worst;
+  var worstCount = 0;
+  for (final part in DayPart.values) {
+    final n = counts[part]!;
+    if (n > worstCount) {
+      worst = part;
+      worstCount = n;
+    }
+  }
+  return worst;
+}
+
 List<DayOccurrence> _occurrencesFromLogsOnly({
   required ScheduleWithMedicine item,
   required List<DoseRecord> logs,

@@ -20,7 +20,7 @@ import 'features/notification_engine/notification_actions.dart';
 import 'features/notification_engine/notification_service.dart';
 import 'features/onboarding/onboarding_screen.dart';
 import 'features/push/push_service.dart';
-import 'features/reminders_home/home_screen.dart';
+import 'features/shell/app_shell.dart';
 
 void main() async {
   // With SentryConfig.dsn empty (the default), SentryFlutter.init disables
@@ -241,7 +241,7 @@ class _AuthGateState extends State<_AuthGate> {
                 body: Center(child: CircularProgressIndicator()),
               );
             }
-            return HomeScreen(db: db);
+            return AppShell(db: db);
           },
         );
       },

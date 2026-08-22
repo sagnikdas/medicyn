@@ -22,7 +22,7 @@ class CalendarDayMarks {
   bool get isEmpty => !taken && !pending && !missed && !snoozed && !notRecorded;
 }
 
-const _takenDot = Color(0xFF2F6F5E);
+const _takenDot = Color(0xFF00685F);
 const _pendingDot = Color(0xFF3D6FA8);
 
 const _months = [

@@ -17,26 +17,36 @@ import '../notification_engine/notification_actions.dart';
 import '../notification_engine/notification_service.dart';
 import '../push/push_service.dart';
 import '../review_edit/review_edit_screen.dart';
-import '../settings/settings_screen.dart';
 import '../voice_capture/voice_capture_screen.dart';
+import '../../core/widgets/dosely_chrome.dart';
 import 'calendar_collapse_sliver.dart';
 import 'day_dose_list.dart';
 import 'day_occurrences.dart';
 import 'dose_calendar.dart';
-import 'medicines_list_screen.dart';
 import 'refill.dart';
 
 enum _ReminderDisposition { stop, deleteHistory }
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key, required this.db});
+  const HomeScreen({
+    super.key,
+    required this.db,
+    this.onAvatarTap,
+    this.onNames,
+  });
   final AppDatabase db;
 
+  /// Opens the Profile tab when this screen is hosted in [AppShell].
+  final VoidCallback? onAvatarTap;
+
+  /// Lets the Plan tab show the same edit-attribution names Home loaded.
+  final ValueChanged<Map<String, String>>? onNames;
+
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  HomeScreenState createState() => HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
+class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Map<String, String> _names = {};
   DateTime _selectedDay = calendarDay(DateTime.now());
   Timer? _clock;
@@ -172,10 +182,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       final name = await CareService.instance.displayName(other);
       if (!mounted || name == null) return;
       setState(() => _names = {other: name});
+      widget.onNames?.call(_names);
     } catch (_) {
       // Attribution falls back to "someone".
     }
   }
+
+  Future<void> startCapture() => _startCapture();
+
+  Future<void> edit(ScheduleWithMedicine item) => _edit(item);
+
+  Future<void> delete(ScheduleWithMedicine item) => _delete(item);
 
   Future<void> _startCapture() async {
     final ocrText = await Navigator.of(
@@ -281,35 +298,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Dosely',
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        actions: [
-          IconButton(
-            tooltip: 'My medicines',
-            icon: const Icon(Icons.medication_outlined),
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => MedicinesListScreen(
-                  db: widget.db,
-                  names: _names,
-                  onAdd: _startCapture,
-                  onEdit: _edit,
-                  onDelete: _delete,
-                ),
-              ),
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.settings_outlined),
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => SettingsScreen(db: widget.db)),
-            ),
-          ),
-        ],
+      appBar: DoselyTopBar(
+        onAvatarTap: widget.onAvatarTap,
+        avatarLabel: AuthService.instance.currentUser?.email,
       ),
       body: StreamBuilder<List<ScheduleWithMedicine>>(
         stream: widget.db.watchSchedulesWithMedicines(),
@@ -361,8 +352,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       day: _selectedDay,
       now: now,
     );
-    final adherence = weekAdherence(items: schedules, logs: records, now: now);
-
+    final next = isSameCalendarDay(_selectedDay, now)
+        ? nextActionableDose(occurrences)
+        : null;
+    final takenCount = occurrences
+        .where((o) => o.status == DayDoseStatus.taken)
+        .length;
+    final expectedCount = occurrences.length;
     final month = _calendarMonth;
 
     return CustomScrollView(
@@ -371,9 +367,32 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         parent: AlwaysScrollableScrollPhysics(),
       ),
       slivers: [
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  greetingFor(now),
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  isSameCalendarDay(_selectedDay, now)
+                      ? 'Your health schedule for today.'
+                      : 'Your health schedule for this day.',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
         HomeCalendarSliver(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(4, 4, 4, 0),
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
             child: DoseCalendar(
               selectedDay: _selectedDay,
               now: now,
@@ -384,15 +403,58 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ),
           ),
         ),
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-            child: WeekAdherenceLine(
-              taken: adherence.taken,
-              expected: adherence.expected,
+        if (next != null)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+              child: _NextDoseCard(
+                occurrence: next,
+                onMarkTaken: () => _markTaken(next),
+              ),
             ),
           ),
-        ),
+        if (expectedCount > 0)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+              child: AmbientCard(
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Daily progress',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '$takenCount of $expectedCount doses completed',
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
+                                ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    ProgressRing(
+                      fraction: expectedCount == 0
+                          ? 0
+                          : takenCount / expectedCount,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
         if (schedules.isEmpty)
           SliverToBoxAdapter(child: _EmptyState(onAdd: _startCapture))
         else
@@ -442,49 +504,171 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 }
 
+class _NextDoseCard extends StatefulWidget {
+  const _NextDoseCard({required this.occurrence, required this.onMarkTaken});
+
+  final DayOccurrence occurrence;
+  final Future<void> Function() onMarkTaken;
+
+  @override
+  State<_NextDoseCard> createState() => _NextDoseCardState();
+}
+
+class _NextDoseCardState extends State<_NextDoseCard> {
+  bool _busy = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final medicine = widget.occurrence.item.medicine;
+    final local = widget.occurrence.scheduledAt.toLocal();
+    final time =
+        '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
+    final subtitle = [
+      if (medicine.strength.isNotEmpty) medicine.strength,
+      if (medicine.notes.isNotEmpty) medicine.notes,
+    ].join(' • ');
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: scheme.primary,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x3300685F),
+            blurRadius: 16,
+            offset: Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Flexible(
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: scheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      'NEXT DOSE',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: scheme.onPrimaryContainer,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                time,
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(color: scheme.onPrimary),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            medicine.drugName,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(
+              context,
+            ).textTheme.headlineSmall?.copyWith(color: scheme.onPrimary),
+          ),
+          if (subtitle.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              subtitle,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: scheme.inversePrimary),
+            ),
+          ],
+          const SizedBox(height: 16),
+          FilledButton(
+            onPressed: _busy
+                ? null
+                : () async {
+                    setState(() => _busy = true);
+                    try {
+                      await widget.onMarkTaken();
+                    } finally {
+                      if (mounted) setState(() => _busy = false);
+                    }
+                  },
+            style: FilledButton.styleFrom(
+              backgroundColor: scheme.onPrimary,
+              foregroundColor: scheme.primary,
+            ),
+            child: const Text('Mark as Taken'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _EmptyState extends StatelessWidget {
   const _EmptyState({required this.onAdd});
   final VoidCallback onAdd;
 
   @override
   Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.topCenter,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(32, 32, 32, 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Icon(
-              Icons.medication_outlined,
-              size: 64,
-              color: Theme.of(context).colorScheme.primary,
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(32, 48, 32, 24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 160,
+            height: 160,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: scheme.primaryContainer.withValues(alpha: 0.12),
             ),
-            const SizedBox(height: 16),
-            Text(
-              'No reminders yet',
-              style: Theme.of(context).textTheme.titleMedium,
-              textAlign: TextAlign.center,
+            child: Icon(Icons.medication, size: 72, color: scheme.primary),
+          ),
+          const SizedBox(height: 24),
+          Text(
+            'No reminders yet',
+            style: Theme.of(context).textTheme.titleLarge,
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Scan a label or speak the details to add your first one.',
+            style: Theme.of(
+              context,
+            ).textTheme.bodyLarge?.copyWith(color: scheme.onSurfaceVariant),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 24),
+          FilledButton.icon(
+            onPressed: onAdd,
+            icon: const Icon(Icons.add),
+            label: const Text(
+              'Add medicine',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-            const SizedBox(height: 8),
-            Text(
-              'Scan a label or speak the details to add the first one.',
-              style: Theme.of(context).textTheme.bodyMedium,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            FilledButton.icon(
-              onPressed: onAdd,
-              icon: const Icon(Icons.add),
-              label: const Text(
-                'Add medicine',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

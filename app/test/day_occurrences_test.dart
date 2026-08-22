@@ -221,6 +221,42 @@ void main() {
     expect(result.expected, 3);
   });
 
+  test('weekDayAdherence matches weekAdherence totals', () {
+    final definedThursday = DateTime(2026, 8, 20, 7, 0);
+    final items = [item(s: schedule(updatedAt: definedThursday))];
+    final logs = [
+      record(scheduledAt: DateTime(2026, 8, 20, 8, 0)),
+      record(scheduledAt: DateTime(2026, 8, 20, 20, 0)),
+    ];
+    final days = weekDayAdherence(items: items, logs: logs, now: now);
+    expect(days, hasLength(7));
+    expect(days[0].day, DateTime(2026, 8, 16)); // Sunday
+    final taken = days.fold<int>(0, (n, d) => n + d.taken);
+    final expected = days.fold<int>(0, (n, d) => n + d.expected);
+    expect(taken, 2);
+    expect(expected, 3);
+  });
+
+  test('nextActionableDose is the earliest pending or upcoming', () {
+    final occs = onDay(day: now);
+    final next = nextActionableDose(occs);
+    expect(next?.scheduledAt, DateTime(2026, 8, 21, 8, 0));
+    expect(next?.status, DayDoseStatus.pending);
+  });
+
+  test('dayPartOf splits morning afternoon evening', () {
+    expect(dayPartOf(DateTime(2026, 8, 21, 8, 0)), DayPart.morning);
+    expect(dayPartOf(DateTime(2026, 8, 21, 13, 0)), DayPart.afternoon);
+    expect(dayPartOf(DateTime(2026, 8, 21, 20, 0)), DayPart.evening);
+  });
+
+  test('groupByDayPart puts 08:00 in morning and 20:00 in evening', () {
+    final grouped = groupByDayPart(onDay(day: now));
+    expect(grouped[DayPart.morning], hasLength(1));
+    expect(grouped[DayPart.afternoon], isEmpty);
+    expect(grouped[DayPart.evening], hasLength(1));
+  });
+
   test('taken wins over a later snooze on the same slot', () {
     final due = DateTime(2026, 8, 21, 8, 0);
     final occs = onDay(

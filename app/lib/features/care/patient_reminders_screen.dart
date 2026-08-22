@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/widgets/dosely_layout.dart';
 import '../../data/local/database.dart';
 import '../auth/auth_service.dart';
 import '../reminders_home/reminder_copy.dart';
@@ -50,7 +51,9 @@ class _PatientRemindersScreenState extends State<PatientRemindersScreen> {
 
   Future<void> _load() async {
     try {
-      final items = await CareService.instance.patientReminders(widget.patientId);
+      final items = await CareService.instance.patientReminders(
+        widget.patientId,
+      );
       final ids = <String>{
         for (final item in items) ...[
           if (item.medicine.updatedBy != null) item.medicine.updatedBy!,
@@ -105,7 +108,9 @@ class _PatientRemindersScreenState extends State<PatientRemindersScreen> {
         label: const Text('Add reminder'),
       ),
       body: SafeArea(
-        child: RefreshIndicator(onRefresh: _load, child: _body()),
+        child: DoselyContent(
+          child: RefreshIndicator(onRefresh: _load, child: _body()),
+        ),
       ),
     );
   }
@@ -163,19 +168,29 @@ class _PatientRemindersScreenState extends State<PatientRemindersScreen> {
                 children: [
                   Text(
                     medicineTitle(medicine),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                   if (medicine.doseAmount.isNotEmpty) ...[
                     const SizedBox(height: 4),
-                    Text(medicine.doseAmount, style: Theme.of(context).textTheme.bodyMedium),
+                    Text(
+                      medicine.doseAmount,
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
                   ],
                   const SizedBox(height: 4),
-                  Text(describeSchedule(item.schedule), style: Theme.of(context).textTheme.bodySmall),
-                  if (refillWarningLine(refillDaysLeft(
-                        tabletsRemaining: medicine.tabletsRemaining,
-                        tabletsPerDose: medicine.tabletsPerDose,
-                        schedules: [item.schedule],
-                      ))
+                  Text(
+                    describeSchedule(item.schedule),
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  if (refillWarningLine(
+                        refillDaysLeft(
+                          tabletsRemaining: medicine.tabletsRemaining,
+                          tabletsPerDose: medicine.tabletsPerDose,
+                          schedules: [item.schedule],
+                        ),
+                      )
                       case final warning?) ...[
                     const SizedBox(height: 4),
                     Text(
@@ -187,7 +202,10 @@ class _PatientRemindersScreenState extends State<PatientRemindersScreen> {
                   ],
                   if (attribution != null) ...[
                     const SizedBox(height: 4),
-                    Text(attribution, style: Theme.of(context).textTheme.bodySmall),
+                    Text(
+                      attribution,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
                   ],
                 ],
               ),
