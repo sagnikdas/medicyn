@@ -90,7 +90,7 @@ class DayDoseList extends StatelessWidget {
     return ListView(
       shrinkWrap: shrinkWrap,
       physics: physics,
-      padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
       children: [
         _DayDoseColumn(
           day: day,
@@ -117,7 +117,7 @@ List<Widget> dayDoseSlivers({
 }) {
   return [
     SliverPadding(
-      padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
       sliver: SliverToBoxAdapter(
         child: _DayDoseColumn(
           day: day,
@@ -158,7 +158,9 @@ class _DayDoseColumn extends StatelessWidget {
         if (showHeading) ...[
           Text(
             _dayHeading(day, now),
-            style: Theme.of(context).textTheme.headlineMedium,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.titleLarge,
           ),
           const SizedBox(height: 16),
         ],
@@ -214,7 +216,7 @@ class _DayPartHeader extends StatelessWidget {
           color: Theme.of(context).colorScheme.onSurfaceVariant,
         ),
         const SizedBox(width: 8),
-        Text(label, style: Theme.of(context).textTheme.headlineMedium),
+        Text(label, style: Theme.of(context).textTheme.titleMedium),
       ],
     );
   }
@@ -292,7 +294,8 @@ class _DayDoseRowState extends State<_DayDoseRow> {
     final subtitle = _occurrenceSubtitle(occurrence);
     final taken = status == DayDoseStatus.taken;
     final notes = medicine.notes.trim();
-    final highlight = status == DayDoseStatus.pending ||
+    final highlight =
+        status == DayDoseStatus.pending ||
         status == DayDoseStatus.upcoming ||
         status == DayDoseStatus.snoozed;
 
@@ -326,7 +329,9 @@ class _DayDoseRowState extends State<_DayDoseRow> {
                       children: [
                         Text(
                           title,
-                          style: Theme.of(context).textTheme.headlineMedium
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.titleMedium
                               ?.copyWith(
                                 decoration: taken
                                     ? TextDecoration.lineThrough
@@ -339,6 +344,8 @@ class _DayDoseRowState extends State<_DayDoseRow> {
                         const SizedBox(height: 4),
                         Text(
                           subtitle,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                           style: Theme.of(context).textTheme.bodyMedium
                               ?.copyWith(color: scheme.onSurfaceVariant),
                         ),
@@ -355,6 +362,8 @@ class _DayDoseRowState extends State<_DayDoseRow> {
                             ),
                             child: Text(
                               notes,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                               style: Theme.of(context).textTheme.labelSmall
                                   ?.copyWith(
                                     color: scheme.onSecondaryContainer,
@@ -405,7 +414,9 @@ class _DayDoseRowState extends State<_DayDoseRow> {
                       ),
                       style: IconButton.styleFrom(
                         side: BorderSide(
-                          color: highlight ? scheme.primary : scheme.outlineVariant,
+                          color: highlight
+                              ? scheme.primary
+                              : scheme.outlineVariant,
                           width: 2,
                         ),
                         minimumSize: const Size(48, 48),
@@ -443,7 +454,8 @@ class _StatusAvatar extends StatelessWidget {
       ),
       child: Icon(
         taken ? Icons.check : Icons.medication,
-        color: taken ||
+        color:
+            taken ||
                 status == DayDoseStatus.pending ||
                 status == DayDoseStatus.upcoming
             ? scheme.primary

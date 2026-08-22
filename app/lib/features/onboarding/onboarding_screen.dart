@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/app_settings.dart';
 import '../../core/widgets/dosely_chrome.dart';
+import '../../core/widgets/dosely_layout.dart';
 
 /// Shown once, before sign-in, on first launch only (see the
 /// `_OnboardingGate` in main.dart). Three plain-language pages explaining
@@ -15,7 +16,11 @@ class OnboardingScreen extends StatefulWidget {
 }
 
 class _OnboardingPage {
-  const _OnboardingPage({required this.icon, required this.headline, required this.body});
+  const _OnboardingPage({
+    required this.icon,
+    required this.headline,
+    required this.body,
+  });
   final IconData icon;
   final String headline;
   final String body;
@@ -25,7 +30,8 @@ const _pages = [
   _OnboardingPage(
     icon: Icons.document_scanner_outlined,
     headline: 'Scan your medicine label',
-    body: 'Point your camera at the label and Dosely reads the details for you.',
+    body:
+        'Point your camera at the label and Dosely reads the details for you.',
   ),
   _OnboardingPage(
     icon: Icons.mic_outlined,
@@ -58,7 +64,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       _finish();
       return;
     }
-    _controller.nextPage(duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
+    _controller.nextPage(
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeOut,
+    );
   }
 
   @override
@@ -66,59 +75,64 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     final isLast = _page == _pages.length - 1;
     return Scaffold(
       body: SafeArea(
-        child: Column(
-          children: [
-            Align(
-              alignment: Alignment.topRight,
-              child: Padding(
-                padding: const EdgeInsets.only(right: 8, top: 4),
-                child: TextButton(
-                  onPressed: _finish,
-                  child: const Text('Skip'),
+        child: DoselyContent(
+          child: Column(
+            children: [
+              Align(
+                alignment: Alignment.topRight,
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 8, top: 4),
+                  child: TextButton(
+                    onPressed: _finish,
+                    child: const Text('Skip'),
+                  ),
                 ),
               ),
-            ),
-            const Padding(
-              padding: EdgeInsets.only(bottom: 8),
-              child: DoselyBrandMark(compact: true),
-            ),
-            Expanded(
-              child: PageView.builder(
-                controller: _controller,
-                itemCount: _pages.length,
-                onPageChanged: (i) => setState(() => _page = i),
-                itemBuilder: (context, i) => _OnboardingPageView(page: _pages[i]),
+              const Padding(
+                padding: EdgeInsets.only(bottom: 8),
+                child: DoselyBrandMark(compact: true),
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(
-                  _pages.length,
-                  (i) => AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    margin: const EdgeInsets.symmetric(horizontal: 4),
-                    width: i == _page ? 20 : 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: i == _page
-                          ? Theme.of(context).colorScheme.primary
-                          : Theme.of(context).colorScheme.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(4),
+              Expanded(
+                child: PageView.builder(
+                  controller: _controller,
+                  itemCount: _pages.length,
+                  onPageChanged: (i) => setState(() => _page = i),
+                  itemBuilder: (context, i) =>
+                      _OnboardingPageView(page: _pages[i]),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(
+                    _pages.length,
+                    (i) => AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      margin: const EdgeInsets.symmetric(horizontal: 4),
+                      width: i == _page ? 20 : 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: i == _page
+                            ? Theme.of(context).colorScheme.primary
+                            : Theme.of(
+                                context,
+                              ).colorScheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(28, 8, 28, 24),
-              child: FilledButton(
-                onPressed: _next,
-                child: Text(isLast ? 'Get started' : 'Next'),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(28, 8, 28, 24),
+                child: FilledButton(
+                  onPressed: _next,
+                  child: Text(isLast ? 'Get started' : 'Next'),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -131,26 +145,41 @@ class _OnboardingPageView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(32),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(page.icon, size: 120, color: Theme.of(context).colorScheme.primary),
-          const SizedBox(height: 32),
-          Text(
-            page.headline,
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.headlineSmall,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxHeight < 420;
+        return SingleChildScrollView(
+          padding: EdgeInsets.symmetric(
+            horizontal: 32,
+            vertical: compact ? 16 : 32,
           ),
-          const SizedBox(height: 12),
-          Text(
-            page.body,
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyLarge,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  page.icon,
+                  size: compact ? 64 : 120,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                SizedBox(height: compact ? 16 : 32),
+                Text(
+                  page.headline,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  page.body,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodyLarge,
+                ),
+              ],
+            ),
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

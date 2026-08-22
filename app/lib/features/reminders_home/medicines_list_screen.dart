@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/widgets/dosely_layout.dart';
 import '../../data/local/database.dart';
 import '../auth/auth_service.dart';
 import '../care/edit_attribution.dart';
@@ -28,66 +29,68 @@ class MedicinesListScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: embedded
-          ? null
-          : AppBar(title: const Text('My medicines')),
+      appBar: embedded ? null : AppBar(title: const Text('My medicines')),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: onAdd,
         icon: const Icon(Icons.add),
         label: const Text('Add medicine'),
       ),
-      body: StreamBuilder<List<ScheduleWithMedicine>>(
-        stream: db.watchActiveSchedules(),
-        builder: (context, snapshot) {
-          final items = snapshot.data ?? [];
-          if (items.isEmpty) {
-            return _EmptyState(onAdd: onAdd, embedded: embedded);
-          }
-          return ListView.separated(
-            padding: EdgeInsets.fromLTRB(20, embedded ? 24 : 16, 20, 96),
-            itemCount: items.length + (embedded ? 1 : 0),
-            separatorBuilder: (context, i) {
-              if (embedded && i == 0) return const SizedBox(height: 16);
-              return const SizedBox(height: 12);
-            },
-            itemBuilder: (context, i) {
-              if (embedded && i == 0) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Your plan',
-                      style: Theme.of(context).textTheme.headlineSmall,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Everything you take, and when.',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+      body: DoselyContent(
+        child: StreamBuilder<List<ScheduleWithMedicine>>(
+          stream: db.watchActiveSchedules(),
+          builder: (context, snapshot) {
+            final items = snapshot.data ?? [];
+            if (items.isEmpty) {
+              return _EmptyState(onAdd: onAdd, embedded: embedded);
+            }
+            return ListView.separated(
+              padding: EdgeInsets.fromLTRB(20, embedded ? 24 : 16, 20, 96),
+              itemCount: items.length + (embedded ? 1 : 0),
+              separatorBuilder: (context, i) {
+                if (embedded && i == 0) return const SizedBox(height: 16);
+                return const SizedBox(height: 12);
+              },
+              itemBuilder: (context, i) {
+                if (embedded && i == 0) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Your plan',
+                        style: Theme.of(context).textTheme.titleLarge,
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 4),
+                      Text(
+                        'Everything you take, and when.',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  );
+                }
+                final item = items[embedded ? i - 1 : i];
+                return ReminderCard(
+                  item: item,
+                  db: db,
+                  attribution: editAttributionLine(
+                    updatedBy:
+                        item.schedule.updatedBy ?? item.medicine.updatedBy,
+                    updatedAt:
+                        item.schedule.updatedAt.isAfter(item.medicine.updatedAt)
+                        ? item.schedule.updatedAt
+                        : item.medicine.updatedAt,
+                    createdAt: item.medicine.createdAt,
+                    currentUserId: AuthService.instance.currentUser?.id,
+                    nameOf: (id) => names[id],
+                  ),
+                  onTap: () => onEdit(item),
+                  onDelete: () => onDelete(item),
                 );
-              }
-              final item = items[embedded ? i - 1 : i];
-              return ReminderCard(
-                item: item,
-                db: db,
-                attribution: editAttributionLine(
-                  updatedBy: item.schedule.updatedBy ?? item.medicine.updatedBy,
-                  updatedAt: item.schedule.updatedAt.isAfter(item.medicine.updatedAt)
-                      ? item.schedule.updatedAt
-                      : item.medicine.updatedAt,
-                  createdAt: item.medicine.createdAt,
-                  currentUserId: AuthService.instance.currentUser?.id,
-                  nameOf: (id) => names[id],
-                ),
-                onTap: () => onEdit(item),
-                onDelete: () => onDelete(item),
-              );
-            },
-          );
-        },
+              },
+            );
+          },
+        ),
       ),
     );
   }
@@ -109,16 +112,20 @@ class _EmptyState extends StatelessWidget {
             if (embedded) ...[
               Text(
                 'Your plan',
-                style: Theme.of(context).textTheme.headlineSmall,
+                style: Theme.of(context).textTheme.titleLarge,
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 24),
             ],
-            Icon(Icons.medication_outlined, size: 64, color: Theme.of(context).colorScheme.primary),
+            Icon(
+              Icons.medication_outlined,
+              size: 64,
+              color: Theme.of(context).colorScheme.primary,
+            ),
             const SizedBox(height: 16),
             Text(
               'No reminders yet',
-              style: Theme.of(context).textTheme.headlineSmall,
+              style: Theme.of(context).textTheme.titleLarge,
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../core/widgets/dosely_layout.dart';
 import '../../data/local/database.dart';
 import '../../data/local/tables.dart';
 import '../../data/remote/sync_service.dart';
@@ -13,7 +14,11 @@ import '../../data/remote/sync_service.dart';
 /// The Taken/Missed/Snoozed label is never edited. A user who disagrees
 /// attaches a correction note instead.
 class DoseHistoryScreen extends StatelessWidget {
-  const DoseHistoryScreen({super.key, required this.scheduleId, required this.db});
+  const DoseHistoryScreen({
+    super.key,
+    required this.scheduleId,
+    required this.db,
+  });
 
   final String scheduleId;
   final AppDatabase db;
@@ -23,28 +28,31 @@ class DoseHistoryScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Dose history')),
       body: SafeArea(
-        child: StreamBuilder<List<DoseLogWithContest>>(
-          stream: db.watchDoseLogsWithContests(scheduleId),
-          builder: (context, snapshot) {
-            if (!snapshot.hasData) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            final rows = List.of(snapshot.data!)
-              ..sort((a, b) => b.log.scheduledAt.compareTo(a.log.scheduledAt));
-            if (rows.isEmpty) {
-              return _EmptyState();
-            }
-            return ListView.separated(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-              itemCount: rows.length,
-              separatorBuilder: (_, _) => const SizedBox(height: 12),
-              itemBuilder: (context, i) => _DoseLogCard(
-                log: rows[i].log,
-                contest: rows[i].contest,
-                db: db,
-              ),
-            );
-          },
+        child: DoselyContent(
+          child: StreamBuilder<List<DoseLogWithContest>>(
+            stream: db.watchDoseLogsWithContests(scheduleId),
+            builder: (context, snapshot) {
+              if (!snapshot.hasData) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              final rows = List.of(
+                snapshot.data!,
+              )..sort((a, b) => b.log.scheduledAt.compareTo(a.log.scheduledAt));
+              if (rows.isEmpty) {
+                return _EmptyState();
+              }
+              return ListView.separated(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+                itemCount: rows.length,
+                separatorBuilder: (_, _) => const SizedBox(height: 12),
+                itemBuilder: (context, i) => _DoseLogCard(
+                  log: rows[i].log,
+                  contest: rows[i].contest,
+                  db: db,
+                ),
+              );
+            },
+          ),
         ),
       ),
     );
@@ -60,7 +68,11 @@ class _EmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.history, size: 72, color: Theme.of(context).colorScheme.primary),
+            Icon(
+              Icons.history,
+              size: 72,
+              color: Theme.of(context).colorScheme.primary,
+            ),
             const SizedBox(height: 16),
             Text(
               'No history yet',
@@ -81,20 +93,34 @@ class _EmptyState extends StatelessWidget {
 }
 
 class _DoseLogCard extends StatelessWidget {
-  const _DoseLogCard({required this.log, required this.contest, required this.db});
+  const _DoseLogCard({
+    required this.log,
+    required this.contest,
+    required this.db,
+  });
   final DoseLog log;
   final DoseLogContest? contest;
   final AppDatabase db;
 
   DoseAction get _action => DoseAction.values.byName(log.action);
 
-  ({IconData icon, Color color, String label}) _actionVisuals(BuildContext context) {
+  ({IconData icon, Color color, String label}) _actionVisuals(
+    BuildContext context,
+  ) {
     final scheme = Theme.of(context).colorScheme;
     switch (_action) {
       case DoseAction.taken:
-        return (icon: Icons.check_circle, color: Colors.green.shade600, label: 'Taken');
+        return (
+          icon: Icons.check_circle,
+          color: Colors.green.shade600,
+          label: 'Taken',
+        );
       case DoseAction.snoozed:
-        return (icon: Icons.snooze, color: Colors.orange.shade700, label: 'Snoozed');
+        return (
+          icon: Icons.snooze,
+          color: Colors.orange.shade700,
+          label: 'Snoozed',
+        );
       case DoseAction.missed:
         return (icon: Icons.cancel, color: scheme.error, label: 'Missed');
     }
@@ -111,7 +137,8 @@ class _DoseLogCard extends StatelessWidget {
   Future<void> _editNote(BuildContext context) async {
     final saved = await showDialog<String>(
       context: context,
-      builder: (dialogContext) => _ContestNoteDialog(initial: contest?.note ?? ''),
+      builder: (dialogContext) =>
+          _ContestNoteDialog(initial: contest?.note ?? ''),
     );
     if (saved == null) return;
     await db.upsertDoseLogContest(doseLogId: log.id, note: saved);
@@ -137,9 +164,9 @@ class _DoseLogCard extends StatelessWidget {
                   Text(
                     visuals.label,
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          color: visuals.color,
-                          fontWeight: FontWeight.bold,
-                        ),
+                      color: visuals.color,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   const SizedBox(height: 4),
                   Text(

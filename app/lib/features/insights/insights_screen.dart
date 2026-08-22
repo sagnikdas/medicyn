@@ -12,11 +12,7 @@ import '../reminders_home/day_occurrences.dart';
 /// Home already uses. Nothing here is invented: a week with no doses due
 /// shows empty copy rather than a fake 92%.
 class InsightsScreen extends StatelessWidget {
-  const InsightsScreen({
-    super.key,
-    required this.db,
-    this.onAvatarTap,
-  });
+  const InsightsScreen({super.key, required this.db, this.onAvatarTap});
 
   final AppDatabase db;
   final VoidCallback? onAvatarTap;
@@ -77,14 +73,20 @@ class _InsightsBody extends StatelessWidget {
       if (day.expected > day.taken) missed += day.expected - day.taken;
     }
     final avg = week.expected == 0 ? 0.0 : week.taken / week.expected;
-    final morning = _partRate(days: days, logs: records, items: schedules, now: now, part: DayPart.morning);
+    final morning = _partRate(
+      days: days,
+      logs: records,
+      items: schedules,
+      now: now,
+      part: DayPart.morning,
+    );
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
       children: [
         Text(
           'Your health insights',
-          style: Theme.of(context).textTheme.headlineSmall,
+          style: Theme.of(context).textTheme.titleLarge,
         ),
         const SizedBox(height: 4),
         Text(
@@ -107,36 +109,48 @@ class _InsightsBody extends StatelessWidget {
                       children: [
                         Text(
                           'Weekly adherence',
-                          style: Theme.of(context).textTheme.headlineMedium,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.titleLarge,
                         ),
                         const SizedBox(height: 4),
                         Text(
                           week.expected == 0
                               ? 'Nothing due this week yet.'
                               : '${week.taken} of ${week.expected} taken',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
                       ],
                     ),
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .primaryContainer
-                          .withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      week.expected == 0
-                          ? '—'
-                          : '${(avg * 100).round()}% avg',
-                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                        color: Theme.of(context).colorScheme.primary,
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.primaryContainer.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          week.expected == 0
+                              ? '—'
+                              : '${(avg * 100).round()}% avg',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.labelLarge
+                              ?.copyWith(
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                        ),
                       ),
                     ),
                   ),
@@ -148,78 +162,41 @@ class _InsightsBody extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 16),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: _StatHero(
-                icon: Icons.local_fire_department,
-                label: 'Consistency streak',
-                value: '$streak',
-                unit: streak == 1 ? 'day' : 'days',
-                caption: streak == 0
-                    ? 'A day counts when every due dose was taken.'
-                    : 'Every due dose taken, walking back from today.',
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: AmbientCard(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.wb_sunny_outlined,
-                          color: Theme.of(context).colorScheme.tertiary,
-                          size: 18,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          'Most consistent',
-                          style: Theme.of(context).textTheme.labelLarge
-                              ?.copyWith(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onSurfaceVariant,
-                              ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      morning.label,
-                      style: Theme.of(context).textTheme.headlineMedium,
-                    ),
-                    const SizedBox(height: 12),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(4),
-                      child: LinearProgressIndicator(
-                        value: morning.rate,
-                        minHeight: 8,
-                        color: Theme.of(context).colorScheme.tertiary,
-                        backgroundColor: Theme.of(
-                          context,
-                        ).colorScheme.surfaceContainerHigh,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: Text(
-                        morning.expected == 0
-                            ? 'No morning doses'
-                            : '${(morning.rate * 100).round()}% taken',
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final streakCard = _StatHero(
+              icon: Icons.local_fire_department,
+              label: 'Consistency streak',
+              value: '$streak',
+              unit: streak == 1 ? 'day' : 'days',
+              caption: streak == 0
+                  ? 'A day counts when every due dose was taken.'
+                  : 'Every due dose taken, walking back from today.',
+            );
+            final consistentCard = InsightsMostConsistentCard(
+              label: morning.label,
+              rate: morning.rate,
+              expected: morning.expected,
+            );
+            if (constraints.maxWidth < 420) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  streakCard,
+                  const SizedBox(height: 12),
+                  consistentCard,
+                ],
+              );
+            }
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: streakCard),
+                const SizedBox(width: 12),
+                Expanded(child: consistentCard),
+              ],
+            );
+          },
         ),
         const SizedBox(height: 16),
         AmbientCard(
@@ -243,7 +220,7 @@ class _InsightsBody extends StatelessWidget {
                     ),
                     Text(
                       '$missed',
-                      style: Theme.of(context).textTheme.headlineMedium,
+                      style: Theme.of(context).textTheme.titleLarge,
                     ),
                     Text(
                       'This week',
@@ -283,7 +260,7 @@ class _InsightsBody extends StatelessWidget {
                     ),
                     Text(
                       '${week.taken}',
-                      style: Theme.of(context).textTheme.headlineMedium,
+                      style: Theme.of(context).textTheme.titleLarge,
                     ),
                     Text(
                       'This week',
@@ -450,13 +427,16 @@ class _Bar extends StatelessWidget {
         Expanded(
           child: Align(
             alignment: Alignment.bottomCenter,
-            child: Container(
-              width: 28,
-              height: h,
-              decoration: BoxDecoration(
-                color: color,
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(6),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 40),
+              child: Container(
+                width: double.infinity,
+                height: h,
+                decoration: BoxDecoration(
+                  color: color,
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(6),
+                  ),
                 ),
               ),
             ),
@@ -473,6 +453,84 @@ class _Bar extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Half of the streak row. The title used to sit in an unbounded [Row]
+/// next to the sun icon, so on a phone it overflowed the card by ~27px.
+@visibleForTesting
+class InsightsMostConsistentCard extends StatelessWidget {
+  const InsightsMostConsistentCard({
+    super.key,
+    required this.label,
+    required this.rate,
+    required this.expected,
+  });
+
+  final String label;
+  final double rate;
+  final int expected;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return SizedBox(
+      width: double.infinity,
+      child: AmbientCard(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.wb_sunny_outlined, color: scheme.tertiary, size: 18),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Most consistent',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 12),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: rate,
+                minHeight: 8,
+                color: scheme.tertiary,
+                backgroundColor: scheme.surfaceContainerHigh,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerRight,
+              child: Text(
+                expected == 0
+                    ? 'No morning doses'
+                    : '${(rate * 100).round()}% taken',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.end,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -496,6 +554,7 @@ class _StatHero extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Container(
+      width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: scheme.primary,
@@ -526,18 +585,20 @@ class _StatHero extends StatelessWidget {
               children: [
                 TextSpan(
                   text: value,
-                  style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                    color: scheme.onPrimary,
-                  ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.headlineSmall?.copyWith(color: scheme.onPrimary),
                 ),
                 TextSpan(
                   text: ' $unit',
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: scheme.onPrimary,
-                  ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyLarge?.copyWith(color: scheme.onPrimary),
                 ),
               ],
             ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 8),
           Text(

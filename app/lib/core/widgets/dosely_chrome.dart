@@ -25,7 +25,7 @@ class DoselyBrandMark extends StatelessWidget {
         const SizedBox(width: 8),
         Text(
           'Dosely',
-          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
             color: color,
             fontWeight: FontWeight.w700,
           ),
@@ -37,11 +37,7 @@ class DoselyBrandMark extends StatelessWidget {
 
 /// 32px circle used as the top-bar avatar. Tapping it opens Profile.
 class DoselyAvatarButton extends StatelessWidget {
-  const DoselyAvatarButton({
-    super.key,
-    required this.label,
-    this.onTap,
-  });
+  const DoselyAvatarButton({super.key, required this.label, this.onTap});
 
   /// First letter of the signed-in email, or a generic person icon.
   final String? label;
@@ -51,7 +47,9 @@ class DoselyAvatarButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final letter = (label ?? '').trim();
-    final initial = letter.isEmpty ? null : letter.substring(0, 1).toUpperCase();
+    final initial = letter.isEmpty
+        ? null
+        : letter.substring(0, 1).toUpperCase();
     return InkWell(
       onTap: onTap,
       customBorder: const CircleBorder(),
@@ -68,9 +66,9 @@ class DoselyAvatarButton extends StatelessWidget {
               ? Icon(Icons.person, size: 18, color: scheme.onSurfaceVariant)
               : Text(
                   initial,
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: scheme.primary,
-                  ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.labelLarge?.copyWith(color: scheme.primary),
                 ),
         ),
       ),
@@ -100,16 +98,16 @@ class DoselyTopBar extends StatelessWidget implements PreferredSizeWidget {
       elevation: 0.5,
       shadowColor: const Color(0x14000000),
       child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-          child: Row(
-            children: [
-              const DoselyBrandMark(compact: true),
-              const Spacer(),
-              trailing ??
-                  DoselyAvatarButton(label: avatarLabel, onTap: onAvatarTap),
-            ],
-          ),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        child: Row(
+          children: [
+            const DoselyBrandMark(compact: true),
+            const Spacer(),
+            trailing ??
+                DoselyAvatarButton(label: avatarLabel, onTap: onAvatarTap),
+          ],
         ),
+      ),
     );
   }
 }
@@ -138,9 +136,7 @@ class AmbientCard extends StatelessWidget {
         color: color ?? scheme.surfaceContainerLowest,
         borderRadius: BorderRadius.circular(12),
         boxShadow: DoselyTheme.ambientShadow,
-        border: borderColor == null
-            ? null
-            : Border.all(color: borderColor!),
+        border: borderColor == null ? null : Border.all(color: borderColor!),
       ),
       child: Padding(padding: padding, child: child),
     );
@@ -191,9 +187,9 @@ class ProgressRing extends StatelessWidget {
           ),
           Text(
             '${(clamped * 100).round()}%',
-            style: Theme.of(context).textTheme.labelLarge?.copyWith(
-              color: scheme.primary,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.labelLarge?.copyWith(color: scheme.primary),
           ),
         ],
       ),
@@ -236,10 +232,17 @@ class ProfileMenuRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: Theme.of(context).textTheme.labelLarge),
+                Text(
+                  title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.labelLarge,
+                ),
                 const SizedBox(height: 2),
                 Text(
                   subtitle,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ],
@@ -263,9 +266,21 @@ class DoselyBottomNav extends StatelessWidget {
   final ValueChanged<int> onChanged;
 
   static const items = [
-    (icon: Icons.calendar_today_outlined, selected: Icons.calendar_today, label: 'Today'),
-    (icon: Icons.medical_services_outlined, selected: Icons.medical_services, label: 'Plan'),
-    (icon: Icons.analytics_outlined, selected: Icons.analytics, label: 'Insights'),
+    (
+      icon: Icons.calendar_today_outlined,
+      selected: Icons.calendar_today,
+      label: 'Today',
+    ),
+    (
+      icon: Icons.medical_services_outlined,
+      selected: Icons.medical_services,
+      label: 'Plan',
+    ),
+    (
+      icon: Icons.analytics_outlined,
+      selected: Icons.analytics,
+      label: 'Insights',
+    ),
     (icon: Icons.person_outline, selected: Icons.person, label: 'Profile'),
   ];
 
@@ -336,19 +351,19 @@ class _NavItem extends StatelessWidget {
         Icon(
           selected ? item.selected : item.icon,
           size: 22,
-          color: selected
-              ? scheme.onPrimaryContainer
-              : scheme.onSurfaceVariant,
+          color: selected ? scheme.onPrimaryContainer : scheme.onSurfaceVariant,
         ),
         const SizedBox(height: 4),
-        Text(
-          item.label,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-            color: selected
-                ? scheme.onPrimaryContainer
-                : scheme.onSurfaceVariant,
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            item.label,
+            maxLines: 1,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: selected
+                  ? scheme.onPrimaryContainer
+                  : scheme.onSurfaceVariant,
+            ),
           ),
         ),
       ],
@@ -366,8 +381,8 @@ class _NavItem extends StatelessWidget {
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
             padding: selected
-                ? const EdgeInsets.symmetric(horizontal: 16, vertical: 6)
-                : const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                ? const EdgeInsets.symmetric(horizontal: 10, vertical: 6)
+                : const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
             decoration: BoxDecoration(
               color: selected ? scheme.primaryContainer : Colors.transparent,
               borderRadius: BorderRadius.circular(24),

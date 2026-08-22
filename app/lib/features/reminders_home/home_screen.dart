@@ -382,7 +382,7 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   isSameCalendarDay(_selectedDay, now)
                       ? 'Your health schedule for today.'
                       : 'Your health schedule for this day.',
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
@@ -392,7 +392,7 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         ),
         HomeCalendarSliver(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
             child: DoseCalendar(
               selectedDay: _selectedDay,
               now: now,
@@ -426,11 +426,15 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         children: [
                           Text(
                             'Daily progress',
-                            style: Theme.of(context).textTheme.headlineMedium,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.titleLarge,
                           ),
                           const SizedBox(height: 4),
                           Text(
                             '$takenCount of $expectedCount doses completed',
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
                             style: Theme.of(context).textTheme.bodyMedium
                                 ?.copyWith(
                                   color: Theme.of(
@@ -501,10 +505,7 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 }
 
 class _NextDoseCard extends StatefulWidget {
-  const _NextDoseCard({
-    required this.occurrence,
-    required this.onMarkTaken,
-  });
+  const _NextDoseCard({required this.occurrence, required this.onMarkTaken});
 
   final DayOccurrence occurrence;
   final Future<void> Function() onMarkTaken;
@@ -545,43 +546,57 @@ class _NextDoseCardState extends State<_NextDoseCard> {
         children: [
           Row(
             children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: scheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  'NEXT DOSE',
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: scheme.onPrimaryContainer,
-                    letterSpacing: 1,
+              Flexible(
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: scheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      'NEXT DOSE',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: scheme.onPrimaryContainer,
+                        letterSpacing: 1,
+                      ),
+                    ),
                   ),
                 ),
               ),
-              const Spacer(),
+              const SizedBox(width: 8),
               Text(
                 time,
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  color: scheme.onPrimary,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(color: scheme.onPrimary),
               ),
             ],
           ),
           const SizedBox(height: 8),
           Text(
             medicine.drugName,
-            style: Theme.of(context).textTheme.displaySmall?.copyWith(
-              color: scheme.onPrimary,
-            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(
+              context,
+            ).textTheme.headlineSmall?.copyWith(color: scheme.onPrimary),
           ),
           if (subtitle.isNotEmpty) ...[
             const SizedBox(height: 4),
             Text(
               subtitle,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: scheme.inversePrimary,
-              ),
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: scheme.inversePrimary),
             ),
           ],
           const SizedBox(height: 16),
@@ -627,24 +642,20 @@ class _EmptyState extends StatelessWidget {
               shape: BoxShape.circle,
               color: scheme.primaryContainer.withValues(alpha: 0.12),
             ),
-            child: Icon(
-              Icons.medication,
-              size: 72,
-              color: scheme.primary,
-            ),
+            child: Icon(Icons.medication, size: 72, color: scheme.primary),
           ),
           const SizedBox(height: 24),
           Text(
             'No reminders yet',
-            style: Theme.of(context).textTheme.headlineSmall,
+            style: Theme.of(context).textTheme.titleLarge,
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 8),
           Text(
             'Scan a label or speak the details to add your first one.',
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-              color: scheme.onSurfaceVariant,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyLarge?.copyWith(color: scheme.onSurfaceVariant),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 24),

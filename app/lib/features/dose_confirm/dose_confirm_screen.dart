@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/widgets/dosely_layout.dart';
 import '../../data/local/database.dart';
 import '../notification_engine/notification_actions.dart';
 
@@ -47,7 +48,9 @@ class _DoseConfirmScreenState extends State<DoseConfirmScreen> {
 
   Future<void> _load() async {
     final schedule = await widget.db.scheduleById(widget.scheduleId);
-    final medicine = schedule == null ? null : await widget.db.medicineById(schedule.medicineId);
+    final medicine = schedule == null
+        ? null
+        : await widget.db.medicineById(schedule.medicineId);
     if (!mounted) return;
     if (schedule == null || medicine == null) {
       setState(() {
@@ -65,9 +68,17 @@ class _DoseConfirmScreenState extends State<DoseConfirmScreen> {
   Future<void> _respond(bool taken) async {
     setState(() => _submitting = true);
     if (taken) {
-      await recordDoseTaken(widget.db, scheduleId: widget.scheduleId, scheduledAt: widget.scheduledAt);
+      await recordDoseTaken(
+        widget.db,
+        scheduleId: widget.scheduleId,
+        scheduledAt: widget.scheduledAt,
+      );
     } else {
-      await recordDoseSnoozed(widget.db, scheduleId: widget.scheduleId, scheduledAt: widget.scheduledAt);
+      await recordDoseSnoozed(
+        widget.db,
+        scheduleId: widget.scheduleId,
+        scheduledAt: widget.scheduledAt,
+      );
     }
     if (!mounted) return;
     Navigator.of(context).maybePop();
@@ -77,8 +88,12 @@ class _DoseConfirmScreenState extends State<DoseConfirmScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
-        child: Center(
-          child: _loading ? const CircularProgressIndicator() : (_notFound ? _notFoundView() : _body()),
+        child: DoselyContent(
+          child: Center(
+            child: _loading
+                ? const CircularProgressIndicator()
+                : (_notFound ? _notFoundView() : _body()),
+          ),
         ),
       ),
     );
@@ -92,7 +107,10 @@ class _DoseConfirmScreenState extends State<DoseConfirmScreen> {
         children: [
           const Text('This reminder no longer exists.'),
           const SizedBox(height: 16),
-          FilledButton(onPressed: () => Navigator.of(context).maybePop(), child: const Text('Close')),
+          FilledButton(
+            onPressed: () => Navigator.of(context).maybePop(),
+            child: const Text('Close'),
+          ),
         ],
       ),
     );
@@ -131,17 +149,19 @@ class _DoseConfirmScreenState extends State<DoseConfirmScreen> {
                 const SizedBox(height: 8),
                 Text(
                   title,
-                  style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                    color: scheme.onPrimary,
-                  ),
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.headlineSmall?.copyWith(color: scheme.onPrimary),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
                 Text(
                   body,
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: scheme.inversePrimary,
-                  ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyLarge?.copyWith(color: scheme.inversePrimary),
                   textAlign: TextAlign.center,
                 ),
               ],

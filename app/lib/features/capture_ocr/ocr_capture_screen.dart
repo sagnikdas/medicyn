@@ -5,6 +5,7 @@ import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart
 import 'package:image_picker/image_picker.dart';
 
 import '../../core/widgets/dosely_chrome.dart';
+import '../../core/widgets/dosely_layout.dart';
 
 /// Step 1 of the capture flow: photograph the medicine label, run OCR
 /// on-device, then immediately delete the photo. Only the extracted text
@@ -36,7 +37,10 @@ class _OcrCaptureScreenState extends State<OcrCaptureScreen> {
     final picker = ImagePicker();
     XFile? photo;
     try {
-      photo = await picker.pickImage(source: ImageSource.camera, imageQuality: 85);
+      photo = await picker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 85,
+      );
     } catch (e) {
       setState(() {
         _status = _Status.error;
@@ -55,12 +59,15 @@ class _OcrCaptureScreenState extends State<OcrCaptureScreen> {
     final recognizer = TextRecognizer(script: TextRecognitionScript.latin);
     String text = '';
     try {
-      final result = await recognizer.processImage(InputImage.fromFilePath(photo.path));
+      final result = await recognizer.processImage(
+        InputImage.fromFilePath(photo.path),
+      );
       text = result.text;
     } catch (e) {
       setState(() {
         _status = _Status.error;
-        _error = 'Could not read the label. You can still continue with voice only.';
+        _error =
+            'Could not read the label. You can still continue with voice only.';
       });
     } finally {
       await recognizer.close();
@@ -83,8 +90,7 @@ class _OcrCaptureScreenState extends State<OcrCaptureScreen> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final busy =
-        _status == _Status.capturing || _status == _Status.recognizing;
+    final busy = _status == _Status.capturing || _status == _Status.recognizing;
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -96,91 +102,95 @@ class _OcrCaptureScreenState extends State<OcrCaptureScreen> {
         centerTitle: true,
       ),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                'Scan Label',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.headlineSmall,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Point your camera at the medicine label. Keep it steady.',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: scheme.onSurfaceVariant,
+        child: DoselyContent(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Scan Label',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.headlineSmall,
                 ),
-              ),
-              const SizedBox(height: 24),
-              Expanded(
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: scheme.surfaceContainer,
-                    borderRadius: BorderRadius.circular(24),
+                const SizedBox(height: 8),
+                Text(
+                  'Point your camera at the medicine label. Keep it steady.',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: scheme.onSurfaceVariant,
                   ),
-                  child: CustomPaint(
-                    painter: _ViewfinderPainter(color: scheme.primaryContainer),
-                    child: Center(
-                      child: busy
-                          ? CircularProgressIndicator(color: scheme.primary)
-                          : Icon(
-                              Icons.document_scanner_outlined,
-                              size: 64,
-                              color: scheme.primaryContainer,
-                            ),
+                ),
+                const SizedBox(height: 24),
+                Expanded(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: scheme.surfaceContainer,
+                      borderRadius: BorderRadius.circular(24),
                     ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              AmbientCard(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(Icons.lock_outline, color: scheme.primary),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        'The photo stays on your device and is securely discarded immediately after reading it.',
-                        style: Theme.of(context).textTheme.bodySmall,
+                    child: CustomPaint(
+                      painter: _ViewfinderPainter(
+                        color: scheme.primaryContainer,
+                      ),
+                      child: Center(
+                        child: busy
+                            ? CircularProgressIndicator(color: scheme.primary)
+                            : Icon(
+                                Icons.document_scanner_outlined,
+                                size: 64,
+                                color: scheme.primaryContainer,
+                              ),
                       ),
                     ),
-                  ],
+                  ),
                 ),
-              ),
-              if (_error != null) ...[
+                const SizedBox(height: 16),
+                AmbientCard(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.lock_outline, color: scheme.primary),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'The photo stays on your device and is securely discarded immediately after reading it.',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (_error != null) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    _error!,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: scheme.error),
+                  ),
+                ],
+                const SizedBox(height: 16),
+                FilledButton.icon(
+                  onPressed: busy ? null : _scan,
+                  icon: _status == _Status.recognizing
+                      ? const SizedBox(
+                          height: 18,
+                          width: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.photo_camera),
+                  label: Text(
+                    _status == _Status.recognizing
+                        ? 'Reading label…'
+                        : 'Take photo',
+                  ),
+                ),
                 const SizedBox(height: 12),
-                Text(
-                  _error!,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: scheme.error),
+                OutlinedButton(
+                  onPressed: _status == _Status.recognizing ? null : _skip,
+                  child: const Text('Skip — use voice only'),
                 ),
               ],
-              const SizedBox(height: 16),
-              FilledButton.icon(
-                onPressed: busy ? null : _scan,
-                icon: _status == _Status.recognizing
-                    ? const SizedBox(
-                        height: 18,
-                        width: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.photo_camera),
-                label: Text(
-                  _status == _Status.recognizing
-                      ? 'Reading label…'
-                      : 'Take photo',
-                ),
-              ),
-              const SizedBox(height: 12),
-              OutlinedButton(
-                onPressed: _status == _Status.recognizing ? null : _skip,
-                child: const Text('Skip — use voice only'),
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -210,12 +220,32 @@ class _ViewfinderPainter extends CustomPainter {
     // Four L-shaped corners.
     canvas.drawLine(rect.topLeft, rect.topLeft + const Offset(arm, 0), paint);
     canvas.drawLine(rect.topLeft, rect.topLeft + const Offset(0, arm), paint);
-    canvas.drawLine(rect.topRight, rect.topRight + const Offset(-arm, 0), paint);
+    canvas.drawLine(
+      rect.topRight,
+      rect.topRight + const Offset(-arm, 0),
+      paint,
+    );
     canvas.drawLine(rect.topRight, rect.topRight + const Offset(0, arm), paint);
-    canvas.drawLine(rect.bottomLeft, rect.bottomLeft + const Offset(arm, 0), paint);
-    canvas.drawLine(rect.bottomLeft, rect.bottomLeft + const Offset(0, -arm), paint);
-    canvas.drawLine(rect.bottomRight, rect.bottomRight + const Offset(-arm, 0), paint);
-    canvas.drawLine(rect.bottomRight, rect.bottomRight + const Offset(0, -arm), paint);
+    canvas.drawLine(
+      rect.bottomLeft,
+      rect.bottomLeft + const Offset(arm, 0),
+      paint,
+    );
+    canvas.drawLine(
+      rect.bottomLeft,
+      rect.bottomLeft + const Offset(0, -arm),
+      paint,
+    );
+    canvas.drawLine(
+      rect.bottomRight,
+      rect.bottomRight + const Offset(-arm, 0),
+      paint,
+    );
+    canvas.drawLine(
+      rect.bottomRight,
+      rect.bottomRight + const Offset(0, -arm),
+      paint,
+    );
   }
 
   @override

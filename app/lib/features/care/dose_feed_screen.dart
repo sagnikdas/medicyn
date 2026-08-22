@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:timezone/timezone.dart' as tz;
 
 import '../../core/app_navigation.dart';
+import '../../core/widgets/dosely_layout.dart';
 import '../../data/local/database.dart';
 import '../../data/local/tables.dart';
 import '../auth/auth_service.dart';
@@ -177,7 +178,9 @@ class _DoseFeedScreenState extends State<DoseFeedScreen> {
         ],
       ),
       body: SafeArea(
-        child: RefreshIndicator(onRefresh: _load, child: _body()),
+        child: DoselyContent(
+          child: RefreshIndicator(onRefresh: _load, child: _body()),
+        ),
       ),
     );
   }
@@ -429,7 +432,12 @@ class _DoseEventCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(event.title, style: text.titleMedium),
+                  Text(
+                    event.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: text.titleMedium,
+                  ),
                   const SizedBox(height: 2),
                   Text(
                     '${visuals.label} · due ${_clock(clockTime)}',

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../core/widgets/dosely_chrome.dart';
+import '../../core/widgets/dosely_layout.dart';
 import '../../data/local/database.dart';
 import '../insights/insights_screen.dart';
 import '../reminders_home/home_screen.dart';
@@ -31,39 +32,43 @@ class _AppShellState extends State<AppShell> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(
-        index: _index,
-        sizing: StackFit.expand,
-        children: [
-          HomeScreen(
-            key: _homeKey,
-            db: widget.db,
-            onAvatarTap: () => setState(() => _index = 3),
-            onNames: (names) {
-              if (!mounted) return;
-              setState(() => _names = names);
-            },
-          ),
-          MedicinesListScreen(
-            db: widget.db,
-            names: _names,
-            embedded: true,
-            onAdd: () {
-              unawaited(_homeKey.currentState?.startCapture() ?? Future.value());
-            },
-            onEdit: (item) async {
-              await _homeKey.currentState?.edit(item);
-            },
-            onDelete: (item) async {
-              await _homeKey.currentState?.delete(item);
-            },
-          ),
-          InsightsScreen(
-            db: widget.db,
-            onAvatarTap: () => setState(() => _index = 3),
-          ),
-          SettingsScreen(db: widget.db, embedded: true),
-        ],
+      body: DoselyContent(
+        child: IndexedStack(
+          index: _index,
+          sizing: StackFit.expand,
+          children: [
+            HomeScreen(
+              key: _homeKey,
+              db: widget.db,
+              onAvatarTap: () => setState(() => _index = 3),
+              onNames: (names) {
+                if (!mounted) return;
+                setState(() => _names = names);
+              },
+            ),
+            MedicinesListScreen(
+              db: widget.db,
+              names: _names,
+              embedded: true,
+              onAdd: () {
+                unawaited(
+                  _homeKey.currentState?.startCapture() ?? Future.value(),
+                );
+              },
+              onEdit: (item) async {
+                await _homeKey.currentState?.edit(item);
+              },
+              onDelete: (item) async {
+                await _homeKey.currentState?.delete(item);
+              },
+            ),
+            InsightsScreen(
+              db: widget.db,
+              onAvatarTap: () => setState(() => _index = 3),
+            ),
+            SettingsScreen(db: widget.db, embedded: true),
+          ],
+        ),
       ),
       bottomNavigationBar: DoselyBottomNav(
         index: _index,

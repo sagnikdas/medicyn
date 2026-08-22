@@ -47,10 +47,9 @@ class ReminderCard extends StatelessWidget {
                   height: 48,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Theme.of(context)
-                        .colorScheme
-                        .primary
-                        .withValues(alpha: 0.1),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.primary.withValues(alpha: 0.1),
                   ),
                   child: Icon(
                     Icons.medication,
@@ -64,7 +63,7 @@ class ReminderCard extends StatelessWidget {
                     children: [
                       Text(
                         title,
-                        style: Theme.of(context).textTheme.headlineMedium,
+                        style: Theme.of(context).textTheme.titleMedium,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -72,6 +71,8 @@ class ReminderCard extends StatelessWidget {
                       if (medicine.doseAmount.isNotEmpty)
                         Text(
                           medicine.doseAmount,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                           style: Theme.of(context).textTheme.bodyMedium,
                         ),
                       const SizedBox(height: 4),
@@ -79,18 +80,21 @@ class ReminderCard extends StatelessWidget {
                         describeSchedule(item.schedule),
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
-                      if (refillWarningLine(refillDaysLeft(
-                            tabletsRemaining: medicine.tabletsRemaining,
-                            tabletsPerDose: medicine.tabletsPerDose,
-                            schedules: [item.schedule],
-                          ))
+                      if (refillWarningLine(
+                            refillDaysLeft(
+                              tabletsRemaining: medicine.tabletsRemaining,
+                              tabletsPerDose: medicine.tabletsPerDose,
+                              schedules: [item.schedule],
+                            ),
+                          )
                           case final warning?) ...[
                         const SizedBox(height: 4),
                         Text(
                           warning,
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Theme.of(context).colorScheme.error,
-                          ),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: Theme.of(context).colorScheme.error,
+                              ),
                         ),
                       ],
                       if (attribution != null) ...[
@@ -195,7 +199,12 @@ class _SnoozeStatusState extends State<_SnoozeStatus> {
         children: [
           Icon(Icons.snooze, size: 15, color: color),
           const SizedBox(width: 4),
-          Text(label, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: color)),
+          Text(
+            label,
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: color),
+          ),
         ],
       ),
     );

@@ -27,11 +27,7 @@ class DoselyTheme {
 
   /// Soft teal-tinted drop shadow used on schedule cards.
   static List<BoxShadow> get ambientShadow => const [
-    BoxShadow(
-      color: Color(0x0A00685F),
-      blurRadius: 12,
-      offset: Offset(0, 4),
-    ),
+    BoxShadow(color: Color(0x0A00685F), blurRadius: 12, offset: Offset(0, 4)),
   ];
 
   static const _lightScheme = ColorScheme(
@@ -94,7 +90,7 @@ class DoselyTheme {
         elevation: 0,
         centerTitle: false,
         scrolledUnderElevation: 0,
-        titleTextStyle: text.headlineMedium?.copyWith(
+        titleTextStyle: text.titleLarge?.copyWith(
           color: scheme.primary,
           fontWeight: FontWeight.w700,
         ),
@@ -201,6 +197,13 @@ class DoselyTheme {
     );
   }
 
+  /// Phone-sized type, not the Stitch mockup tokens.
+  ///
+  /// The HTML screens use 24px "headline-md" on every medicine card and
+  /// 48px display type on the next-dose name. Those sizes are for a 780px
+  /// artboard; at Settings 100% they fill a real phone. This scale matches
+  /// Material 3 so 100% is the previous comfortable default, and the
+  /// Appearance slider still goes up to 150%.
   static TextTheme _textTheme(ColorScheme scheme) {
     const family = fontFamily;
     TextStyle base({
@@ -221,26 +224,61 @@ class DoselyTheme {
     }
 
     return TextTheme(
-      displayLarge: base(size: 48, height: 56, weight: FontWeight.w700, letterSpacing: -0.96),
-      displayMedium: base(size: 40, height: 48, weight: FontWeight.w700, letterSpacing: -0.4),
-      displaySmall: base(size: 32, height: 40, weight: FontWeight.w700, letterSpacing: -0.32),
-      headlineLarge: base(size: 32, height: 40, weight: FontWeight.w700, letterSpacing: -0.32),
+      displayLarge: base(
+        size: 40,
+        height: 48,
+        weight: FontWeight.w700,
+        letterSpacing: -0.4,
+      ),
+      displayMedium: base(
+        size: 32,
+        height: 40,
+        weight: FontWeight.w700,
+        letterSpacing: -0.3,
+      ),
+      displaySmall: base(
+        size: 28,
+        height: 36,
+        weight: FontWeight.w700,
+        letterSpacing: -0.25,
+      ),
+      headlineLarge: base(
+        size: 28,
+        height: 36,
+        weight: FontWeight.w700,
+        letterSpacing: -0.25,
+      ),
       headlineMedium: base(size: 24, height: 32, weight: FontWeight.w600),
-      headlineSmall: base(size: 28, height: 36, weight: FontWeight.w700),
-      titleLarge: base(size: 24, height: 32, weight: FontWeight.w600),
-      titleMedium: base(size: 16, height: 24, weight: FontWeight.w600),
+      headlineSmall: base(size: 22, height: 28, weight: FontWeight.w700),
+      titleLarge: base(size: 20, height: 26, weight: FontWeight.w600),
+      titleMedium: base(size: 16, height: 22, weight: FontWeight.w600),
       titleSmall: base(
         size: 14,
         height: 20,
         weight: FontWeight.w600,
-        letterSpacing: 0.7,
+        letterSpacing: 0.1,
       ),
-      bodyLarge: base(size: 18, height: 28, color: scheme.onSurface),
-      bodyMedium: base(size: 16, height: 24, color: scheme.onSurface),
+      bodyLarge: base(size: 16, height: 24, color: scheme.onSurface),
+      bodyMedium: base(size: 14, height: 20, color: scheme.onSurface),
       bodySmall: base(size: 12, height: 16, color: scheme.onSurfaceVariant),
-      labelLarge: base(size: 14, height: 20, weight: FontWeight.w600, letterSpacing: 0.7),
-      labelMedium: base(size: 14, height: 20, weight: FontWeight.w600, letterSpacing: 0.7),
-      labelSmall: base(size: 12, height: 16, weight: FontWeight.w600, letterSpacing: 0.4),
+      labelLarge: base(
+        size: 14,
+        height: 20,
+        weight: FontWeight.w600,
+        letterSpacing: 0.1,
+      ),
+      labelMedium: base(
+        size: 12,
+        height: 16,
+        weight: FontWeight.w600,
+        letterSpacing: 0.2,
+      ),
+      labelSmall: base(
+        size: 11,
+        height: 14,
+        weight: FontWeight.w600,
+        letterSpacing: 0.2,
+      ),
     );
   }
 }
