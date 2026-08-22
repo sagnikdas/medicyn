@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'dart:io';
 
+import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
-import 'package:image_picker/image_picker.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../../core/widgets/dosely_chrome.dart';
 import '../../core/widgets/dosely_layout.dart';
@@ -12,6 +14,10 @@ import '../../core/widgets/dosely_motion.dart';
 /// on-device, then immediately delete the photo. Only the extracted text
 /// ever leaves this screen (and later, the device) — the image itself is
 /// never uploaded or kept, matching the privacy stance in the plan.
+///
+/// The preview is an in-app rear camera, not the system camera app. OEM
+/// camera apps ignore facing extras and reopen whichever lens was last
+/// used — often the selfie camera. A medicine label is not a selfie.
 ///
 /// Pops with the recognized text (possibly empty if the user skips or OCR
 /// finds nothing) — never null, so callers don't need to special-case
@@ -23,26 +29,160 @@ class OcrCaptureScreen extends StatefulWidget {
   State<OcrCaptureScreen> createState() => _OcrCaptureScreenState();
 }
 
+/// Back lens for a medicine label. [availableCameras] often lists the
+/// selfie camera first; never take the first entry on faith. Prefer the
+/// wide back camera when the device reports lens types, so an ultra-wide
+/// does not distort the label.
+CameraDescription? pickBackCamera(List<CameraDescription> cameras) {
+  if (cameras.isEmpty) return null;
+  CameraDescription? back;
+  for (final camera in cameras) {
+    if (camera.lensDirection != CameraLensDirection.back) continue;
+    if (camera.lensType == CameraLensType.wide) return camera;
+    back ??= camera;
+  }
+  return back ?? cameras.first;
+}
+
 enum _Status { idle, capturing, recognizing, error }
 
-class _OcrCaptureScreenState extends State<OcrCaptureScreen> {
+class _OcrCaptureScreenState extends State<OcrCaptureScreen>
+    with WidgetsBindingObserver {
+  CameraController? _camera;
   _Status _status = _Status.idle;
   String? _error;
+  var _opening = true;
+  var _openGen = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    unawaited(_openBackCamera());
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _openGen++;
+    final camera = _camera;
+    _camera = null;
+    unawaited(camera?.dispose());
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // paused/resumed, not inactive: the permission dialog also fires
+    // inactive and would tear the camera down mid-prompt.
+    if (state == AppLifecycleState.paused) {
+      _openGen++;
+      final camera = _camera;
+      _camera = null;
+      if (mounted) setState(() {});
+      unawaited(camera?.dispose());
+    } else if (state == AppLifecycleState.resumed) {
+      unawaited(_openBackCamera());
+    }
+  }
+
+  Future<void> _openBackCamera() async {
+    final gen = ++_openGen;
+    if (mounted) {
+      setState(() {
+        _opening = true;
+        _error = null;
+      });
+    }
+
+    try {
+      final description = pickBackCamera(await availableCameras());
+      if (description == null) {
+        throw CameraException('noCameras', 'No cameras');
+      }
+
+      CameraController? opened;
+      Object? lastError;
+      for (final preset in const [
+        ResolutionPreset.high,
+        ResolutionPreset.medium,
+      ]) {
+        if (gen != _openGen) return;
+        final next = CameraController(
+          description,
+          preset,
+          enableAudio: false,
+          imageFormatGroup: ImageFormatGroup.jpeg,
+        );
+        try {
+          await next.initialize();
+          opened = next;
+          lastError = null;
+          break;
+        } catch (e) {
+          lastError = e;
+          await next.dispose();
+        }
+      }
+
+      if (gen != _openGen) {
+        await opened?.dispose();
+        return;
+      }
+      if (opened == null) {
+        Error.throwWithStackTrace(
+          lastError ?? CameraException('failed', 'init'),
+          StackTrace.current,
+        );
+      }
+
+      final previous = _camera;
+      _camera = opened;
+      await previous?.dispose();
+      if (!mounted || gen != _openGen) return;
+      setState(() {
+        _opening = false;
+        _error = null;
+      });
+    } catch (e) {
+      if (!mounted || gen != _openGen) return;
+      var denied = false;
+      try {
+        denied = await Permission.camera.isPermanentlyDenied;
+      } catch (_) {
+        // Tests and hosts without the permission plugin.
+      }
+      if (!mounted || gen != _openGen) return;
+      setState(() {
+        _opening = false;
+        _status = _Status.error;
+        _error = denied
+            ? 'Camera access is off — turn it on in your phone\'s Settings to scan a label.'
+            : 'Could not open the camera.';
+      });
+    }
+  }
 
   Future<void> _scan() async {
+    var camera = _camera;
+    if (camera == null || !camera.value.isInitialized) {
+      await _openBackCamera();
+      camera = _camera;
+      if (!mounted) return;
+      if (camera == null || !camera.value.isInitialized) return;
+    }
+    if (camera.value.isTakingPicture) return;
+
     setState(() {
       _status = _Status.capturing;
       _error = null;
     });
 
-    final picker = ImagePicker();
-    XFile? photo;
+    XFile photo;
     try {
-      photo = await picker.pickImage(
-        source: ImageSource.camera,
-        imageQuality: 85,
-      );
+      photo = await camera.takePicture();
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _status = _Status.error;
         _error = 'Could not open the camera.';
@@ -50,8 +190,8 @@ class _OcrCaptureScreenState extends State<OcrCaptureScreen> {
       return;
     }
 
-    if (photo == null) {
-      setState(() => _status = _Status.idle);
+    if (!mounted) {
+      await _deletePhoto(photo.path);
       return;
     }
 
@@ -65,24 +205,29 @@ class _OcrCaptureScreenState extends State<OcrCaptureScreen> {
       );
       text = result.text;
     } catch (e) {
-      setState(() {
-        _status = _Status.error;
-        _error =
-            'Could not read the label. You can still continue with voice only.';
-      });
+      if (mounted) {
+        setState(() {
+          _status = _Status.error;
+          _error =
+              'Could not read the label. You can still continue with voice only.';
+        });
+      }
     } finally {
       await recognizer.close();
-      // The photo never leaves the device and isn't kept once OCR runs.
-      try {
-        await File(photo.path).delete();
-      } catch (_) {
-        // Best-effort cleanup; nothing to do if it's already gone.
-      }
+      await _deletePhoto(photo.path);
     }
 
     if (!mounted) return;
     if (_status != _Status.error) {
       Navigator.of(context).pop(text);
+    }
+  }
+
+  Future<void> _deletePhoto(String path) async {
+    try {
+      await File(path).delete();
+    } catch (_) {
+      // Best-effort cleanup; nothing to do if it's already gone.
     }
   }
 
@@ -92,6 +237,8 @@ class _OcrCaptureScreenState extends State<OcrCaptureScreen> {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final busy = _status == _Status.capturing || _status == _Status.recognizing;
+    final camera = _camera;
+    final ready = camera != null && camera.value.isInitialized;
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -128,29 +275,51 @@ class _OcrCaptureScreenState extends State<OcrCaptureScreen> {
                         ),
                         const SizedBox(height: 24),
                         Expanded(
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: scheme.surfaceContainer,
-                              borderRadius: BorderRadius.circular(24),
-                            ),
-                            child: CustomPaint(
-                              painter: _ViewfinderPainter(
-                                color: scheme.primaryContainer,
-                              ),
-                              child: Center(
-                                child: DoselySwitcher(
-                                  child: busy
-                                      ? CircularProgressIndicator(
-                                          key: const ValueKey('busy'),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(24),
+                            child: ColoredBox(
+                              color: ready
+                                  ? Colors.black
+                                  : scheme.surfaceContainer,
+                              child: Stack(
+                                fit: StackFit.expand,
+                                children: [
+                                  if (ready)
+                                    Positioned.fill(
+                                      child: CameraPreview(camera),
+                                    )
+                                  else
+                                    Center(
+                                      child: _opening
+                                          ? CircularProgressIndicator(
+                                              color: scheme.primary,
+                                            )
+                                          : Icon(
+                                              Icons.document_scanner_outlined,
+                                              size: 64,
+                                              color: scheme.primaryContainer,
+                                            ),
+                                    ),
+                                  CustomPaint(
+                                    painter: _ViewfinderPainter(
+                                      color: ready
+                                          ? Colors.white.withValues(alpha: 0.9)
+                                          : scheme.primaryContainer,
+                                    ),
+                                    child: const SizedBox.expand(),
+                                  ),
+                                  if (_status == _Status.recognizing)
+                                    ColoredBox(
+                                      color: Colors.black.withValues(
+                                        alpha: 0.4,
+                                      ),
+                                      child: Center(
+                                        child: CircularProgressIndicator(
                                           color: scheme.primary,
-                                        )
-                                      : Icon(
-                                          Icons.document_scanner_outlined,
-                                          key: const ValueKey('idle'),
-                                          size: 64,
-                                          color: scheme.primaryContainer,
                                         ),
-                                ),
+                                      ),
+                                    ),
+                                ],
                               ),
                             ),
                           ),
@@ -185,7 +354,7 @@ class _OcrCaptureScreenState extends State<OcrCaptureScreen> {
                 ],
                 const SizedBox(height: 16),
                 FilledButton.icon(
-                  onPressed: busy ? null : _scan,
+                  onPressed: busy || _opening ? null : _scan,
                   icon: DoselySwitcher(
                     child: _status == _Status.recognizing
                         ? const SizedBox(
@@ -212,7 +381,7 @@ class _OcrCaptureScreenState extends State<OcrCaptureScreen> {
                 ),
                 const SizedBox(height: 12),
                 OutlinedButton(
-                  onPressed: _status == _Status.recognizing ? null : _skip,
+                  onPressed: busy ? null : _skip,
                   child: const Text('Skip — use voice only'),
                 ),
               ],
