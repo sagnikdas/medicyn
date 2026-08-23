@@ -13,27 +13,39 @@ import '../reminders_home/day_occurrences.dart';
 /// Adherence for the current week, drawn from the same occurrence lattice
 /// Home already uses. Nothing here is invented: a week with no doses due
 /// shows empty copy rather than a fake 92%.
-class InsightsScreen extends StatelessWidget {
+/// Stateful only to hold its two streams. Opening them in `build` made a
+/// StreamBuilder re-subscribe — and both queries re-run over the whole of
+/// dose_logs — every time this tab rebuilt for any reason.
+class InsightsScreen extends StatefulWidget {
   const InsightsScreen({super.key, required this.db, this.onAvatarTap});
 
   final AppDatabase db;
   final VoidCallback? onAvatarTap;
 
   @override
+  State<InsightsScreen> createState() => _InsightsScreenState();
+}
+
+class _InsightsScreenState extends State<InsightsScreen> {
+  late final Stream<List<ScheduleWithMedicine>> _schedulesStream =
+      widget.db.watchSchedulesWithMedicines();
+  late final Stream<List<DoseLog>> _doseLogsStream = widget.db.watchDoseLogs();
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: DoselyTopBar(
-        onAvatarTap: onAvatarTap,
+        onAvatarTap: widget.onAvatarTap,
         avatarLabel: AuthService.instance.currentUser?.email,
       ),
       body: StreamBuilder<List<ScheduleWithMedicine>>(
-        stream: db.watchSchedulesWithMedicines(),
+        stream: _schedulesStream,
         builder: (context, scheduleSnap) {
           return StreamBuilder<List<DoseLog>>(
-            stream: db.watchDoseLogs(),
+            stream: _doseLogsStream,
             builder: (context, logSnap) {
               return _InsightsBody(
-                db: db,
+                db: widget.db,
                 schedules: scheduleSnap.data ?? const [],
                 logs: logSnap.data ?? const [],
               );
@@ -62,12 +74,19 @@ class _InsightsBody extends StatelessWidget {
     final records = <DoseRecord>[
       for (final log in logs) ?DoseRecord.tryFromLog(log),
     ];
-    final week = weekAdherence(items: schedules, logs: records, now: now);
-    final days = weekDayAdherence(items: schedules, logs: records, now: now);
-    final streak = consistencyStreak(items: schedules, logs: records, now: now);
+    // One index for all five walks below. Each of them would otherwise
+    // rebuild it, and consistencyStreak alone walks a year of days.
+    final logIndex = DoseRecordIndex(records);
+    final week = weekAdherence(items: schedules, index: logIndex, now: now);
+    final days = weekDayAdherence(items: schedules, index: logIndex, now: now);
+    final streak = consistencyStreak(
+      items: schedules,
+      index: logIndex,
+      now: now,
+    );
     final missedPart = mostMissedDayPart(
       items: schedules,
-      logs: records,
+      index: logIndex,
       now: now,
     );
     var missed = 0;
@@ -77,7 +96,7 @@ class _InsightsBody extends StatelessWidget {
     final avg = week.expected == 0 ? 0.0 : week.taken / week.expected;
     final morning = _partRate(
       days: days,
-      logs: records,
+      index: logIndex,
       items: schedules,
       now: now,
       part: DayPart.morning,
@@ -352,7 +371,7 @@ class _InsightsBody extends StatelessWidget {
 
   static ({String label, double rate, int expected}) _partRate({
     required List<({DateTime day, int taken, int expected})> days,
-    required List<DoseRecord> logs,
+    required DoseRecordIndex index,
     required List<ScheduleWithMedicine> items,
     required DateTime now,
     required DayPart part,
@@ -364,7 +383,7 @@ class _InsightsBody extends StatelessWidget {
     for (final day in days) {
       final occs = occurrencesOnDay(
         items: items,
-        logs: logs,
+        index: index,
         day: day.day,
         now: now,
       );

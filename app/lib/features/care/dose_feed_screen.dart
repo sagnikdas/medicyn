@@ -197,11 +197,12 @@ class _DoseFeedScreenState extends State<DoseFeedScreen> {
     final now = _nowThere(zone);
     final clock = _wallClock(zone);
     final records = _doseRecords(events, zone);
+    final logIndex = DoseRecordIndex(records);
     final rangeStart = _civilDate(now, now.year, now.month - 18, 1);
     final rangeEnd = _civilDate(now, now.year, now.month + 6, 1);
     final cellMarks = cellMarksForRange(
       items: _reminders,
-      logs: records,
+      index: logIndex,
       rangeStart: rangeStart,
       rangeEnd: rangeEnd,
       now: now,
@@ -219,7 +220,7 @@ class _DoseFeedScreenState extends State<DoseFeedScreen> {
     };
     final occurrences = occurrencesOnDay(
       items: _reminders,
-      logs: records,
+      index: logIndex,
       day: _selectedDay,
       now: now,
       wallClock: clock,
@@ -238,7 +239,7 @@ class _DoseFeedScreenState extends State<DoseFeedScreen> {
     ];
     final adherence = weekAdherence(
       items: _reminders,
-      logs: records,
+      index: logIndex,
       now: now,
       wallClock: clock,
     );

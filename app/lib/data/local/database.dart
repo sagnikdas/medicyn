@@ -441,9 +441,15 @@ class AppDatabase extends _$AppDatabase {
   }
 
   /// Ids of every local dose log, so a pull can skip the ones it already has.
+  ///
+  /// Projects the id column rather than selecting whole rows: this is the
+  /// largest table by far, and reading every column of two years of history
+  /// to throw all but one of them away cost the pull an order of magnitude
+  /// more than it needed to.
   Future<Set<String>> doseLogIds() async {
-    final rows = await select(doseLogs).get();
-    return {for (final r in rows) r.id};
+    final query = selectOnly(doseLogs)..addColumns([doseLogs.id]);
+    final rows = await query.get();
+    return {for (final r in rows) r.read(doseLogs.id)!};
   }
 
   /// `doseLogId -> updatedAt` for every local contest note. Unlike dose logs,

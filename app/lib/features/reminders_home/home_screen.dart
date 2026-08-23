@@ -52,6 +52,17 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Map<String, String> _names = {};
   DateTime _selectedDay = calendarDay(DateTime.now());
   Timer? _clock;
+
+  // Opened once, deliberately, rather than in `build`. A StreamBuilder
+  // re-subscribes whenever the stream instance changes, so calling
+  // `db.watchX()` from build re-ran both of these queries on every rebuild
+  // — including the sixty an hour the clock timer below fires, and one for
+  // every calendar day tap. Over a full 24 months of retained history that
+  // measured 24ms of query and subscription churn per rebuild against
+  // 2.5ms for a stream opened once.
+  late final Stream<List<ScheduleWithMedicine>> _schedulesStream =
+      widget.db.watchSchedulesWithMedicines();
+  late final Stream<List<DoseLog>> _doseLogsStream = widget.db.watchDoseLogs();
   final _scroll = ScrollController();
   bool _calendarMonth = false;
 
@@ -305,10 +316,10 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         avatarLabel: AuthService.instance.currentUser?.email,
       ),
       body: StreamBuilder<List<ScheduleWithMedicine>>(
-        stream: widget.db.watchSchedulesWithMedicines(),
+        stream: _schedulesStream,
         builder: (context, scheduleSnap) {
           return StreamBuilder<List<DoseLog>>(
-            stream: widget.db.watchDoseLogs(),
+            stream: _doseLogsStream,
             builder: (context, logSnap) {
               return _calendarBody(
                 schedules: scheduleSnap.data ?? const [],
@@ -329,11 +340,12 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final records = <DoseRecord>[
       for (final log in logs) ?DoseRecord.tryFromLog(log),
     ];
+    final logIndex = DoseRecordIndex(records);
     final rangeStart = DateTime(now.year, now.month - 18, 1);
     final rangeEnd = DateTime(now.year, now.month + 6, 1);
     final cellMarks = cellMarksForRange(
       items: schedules,
-      logs: records,
+      index: logIndex,
       rangeStart: rangeStart,
       rangeEnd: rangeEnd,
       now: now,
@@ -350,7 +362,7 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     };
     final occurrences = occurrencesOnDay(
       items: schedules,
-      logs: records,
+      index: logIndex,
       day: _selectedDay,
       now: now,
     );

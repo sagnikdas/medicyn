@@ -48,6 +48,66 @@ class DoseRecord {
   }
 }
 
+/// [DoseRecord]s bucketed by schedule and calendar day, built once and
+/// reused for every day a range walk visits.
+///
+/// The grouping this replaces lived inside [occurrencesOnDay], so a
+/// two-year calendar rebuilt it 730 times and then had [_winningLog] scan
+/// the whole of a schedule's history for every dose slot on every one of
+/// those days — quadratic in history, and paid on each rebuild, including
+/// the ones the home screen's minute timer fires.
+///
+/// A log is filed under its `scheduledAt` day *and* its `loggedAt` day,
+/// because [_winningLog] matches on either one. [forDay] then reads a
+/// small window of days around the one asked for, so a slot at midnight
+/// still sees the log 60 seconds the other side of it, and a caregiver
+/// reading the feed in another timezone still sees logs whose civil date
+/// there is a day off from the one here.
+class DoseRecordIndex {
+  DoseRecordIndex(List<DoseRecord> logs) {
+    for (final log in logs) {
+      final byDay = _byScheduleDay.putIfAbsent(log.scheduleId, () => {});
+      final scheduledDay = _dayKey(log.scheduledAt);
+      byDay.putIfAbsent(scheduledDay, () => []).add(log);
+      final loggedDay = _dayKey(log.loggedAt);
+      if (loggedDay != scheduledDay) {
+        byDay.putIfAbsent(loggedDay, () => []).add(log);
+      }
+    }
+  }
+
+  /// Two days either side. One would cover the midnight edge; two also
+  /// covers the widest pair of timezones, where the same instant carries
+  /// civil dates 26 hours apart.
+  static const _window = 2;
+
+  final Map<String, Map<int, List<DoseRecord>>> _byScheduleDay = {};
+
+  /// Every log that could belong to a dose slot on [day].
+  ///
+  /// Deduplicated by identity: a log filed under two different days can be
+  /// reached twice by the window. Buckets hold a handful of rows each, so
+  /// the linear check is cheaper than allocating a set per call.
+  List<DoseRecord> forDay(String scheduleId, DateTime day) {
+    final byDay = _byScheduleDay[scheduleId];
+    if (byDay == null) return const [];
+    final out = <DoseRecord>[];
+    for (var offset = -_window; offset <= _window; offset++) {
+      final bucket = byDay[_dayKey(_civilAddDays(day, offset))];
+      if (bucket == null) continue;
+      for (final log in bucket) {
+        if (!out.contains(log)) out.add(log);
+      }
+    }
+    return out;
+  }
+}
+
+/// A civil date as a sortable int, so buckets key off year/month/day rather
+/// than a [DateTime] — `TZDateTime` and `DateTime` naming the same date are
+/// not interchangeable map keys, and the caregiver feed mixes both.
+int _dayKey(DateTime day) => day.year * 10000 + day.month * 100 + day.day;
+
 /// One expected (or historically logged) dose on a calendar day.
 class DayOccurrence {
   const DayOccurrence({
@@ -116,7 +176,8 @@ bool isSameCalendarDay(DateTime a, DateTime b) =>
 /// the sweep writes missed, and silence beats a false alarm until it does.
 List<DayOccurrence> occurrencesOnDay({
   required List<ScheduleWithMedicine> items,
-  required List<DoseRecord> logs,
+  List<DoseRecord> logs = const [],
+  DoseRecordIndex? index,
   required DateTime day,
   required DateTime now,
   Duration grace = MissedDoseDetector.grace,
@@ -127,16 +188,12 @@ List<DayOccurrence> occurrencesOnDay({
   final today = calendarDay(now);
   final onDay = calendarDay(day);
   final dayEnd = _civilAddDays(onDay, 1);
-
-  final logsBySchedule = <String, List<DoseRecord>>{};
-  for (final log in logs) {
-    logsBySchedule.putIfAbsent(log.scheduleId, () => []).add(log);
-  }
+  final logIndex = index ?? DoseRecordIndex(logs);
 
   final out = <DayOccurrence>[];
   for (final item in items) {
     final schedule = item.schedule;
-    final scheduleLogs = logsBySchedule[schedule.id] ?? const <DoseRecord>[];
+    final scheduleLogs = logIndex.forDay(schedule.id, onDay);
 
     // expectedDoses returns [] for inactive rows, which would hide a taken
     // or missed log from a reminder that was later turned off. History has
@@ -197,7 +254,8 @@ List<DayOccurrence> occurrencesOnDay({
 /// Empty days are omitted so a quiet month stays a small map.
 Map<DateTime, DayCellMarks> cellMarksForRange({
   required List<ScheduleWithMedicine> items,
-  required List<DoseRecord> logs,
+  List<DoseRecord> logs = const [],
+  DoseRecordIndex? index,
   required DateTime rangeStart,
   required DateTime rangeEnd,
   required DateTime now,
@@ -205,13 +263,14 @@ Map<DateTime, DayCellMarks> cellMarksForRange({
   Duration snoozeWindow = const Duration(minutes: 10),
   WallClock? wallClock,
 }) {
+  final logIndex = index ?? DoseRecordIndex(logs);
   final marks = <DateTime, DayCellMarks>{};
   var day = calendarDay(rangeStart);
   final end = calendarDay(rangeEnd);
   while (day.isBefore(end)) {
     final occs = occurrencesOnDay(
       items: items,
-      logs: logs,
+      index: logIndex,
       day: day,
       now: now,
       grace: grace,
@@ -233,12 +292,14 @@ Map<DateTime, DayCellMarks> cellMarksForRange({
 /// Saturday's doses.
 ({int taken, int expected}) weekAdherence({
   required List<ScheduleWithMedicine> items,
-  required List<DoseRecord> logs,
+  List<DoseRecord> logs = const [],
+  DoseRecordIndex? index,
   required DateTime now,
   Duration grace = MissedDoseDetector.grace,
   Duration snoozeWindow = const Duration(minutes: 10),
   WallClock? wallClock,
 }) {
+  final logIndex = index ?? DoseRecordIndex(logs);
   final today = calendarDay(now);
   final storedWeekday = now.weekday == DateTime.sunday ? 0 : now.weekday;
   final sunday = _civilAddDays(today, -storedWeekday);
@@ -250,7 +311,7 @@ Map<DateTime, DayCellMarks> cellMarksForRange({
   while (day.isBefore(nextSunday)) {
     final occs = occurrencesOnDay(
       items: items,
-      logs: logs,
+      index: logIndex,
       day: day,
       now: now,
       grace: grace,
@@ -310,12 +371,14 @@ DayOccurrence? nextActionableDose(List<DayOccurrence> occs) {
 /// days are not in the denominator.
 List<({DateTime day, int taken, int expected})> weekDayAdherence({
   required List<ScheduleWithMedicine> items,
-  required List<DoseRecord> logs,
+  List<DoseRecord> logs = const [],
+  DoseRecordIndex? index,
   required DateTime now,
   Duration grace = MissedDoseDetector.grace,
   Duration snoozeWindow = const Duration(minutes: 10),
   WallClock? wallClock,
 }) {
+  final logIndex = index ?? DoseRecordIndex(logs);
   final today = calendarDay(now);
   final storedWeekday = now.weekday == DateTime.sunday ? 0 : now.weekday;
   final sunday = _civilAddDays(today, -storedWeekday);
@@ -324,7 +387,7 @@ List<({DateTime day, int taken, int expected})> weekDayAdherence({
   for (var i = 0; i < 7; i++) {
     final occs = occurrencesOnDay(
       items: items,
-      logs: logs,
+      index: logIndex,
       day: day,
       now: now,
       grace: grace,
@@ -350,19 +413,21 @@ List<({DateTime day, int taken, int expected})> weekDayAdherence({
 /// counted, so a gap in the schedule does not mint a streak.
 int consistencyStreak({
   required List<ScheduleWithMedicine> items,
-  required List<DoseRecord> logs,
+  List<DoseRecord> logs = const [],
+  DoseRecordIndex? index,
   required DateTime now,
   Duration grace = MissedDoseDetector.grace,
   Duration snoozeWindow = const Duration(minutes: 10),
   WallClock? wallClock,
   int maxDays = 365,
 }) {
+  final logIndex = index ?? DoseRecordIndex(logs);
   var streak = 0;
   var day = calendarDay(now);
   for (var i = 0; i < maxDays; i++) {
     final occs = occurrencesOnDay(
       items: items,
-      logs: logs,
+      index: logIndex,
       day: day,
       now: now,
       grace: grace,
@@ -391,12 +456,14 @@ int consistencyStreak({
 /// Which [DayPart] missed the most doses this week, or null when none did.
 DayPart? mostMissedDayPart({
   required List<ScheduleWithMedicine> items,
-  required List<DoseRecord> logs,
+  List<DoseRecord> logs = const [],
+  DoseRecordIndex? index,
   required DateTime now,
   Duration grace = MissedDoseDetector.grace,
   Duration snoozeWindow = const Duration(minutes: 10),
   WallClock? wallClock,
 }) {
+  final logIndex = index ?? DoseRecordIndex(logs);
   final today = calendarDay(now);
   final storedWeekday = now.weekday == DateTime.sunday ? 0 : now.weekday;
   final sunday = _civilAddDays(today, -storedWeekday);
@@ -405,7 +472,7 @@ DayPart? mostMissedDayPart({
   for (var i = 0; i < 7; i++) {
     final occs = occurrencesOnDay(
       items: items,
-      logs: logs,
+      index: logIndex,
       day: day,
       now: now,
       grace: grace,
