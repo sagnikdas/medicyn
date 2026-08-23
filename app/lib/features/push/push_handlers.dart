@@ -3,6 +3,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/widgets.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../core/app_settings.dart';
 import '../../core/supabase_init.dart';
 import '../../data/local/database.dart';
 import '../../data/remote/sync_service.dart';
@@ -31,6 +32,14 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   try {
     await Firebase.initializeApp();
     await initializeSupabase();
+    // This isolate is fresh, so AppSettings is an unloaded singleton whose
+    // consent flags all read false. SyncService.pullAll returns on its very
+    // first line without it, which made the silent data_changed message a
+    // no-op in exactly the case it exists for: the app not in the
+    // foreground. reconcile would then re-arm from an unchanged database,
+    // so an edit made on the other phone never reached this one until
+    // someone happened to open the app.
+    await AppSettings.instance.init();
   } catch (_) {
     // Already initialized (Android sometimes reuses a warm isolate), or
     // genuinely unavailable. Either way the pull below will tell us.

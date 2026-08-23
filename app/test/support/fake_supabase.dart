@@ -128,7 +128,7 @@ Future<void> initFakeSupabase({
   final key = init.supabasePersistSessionKey(fakeSupabaseUrl);
   await Supabase.initialize(
     url: fakeSupabaseUrl,
-    anonKey: 'anon-key',
+    publishableKey: 'publishable-key',
     httpClient: backend.client,
     authOptions: FlutterAuthClientOptions(
       autoRefreshToken: false,

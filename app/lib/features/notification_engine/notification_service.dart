@@ -115,6 +115,33 @@ bool isPatientReminderNotification({required String? channelId}) {
   return channelId == null || channelId.isEmpty;
 }
 
+/// The next calendar day at the same wall-clock time.
+///
+/// Rebuilt through the constructor rather than by adding 24 hours.
+/// `TZDateTime.add` is absolute-time arithmetic, so across a DST change "a
+/// day later" lands an hour off on the clock: 08:00 the day before the
+/// spring change became 09:00, and before the autumn change 07:00.
+///
+/// That mattered twice over. The alarm rang at the wrong hour, and
+/// `expectedDoses` — which builds its occurrences from the wall clock —
+/// carried on expecting 08:00, so `MissedDoseDetector` judged a dose missed
+/// that the device had armed for an hour later, and pushed a family a
+/// notification saying their parent had skipped their medication. For
+/// `specificDays` the alarm repeats weekly, so the wrong hour would persist
+/// for a whole week per un-reconciled schedule.
+///
+/// Kept top-level so the arithmetic can be tested without the notification
+/// plugin, like [reminderLockScreenCopy] above.
+tz.TZDateTime nextWallClockDay(tz.TZDateTime from, ClockTime time) =>
+    tz.TZDateTime(
+      tz.local,
+      from.year,
+      from.month,
+      from.day + 1,
+      time.hour,
+      time.minute,
+    );
+
 // Android's Notification.FLAG_INSISTENT: repeats the sound/vibration on loop
 // until the notification is dismissed or tapped, instead of playing once.
 const int _flagInsistent = 4;
@@ -323,6 +350,8 @@ class NotificationService {
       time.minute,
     );
 
+    tz.TZDateTime nextDay(tz.TZDateTime from) => nextWallClockDay(from, time);
+
     if (weekday != null) {
       final targetDartWeekday = weekday == 0 ? 7 : weekday;
       // A matching weekday is always within seven steps, so this bound is
@@ -333,19 +362,31 @@ class NotificationService {
         if (scheduled.weekday == targetDartWeekday && scheduled.isAfter(now)) {
           return scheduled;
         }
-        scheduled = scheduled.add(const Duration(days: 1));
+        scheduled = nextDay(scheduled);
       }
       return null;
     }
 
     if (!scheduled.isAfter(now)) {
-      scheduled = scheduled.add(const Duration(days: 1));
+      scheduled = nextDay(scheduled);
     }
     return scheduled;
   }
 
-  String _payload(String scheduleId, String timeLabel) =>
-      jsonEncode({'scheduleId': scheduleId, 'timeLabel': timeLabel});
+  /// [scheduledAt] is what the answer gets attributed to.
+  ///
+  /// `timeLabel` alone could not say which occurrence rang. A snoozed
+  /// reminder carried the literal 'snooze', and every occurrence of an
+  /// every-X-hours schedule carried its anchor time — so answering the 16:00
+  /// slot recorded a dose at 08:00, and answering a snoozed 08:00 reminder
+  /// recorded one at whatever time the person happened to tap. The label is
+  /// still written for notifications that an older build may read back.
+  String _payload(String scheduleId, String timeLabel, DateTime scheduledAt) =>
+      jsonEncode({
+        'scheduleId': scheduleId,
+        'timeLabel': timeLabel,
+        'scheduledAt': scheduledAt.toUtc().toIso8601String(),
+      });
 
   /// [skipCancel] is for callers that have already cleared this schedule's
   /// alarms in a wider sweep — see [reconcile]. Cancelling costs a full
@@ -399,7 +440,7 @@ class NotificationService {
             notificationDetails: details,
             androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
             matchDateTimeComponents: DateTimeComponents.time,
-            payload: _payload(schedule.id, time.label),
+            payload: _payload(schedule.id, time.label, when),
           );
         }
         break;
@@ -417,7 +458,7 @@ class NotificationService {
               notificationDetails: details,
               androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
               matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
-              payload: _payload(schedule.id, time.label),
+              payload: _payload(schedule.id, time.label, when),
             );
           }
         }
@@ -491,7 +532,7 @@ class NotificationService {
             ),
             notificationDetails: details,
             androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-            payload: _payload(schedule.id, anchor.label),
+            payload: _payload(schedule.id, anchor.label, when),
           );
         }
         break;
@@ -512,7 +553,7 @@ class NotificationService {
   /// which also naturally cancels any outstanding snooze one-off.
   Future<void> cancelForSchedule(Schedule schedule) async {
     await init();
-    await _cancelWhere((scheduleId) => scheduleId == schedule.id);
+    await _cancelWhere((scheduleId, _) => scheduleId == schedule.id);
   }
 
   /// Cancels every pending notification whose payload's `scheduleId`
@@ -520,44 +561,50 @@ class NotificationService {
   /// (there shouldn't be any, but a plugin-internal or malformed one isn't
   /// impossible) are left alone rather than guessed at.
   Future<void> _cancelWhere(
-    bool Function(String scheduleId) shouldCancel,
+    bool Function(String scheduleId, Map<String, dynamic> payload) shouldCancel,
   ) async {
     final pending = await _plugin.pendingNotificationRequests();
     for (final request in pending) {
       final payload = request.payload;
       if (payload == null || payload.isEmpty) continue;
       String? scheduleId;
+      Map<String, dynamic> decoded;
       try {
-        scheduleId =
-            (jsonDecode(payload) as Map<String, dynamic>)['scheduleId']
-                as String?;
+        decoded = jsonDecode(payload) as Map<String, dynamic>;
+        scheduleId = decoded['scheduleId'] as String?;
       } catch (_) {
         continue;
       }
-      if (scheduleId != null && shouldCancel(scheduleId)) {
+      if (scheduleId != null && shouldCancel(scheduleId, decoded)) {
         await _plugin.cancel(id: request.id);
       }
     }
   }
 
+  /// Arms the one re-reminder for [scheduledAt]'s dose, [delay] from now.
+  ///
+  /// The id is derived from the dose, not from the moment of the tap. It used
+  /// to embed `DateTime.now().millisecondsSinceEpoch`, which made every press
+  /// a *different* notification — so holding the reminder and pressing Snooze
+  /// five times armed five alarms and the phone went off five times ten
+  /// minutes later. That is also the opposite of what notification_ids.dart
+  /// exists for: a stable id means re-arming overwrites rather than piles up.
   Future<void> scheduleSnooze({
     required String scheduleId,
     required Medicine medicine,
     required Duration delay,
+    required DateTime scheduledAt,
   }) async {
     await init();
     final copy = await _copyFor(medicine);
     await _plugin.zonedSchedule(
-      id: notificationIdFor(
-        scheduleId,
-        'snooze-${DateTime.now().millisecondsSinceEpoch}',
-      ),
+      id: snoozeNotificationId(scheduleId, scheduledAt),
       title: copy.title,
       body: copy.body,
       scheduledDate: tz.TZDateTime.now(tz.local).add(delay),
       notificationDetails: _details(visibility: copy.visibility),
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      payload: _payload(scheduleId, 'snooze'),
+      payload: _payload(scheduleId, snoozeTimeLabel, scheduledAt),
     );
   }
 
@@ -671,7 +718,17 @@ class NotificationService {
     // (orphans) and alarms belonging to one that's about to be re-armed
     // below. Doing both here is what lets the per-schedule calls skip their
     // own cancel pass — see [scheduleForScheduleWithMedicine].
-    await _cancelWhere((_) => true);
+    //
+    // Except a pending snooze. Nothing below re-arms one — it exists only as
+    // the alarm itself, never as a row — so sweeping it up silently threw the
+    // re-reminder away. Since reconcile runs on every foreground and on the
+    // background isolate for a `data_changed` push, snoozing a dose and then
+    // opening the app meant the reminder never came back. A snooze for a
+    // schedule that is genuinely going away is still cancelled, by
+    // [cancelForSchedule] on the stop/delete path.
+    await _cancelWhere(
+      (_, payload) => payload['timeLabel'] != snoozeTimeLabel,
+    );
 
     // Every schedule gets its own try/catch, because the sweep above has
     // already happened: without this, the first schedule that cannot be
@@ -733,7 +790,7 @@ class NotificationService {
       title: copy.title,
       body: copy.body,
       notificationDetails: _details(visibility: copy.visibility),
-      payload: _payload(scheduleId, timeLabel),
+      payload: _payload(scheduleId, timeLabel, scheduledAt),
     );
   }
 

@@ -538,7 +538,16 @@ class CareService {
           .select(
             'id, medicine_id, user_id, frequency_type, times, days_of_week, '
             'interval_hours, active, created_at, updated_at, updated_by, '
+            // tablets_remaining / tablets_per_dose have to be here even
+            // though this screen does not show a pill count: reminderFromRow
+            // reads them, the edit screen fills its fields from what it
+            // reads, and savePatientReminder writes those fields straight
+            // back. Leaving them out of the select made every caregiver
+            // edit — a strength correction, a time change — silently null
+            // the patient's refill tracking, which is what the refill_low
+            // alert is computed from.
             'medicines!inner(id, drug_name, strength, form, dose_amount, notes, '
+            'tablets_remaining, tablets_per_dose, '
             'created_at, updated_at, updated_by)',
           )
           .eq('user_id', patientId)

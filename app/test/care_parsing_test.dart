@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:dosely/features/care/care_service.dart';
 import 'package:dosely/data/local/tables.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -242,4 +244,56 @@ void main() {
       expect(r.schedule.deleted, isFalse);
     });
   });
+
+  group('the caregiver read must carry everything the caregiver write sends',
+      () {
+    test('patientReminders selects the stock columns reminderFromRow reads',
+        () {
+      // These two are not shown on the caregiver's list, which is why they
+      // were left out of the select. But reminderFromRow reads them, the
+      // edit screen fills its fields from what it reads, and
+      // savePatientReminder writes those fields straight back — so omitting
+      // them meant every caregiver edit silently nulled the patient's refill
+      // tracking, and with it the refill_low alert.
+      final source = File('lib/features/care/care_service.dart').readAsStringSync();
+      final select = source.substring(
+        source.indexOf("from('schedules')"),
+        source.indexOf("Writes a medicine and its schedule"),
+      );
+      for (final column in ['tablets_remaining', 'tablets_per_dose']) {
+        expect(select, contains(column),
+            reason: 'savePatientReminder writes \$column back');
+      }
+    });
+
+    test('a row carrying the stock columns keeps them', () {
+      final r = CareService.reminderFromRow({
+        'id': 'sched-1',
+        'frequency_type': 'daily',
+        'times': const ['08:00'],
+        'days_of_week': const <int>[],
+        'interval_hours': null,
+        'active': true,
+        'created_at': '2026-01-01T00:00:00Z',
+        'updated_at': '2026-08-02T00:00:00Z',
+        'updated_by': null,
+        'medicines': {
+          'id': 'med-1',
+          'drug_name': 'Metformin',
+          'strength': '500mg',
+          'form': 'tablet',
+          'dose_amount': '1 tablet',
+          'notes': '',
+          'tablets_remaining': 40,
+          'tablets_per_dose': 1,
+          'created_at': '2026-01-01T00:00:00Z',
+          'updated_at': '2026-08-01T00:00:00Z',
+          'updated_by': null,
+        },
+      })!;
+      expect(r.medicine.tabletsRemaining, 40);
+      expect(r.medicine.tabletsPerDose, 1);
+    });
+  });
 }
+
