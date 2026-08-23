@@ -49,4 +49,19 @@ void main() {
   test('care alerts are private on the lock screen, with no named opt-in', () {
     expect(careAlertLockScreenVisibility, NotificationVisibility.private);
   });
+
+  test(
+    'isPatientReminderNotification never treats a care alert as an alarm',
+    () {
+      expect(
+        isPatientReminderNotification(channelId: reminderChannelId),
+        isTrue,
+      );
+      expect(
+        isPatientReminderNotification(channelId: careAlertChannelId),
+        isFalse,
+      );
+      expect(isPatientReminderNotification(channelId: null), isTrue);
+    },
+  );
 }

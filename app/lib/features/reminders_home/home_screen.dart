@@ -24,6 +24,7 @@ import '../voice_capture/voice_capture_screen.dart';
 import 'calendar_collapse_sliver.dart';
 import 'day_dose_list.dart';
 import 'day_occurrences.dart';
+import 'dose_attention_panel.dart';
 import 'dose_calendar.dart';
 import 'refill.dart';
 
@@ -35,6 +36,7 @@ class HomeScreen extends StatefulWidget {
     required this.db,
     this.onAvatarTap,
     this.onNames,
+    this.onNeedsAttention,
   });
   final AppDatabase db;
 
@@ -43,6 +45,10 @@ class HomeScreen extends StatefulWidget {
 
   /// Lets the Plan tab show the same edit-attribution names Home loaded.
   final ValueChanged<Map<String, String>>? onNames;
+
+  /// Switch to the Today tab when a dose needs answering, so opening the
+  /// app from Plan or Insights still lands on Taken / Snooze.
+  final VoidCallback? onNeedsAttention;
 
   @override
   HomeScreenState createState() => HomeScreenState();
@@ -65,6 +71,7 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   late final Stream<List<DoseLog>> _doseLogsStream = widget.db.watchDoseLogs();
   final _scroll = ScrollController();
   bool _calendarMonth = false;
+  List<DayOccurrence> _ringIfLeft = const [];
 
   @override
   void initState() {
@@ -72,9 +79,14 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     _bootstrap(requestPermissions: true);
     // Upcoming → pending has to flip when the clock time passes, not only
-    // when the user comes back from another screen.
-    _clock = Timer.periodic(const Duration(minutes: 1), (_) {
-      if (mounted) setState(() {});
+    // when the user comes back from another screen. Fifteen seconds is
+    // short enough to notice an alarm that fired while the app is open.
+    _clock = Timer.periodic(const Duration(seconds: 15), (_) {
+      if (!mounted) return;
+      setState(() {});
+      if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
+        unawaited(_silenceIfRinging());
+      }
     });
   }
 
@@ -92,6 +104,7 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     // app comes back to the foreground — the mitigation for OEMs that
     // silently drop background alarms (see notification_service.dart).
     if (state == AppLifecycleState.resumed) _bootstrap();
+    if (state == AppLifecycleState.paused) unawaited(_reRingUnanswered());
   }
 
   /// [requestPermissions] only on the first run, from `initState`. Asking on
@@ -131,6 +144,11 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     // arms their alarms in this same pass instead of waiting for the next
     // resume.
     if (sync != null && requestPermissions) await sync.pullAll();
+    // Stop a looping alarm that is already on screen. Opening the app is
+    // the answer; they should not have to find that row in the shade.
+    // Reconcile afterwards puts the repeating series back (cancel of a
+    // fired daily id also drops AlarmManager for that id).
+    await NotificationService.instance.dismissActiveReminderNotifications();
     await NotificationService.instance.reconcile(widget.db);
     if (signedIn) {
       unawaited(_reportHealth());
@@ -175,6 +193,28 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final items = await widget.db.activeSchedulesOnce();
     if (anyRefillLow(items)) {
       unawaited(CareNotifier.instance.refillLow());
+    }
+  }
+
+  Future<void> _silenceIfRinging() async {
+    final n = await NotificationService.instance
+        .dismissActiveReminderNotifications();
+    if (n == 0) return;
+    await NotificationService.instance.reconcile(widget.db);
+  }
+
+  Future<void> _reRingUnanswered() async {
+    for (final o in _ringIfLeft) {
+      if (!doseStillRings(o.status)) continue;
+      try {
+        await NotificationService.instance.ringDueDoseNow(
+          scheduleId: o.item.schedule.id,
+          medicine: o.item.medicine,
+          scheduledAt: o.scheduledAt,
+        );
+      } catch (_) {
+        // Tests and hosts without the plugin; the in-app list still works.
+      }
     }
   }
 
@@ -366,8 +406,37 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       day: _selectedDay,
       now: now,
     );
+    final today = calendarDay(now);
+    final todayOccs = isSameCalendarDay(_selectedDay, now)
+        ? occurrences
+        : occurrencesOnDay(
+            items: schedules,
+            logs: records,
+            day: today,
+            now: now,
+          );
+    final yesterdayOccs = occurrencesOnDay(
+      items: schedules,
+      logs: records,
+      day: addCalendarDays(today, -1),
+      now: now,
+    );
+    final attention = attentionDoses(
+      today: todayOccs,
+      yesterday: yesterdayOccs,
+    );
+    _ringIfLeft = [
+      for (final o in attention)
+        if (doseStillRings(o.status)) o,
+    ];
+    if (attention.isNotEmpty) {
+      final jump = widget.onNeedsAttention;
+      if (jump != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) => jump());
+      }
+    }
     final next = isSameCalendarDay(_selectedDay, now)
-        ? nextActionableDose(occurrences)
+        ? nextUpcomingDose(todayOccs)
         : null;
     final takenCount = occurrences
         .where((o) => o.status == DayDoseStatus.taken)
@@ -406,6 +475,20 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ),
           ),
         ),
+        if (attention.isNotEmpty)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+              child: DoselyFadeIn(
+                child: DoseAttentionPanel(
+                  occurrences: attention,
+                  now: now,
+                  onMarkTaken: _markTaken,
+                  onSnooze: _snooze,
+                ),
+              ),
+            ),
+          ),
         HomeCalendarSliver(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
@@ -485,6 +568,16 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       scheduleId: occurrence.item.schedule.id,
       scheduledAt: occurrence.scheduledAt,
       source: 'calendar',
+    );
+    if (AuthService.instance.currentUser == null) return;
+    unawaited(SyncService(widget.db).syncAll());
+  }
+
+  Future<void> _snooze(DayOccurrence occurrence) async {
+    await recordDoseSnoozed(
+      widget.db,
+      scheduleId: occurrence.item.schedule.id,
+      scheduledAt: occurrence.scheduledAt,
     );
     if (AuthService.instance.currentUser == null) return;
     unawaited(SyncService(widget.db).syncAll());
