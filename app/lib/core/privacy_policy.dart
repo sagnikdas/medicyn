@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-/// Bundled copy of the repo-root `PRIVACY.md`. The GitHub blob URL is not
-/// used: the repository is private, so that link 404s for anyone who is
-/// not signed in to GitHub.
+/// The privacy policy bundled with the app. `docs/compliance/PRIVACY.md` in
+/// the repo is a symlink to this file, so there is one source of truth. The
+/// GitHub blob URL is not used: the repository is private, so that link
+/// 404s for anyone who is not signed in to GitHub.
 const privacyPolicyAsset = 'assets/PRIVACY.md';
 
 /// Opens the in-app policy so the user can actually read it, even offline.

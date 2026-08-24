@@ -192,12 +192,12 @@ Good candidates for picking up in any order once Phase 1 exists.
 calendar time no matter what else is happening, so start it as soon as Phase 0
 says the build is sound and let it run while Phases 1–3 proceed.
 
-- [ ] Fill the three placeholders in `PRIVACY.md` — effective date, and
+- [ ] Fill the three placeholders in `../compliance/PRIVACY.md` — effective date, and
       support email in two places
 - [ ] Host the policy at a public URL; Play will not accept a listing without one
 - [ ] Release keystore and `app/android/key.properties` (see
       `app/README.md` → Release signing)
-- [ ] Play Console: Data safety form, and it must agree with `PRIVACY.md`
+- [ ] Play Console: Data safety form, and it must agree with `../compliance/PRIVACY.md`
 - [ ] Declare `USE_EXACT_ALARM` and `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`
 - [ ] `flutter build appbundle --release`, upload to internal testing
 - [ ] Register an Android OAuth client for **each** SHA-1 Play shows — app
@@ -269,7 +269,7 @@ worth remembering.
 - **Nobody can be both** a parent and a caregiver, in different pairs.
 - **Voice input is not on-device.** `SpeechListenOptions.onDevice` is left
   false, so the platform recogniser handles it and on most Android devices
-  Google's servers see the audio. `PRIVACY.md` says so plainly. Setting it
+  Google's servers see the audio. `../compliance/PRIVACY.md` says so plainly. Setting it
   true is a one-line change that fails outright on devices with no offline
   model.
 - **The `deleted` column** on `medicines` and `schedules` is dead — never set,

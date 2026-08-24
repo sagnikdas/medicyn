@@ -35,12 +35,12 @@ rule in Console; Google has changed it before.
 
    1. Create a **public** GitHub repo (for example `dosely-legal`) or a
       public gist.
-   2. Copy [`PRIVACY.md`](../PRIVACY.md) into it unchanged. That URL is the
-      Play privacy-policy field.
-   3. Copy [`docs/delete-account.md`](delete-account.md) into it unchanged.
-      That URL is the Play account-deletion field.
-   4. Optionally copy [`docs/MHMD.md`](MHMD.md) if you also want a public
-      Washington consumer-health URL.
+   2. Copy [`PRIVACY.md`](../compliance/PRIVACY.md) into it unchanged. That
+      URL is the Play privacy-policy field.
+   3. Copy [`docs/play-store/delete-account.md`](delete-account.md) into it
+      unchanged. That URL is the Play account-deletion field.
+   4. Optionally copy [`docs/compliance/MHMD.md`](../compliance/MHMD.md) if
+      you also want a public Washington consumer-health URL.
    5. Open each URL in a private browser window. If GitHub asks you to log
       in, Play cannot read it either — fix hosting before continuing.
    6. Write down the two (or three) public URLs. You paste them in steps 26
@@ -163,7 +163,7 @@ rule in Console; Google has changed it before.
     this is not a government app.
 
 18. Do **not** enable EEA/UK **production** countries yet.
-    `COMPLIANCE/SCOPE.md` still has no Art. 27 EU representative. Closed
+    `docs/compliance/pack/SCOPE.md` still has no Art. 27 EU representative. Closed
     testing uses named testers; you do not need a worldwide production
     listing today. You cannot start a test track until Play’s dashboard
     says setup is complete enough to create a release — that is the
@@ -221,7 +221,7 @@ rule in Console; Google has changed it before.
     content** (labels move; find Ads, Target audience, Content rating,
     Data safety, Health, Restricted permissions, App access). Fill the
     next steps in that order. For Data safety, copy
-    [`COMPLIANCE/PLAY-DATA-SAFETY.md`](../COMPLIANCE/PLAY-DATA-SAFETY.md)
+    [`docs/compliance/pack/PLAY-DATA-SAFETY.md`](../compliance/pack/PLAY-DATA-SAFETY.md)
     so it still matches `PRIVACY.md`. Do not invent extra data types.
 
 30. Ads: declare that the app does **not** contain ads.
@@ -413,11 +413,11 @@ rule in Console; Google has changed it before.
 
 If you are stuck, these files match the steps above:
 
-- Why this runs in parallel with other work: [`PLAN.md`](../PLAN.md) Phase 4
-- Upload keystore (same commands): [`app/README.md`](../app/README.md),
-  [`README.md`](../README.md) “Before shipping a release build”
+- Why this runs in parallel with other work: [`PLAN.md`](../product/PLAN.md) Phase 4
+- Upload keystore (same commands): [`app/README.md`](../../app/README.md),
+  [`README.md`](../../README.md) “Before shipping a release build”
 - Data Safety / health / permissions:
-  [`COMPLIANCE/PLAY-DATA-SAFETY.md`](../COMPLIANCE/PLAY-DATA-SAFETY.md)
-- Privacy policy source: [`PRIVACY.md`](../PRIVACY.md)
-- Account deletion source: [`docs/delete-account.md`](delete-account.md)
-- EEA / Art. 27: [`COMPLIANCE/SCOPE.md`](../COMPLIANCE/SCOPE.md)
+  [`docs/compliance/pack/PLAY-DATA-SAFETY.md`](../compliance/pack/PLAY-DATA-SAFETY.md)
+- Privacy policy source: [`PRIVACY.md`](../compliance/PRIVACY.md)
+- Account deletion source: [`docs/play-store/delete-account.md`](delete-account.md)
+- EEA / Art. 27: [`docs/compliance/pack/SCOPE.md`](../compliance/pack/SCOPE.md)

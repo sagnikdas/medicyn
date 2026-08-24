@@ -220,7 +220,7 @@ FTC HBNR and a future HIPAA deal both want this. Out of Phase 3 scope
   confirm.
 - Encrypted per-account local DB; session in Keystore; Android backup off.
 - Consent capture and Settings withdraw; local-only mode.
-- Account deletion in-app and via email / `docs/delete-account.md`.
+- Account deletion in-app and via email / `../../play-store/delete-account.md`.
 - Download my data; contest note on a dose log; true delete of a medicine.
 - Retention prune; in-app privacy policy.
 - Notification content composed server-side.

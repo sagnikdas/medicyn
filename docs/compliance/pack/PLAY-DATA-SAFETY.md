@@ -42,7 +42,7 @@ Declare **shared** for:
 Encrypted in transit: **Yes** (TLS; cleartext disallowed).
 Users can request deletion: **Yes** (Settings → Delete account; web page
 exists but is currently a private GitHub URL — Play wants a **public**
-URL; host `docs/delete-account.md` somewhere public before review).
+URL; host `../../play-store/delete-account.md` somewhere public before review).
 Data collected for app functionality: **Yes**.
 Sold: **No**.
 Optional, account-creation not required: **Yes** (local-only mode).

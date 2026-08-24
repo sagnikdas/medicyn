@@ -1,9 +1,9 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Play-required web URL for requesting account deletion without the app.
-/// Rendered from `docs/delete-account.md` on GitHub.
+/// Rendered from `docs/play-store/delete-account.md` on GitHub.
 const deleteAccountWebUrl =
-    'https://github.com/sagnikdas/dosely/blob/main/docs/delete-account.md';
+    'https://github.com/sagnikdas/dosely/blob/main/docs/play-store/delete-account.md';
 
 class AccountDeletionException implements Exception {
   const AccountDeletionException(this.message);
