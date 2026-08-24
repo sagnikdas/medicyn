@@ -89,6 +89,27 @@ class SyncService {
     await _pullDoseLogContests(user.id);
   }
 
+  /// The subset of [pullAll] cheap enough to run before every push, not just
+  /// on a fresh install. [syncAll] has no version guard of its own — it
+  /// blind-upserts every locally dirty row — so a device that has been
+  /// offline can otherwise push a stale edit straight over a caregiver's
+  /// newer one. Running this first gives medicines, schedules, and contest
+  /// notes their last-write-wins comparison before that happens.
+  ///
+  /// Dose logs are left out on purpose: they are insert-only, so a push can
+  /// never clobber one, and the table is the one that only grows — which is
+  /// why a full [pullAll] stays reserved for first run / a new device.
+  Future<void> pullEditableTables() async {
+    if (!AppSettings.instance.consentCloudBackup) return;
+    final user = _client.auth.currentUser;
+    if (user == null) return;
+    _schedulesChanged = false;
+    _rejectedScheduleIds.clear();
+    await _pullMedicines(user.id);
+    await _pullSchedules(user.id);
+    await _pullDoseLogContests(user.id);
+  }
+
   // Every network call below is bounded with a timeout. Without one, a
   // stalled connection (no connectivity, unreachable Supabase host, etc.)
   // leaves the `await` unresolved forever — the per-call try/catch only

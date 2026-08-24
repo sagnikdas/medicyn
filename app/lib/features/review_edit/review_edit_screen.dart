@@ -22,6 +22,7 @@ import '../consent/consent_service.dart';
 import '../history/dose_history_screen.dart';
 import '../notification_engine/notification_service.dart';
 import '../notification_engine/schedule_validation.dart';
+import '../reminders_home/refill.dart';
 import 'parsed_medicine.dart';
 
 /// The one gate everything else in the capture flow passes through: nothing
@@ -128,7 +129,17 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
 
   Future<void> _load() async {
     if (_isEditing) {
-      _applyExisting(widget.existing!);
+      // Caregiver-editing-a-patient's-reminder skips this: patientReminders
+      // does not select the stock columns at all yet (a separate, already
+      // fixed fix waiting to land), so medicine.tabletsRemaining is always
+      // null on that path today and there is nothing to derive.
+      final takenSinceBaseline = _forSomeoneElse
+          ? 0
+          : await widget.db.takenCountSince(
+              widget.existing!.schedule.id,
+              widget.existing!.medicine.updatedAt,
+            );
+      _applyExisting(widget.existing!, takenSinceBaseline);
       setState(() => _loadState = _LoadState.ready);
       return;
     }
@@ -187,7 +198,7 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
     _confidence = p.confidence;
   }
 
-  void _applyExisting(ScheduleWithMedicine sm) {
+  void _applyExisting(ScheduleWithMedicine sm, int takenSinceBaseline) {
     final medicine = sm.medicine;
     final schedule = sm.schedule;
     _drugNameController.text = medicine.drugName;
@@ -195,8 +206,13 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
     _formController.text = medicine.form;
     _doseAmountController.text = medicine.doseAmount;
     _notesController.text = medicine.notes;
-    if (medicine.tabletsRemaining != null) {
-      _remainingController.text = '${medicine.tabletsRemaining}';
+    // Derived, not the raw stored baseline: every save re-baselines the count
+    // to whatever is shown here, so an edit that never touches this field
+    // (renaming the drug, say) must still write back the current count, not
+    // the stale one from whenever the baseline was last set.
+    final derived = derivedTabletsRemaining(medicine, takenSinceBaseline);
+    if (derived != null) {
+      _remainingController.text = '$derived';
     }
     if (medicine.tabletsPerDose != null) {
       _perDoseController.text = '${medicine.tabletsPerDose}';

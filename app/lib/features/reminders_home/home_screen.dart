@@ -113,10 +113,13 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   /// they returned to the app — the permission requests are one-time asks,
   /// while the re-arming below is what actually needs to happen on resume.
   ///
-  /// The same flag gates the Supabase pull, for the same reason: restoring
-  /// remote rows matters on a fresh install or a new device, not on every
-  /// foreground. It reads all three tables in full, including every dose log
-  /// ever written, which only grows.
+  /// The same flag gates the *full* Supabase pull, for the same reason:
+  /// restoring dose-log history wholesale matters on a fresh install or a new
+  /// device, not on every foreground, and that table only grows. Every
+  /// resume still runs [SyncService.pullEditableTables] below — medicines,
+  /// schedules, and contest notes are cheap, and skipping them would let the
+  /// push that follows blind-overwrite an edit made elsewhere while this
+  /// device was away.
   Future<void> _bootstrap({bool requestPermissions = false}) async {
     await NotificationService.instance.init();
     if (requestPermissions) {
@@ -143,7 +146,13 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     // schedules yet, so restoring them from Supabase first means reconcile
     // arms their alarms in this same pass instead of waiting for the next
     // resume.
-    if (sync != null && requestPermissions) await sync.pullAll();
+    if (sync != null) {
+      if (requestPermissions) {
+        await sync.pullAll();
+      } else {
+        await sync.pullEditableTables();
+      }
+    }
     // Stop a looping alarm that is already on screen. Opening the app is
     // the answer; they should not have to find that row in the shade.
     // Reconcile afterwards puts the repeating series back (cancel of a
@@ -191,7 +200,8 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       unawaited(CareNotifier.instance.dataChanged());
     }
     final items = await widget.db.activeSchedulesOnce();
-    if (anyRefillLow(items)) {
+    final taken = await widget.db.takenCountsSinceBaseline(items);
+    if (anyRefillLow(items, taken)) {
       unawaited(CareNotifier.instance.refillLow());
     }
   }

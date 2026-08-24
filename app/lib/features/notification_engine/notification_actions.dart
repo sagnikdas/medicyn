@@ -109,6 +109,10 @@ Future<void> recordDoseTaken(
   required DateTime scheduledAt,
   String source = 'notification',
 }) async {
+  // Nothing decrements the medicine's stock count here — it is derived from
+  // this log at display time (see derivedTabletsRemaining), so a caregiver's
+  // concurrent edit to the reminder can never revert a dose this device just
+  // took.
   await db.recordDoseAction(
     id: newUuid(),
     scheduleId: scheduleId,
@@ -116,7 +120,6 @@ Future<void> recordDoseTaken(
     action: DoseAction.taken,
     source: source,
   );
-  await db.decrementStockForSchedule(scheduleId);
 }
 
 /// Logs the snooze, then arms a one-off reminder [delay] out.

@@ -73,27 +73,30 @@ class AppDatabase extends _$AppDatabase {
   Future<Medicine?> medicineById(String id) =>
       (select(medicines)..where((t) => t.id.equals(id))).getSingleOrNull();
 
-  /// Subtracts one dose from the bottle for [scheduleId]'s medicine.
-  ///
-  /// Leaves [Medicines.updatedAt] alone: a Taken is not an edit of the
-  /// reminder, and bumping the stamp would let a decrement overwrite a
-  /// caregiver's concurrent change to the name.
-  Future<void> decrementStockForSchedule(String scheduleId) async {
-    final schedule = await scheduleById(scheduleId);
-    if (schedule == null) return;
-    final medicine = await medicineById(schedule.medicineId);
-    if (medicine == null || medicine.tabletsRemaining == null) return;
-    final perDose = (medicine.tabletsPerDose == null || medicine.tabletsPerDose! < 1)
-        ? 1
-        : medicine.tabletsPerDose!;
-    final next = medicine.tabletsRemaining! - perDose;
-    final remaining = next < 0 ? 0 : next;
-    await (update(medicines)..where((t) => t.id.equals(medicine.id))).write(
-      MedicinesCompanion(
-        tabletsRemaining: Value(remaining),
-        pendingSync: const Value(true),
-      ),
-    );
+  /// Doses answered Taken on [scheduleId] strictly after [since] — the count
+  /// [derivedTabletsRemaining] subtracts from a medicine's stored baseline.
+  Future<int> takenCountSince(String scheduleId, DateTime since) async {
+    final rows = await (select(doseLogs)
+          ..where((t) =>
+              t.scheduleId.equals(scheduleId) &
+              t.action.equals(DoseAction.taken.name) &
+              t.loggedAt.isBiggerThanValue(since)))
+        .get();
+    return rows.length;
+  }
+
+  /// [takenCountSince], batched across every schedule in [items] and summed
+  /// per medicine — one medicine can have more than one active schedule, and
+  /// every schedule against it draws from the same bottle.
+  Future<Map<String, int>> takenCountsSinceBaseline(
+    List<ScheduleWithMedicine> items,
+  ) async {
+    final out = <String, int>{};
+    for (final item in items) {
+      final n = await takenCountSince(item.schedule.id, item.medicine.updatedAt);
+      out[item.medicine.id] = (out[item.medicine.id] ?? 0) + n;
+    }
+    return out;
   }
 
   // --- Schedules -----------------------------------------------------------
