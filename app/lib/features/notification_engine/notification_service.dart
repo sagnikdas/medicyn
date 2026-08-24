@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io' show Platform;
 import 'dart:typed_data' show Int32List;
 
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -67,6 +68,15 @@ bool shouldOpenFromLaunchDetails({
   required String fingerprint,
   required String? alreadyHandled,
 }) => alreadyHandled != fingerprint;
+
+/// A cold-start launch response paired with the fingerprint that will mark
+/// it handled — see [NotificationService.consumeLaunchNotificationResponse]
+/// and [NotificationService.markLaunchHandled].
+class LaunchNotification {
+  const LaunchNotification(this.response, this.fingerprint);
+  final NotificationResponse response;
+  final String fingerprint;
+}
 
 /// Care alerts default to private: the recipient does not need the drug name
 /// on a locked phone. Unlike the patient's own reminder, there is no opt-in
@@ -170,8 +180,14 @@ class NotificationService {
     try {
       final deviceTz = await FlutterTimezone.getLocalTimezone();
       tz.setLocalLocation(tz.getLocation(deviceTz.identifier));
-    } catch (_) {
-      // Fallback to UTC if timezone lookup fails to prevent initialization crash
+    } catch (e) {
+      // Falls back to UTC so init() can still complete rather than crash —
+      // but every alarm this process arms is now off by the device's UTC
+      // offset, silently, for its whole lifetime (see the `_initialized`
+      // guard above: this only runs once). That was previously swallowed
+      // with no trace at all; logged now so a report of reminders firing at
+      // the wrong time has somewhere to start.
+      debugPrint('[dosely] device timezone lookup failed, falling back to UTC: $e');
       tz.setLocalLocation(tz.getLocation('UTC'));
     }
 
@@ -229,7 +245,14 @@ class NotificationService {
   /// The plugin reports the *last* notification launch on every later start,
   /// including Run from the IDE. We remember the one we already opened today
   /// so a normal launch does not replay the Taken/Snooze screen.
-  Future<NotificationResponse?> consumeLaunchNotificationResponse() async {
+  /// Checks the launch response against the dedup pref, but does not write
+  /// it — that happens in [markLaunchHandled], only once the response has
+  /// actually finished being acted on. Writing it here, before `main()` even
+  /// calls `runApp`, meant a process killed between this returning and
+  /// `handleNotificationResponse` finishing (which records the dose) lost
+  /// the Taken for good: already marked handled, so no later cold start —
+  /// even one seeing the same stale launch intent — would ever retry it.
+  Future<LaunchNotification?> consumeLaunchNotificationResponse() async {
     final details = await _plugin.getNotificationAppLaunchDetails();
     if (details?.didNotificationLaunchApp != true) return null;
     final response = details?.notificationResponse;
@@ -244,8 +267,14 @@ class NotificationService {
     )) {
       return null;
     }
+    return LaunchNotification(response, fingerprint);
+  }
+
+  /// See [consumeLaunchNotificationResponse]. Call only after the response it
+  /// returned has actually been handled.
+  Future<void> markLaunchHandled(String fingerprint) async {
+    final prefs = await SharedPreferences.getInstance();
     await prefs.setString(handledNotificationLaunchPref, fingerprint);
-    return response;
   }
 
   Future<bool> requestPermissions() async {
@@ -743,6 +772,13 @@ class NotificationService {
         failures[sm.schedule.id] = error;
       }
     }
+    if (failures.isNotEmpty) {
+      // None of the four callers inspect the returned report today, so this
+      // was previously the only trace a failed-to-arm schedule left anywhere
+      // — logged here once, centrally, rather than asking every call site to
+      // remember to check `allArmed` itself.
+      debugPrint('[dosely] reconcile: ${failures.length} schedule(s) failed to arm: $failures');
+    }
     return ReconcileReport(
       armed: active.length - failures.length,
       failures: failures,
@@ -809,9 +845,10 @@ class NotificationService {
 
 /// What [NotificationService.reconcile] managed to arm.
 ///
-/// Returned rather than logged so a caller can tell the user that a specific
-/// reminder is not running. Nothing surfaces it yet; the value of returning
-/// it now is that the information stops being thrown away.
+/// A failure is logged inside [NotificationService.reconcile] itself, since
+/// none of its callers inspect this. Still returned, not only logged, so a
+/// caller can eventually tell the user that a specific reminder is not
+/// running — that part of the design is unbuilt, not the reason this exists.
 class ReconcileReport {
   const ReconcileReport({required this.armed, required this.failures});
 

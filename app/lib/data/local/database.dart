@@ -73,27 +73,30 @@ class AppDatabase extends _$AppDatabase {
   Future<Medicine?> medicineById(String id) =>
       (select(medicines)..where((t) => t.id.equals(id))).getSingleOrNull();
 
-  /// Subtracts one dose from the bottle for [scheduleId]'s medicine.
-  ///
-  /// Leaves [Medicines.updatedAt] alone: a Taken is not an edit of the
-  /// reminder, and bumping the stamp would let a decrement overwrite a
-  /// caregiver's concurrent change to the name.
-  Future<void> decrementStockForSchedule(String scheduleId) async {
-    final schedule = await scheduleById(scheduleId);
-    if (schedule == null) return;
-    final medicine = await medicineById(schedule.medicineId);
-    if (medicine == null || medicine.tabletsRemaining == null) return;
-    final perDose = (medicine.tabletsPerDose == null || medicine.tabletsPerDose! < 1)
-        ? 1
-        : medicine.tabletsPerDose!;
-    final next = medicine.tabletsRemaining! - perDose;
-    final remaining = next < 0 ? 0 : next;
-    await (update(medicines)..where((t) => t.id.equals(medicine.id))).write(
-      MedicinesCompanion(
-        tabletsRemaining: Value(remaining),
-        pendingSync: const Value(true),
-      ),
-    );
+  /// Doses answered Taken on [scheduleId] strictly after [since] — the count
+  /// [derivedTabletsRemaining] subtracts from a medicine's stored baseline.
+  Future<int> takenCountSince(String scheduleId, DateTime since) async {
+    final rows = await (select(doseLogs)
+          ..where((t) =>
+              t.scheduleId.equals(scheduleId) &
+              t.action.equals(DoseAction.taken.name) &
+              t.loggedAt.isBiggerThanValue(since)))
+        .get();
+    return rows.length;
+  }
+
+  /// [takenCountSince], batched across every schedule in [items] and summed
+  /// per medicine — one medicine can have more than one active schedule, and
+  /// every schedule against it draws from the same bottle.
+  Future<Map<String, int>> takenCountsSinceBaseline(
+    List<ScheduleWithMedicine> items,
+  ) async {
+    final out = <String, int>{};
+    for (final item in items) {
+      final n = await takenCountSince(item.schedule.id, item.medicine.updatedAt);
+      out[item.medicine.id] = (out[item.medicine.id] ?? 0) + n;
+    }
+    return out;
   }
 
   // --- Schedules -----------------------------------------------------------
@@ -456,6 +459,50 @@ class AppDatabase extends _$AppDatabase {
   Future<Map<String, DateTime>> scheduleVersions() async {
     final rows = await select(schedules).get();
     return {for (final r in rows) r.id: r.updatedAt};
+  }
+
+  /// Local medicines missing from [remoteIds] that a pull may safely
+  /// tombstone: rows this device believes are already synced, since a pull
+  /// runs before push and there is nothing left here to lose. A `pendingSync`
+  /// row is excluded — it might be a local edit or a brand-new medicine that
+  /// simply hasn't reached the server yet, and this only ever runs against a
+  /// SELECT that actually succeeded (the caller's try/catch sees to that), so
+  /// its absence there is the server's word that this row is really gone.
+  Future<List<String>> medicineIdsMissingRemotely(Set<String> remoteIds) async {
+    final rows = await (select(medicines)
+          ..where((t) => t.pendingSync.equals(false) & t.deleted.equals(false)))
+        .get();
+    return [for (final r in rows) if (!remoteIds.contains(r.id)) r.id];
+  }
+
+  /// See [medicineIdsMissingRemotely].
+  Future<List<String>> scheduleIdsMissingRemotely(Set<String> remoteIds) async {
+    final rows = await (select(schedules)
+          ..where((t) => t.pendingSync.equals(false) & t.deleted.equals(false)))
+        .get();
+    return [for (final r in rows) if (!remoteIds.contains(r.id)) r.id];
+  }
+
+  /// Tombstones medicines a pull found gone from the server — the local half
+  /// of a delete that happened on another device. Nothing to push back:
+  /// the server already reflects this, so `pendingSync` stays false.
+  Future<void> tombstoneMedicinesMissingRemotely(List<String> ids) async {
+    if (ids.isEmpty) return;
+    await (update(medicines)..where((t) => t.id.isIn(ids))).write(
+      const MedicinesCompanion(deleted: Value(true), pendingSync: Value(false)),
+    );
+  }
+
+  /// See [tombstoneMedicinesMissingRemotely].
+  Future<void> tombstoneSchedulesMissingRemotely(List<String> ids) async {
+    if (ids.isEmpty) return;
+    await (update(schedules)..where((t) => t.id.isIn(ids))).write(
+      const SchedulesCompanion(
+        deleted: Value(true),
+        active: Value(false),
+        pendingSync: Value(false),
+      ),
+    );
   }
 
   /// Ids of every local dose log, so a pull can skip the ones it already has.

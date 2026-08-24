@@ -368,6 +368,12 @@ void main() {
   group('pull of dose logs', () {
     test('inserts a log this device has never seen', () async {
       await seedLocalSchedule(pendingSync: false);
+      // Matches the local schedule so the delete-propagation check (a
+      // pendingSync=false row missing from an otherwise-successful pull is
+      // tombstoned — see medicineIdsMissingRemotely) doesn't remove it
+      // before the dose log pull runs; a tombstoned schedule's dose logs
+      // are filtered out on the way in by design.
+      backend.tables['schedules'] = [remoteSchedule()];
       backend.tables['dose_logs'] = [remoteDoseLog()];
 
       await SyncService(db).pullAll();

@@ -55,8 +55,36 @@ int? refillDaysLeft({
 
 bool refillIsLow(int? daysLeft) => daysLeft != null && daysLeft <= refillWarnDays;
 
+/// The bottle's count right now: the last explicitly-entered baseline minus
+/// what has been taken since.
+///
+/// [medicine.tabletsRemaining] only changes when a save — this device's or a
+/// linked caregiver's — writes a new number; nothing decrements it in place.
+/// [takenSinceBaseline] must count only doses logged strictly after
+/// [medicine.updatedAt], the moment that baseline was captured, since every
+/// save re-stamps both fields together from the derived count shown at save
+/// time. Counting from any earlier point would subtract a dose that was
+/// already folded into the baseline.
+int? derivedTabletsRemaining(Medicine medicine, int takenSinceBaseline) {
+  final baseline = medicine.tabletsRemaining;
+  if (baseline == null) return null;
+  final perDose = (medicine.tabletsPerDose == null || medicine.tabletsPerDose! < 1)
+      ? 1
+      : medicine.tabletsPerDose!;
+  final remaining = baseline - perDose * takenSinceBaseline;
+  return remaining < 0 ? 0 : remaining;
+}
+
 /// True when any tracked bottle on [items] is at or below the warning.
-bool anyRefillLow(List<ScheduleWithMedicine> items) {
+///
+/// [takenSinceBaseline] is doses taken since each medicine's baseline was
+/// set, keyed by medicine id — see [derivedTabletsRemaining]. A medicine
+/// missing from the map is treated as having none, which is right for a
+/// baseline just set with nothing taken against it yet.
+bool anyRefillLow(
+  List<ScheduleWithMedicine> items,
+  Map<String, int> takenSinceBaseline,
+) {
   final remaining = <String, Medicine>{};
   final byMedicine = <String, List<Schedule>>{};
   for (final item in items) {
@@ -66,7 +94,7 @@ bool anyRefillLow(List<ScheduleWithMedicine> items) {
   for (final id in remaining.keys) {
     final medicine = remaining[id]!;
     if (refillIsLow(refillDaysLeft(
-      tabletsRemaining: medicine.tabletsRemaining,
+      tabletsRemaining: derivedTabletsRemaining(medicine, takenSinceBaseline[id] ?? 0),
       tabletsPerDose: medicine.tabletsPerDose,
       schedules: byMedicine[id]!,
     ))) {

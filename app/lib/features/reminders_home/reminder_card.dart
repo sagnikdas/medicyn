@@ -82,23 +82,7 @@ class ReminderCard extends StatelessWidget {
                           describeSchedule(item.schedule),
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
-                        if (refillWarningLine(
-                              refillDaysLeft(
-                                tabletsRemaining: medicine.tabletsRemaining,
-                                tabletsPerDose: medicine.tabletsPerDose,
-                                schedules: [item.schedule],
-                              ),
-                            )
-                            case final warning?) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            warning,
-                            style: Theme.of(context).textTheme.bodySmall
-                                ?.copyWith(
-                                  color: Theme.of(context).colorScheme.error,
-                                ),
-                          ),
-                        ],
+                        _RefillStatus(db: db, item: item),
                         if (attribution != null) ...[
                           const SizedBox(height: 4),
                           Text(
@@ -210,6 +194,48 @@ class _SnoozeStatusState extends State<_SnoozeStatus> {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Shows the low-refill warning under a reminder, or nothing when the bottle
+/// isn't tracked or isn't low.
+///
+/// A one-shot query per build rather than a `.watch()` stream, for the same
+/// reason as [_SnoozeStatus]: a Taken recorded from the notification tray
+/// runs on a separate `AppDatabase` instance and never pushes to this one's
+/// streams. HomeScreen's own 15-second clock already rebuilds this card,
+/// which keeps the count close enough to live without a poll timer of its
+/// own.
+class _RefillStatus extends StatelessWidget {
+  const _RefillStatus({required this.db, required this.item});
+  final AppDatabase db;
+  final ScheduleWithMedicine item;
+
+  @override
+  Widget build(BuildContext context) {
+    if (item.medicine.tabletsRemaining == null) return const SizedBox.shrink();
+    return FutureBuilder<int>(
+      future: db.takenCountSince(item.schedule.id, item.medicine.updatedAt),
+      builder: (context, snapshot) {
+        final warning = refillWarningLine(
+          refillDaysLeft(
+            tabletsRemaining: derivedTabletsRemaining(item.medicine, snapshot.data ?? 0),
+            tabletsPerDose: item.medicine.tabletsPerDose,
+            schedules: [item.schedule],
+          ),
+        );
+        if (warning == null) return const SizedBox.shrink();
+        return Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Text(
+            warning,
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.error),
+          ),
+        );
+      },
     );
   }
 }

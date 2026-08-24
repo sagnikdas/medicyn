@@ -11,6 +11,7 @@ import '../../data/local/database.dart';
 import '../../data/local/encrypted_database.dart';
 import '../auth/auth_service.dart';
 import '../care/care_screen.dart';
+import '../care/care_service.dart';
 import '../consent/consent_purpose.dart';
 import '../consent/consent_service.dart';
 import '../notification_engine/notification_service.dart';
@@ -373,8 +374,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 value: ConsentService.instance.isGranted(
                                   purpose,
                                 ),
-                                onChanged: (v) => ConsentService.instance
-                                    .setGranted(purpose, v),
+                                onChanged: (v) =>
+                                    _onConsentChanged(context, purpose, v),
                               ),
                           ],
                         );
@@ -456,6 +457,65 @@ class _SettingsScreenState extends State<SettingsScreen> {
       await NotificationService.instance.reconcileFromDisk();
     } catch (_) {
       // Next foreground re-arms; the pref is already stored.
+    }
+  }
+
+  /// Cloud backup consent is what gates the missed-dose push in
+  /// HomeScreen._bootstrap (no push means nothing for the server to
+  /// announce), but the Care screens read link status alone and keep saying
+  /// "Connected" regardless. Turning it off while a caregiver is actually
+  /// linked would silently stop the one thing that screen is telling them is
+  /// still working — worth a stop, unlike every other purpose here, which
+  /// really does take effect with nothing else watching.
+  Future<void> _onConsentChanged(
+    BuildContext context,
+    ConsentPurpose purpose,
+    bool value,
+  ) async {
+    if (purpose != ConsentPurpose.cloudBackup || value) {
+      await ConsentService.instance.setGranted(purpose, value);
+      return;
+    }
+    final me = AuthService.instance.currentUser?.id;
+    CareLink? link;
+    try {
+      link = await CareService.instance.currentLink();
+    } catch (_) {
+      // Can't confirm either way without a network round-trip that just
+      // failed — fail open rather than block turning consent off.
+    }
+    final linkedAsPatient =
+        link != null && link.status == CareLinkStatus.active && link.patientId == me;
+    if (!linkedAsPatient) {
+      await ConsentService.instance.setGranted(purpose, value);
+      return;
+    }
+    if (!context.mounted) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Turn off cloud backup?'),
+        content: const Text(
+          "Your caregiver won't be told if you miss a dose while this is "
+          'off, even though their screen will still say Connected.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(dialogContext).colorScheme.error,
+            ),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Turn off'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      await ConsentService.instance.setGranted(purpose, value);
     }
   }
 

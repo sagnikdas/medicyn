@@ -37,61 +37,6 @@ void main() {
     ));
   }
 
-  group('decrementStockForSchedule', () {
-    test('takes one tablet off the bottle', () async {
-      await seed(remaining: 30);
-      await db.decrementStockForSchedule('sched-1');
-      expect((await db.medicineById('med-1'))!.tabletsRemaining, 29);
-    });
-
-    test('takes the whole dose when a dose is more than one tablet', () async {
-      await seed(remaining: 30, perDose: 2);
-      await db.decrementStockForSchedule('sched-1');
-      expect((await db.medicineById('med-1'))!.tabletsRemaining, 28);
-    });
-
-    test('never goes negative, however many doses are recorded', () async {
-      await seed(remaining: 1, perDose: 3);
-      await db.decrementStockForSchedule('sched-1');
-      expect((await db.medicineById('med-1'))!.tabletsRemaining, 0);
-
-      await db.decrementStockForSchedule('sched-1');
-      expect((await db.medicineById('med-1'))!.tabletsRemaining, 0);
-    });
-
-    test('a nonsense per-dose falls back to one rather than to zero', () async {
-      // A zero would make every Taken a no-op and the bottle never empty.
-      await seed(remaining: 10, perDose: 0);
-      await db.decrementStockForSchedule('sched-1');
-      expect((await db.medicineById('med-1'))!.tabletsRemaining, 9);
-    });
-
-    test('does nothing when the user is not tracking the count', () async {
-      await seed(remaining: null);
-      await db.decrementStockForSchedule('sched-1');
-      final med = (await db.medicineById('med-1'))!;
-      expect(med.tabletsRemaining, isNull);
-      expect(med.pendingSync, isFalse, reason: 'no write, so nothing to push');
-    });
-
-    test('leaves updatedAt alone so it cannot outrank a real edit', () async {
-      // Last-write-wins is on updatedAt. If taking a tablet bumped it, a
-      // decrement here would silently beat the caregiver's rename there.
-      final stamp = DateTime(2026, 8, 1);
-      await seed(remaining: 30, medicineUpdatedAt: stamp);
-      await db.decrementStockForSchedule('sched-1');
-      final med = (await db.medicineById('med-1'))!;
-      expect(med.updatedAt, stamp);
-      expect(med.pendingSync, isTrue, reason: 'the new count still has to sync');
-    });
-
-    test('a schedule that no longer exists is not an error', () async {
-      await seed(remaining: 30);
-      await db.decrementStockForSchedule('sched-missing');
-      expect((await db.medicineById('med-1'))!.tabletsRemaining, 30);
-    });
-  });
-
   group('syncedMissedDoseIdsSince', () {
     Future<void> log(
       String id, {

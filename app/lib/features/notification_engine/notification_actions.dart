@@ -28,7 +28,13 @@ void notificationTapBackground(NotificationResponse response) {
 /// rather than relying on an app-wide singleton, since a background isolate
 /// has none of the app's state. For a plain tap on the notification body,
 /// pushes [DoseConfirmScreen] instead — which does the same on its own.
-void handleNotificationResponse(NotificationResponse response) async {
+///
+/// Returns a [Future] (rather than plain `void`) so main.dart's cold-start
+/// launch path can await it before marking that launch handled — a
+/// void-returning function is still a valid
+/// `onDidReceiveNotificationResponse`/background callback, so neither of
+/// those two callers has to change.
+Future<void> handleNotificationResponse(NotificationResponse response) async {
   final actionId = response.actionId;
 
   final payloadRaw = response.payload;
@@ -113,19 +119,20 @@ Future<void> recordDoseTaken(
   required DateTime scheduledAt,
   String source = 'notification',
 }) async {
-  final id = doseLogIdFor(scheduleId, scheduledAt, DoseAction.taken);
-  final alreadyRecorded = await db.doseLogById(id) != null;
+  // Nothing decrements the medicine's stock count here — it is derived from
+  // this log at display time (see derivedTabletsRemaining), so a caregiver's
+  // concurrent edit to the reminder can never revert a dose this device just
+  // took. Repeated taps don't need an `alreadyRecorded` guard either, for
+  // the same reason: there's no decrement left to double-count. recordDoseAction
+  // is a plain insertOnConflictUpdate, so a second tap just rewrites the same
+  // fact — the deterministic id below is what keeps it one row.
   await db.recordDoseAction(
-    id: id,
+    id: doseLogIdFor(scheduleId, scheduledAt, DoseAction.taken),
     scheduleId: scheduleId,
     scheduledAt: scheduledAt,
     action: DoseAction.taken,
     source: source,
   );
-  // Only the first Taken for this dose comes off the bottle. The count is
-  // what the refill warning is computed from, so double-counting it empties
-  // the bottle on paper while the real one is still full.
-  if (!alreadyRecorded) await db.decrementStockForSchedule(scheduleId);
 }
 
 /// Logs the snooze, then arms a one-off reminder [delay] out.

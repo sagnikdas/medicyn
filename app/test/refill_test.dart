@@ -4,6 +4,22 @@ import 'package:dosely/features/reminders_home/refill.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  Medicine medicine({int? tabletsRemaining, int? tabletsPerDose}) => Medicine(
+        id: 'm1',
+        drugName: 'Metformin',
+        strength: '',
+        form: '',
+        doseAmount: '',
+        tabletsRemaining: tabletsRemaining,
+        tabletsPerDose: tabletsPerDose,
+        notes: '',
+        createdAt: DateTime(2026, 8, 1),
+        updatedAt: DateTime(2026, 8, 1),
+        updatedBy: null,
+        pendingSync: false,
+        deleted: false,
+      );
+
   Schedule daily({List<String> times = const ['08:00', '20:00']}) => Schedule(
         id: 's1',
         medicineId: 'm1',
@@ -105,5 +121,67 @@ void main() {
       ),
       isNull,
     );
+  });
+
+  group('derivedTabletsRemaining', () {
+    test('subtracts what has been taken since the baseline was set', () {
+      expect(
+        derivedTabletsRemaining(medicine(tabletsRemaining: 30, tabletsPerDose: 1), 2),
+        28,
+      );
+    });
+
+    test('multiplies by tablets per dose', () {
+      expect(
+        derivedTabletsRemaining(medicine(tabletsRemaining: 30, tabletsPerDose: 2), 3),
+        24,
+      );
+    });
+
+    test('a nonsense per-dose falls back to one rather than to zero', () {
+      // A zero would make every Taken subtract nothing, and the bottle
+      // would never register as running out.
+      expect(
+        derivedTabletsRemaining(medicine(tabletsRemaining: 10, tabletsPerDose: 0), 1),
+        9,
+      );
+    });
+
+    test('floors at zero rather than going negative', () {
+      expect(
+        derivedTabletsRemaining(medicine(tabletsRemaining: 3, tabletsPerDose: 2), 5),
+        0,
+      );
+    });
+
+    test('null baseline means the bottle is not tracked', () {
+      expect(derivedTabletsRemaining(medicine(tabletsPerDose: 1), 2), isNull);
+    });
+
+    test('nothing taken yet leaves the baseline untouched', () {
+      expect(
+        derivedTabletsRemaining(medicine(tabletsRemaining: 30, tabletsPerDose: 1), 0),
+        30,
+      );
+    });
+  });
+
+  group('anyRefillLow', () {
+    ScheduleWithMedicine item({int? tabletsRemaining}) => ScheduleWithMedicine(
+          daily(),
+          medicine(tabletsRemaining: tabletsRemaining, tabletsPerDose: 1),
+        );
+
+    test('a dose taken since the baseline can push a bottle into the warning', () {
+      // Baseline of 12 (over the 5-day warning at 2/day) minus 8 taken lands
+      // on 4 remaining — two days, which is low. Passing the raw baseline
+      // with nothing taken must not have warned yet.
+      expect(anyRefillLow([item(tabletsRemaining: 12)], const {}), isFalse);
+      expect(anyRefillLow([item(tabletsRemaining: 12)], const {'m1': 8}), isTrue);
+    });
+
+    test('a medicine missing from the map is treated as nothing taken', () {
+      expect(anyRefillLow([item(tabletsRemaining: 12)], const {'other': 8}), isFalse);
+    });
   });
 }

@@ -5,6 +5,7 @@ import 'package:dosely/features/notification_engine/notification_actions.dart';
 import 'package:dosely/features/notification_engine/notification_ids.dart';
 import 'package:dosely/features/notification_engine/notification_service.dart';
 import 'package:dosely/features/notification_engine/schedule_validation.dart';
+import 'package:dosely/features/reminders_home/refill.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -113,6 +114,10 @@ void main() {
         drugName: 'Metformin',
         tabletsRemaining: const Value(30),
         tabletsPerDose: const Value(1),
+        // Safely before `due` (and before whenever this test actually
+        // runs), so takenCountSince's strict-greater-than comparison can
+        // never tie with a dose logged moments after setUp.
+        updatedAt: Value(DateTime(2020, 1, 1)),
       ));
       await db.upsertSchedule(SchedulesCompanion.insert(
         id: scheduleId,
@@ -126,13 +131,22 @@ void main() {
 
     Future<List<DoseLog>> logs() => db.watchDoseLogsForSchedule(scheduleId).first;
 
+    // The bottle count is no longer decremented in place — it's derived from
+    // doses taken since the medicine's baseline (see derivedTabletsRemaining)
+    // — so these read the same way the app itself would show the count.
+    Future<int?> remaining() async {
+      final medicine = (await db.medicineById(medicineId))!;
+      final taken = await db.takenCountSince(scheduleId, medicine.updatedAt);
+      return derivedTabletsRemaining(medicine, taken);
+    }
+
     test('five taps of Taken are one dose and one tablet', () async {
       for (var i = 0; i < 5; i++) {
         await recordDoseTaken(db, scheduleId: scheduleId, scheduledAt: due);
       }
 
       expect(await logs(), hasLength(1));
-      expect((await db.medicineById(medicineId))!.tabletsRemaining, 29,
+      expect(await remaining(), 29,
           reason: 'the bottle must not empty faster than it is emptied');
     });
 
@@ -142,7 +156,7 @@ void main() {
           db, scheduleId: scheduleId, scheduledAt: due.add(const Duration(hours: 12)));
 
       expect(await logs(), hasLength(2));
-      expect((await db.medicineById(medicineId))!.tabletsRemaining, 28);
+      expect(await remaining(), 28);
     });
 
     test('a snooze after a taken is still recorded as its own fact', () async {
