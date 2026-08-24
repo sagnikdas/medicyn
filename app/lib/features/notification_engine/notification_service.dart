@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io' show Platform;
 import 'dart:typed_data' show Int32List;
 
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -152,8 +153,14 @@ class NotificationService {
     try {
       final deviceTz = await FlutterTimezone.getLocalTimezone();
       tz.setLocalLocation(tz.getLocation(deviceTz.identifier));
-    } catch (_) {
-      // Fallback to UTC if timezone lookup fails to prevent initialization crash
+    } catch (e) {
+      // Falls back to UTC so init() can still complete rather than crash —
+      // but every alarm this process arms is now off by the device's UTC
+      // offset, silently, for its whole lifetime (see the `_initialized`
+      // guard above: this only runs once). That was previously swallowed
+      // with no trace at all; logged now so a report of reminders firing at
+      // the wrong time has somewhere to start.
+      debugPrint('[dosely] device timezone lookup failed, falling back to UTC: $e');
       tz.setLocalLocation(tz.getLocation('UTC'));
     }
 
@@ -708,6 +715,13 @@ class NotificationService {
         failures[sm.schedule.id] = error;
       }
     }
+    if (failures.isNotEmpty) {
+      // None of the four callers inspect the returned report today, so this
+      // was previously the only trace a failed-to-arm schedule left anywhere
+      // — logged here once, centrally, rather than asking every call site to
+      // remember to check `allArmed` itself.
+      debugPrint('[dosely] reconcile: ${failures.length} schedule(s) failed to arm: $failures');
+    }
     return ReconcileReport(
       armed: active.length - failures.length,
       failures: failures,
@@ -774,9 +788,10 @@ class NotificationService {
 
 /// What [NotificationService.reconcile] managed to arm.
 ///
-/// Returned rather than logged so a caller can tell the user that a specific
-/// reminder is not running. Nothing surfaces it yet; the value of returning
-/// it now is that the information stops being thrown away.
+/// A failure is logged inside [NotificationService.reconcile] itself, since
+/// none of its callers inspect this. Still returned, not only logged, so a
+/// caller can eventually tell the user that a specific reminder is not
+/// running — that part of the design is unbuilt, not the reason this exists.
 class ReconcileReport {
   const ReconcileReport({required this.armed, required this.failures});
 
