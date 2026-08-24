@@ -359,6 +359,10 @@ class SyncService {
   Future<void> _pullMedicines(String userId) async {
     try {
       final rows = await _client.from('medicines').select().eq('user_id', userId).timeout(_networkTimeout);
+      // Extracted before the per-row try below, since an id is always
+      // present on a row Postgrest actually returned — a row missing from
+      // this set genuinely no longer exists remotely, not just unparsed.
+      final remoteIds = rows.map((r) => r['id'] as String?).whereType<String>().toSet();
       final local = await _db.medicineVersions();
       final winners = <MedicinesCompanion>[];
       for (final r in rows) {
@@ -394,6 +398,11 @@ class SyncService {
         }
       }
       await _db.applyRemoteMedicines(winners);
+      // A medicine deleted on another device is a hard DELETE there, with no
+      // tombstone column to pull — its absence from this response is the
+      // only signal this device gets. See medicineIdsMissingRemotely.
+      final gone = await _db.medicineIdsMissingRemotely(remoteIds);
+      await _db.tombstoneMedicinesMissingRemotely(gone);
     } catch (_) {
       // Best-effort — retried on the next pullAll() call.
     }
@@ -402,6 +411,7 @@ class SyncService {
   Future<void> _pullSchedules(String userId) async {
     try {
       final rows = await _client.from('schedules').select().eq('user_id', userId).timeout(_networkTimeout);
+      final remoteIds = rows.map((r) => r['id'] as String?).whereType<String>().toSet();
       final local = await _db.scheduleVersions();
       final winners = <SchedulesCompanion>[];
       for (final r in rows) {
@@ -453,11 +463,18 @@ class SyncService {
         }
       }
       await _db.applyRemoteSchedules(winners);
+      // A schedule deleted on another device is a hard DELETE there, with no
+      // tombstone column to pull — its absence from this response is the
+      // only signal this device gets. Without this, a second device kept
+      // ringing forever for a medicine stopped elsewhere. See
+      // scheduleIdsMissingRemotely.
+      final gone = await _db.scheduleIdsMissingRemotely(remoteIds);
+      await _db.tombstoneSchedulesMissingRemotely(gone);
       // A schedule that changed elsewhere is a different alarm. Nothing here
       // re-arms it — HomeScreen's reconcile does, on the next foreground.
       // Until a change can push a device awake, that is the window in which
       // the two disagree; see the release spec.
-      if (winners.isNotEmpty) _schedulesChanged = true;
+      if (winners.isNotEmpty || gone.isNotEmpty) _schedulesChanged = true;
     } catch (_) {
       // Best-effort — retried on the next pullAll() call.
     }
