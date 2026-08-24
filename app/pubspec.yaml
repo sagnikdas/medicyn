@@ -56,6 +56,10 @@ dev_dependencies:
   flutter_lints: ^6.0.0
   drift_dev: ^2.34.0
   build_runner: ^2.15.1
+  # For test/support/fake_supabase.dart: MockClient stands in for the network
+  # so SyncService can be driven end to end. Already present transitively via
+  # supabase_flutter; named here because the tests import it directly.
+  http: ^1.5.0
 
 # Rechecked 2026-08-19 against Kotlin Gradle Plugin 2.2.20
 # (app/android/settings.gradle.kts). permission_handler_android 14.0.0 still

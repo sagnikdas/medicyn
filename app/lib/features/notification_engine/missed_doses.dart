@@ -38,6 +38,29 @@ class MissedDoseDetector {
   /// writing rows on a foreground.
   static const _maxPerSweep = 200;
 
+  /// How long a snooze holds the dose open. Matches the delay
+  /// `recordDoseSnoozed` arms the one-off for, and the window the calendar
+  /// uses to tell a live snooze from an expired one.
+  static const snoozeWindow = Duration(minutes: 10);
+
+  /// Whether [log] settles the dose it landed in.
+  ///
+  /// Taken and missed settle it. A snooze does not: it postpones the
+  /// question, and it is the single strongest signal that a dose is about to
+  /// be forgotten. Counting one as an answer meant that snoozing at 08:02 and
+  /// then ignoring the 08:12 re-ring produced no missed row and no push — the
+  /// family heard nothing about precisely the dose most likely to be skipped.
+  ///
+  /// A snooze that is still live does hold it open, so the sweep stays quiet
+  /// while the person still has a reminder coming. Sweeps run on every
+  /// foreground, so the dose is judged on the next one once the snooze has
+  /// lapsed. The calendar draws the same distinction — see
+  /// `_statusFromRecord` in day_occurrences.dart.
+  static bool _answersTheDose(DoseLog log, DateTime at) {
+    if (log.action != DoseAction.snoozed.name) return true;
+    return log.loggedAt.add(snoozeWindow).isAfter(at);
+  }
+
   /// Whether an occurrence at [due] was ever actually armed as an alarm, given
   /// a schedule last defined at [definedAt] ([Schedules.updatedAt]).
   ///
@@ -116,7 +139,10 @@ class MissedDoseDetector {
         // payload and can carry the wrong date when someone answers late.
         final nextDue = i + 1 < occurrences.length ? occurrences[i + 1] : at;
         final answered = scheduleLogs.any(
-          (log) => !log.loggedAt.isBefore(due) && log.loggedAt.isBefore(nextDue),
+          (log) =>
+              !log.loggedAt.isBefore(due) &&
+              log.loggedAt.isBefore(nextDue) &&
+              _answersTheDose(log, at),
         );
         if (answered) continue;
 
@@ -146,7 +172,34 @@ class MissedDoseDetector {
 /// a hash of the due time: two schedules can't collide without sharing 96
 /// bits of uuid, and two occurrences of one schedule can't without colliding
 /// the hash of two different timestamps.
-String missedDoseId(String scheduleId, DateTime scheduledAt) {
+String missedDoseId(String scheduleId, DateTime scheduledAt) =>
+    _deterministicDoseLogId(
+      scheduleId,
+      scheduledAt.toUtc().toIso8601String(),
+    );
+
+/// The same idea for an answer the user gave: one row per dose occurrence
+/// per kind of answer.
+///
+/// Taken and Snooze used to mint a fresh uuid on every tap, so holding the
+/// notification and tapping Snooze five times wrote five rows for one dose —
+/// and five decrements of the pill count for five taps of Taken. Keying on
+/// the action as well as the occurrence means a repeat tap updates the row it
+/// already wrote (`recordDoseAction` is insert-or-update), while a snooze
+/// followed by a taken stays two rows, because those are two different facts
+/// about the dose and the feed should show both.
+///
+/// [missedDoseId] deliberately does *not* fold the action into the hash: its
+/// ids are how two devices and the server agree that they are looking at the
+/// same missed dose, so they have to keep hashing exactly what they always
+/// hashed.
+String doseLogIdFor(String scheduleId, DateTime scheduledAt, DoseAction action) =>
+    _deterministicDoseLogId(
+      scheduleId,
+      '${action.name}|${scheduledAt.toUtc().toIso8601String()}',
+    );
+
+String _deterministicDoseLogId(String scheduleId, String seed) {
   final hex = scheduleId.replaceAll('-', '').toLowerCase();
   if (hex.length != 32 || !RegExp(r'^[0-9a-f]{32}$').hasMatch(hex)) {
     // Not a uuid we can build on. A random id still records the dose; it
@@ -155,7 +208,7 @@ String missedDoseId(String scheduleId, DateTime scheduledAt) {
   }
 
   var hash = 0x811c9dc5; // FNV-1a, 32-bit
-  for (final unit in scheduledAt.toUtc().toIso8601String().codeUnits) {
+  for (final unit in seed.codeUnits) {
     hash ^= unit;
     hash = (hash * 0x01000193) & 0xffffffff;
   }
