@@ -28,7 +28,13 @@ void notificationTapBackground(NotificationResponse response) {
 /// rather than relying on an app-wide singleton, since a background isolate
 /// has none of the app's state. For a plain tap on the notification body,
 /// pushes [DoseConfirmScreen] instead — which does the same on its own.
-void handleNotificationResponse(NotificationResponse response) async {
+///
+/// Returns a [Future] (rather than plain `void`) so main.dart's cold-start
+/// launch path can await it before marking that launch handled — a
+/// void-returning function is still a valid
+/// `onDidReceiveNotificationResponse`/background callback, so neither of
+/// those two callers has to change.
+Future<void> handleNotificationResponse(NotificationResponse response) async {
   final actionId = response.actionId;
 
   final payloadRaw = response.payload;

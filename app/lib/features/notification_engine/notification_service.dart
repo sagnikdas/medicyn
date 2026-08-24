@@ -68,6 +68,15 @@ bool shouldOpenFromLaunchDetails({
   required String? alreadyHandled,
 }) => alreadyHandled != fingerprint;
 
+/// A cold-start launch response paired with the fingerprint that will mark
+/// it handled — see [NotificationService.consumeLaunchNotificationResponse]
+/// and [NotificationService.markLaunchHandled].
+class LaunchNotification {
+  const LaunchNotification(this.response, this.fingerprint);
+  final NotificationResponse response;
+  final String fingerprint;
+}
+
 /// Care alerts default to private: the recipient does not need the drug name
 /// on a locked phone. Unlike the patient's own reminder, there is no opt-in
 /// to show it — a care alert is not something you act on through the lock
@@ -202,7 +211,14 @@ class NotificationService {
   /// The plugin reports the *last* notification launch on every later start,
   /// including Run from the IDE. We remember the one we already opened today
   /// so a normal launch does not replay the Taken/Snooze screen.
-  Future<NotificationResponse?> consumeLaunchNotificationResponse() async {
+  /// Checks the launch response against the dedup pref, but does not write
+  /// it — that happens in [markLaunchHandled], only once the response has
+  /// actually finished being acted on. Writing it here, before `main()` even
+  /// calls `runApp`, meant a process killed between this returning and
+  /// `handleNotificationResponse` finishing (which records the dose) lost
+  /// the Taken for good: already marked handled, so no later cold start —
+  /// even one seeing the same stale launch intent — would ever retry it.
+  Future<LaunchNotification?> consumeLaunchNotificationResponse() async {
     final details = await _plugin.getNotificationAppLaunchDetails();
     if (details?.didNotificationLaunchApp != true) return null;
     final response = details?.notificationResponse;
@@ -217,8 +233,14 @@ class NotificationService {
     )) {
       return null;
     }
+    return LaunchNotification(response, fingerprint);
+  }
+
+  /// See [consumeLaunchNotificationResponse]. Call only after the response it
+  /// returned has actually been handled.
+  Future<void> markLaunchHandled(String fingerprint) async {
+    final prefs = await SharedPreferences.getInstance();
     await prefs.setString(handledNotificationLaunchPref, fingerprint);
-    return response;
   }
 
   Future<bool> requestPermissions() async {
