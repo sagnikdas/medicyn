@@ -4,7 +4,7 @@
 **Contact:** sagnikd91@gmail.com
 
 This policy is **only** about consumer health data. The general
-[Privacy Policy](../PRIVACY.md) still applies. Washington's My Health My
+[Privacy Policy](PRIVACY.md) still applies. Washington's My Health My
 Data Act requires this separate document. Nevada SB370 is meant to be
 satisfied by the same text.
 

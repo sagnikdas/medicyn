@@ -290,7 +290,7 @@ accident.
 If you cannot open the app, email **sagnikd91@gmail.com** from the Google
 address you signed in with, or use this page:
 
-https://github.com/sagnikdas/dosely/blob/main/docs/delete-account.md
+https://github.com/sagnikdas/dosely/blob/main/docs/play-store/delete-account.md
 
 That deletes your account, the cloud backup, any family link, and
 notification tokens. Uninstalling the app removes the copy on your phone
@@ -328,7 +328,7 @@ write to the email above and to your supervisory authority.
 ## Washington and Nevada health privacy
 
 If Washington's My Health My Data Act or Nevada SB370 applies to you,
-there is a **separate** consumer health data policy in `docs/MHMD.md` in
+there is a **separate** consumer health data policy in `docs/compliance/MHMD.md` in
 the Dosely source tree. Ask for it by email if you cannot open that
 file. It names Supabase, Anthropic, and Google, and it describes the
 second consent before family sharing.

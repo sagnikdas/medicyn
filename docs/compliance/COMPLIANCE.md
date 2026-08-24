@@ -385,7 +385,7 @@ complete a Transfer Impact Assessment per recipient.
 
 **The small-organisation exemption does not apply** — it is disapplied where
 processing includes special categories. A ROPA is mandatory regardless of
-headcount. Keep it as `COMPLIANCE/ROPA.md`.
+headcount. Keep it as `pack/ROPA.md`.
 
 ### 3.5 Breach response
 
@@ -533,7 +533,7 @@ technical leftovers (4.3c–e) live on this branch until it is merged to `main`.
 | 1.2 | Wipe local DB on sign-out so a second Google account cannot see the previous person's medicines | App | **Done differently** — #33 | Not a wipe: encrypted `dosely-<userId>.sqlite` per Google account. Same account keeps reminders; a different account opens a different file. Dialog copy was updated. |
 | 1.3 | Consent screen (unticked purposes) + `consents` table + Settings toggles | App + DB | **Done** — #40 | Onboarding → consent → auth. Unticked purposes: `cloud_backup`, `anthropic_parse`, `google_speech`. Care-share at Care Link. Settings withdraw. Hosted `consents` migration applied. |
 | 1.4 | Local-only mode so reminders work without signing in / cloud | App | **Done** — #38 | “Use without an account” writes `dosely-local.sqlite`. Sync / push / Care Link stay off until Google sign-in; first sign-in can adopt the local file. |
-| 1.5 | In-app account deletion + `delete_account` function + wipe local DB + web URL | App + backend | **Done** — #39 | In-app two-step delete, hosted `delete_account` function, local sqlite wipe, `docs/delete-account.md`. Play still needs a *public* web URL; the GitHub page is on a private repo. |
+| 1.5 | In-app account deletion + `delete_account` function + wipe local DB + web URL | App + backend | **Done** — #39 | In-app two-step delete, hosted `delete_account` function, local sqlite wipe, `../play-store/delete-account.md`. Play still needs a *public* web URL; the GitHub page is on a private repo. |
 | 1.6 | Name the Care Link claimant (name + email); fail closed; longer code; claim throttle | App + DB | **Done** — #34 | 8-digit codes; 10 claims / 15 min; hosted migration applied. |
 | 1.7 | Fill `PRIVACY.md` placeholders and link the policy in-app | Docs + app | **Done** — #37, #41 | Placeholders filled. The GitHub blob URL 404s because the repo is private; the app opens a bundled `PRIVACY.md` instead. Play still needs a public web policy URL. |
 | 2.1 | Rewrite `PRIVACY.md` for Art. 13 (bases, transfers, retention, rights, Art. 22) | Docs | **Done** — #43 | Legal bases, Singapore/US transfers (no invented SCCs), retention, six rights + withdraw/complain, Art. 22 human review. |
@@ -543,14 +543,14 @@ technical leftovers (4.3c–e) live on this branch until it is merged to `main`.
 | 2.5 | “Remove this reminder” still only sets `active = false` | App | **Done** — #45 | **Stop reminding me** keeps history. **Delete medicine and history** tombstones locally and `DELETE`s the medicine in Postgres so the family feed drops it. |
 | 2.6 | Retention TTLs + prune job (`dose_logs` 24m, `care_alerts` 12m, revoked links 12m, tokens 90d) | Backend | **Done** — #44 | `prune_expired_data()` on hosted `twybepxnqayypzljhcnx`. pg_cron job `prune-expired-data` at 03:20 UTC. Local 24-month dose-log prune on bootstrap. |
 | 2.7 | Revoked caregiver must not read `care_alerts`; expire stale claimed links | DB | **Done** — #23, #24 | Caregiver read requires `status = 'active'`. Confirm checks `expires_at`. Lazy auto-revoke of stale `claimed` rows is not implemented. |
-| 3.1 | DPIA | Paper | **Done (document)** — `COMPLIANCE/DPIA.md` | Mandatory WP248 assessment. Operator: re-read before Play release. |
-| 3.2 | Processor DPAs (Supabase, Anthropic, Google FCM / Sign-In) | Paper | **Partial** — `COMPLIANCE/DPA.md` | Tracker and console links. No DPA has been accepted in a vendor console yet. Speech is a Google controller — no DPA. |
-| 3.3 | Document (or eliminate) Singapore + US transfers; TIA / SCCs / DPF | Paper + infra | **Partial** — `COMPLIANCE/TRANSFERS.md` | TIA written. Database still `ap-southeast-1`. SCCs/DPF not executed. Recreating the project in an EU/UK region is still the cleanest fix. |
-| 3.4 | Record of processing — `COMPLIANCE/ROPA.md` | Paper | **Done (document)** — `COMPLIANCE/ROPA.md` | Art. 30; small-org exemption does not apply. |
-| 3.5 | Breach plan, register, reachable contact; backfill timezone-corruption incident | Paper | **Done (document)** — `COMPLIANCE/BREACH.md` | Register includes B-2026-08-19-A (naive timestamps) and B-2026-08-19-B (fabricated missed doses). Contact: sagnikd91@gmail.com. |
-| 3.6 | Decide EEA distribution; Art. 27 representative if yes; privacy contact (no DPO required) | Paper | **Partial** — `COMPLIANCE/SCOPE.md` | EEA/UK distribution is intended. No DPO. Privacy contact is the controller email. Art. 27 representative **not appointed** — required before an EEA Play listing. |
-| 3.7 | Separate Washington MHMD consumer health data policy | Docs | **Done (document)** — `docs/MHMD.md` | Names Supabase, Anthropic, Google; second consent before sharing. Still needs a *public* URL (repo is private). |
-| 3.8 | Play Data Safety + Health apps declaration + `USE_FULL_SCREEN_INTENT` | Store | **Partial** — `COMPLIANCE/PLAY-DATA-SAFETY.md` | Form answers written to match the policy. `USE_FULL_SCREEN_INTENT` is already in the manifest. Operator must paste into Play Console. Play still needs public policy/deletion URLs. |
+| 3.1 | DPIA | Paper | **Done (document)** — `pack/DPIA.md` | Mandatory WP248 assessment. Operator: re-read before Play release. |
+| 3.2 | Processor DPAs (Supabase, Anthropic, Google FCM / Sign-In) | Paper | **Partial** — `pack/DPA.md` | Tracker and console links. No DPA has been accepted in a vendor console yet. Speech is a Google controller — no DPA. |
+| 3.3 | Document (or eliminate) Singapore + US transfers; TIA / SCCs / DPF | Paper + infra | **Partial** — `pack/TRANSFERS.md` | TIA written. Database still `ap-southeast-1`. SCCs/DPF not executed. Recreating the project in an EU/UK region is still the cleanest fix. |
+| 3.4 | Record of processing — `pack/ROPA.md` | Paper | **Done (document)** — `pack/ROPA.md` | Art. 30; small-org exemption does not apply. |
+| 3.5 | Breach plan, register, reachable contact; backfill timezone-corruption incident | Paper | **Done (document)** — `pack/BREACH.md` | Register includes B-2026-08-19-A (naive timestamps) and B-2026-08-19-B (fabricated missed doses). Contact: sagnikd91@gmail.com. |
+| 3.6 | Decide EEA distribution; Art. 27 representative if yes; privacy contact (no DPO required) | Paper | **Partial** — `pack/SCOPE.md` | EEA/UK distribution is intended. No DPO. Privacy contact is the controller email. Art. 27 representative **not appointed** — required before an EEA Play listing. |
+| 3.7 | Separate Washington MHMD consumer health data policy | Docs | **Done (document)** — `MHMD.md` | Names Supabase, Anthropic, Google; second consent before sharing. Still needs a *public* URL (repo is private). |
+| 3.8 | Play Data Safety + Health apps declaration + `USE_FULL_SCREEN_INTENT` | Store | **Partial** — `pack/PLAY-DATA-SAFETY.md` | Form answers written to match the policy. `USE_FULL_SCREEN_INTENT` is already in the manifest. Operator must paste into Play Console. Play still needs public policy/deletion URLs. |
 | 4.1 | Append-only `phi_access_log` + “who looked” screen | App + DB | **Deferred** | HIPAA track. Also useful for FTC HBNR / MHMD. Start when a B2B deal exists. |
 | 4.2 | BAAs (Supabase Team+HIPAA add-on; Anthropic; no BAA for platform speech) | Paper | **Deferred** | |
 | 4.3a | Encrypt local medical database | App | **Done** — #33 | sqlite3mc hooks + Keystore, not the EOL `sqlcipher_flutter_libs` package the plan named. |

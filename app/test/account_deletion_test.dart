@@ -5,7 +5,7 @@ void main() {
   test('the Play web URL points at the GitHub-rendered deletion page', () {
     expect(
       deleteAccountWebUrl,
-      'https://github.com/sagnikdas/dosely/blob/main/docs/delete-account.md',
+      'https://github.com/sagnikdas/dosely/blob/main/docs/play-store/delete-account.md',
     );
   });
 

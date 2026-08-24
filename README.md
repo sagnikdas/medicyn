@@ -11,7 +11,7 @@ fire from the device itself, so they work even with no network.
    screen.
 2. **Speak** — say the dosage/schedule naturally ("one tablet twice a day,
    morning and night"). On most Android phones the recogniser is Google's,
-   and the audio may leave the device — see PRIVACY.md.
+   and the audio may leave the device — see docs/compliance/PRIVACY.md.
 3. **Understand** — the OCR text + transcript are sent to a Supabase Edge
    Function, which asks Claude to structure them into drug name, strength,
    dose, frequency, and times. No photo is ever included in that call.

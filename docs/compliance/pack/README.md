@@ -13,7 +13,7 @@ Play form. Those are operator actions called out in each file.
 | 3.4 ROPA | [ROPA.md](ROPA.md) | Art. 30 record | Keep it in step when a new processor or purpose appears |
 | 3.5 Breach | [BREACH.md](BREACH.md) | Plan, reachable contact, register, backfilled incidents | Use the register for every future incident, including ones you do not notify |
 | 3.6 Scope | [SCOPE.md](SCOPE.md) | Markets, DPO (none), privacy contact | Appoint an Art. 27 EU representative before an EEA Play listing, or restrict countries |
-| 3.7 MHMD | [../docs/MHMD.md](../docs/MHMD.md) | Separate consumer health data policy | Host it on a *public* URL; the GitHub copy is on a private repo |
+| 3.7 MHMD | [../MHMD.md](../MHMD.md) | Separate consumer health data policy | Host it on a *public* URL; the GitHub copy is on a private repo |
 | 3.8 Play Data Safety | [PLAY-DATA-SAFETY.md](PLAY-DATA-SAFETY.md) | Form answers that match `PRIVACY.md` | Paste into Play Console; complete Health apps + restricted-permission declarations |
 
 Controller: Sagnik Das. Privacy contact: sagnikd91@gmail.com.

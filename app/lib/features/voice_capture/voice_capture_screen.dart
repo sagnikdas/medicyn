@@ -15,7 +15,7 @@ import '../consent/consent_service.dart';
 /// on-device one: `SpeechListenOptions.onDevice` is left at its default of
 /// false, so on most Android devices the audio is handled by Google's speech
 /// service. Dosely neither stores nor uploads the audio itself, but "nothing
-/// leaves the phone" would be untrue — see PRIVACY.md, which says so plainly.
+/// leaves the phone" would be untrue — see docs/compliance/PRIVACY.md, which says so plainly.
 /// Only the resulting text is sent onward, and only at the AI structuring
 /// step the review screen triggers explicitly.
 ///

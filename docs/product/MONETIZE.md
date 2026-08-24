@@ -5,7 +5,7 @@ How this app makes money, and in what order. Written for a product with
 not the first problem. Being used by even twenty real families is.
 
 **Last updated:** 2026-08-20 · assumes `PLAN.md` (Care Link, Android-only,
-one caregiver per parent) and `COMPLIANCE.md` (HIPAA does not apply;
+one caregiver per parent) and `../compliance/COMPLIANCE.md` (HIPAA does not apply;
 GDPR / FTC / Play Health do).
 
 ---
@@ -30,8 +30,8 @@ the tempting alternatives are traps.
 | Who pays | **The caregiver.** Never the parent. | The child has the card, the anxiety, and the job of installing the app. A paywall on an elderly phone is how the pair never forms. |
 | What is free forever | **Local reminders.** Scan, speak, save, alarm. Offline. No account required. | This is how the parent keeps the app. If the reminder is the paid bit, they uninstall, and the care link has nothing to attach to. |
 | What is paid | **The care pair** — missed-dose alerts, setup health, remote edit, call-from-alert. | That is the product a working adult will open their wallet for. Scanning a label is a five-minute convenience; knowing Amma missed her 9am pill is the ongoing job. |
-| Ads / data | **Never.** No ad SDK, no sale of health data, no "sponsored" pharmacy. | `PRIVACY.md` already promises this, Play Health and GDPR punish it, and one leak ends the trust the care link is made of. |
-| Clinics / payers | **Not now.** Consumer families only. | A B2B deal with a clinic, home-health agency, or insurer makes Dosely a HIPAA Business Associate (`COMPLIANCE.md`). That is a different company. |
+| Ads / data | **Never.** No ad SDK, no sale of health data, no "sponsored" pharmacy. | `../compliance/PRIVACY.md` already promises this, Play Health and GDPR punish it, and one leak ends the trust the care link is made of. |
+| Clinics / payers | **Not now.** Consumer families only. | A B2B deal with a clinic, home-health agency, or insurer makes Dosely a HIPAA Business Associate (`../compliance/COMPLIANCE.md`). That is a different company. |
 | When to charge | **After evidence, not at launch.** First public version is free. | There is no one to convert. A price on day one is a hypothesis you cannot test, and it will suppress the only signal that matters: do pairs form and stay. |
 | Currency of the first paid plan | **Annual, caregiver-paid, one pair.** | Monthly is churn theatre for a product used in the background. Annual matches "I am responsible for my parent this year." |
 | Early users | **Grandfathered free for at least a year** after paid launches. | The first fifty families are the sales force. Taxing them for the privilege is how word of mouth dies. |
@@ -76,7 +76,7 @@ or pulls you under a statute you are not staffed for.
 - **Ads.** Health inventory is cheap because nobody reputable wants
   it, and the reputable ones will not sit next to a missed-dose
   alert. An SDK that fingerprints the device also contradicts the
-  "no advertising identifiers" line in `PRIVACY.md`.
+  "no advertising identifiers" line in `../compliance/PRIVACY.md`.
 - **Lead-gen to pharmacies or insurers.** That is selling health data
   with extra steps. Washington MHMD and the FTC Health Breach rule
   treat unauthorised disclosure as a breach. Do not.
@@ -91,7 +91,7 @@ or pulls you under a statute you are not staffed for.
 - **Selling into clinics, hospitals, or "RPM reimbursement."** That
   is the HIPAA tripwire. It also means sales cycles, BAAs, and a
   security questionnaire you will fail until Phase 4 of
-  `COMPLIANCE.md` is done. Skip it until a consumer business exists.
+  `../compliance/COMPLIANCE.md` is done. Skip it until a consumer business exists.
 - **Lifetime licences at a fire-sale price.** You will regret the
   support load and you cannot raise the price on the people who
   actually like you.
@@ -185,7 +185,7 @@ Costs that actually move, at today's architecture:
 | FCM | Free | Do not build a second push vendor to save money you are not spending. |
 | Play Billing | 15% (ongoing subs) | Price gross; think net. |
 | Support | Your time, linear in confused caregivers | This will exceed cloud spend until ~1,000 pairs. Write the setup-health panel before you hire anyone. |
-| Compliance | Step-function | GDPR / Play work in `COMPLIANCE.md` is the cost of *being allowed to charge in the EU*. Budget it as a launch cost, not a COGS line. |
+| Compliance | Step-function | GDPR / Play work in `../compliance/COMPLIANCE.md` is the cost of *being allowed to charge in the EU*. Budget it as a launch cost, not a COGS line. |
 
 A Care+ pair at ₹999 or $49 / year is wildly positive on infrastructure
 as long as you do not: (a) let the parse quota become a botnet, which
@@ -294,7 +294,7 @@ If you only watch downloads you will optimize the wrong app.
 Instrument these as soon as the first twenty families exist, even
 if it is a spreadsheet you update by hand. Do not add an analytics
 SDK that identifies the parent in order to learn this. Counts and
-funnels, not dossiers. `PRIVACY.md` has to stay true.
+funnels, not dossiers. `../compliance/PRIVACY.md` has to stay true.
 
 ---
 
@@ -438,7 +438,7 @@ Answer these when Phase C is close, not in the abstract.
 - The first fifty families are not a cohort to convert. They are
   the reason anyone else hears of this.
 - A clinic that wants a demo is a compliance event, not a pipeline
-  event. Read `COMPLIANCE.md` before you say yes.
+  event. Read `../compliance/COMPLIANCE.md` before you say yes.
 - Do not add a pricing page to the app during Phase A. It will
   leak into screenshots and you will spend the year explaining a
   price you are not charging.
