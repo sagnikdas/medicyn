@@ -5,12 +5,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import '../../core/app_navigation.dart';
-import '../../core/ids.dart';
 import '../../data/local/database.dart';
 import '../../data/local/tables.dart';
 import '../care/dose_feed_screen.dart';
 import '../care/phone_dial.dart';
 import '../dose_confirm/dose_confirm_screen.dart';
+import 'missed_doses.dart';
 import 'notification_service.dart';
 
 /// Runs in a separate background isolate when the user taps a notification
@@ -74,10 +74,7 @@ Future<void> handleNotificationResponse(NotificationResponse response) async {
   if (scheduleId == null) return;
   // The dose was due whenever the alarm was set for — not whenever the user
   // got around to responding, which can be minutes (or longer) later.
-  // `timeLabel` carries the real "HH:mm" for daily/specific-days reminders;
-  // snoozed and every-X-hours notifications don't carry a meaningful clock
-  // time here, so those fall back to now.
-  final scheduledAt = _scheduledAtFromTimeLabel(payload['timeLabel'] as String?) ?? DateTime.now();
+  final scheduledAt = _scheduledAtFromPayload(payload) ?? DateTime.now();
 
   if (actionId != actionTaken && actionId != actionSnooze) {
     // Plain tap on the notification body (not an action button) — bring up
@@ -109,6 +106,13 @@ Future<void> handleNotificationResponse(NotificationResponse response) async {
   }
 }
 
+/// Records the dose as taken, once per occurrence however many times the
+/// button is pressed.
+///
+/// The id is derived from the schedule and the due time rather than minted
+/// fresh, so a second tap updates the row the first one wrote. With a random
+/// id, two taps on the same reminder wrote two Taken rows *and* took two
+/// tablets off the bottle.
 Future<void> recordDoseTaken(
   AppDatabase db, {
   required String scheduleId,
@@ -118,9 +122,12 @@ Future<void> recordDoseTaken(
   // Nothing decrements the medicine's stock count here — it is derived from
   // this log at display time (see derivedTabletsRemaining), so a caregiver's
   // concurrent edit to the reminder can never revert a dose this device just
-  // took.
+  // took. Repeated taps don't need an `alreadyRecorded` guard either, for
+  // the same reason: there's no decrement left to double-count. recordDoseAction
+  // is a plain insertOnConflictUpdate, so a second tap just rewrites the same
+  // fact — the deterministic id below is what keeps it one row.
   await db.recordDoseAction(
-    id: newUuid(),
+    id: doseLogIdFor(scheduleId, scheduledAt, DoseAction.taken),
     scheduleId: scheduleId,
     scheduledAt: scheduledAt,
     action: DoseAction.taken,
@@ -129,14 +136,22 @@ Future<void> recordDoseTaken(
 }
 
 /// Logs the snooze, then arms a one-off reminder [delay] out.
+///
+/// Both halves are keyed to the dose rather than to the tap. Pressing Snooze
+/// repeatedly used to write a history row per press and arm an *additional*
+/// alarm per press, so five presses meant five lines in the feed and five
+/// reminders going off ten minutes later. Now the row is updated in place —
+/// which also restarts the snooze window, since the latest press is when the
+/// person actually asked to be left alone — and the alarm replaces the one
+/// before it.
 Future<void> recordDoseSnoozed(
   AppDatabase db, {
   required String scheduleId,
   required DateTime scheduledAt,
-  Duration delay = const Duration(minutes: 10),
+  Duration delay = MissedDoseDetector.snoozeWindow,
 }) async {
   await db.recordDoseAction(
-    id: newUuid(),
+    id: doseLogIdFor(scheduleId, scheduledAt, DoseAction.snoozed),
     scheduleId: scheduleId,
     scheduledAt: scheduledAt,
     action: DoseAction.snoozed,
@@ -150,14 +165,30 @@ Future<void> recordDoseSnoozed(
     scheduleId: scheduleId,
     medicine: medicine,
     delay: delay,
+    scheduledAt: scheduledAt,
   );
 }
 
+/// When the dose this notification is about was due.
+///
+/// Prefers `scheduledAt`, which every alarm this build arms carries: it names
+/// the exact occurrence, so answering a snoozed reminder is attributed to the
+/// dose that was snoozed, and answering the 16:00 slot of an every-X-hours
+/// schedule is not attributed to its 08:00 anchor.
+///
+/// Falls back to parsing `timeLabel` for notifications armed by an earlier
+/// build, which are still sitting in Android's alarm table after an update.
+DateTime? _scheduledAtFromPayload(Map<String, dynamic> payload) {
+  final raw = payload['scheduledAt'] as String?;
+  if (raw != null && raw.isNotEmpty) {
+    final parsed = DateTime.tryParse(raw);
+    if (parsed != null) return parsed.toLocal();
+  }
+  return _scheduledAtFromTimeLabel(payload['timeLabel'] as String?);
+}
+
 /// Parses a "HH:mm" time label into today's occurrence of that clock time.
-/// Returns null for anything that isn't a plain "HH:mm" — notably the
-/// literal string `'snooze'` used by [NotificationService.scheduleSnooze],
-/// and the every-X-hours anchor time, which doesn't represent this specific
-/// occurrence's actual fire time.
+/// Returns null for anything that isn't a plain "HH:mm".
 DateTime? _scheduledAtFromTimeLabel(String? timeLabel) {
   if (timeLabel == null) return null;
   final match = RegExp(r'^([0-2][0-9]):([0-5][0-9])$').firstMatch(timeLabel);

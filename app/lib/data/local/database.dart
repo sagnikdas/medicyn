@@ -371,7 +371,16 @@ class AppDatabase extends _$AppDatabase {
   ///
   /// Calendar months, not 730 days, so this agrees with Postgres
   /// `logged_at < now() - interval '24 months'`.
-  Future<int> pruneExpiredDoseLogs({DateTime? now}) {
+  ///
+  /// Deletes each expiring log's contest note with it. [DoseLogContests]
+  /// declares `onDelete: cascade`, but nothing turns `PRAGMA foreign_keys`
+  /// on for this database, so SQLite ignores every foreign key in the
+  /// schema and the note would outlive the log it annotates — a free-text
+  /// health note kept indefinitely, past the retention period the privacy
+  /// policy states, and orphaned from the row that gives it meaning.
+  /// [deleteMedicineAndHistory] already deletes contests explicitly for the
+  /// same reason; this path did not.
+  Future<int> pruneExpiredDoseLogs({DateTime? now}) async {
     final clock = now ?? DateTime.now();
     final cutoff = DateTime(
       clock.year - 2,
@@ -383,7 +392,16 @@ class AppDatabase extends _$AppDatabase {
       clock.millisecond,
       clock.microsecond,
     );
-    return (delete(doseLogs)..where((t) => t.loggedAt.isSmallerThanValue(cutoff))).go();
+    return transaction(() async {
+      final expiring = await (select(doseLogs)
+            ..where((t) => t.loggedAt.isSmallerThanValue(cutoff)))
+          .get();
+      if (expiring.isEmpty) return 0;
+      final ids = [for (final log in expiring) log.id];
+      await (delete(doseLogContests)..where((t) => t.doseLogId.isIn(ids))).go();
+      return (delete(doseLogs)..where((t) => t.loggedAt.isSmallerThanValue(cutoff)))
+          .go();
+    });
   }
 
   /// Insert-or-ignore, because missed doses carry deterministic ids: a sweep

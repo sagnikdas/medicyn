@@ -138,6 +138,15 @@ void main() {
       );
     });
 
+    test('a nonsense per-dose falls back to one rather than to zero', () {
+      // A zero would make every Taken subtract nothing, and the bottle
+      // would never register as running out.
+      expect(
+        derivedTabletsRemaining(medicine(tabletsRemaining: 10, tabletsPerDose: 0), 1),
+        9,
+      );
+    });
+
     test('floors at zero rather than going negative', () {
       expect(
         derivedTabletsRemaining(medicine(tabletsRemaining: 3, tabletsPerDose: 2), 5),
