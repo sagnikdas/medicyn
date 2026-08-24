@@ -394,6 +394,11 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
         // this, editing an already-synced medicine would silently leave
         // pendingSync at its old (false) value and the edit would never sync.
         pendingSync: const Value(true),
+        // Absent on an edit, same as before: insertOnConflictUpdate then
+        // leaves the existing createdAt alone rather than overwriting it with
+        // now. Explicit on a genuine create, rather than leaning on the
+        // column's own default.
+        createdAt: _isEditing ? const Value.absent() : Value(savedAt),
         updatedAt: Value(savedAt),
         updatedBy: Value(savedBy),
       ),
@@ -432,6 +437,9 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
         // Same reasoning as the medicine upsert above — force it dirty so an
         // edit to an already-synced schedule actually gets pushed.
         pendingSync: const Value(true),
+        // See the medicine upsert above: absent preserves createdAt on an
+        // edit, explicit on a create.
+        createdAt: _isEditing ? const Value.absent() : Value(savedAt),
         updatedAt: Value(savedAt),
         updatedBy: Value(savedBy),
       ),

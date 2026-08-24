@@ -36,7 +36,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -62,8 +62,84 @@ class AppDatabase extends _$AppDatabase {
             await m.addColumn(medicines, medicines.tabletsRemaining);
             await m.addColumn(medicines, medicines.tabletsPerDose);
           }
+          if (from < 5) {
+            await _storeDateTimesAsText(m);
+          }
         },
       );
+
+  /// Schema v4's DateTime columns were unix-seconds integers, truncating
+  /// sub-second precision — two writes landing within the same second were
+  /// indistinguishable, and one silently lost every future version
+  /// comparison against the other. v5 stores them as ISO-8601 text instead
+  /// (see build.yaml's `store_date_time_values_as_text`).
+  ///
+  /// SQLite cannot `ALTER ... SET DEFAULT`, so a column's default cannot be
+  /// fixed in place — each table is recreated from [m]'s *current*
+  /// definition instead, which already carries the right, text-mode default
+  /// baked in, rather than one hand-written here that could drift from it.
+  /// Every column this database has ever written a DateTime into holds a UTC
+  /// instant (see SyncService.isoUtc and the `Value(DateTime.now())` call
+  /// sites — none of them stamp a bare local time), so every conversion
+  /// below produces the same `...Z`-suffixed text
+  /// `SqlTypes.mapToSqlVariable` itself would write for a UTC value.
+  Future<void> _storeDateTimesAsText(Migrator m) async {
+    Future<void> convert({
+      required TableInfo table,
+      required String oldName,
+      required List<String> plainColumns,
+      required List<String> dateTimeColumns,
+    }) async {
+      await customStatement(
+        'ALTER TABLE ${table.actualTableName} RENAME TO $oldName',
+      );
+      await m.createTable(table);
+      final columnList = [...plainColumns, ...dateTimeColumns].join(', ');
+      final selected = [
+        ...plainColumns,
+        for (final c in dateTimeColumns)
+          "strftime('%Y-%m-%dT%H:%M:%S', $c, 'unixepoch') || '.000Z' AS $c",
+      ].join(', ');
+      await customStatement(
+        'INSERT INTO ${table.actualTableName} ($columnList) '
+        'SELECT $selected FROM $oldName',
+      );
+      await customStatement('DROP TABLE $oldName');
+    }
+
+    await convert(
+      table: medicines,
+      oldName: 'medicines_v4',
+      plainColumns: [
+        'id', 'drug_name', 'strength', 'form', 'dose_amount', //
+        'tablets_remaining', 'tablets_per_dose', 'notes', 'updated_by',
+        'pending_sync', 'deleted',
+      ],
+      dateTimeColumns: ['created_at', 'updated_at'],
+    );
+    await convert(
+      table: schedules,
+      oldName: 'schedules_v4',
+      plainColumns: [
+        'id', 'medicine_id', 'frequency_type', 'times', //
+        'days_of_week', 'interval_hours', 'active', 'updated_by',
+        'pending_sync', 'deleted',
+      ],
+      dateTimeColumns: ['created_at', 'updated_at'],
+    );
+    await convert(
+      table: doseLogs,
+      oldName: 'dose_logs_v4',
+      plainColumns: ['id', 'schedule_id', 'action', 'source', 'pending_sync'],
+      dateTimeColumns: ['scheduled_at', 'logged_at'],
+    );
+    await convert(
+      table: doseLogContests,
+      oldName: 'dose_log_contests_v4',
+      plainColumns: ['dose_log_id', 'note', 'pending_sync'],
+      dateTimeColumns: ['created_at', 'updated_at'],
+    );
+  }
 
   // --- Medicines ---------------------------------------------------------
 
@@ -221,8 +297,11 @@ class AppDatabase extends _$AppDatabase {
 
   /// [loggedAt] defaults to now, which is right for a live response. It is
   /// accepted so a caller that already knows when the action happened — a
-  /// backfill, or a test simulating a particular day — can say so instead of
-  /// having the column's default overwrite it.
+  /// backfill, or a test simulating a particular day — can say so instead.
+  ///
+  /// Stamped explicitly rather than left for the column default: this row's
+  /// [id] is a fresh uuid for every real Taken/Snooze, so it is always an
+  /// insert, never a conflict update the default would need to leave alone.
   Future<void> recordDoseAction({
     required String id,
     required String scheduleId,
@@ -238,7 +317,7 @@ class AppDatabase extends _$AppDatabase {
         scheduledAt: scheduledAt,
         action: action.name,
         source: Value(source),
-        loggedAt: loggedAt == null ? const Value.absent() : Value(loggedAt),
+        loggedAt: Value(loggedAt ?? DateTime.now()),
       ),
     );
   }
@@ -293,6 +372,8 @@ class AppDatabase extends _$AppDatabase {
         DoseLogContestsCompanion.insert(
           doseLogId: doseLogId,
           note: trimmed,
+          createdAt: Value(now),
+          updatedAt: Value(now),
         ),
       );
       return;

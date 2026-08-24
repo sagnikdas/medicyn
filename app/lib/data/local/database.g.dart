@@ -2386,6 +2386,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       result: [TableUpdate('dose_log_contests', kind: UpdateKind.delete)],
     ),
   ]);
+  @override
+  DriftDatabaseOptions get options =>
+      const DriftDatabaseOptions(storeDateTimeAsText: true);
 }
 
 typedef $$MedicinesTableCreateCompanionBuilder =

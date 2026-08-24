@@ -1,0 +1,11 @@
+targets:
+  $default:
+    builders:
+      drift_dev:
+        options:
+          # See AppDatabase.schemaVersion's migration for `from < 5`: the
+          # default (unix-seconds integers) truncates sub-second precision,
+          # so a caregiver's write landing within the same second as a local
+          # one is indistinguishable, and the loser is silently dropped on
+          # every future pull's version comparison.
+          store_date_time_values_as_text: true
