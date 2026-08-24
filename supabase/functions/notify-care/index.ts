@@ -49,6 +49,12 @@ const CARE_ALERT_CHANNEL_ID = "dosely_care_alerts_v1";
 // a caregiver should be told forty, not twenty.
 const MAX_DOSES_PER_CALL = 200;
 
+// Marks an alert row as "a retry has claimed this and is sending right now",
+// so a second concurrent retry's conditional update (WHERE delivered_count =
+// 0) can no longer match it. Always resolved back to the real delivered
+// count — 0 included — before the request returns; see announceMissedDoses.
+const RETRY_IN_FLIGHT = -1;
+
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
@@ -189,7 +195,34 @@ async function announceMissedDoses(
     console.error(`care_alerts_claim_failed: ${claimError.message}`);
     return json({ error: "claim_failed" }, 500);
   }
-  const newIds = (claimed ?? []).map((row) => row.dose_log_id as string);
+
+  // Ids the upsert above left alone already have a row — either genuinely
+  // announced, or a previous attempt that claimed the dose but never reached
+  // the caregiver (delivered_count still 0, the send having failed or found
+  // no registered token). The client re-offers the same window on every
+  // foreground specifically so this can retry those: a conditional update,
+  // matched on delivered_count = 0, is what keeps a concurrent retry of the
+  // same dose from claiming it twice — once one caller's update flips that
+  // column away from 0, the other's WHERE clause no longer matches.
+  const firstClaimIds = new Set((claimed ?? []).map((row) => row.dose_log_id as string));
+  const retryCandidates = ids.filter((id) => !firstClaimIds.has(id));
+  let retriedIds: string[] = [];
+  if (retryCandidates.length > 0) {
+    const { data: reclaimed, error: reclaimError } = await admin
+      .from("care_alerts")
+      .update({ delivered_count: RETRY_IN_FLIGHT })
+      .eq("link_id", link.id)
+      .in("dose_log_id", retryCandidates)
+      .eq("delivered_count", 0)
+      .select("dose_log_id");
+    if (reclaimError) {
+      console.error(`care_alerts_reclaim_failed: ${reclaimError.message}`);
+    } else {
+      retriedIds = (reclaimed ?? []).map((row) => row.dose_log_id as string);
+    }
+  }
+
+  const newIds = [...firstClaimIds, ...retriedIds];
   if (newIds.length === 0) return json({ sent: 0, reason: "already_announced" });
 
   // Read the doses back rather than trusting the request for what to say. The
@@ -210,7 +243,17 @@ async function announceMissedDoses(
   if (doses.length === 0) {
     // The ids did not name missed doses of the caller's. The claim rows stay:
     // they cost nothing, and removing them would reopen the door to retrying
-    // the same forged ids until something sticks.
+    // the same forged ids until something sticks. Retried rows go back to 0
+    // rather than staying at the in-flight sentinel — nothing was sent, so a
+    // later, legitimate retry must still be able to claim them.
+    if (retriedIds.length > 0) {
+      await admin
+        .from("care_alerts")
+        .update({ delivered_count: 0 })
+        .eq("link_id", link.id)
+        .in("dose_log_id", retriedIds)
+        .eq("delivered_count", RETRY_IN_FLIGHT);
+    }
     return json({ sent: 0, reason: "no_matching_doses" });
   }
 
@@ -245,12 +288,20 @@ async function announceMissedDoses(
     },
   };
 
-  const delivered = await deliver(admin, tokens, message);
-  await admin
-    .from("care_alerts")
-    .update({ delivered_count: delivered })
-    .in("dose_log_id", newIds)
-    .eq("link_id", link.id);
+  // In a finally so a row retried into RETRY_IN_FLIGHT above is always
+  // resolved back to a real count — 0 included — even if deliver() itself
+  // throws (a token-exchange failure, say), rather than being left stuck at
+  // the sentinel forever.
+  let delivered = 0;
+  try {
+    delivered = await deliver(admin, tokens, message);
+  } finally {
+    await admin
+      .from("care_alerts")
+      .update({ delivered_count: delivered })
+      .in("dose_log_id", newIds)
+      .eq("link_id", link.id);
+  }
 
   return json({ sent: doses.length, recipients: tokens.length, delivered });
 }
@@ -311,15 +362,20 @@ async function announceRefillLow(
       kind: "refill_low",
     })
     .select("id");
+  let claimedId: string | null = null;
   if (claimError) {
-    // Unique index on (link, UTC day) — already told them today.
-    if (claimError.code === "23505") {
-      return json({ sent: 0, reason: "already_announced" });
+    // Unique index on (link, UTC day) — already told them today, or a
+    // previous attempt claimed today's ping and never got through. Only the
+    // second is worth another try; reclaimTodayIfUnsent tells them apart.
+    if (claimError.code !== "23505") {
+      console.error(`care_alerts_claim_failed: ${claimError.message}`);
+      return json({ error: "claim_failed" }, 500);
     }
-    console.error(`care_alerts_claim_failed: ${claimError.message}`);
-    return json({ error: "claim_failed" }, 500);
+    claimedId = await reclaimTodayIfUnsent(admin, link.id, "refill_low");
+  } else if (claimed && claimed.length > 0) {
+    claimedId = claimed[0].id as string;
   }
-  if (!claimed || claimed.length === 0) {
+  if (claimedId === null) {
     return json({ sent: 0, reason: "already_announced" });
   }
 
@@ -328,19 +384,58 @@ async function announceRefillLow(
     tokensOf(admin, recipientId),
   ]);
   const who = patient.displayName ?? "Someone you help";
-  const delivered = await deliver(admin, tokens, {
-    notification: {
-      title: `${who}'s medicine is running low`,
-      body: "Open Dosely to see which one. About five days of tablets left.",
-    },
-    androidChannelId: CARE_ALERT_CHANNEL_ID,
-    data: {
-      event: "refill_low",
-      patientId: link.patient_id,
-    },
-  });
-  await admin.from("care_alerts").update({ delivered_count: delivered }).eq("id", claimed[0].id);
+  // In a finally so a row reclaimed into RETRY_IN_FLIGHT above is always
+  // resolved back to a real count, even if deliver() itself throws.
+  let delivered = 0;
+  try {
+    delivered = await deliver(admin, tokens, {
+      notification: {
+        title: `${who}'s medicine is running low`,
+        body: "Open Dosely to see which one. About five days of tablets left.",
+      },
+      androidChannelId: CARE_ALERT_CHANNEL_ID,
+      data: {
+        event: "refill_low",
+        patientId: link.patient_id,
+      },
+    });
+  } finally {
+    await admin.from("care_alerts").update({ delivered_count: delivered }).eq("id", claimedId);
+  }
   return json({ sent: 1, recipients: tokens.length, delivered });
+}
+
+/// Re-claims today's alert of [kind] on [linkId] for a retry, but only if a
+/// previous attempt claimed it and never sent anything (delivered_count
+/// still 0). The conditional update is the lock: two concurrent retries can
+/// only ever have one of them still match a row still at 0.
+async function reclaimTodayIfUnsent(
+  admin: SupabaseClient,
+  linkId: string,
+  kind: string,
+): Promise<string | null> {
+  const { start, end } = utcDayBounds();
+  const { data, error } = await admin
+    .from("care_alerts")
+    .update({ delivered_count: RETRY_IN_FLIGHT })
+    .eq("link_id", linkId)
+    .eq("kind", kind)
+    .gte("sent_at", start)
+    .lt("sent_at", end)
+    .eq("delivered_count", 0)
+    .select("id");
+  if (error) {
+    console.error(`care_alerts_reclaim_failed: ${error.message}`);
+    return null;
+  }
+  return data && data.length > 0 ? (data[0].id as string) : null;
+}
+
+function utcDayBounds(): { start: string; end: string } {
+  const now = new Date();
+  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+  return { start: start.toISOString(), end: end.toISOString() };
 }
 
 /// Server-side: the patient's app is not running, so it cannot tell anyone.
@@ -368,30 +463,44 @@ async function announceSilentDevices(admin: SupabaseClient): Promise<Response> {
         kind: "device_silent",
       })
       .select("id");
+    let claimedId: string | null = null;
     if (claimError) {
-      if (claimError.code === "23505") continue;
-      console.error(`care_alerts_claim_failed: ${claimError.message}`);
-      continue;
+      // 20260824120000_retry_unsent_device_silent.sql only excludes a link
+      // from `due` once its alert actually delivered, so a 23505 here means
+      // a previous attempt claimed today's row and never got through.
+      if (claimError.code !== "23505") {
+        console.error(`care_alerts_claim_failed: ${claimError.message}`);
+        continue;
+      }
+      claimedId = await reclaimTodayIfUnsent(admin, row.link_id, "device_silent");
+    } else if (claimed && claimed.length > 0) {
+      claimedId = claimed[0].id as string;
     }
-    if (!claimed || claimed.length === 0) continue;
+    if (claimedId === null) continue;
 
     const [patient, tokens] = await Promise.all([
       profileOf(admin, row.patient_id),
       tokensOf(admin, row.caregiver_id),
     ]);
     const who = patient.displayName ?? "Someone you help";
-    const delivered = await deliver(admin, tokens, {
-      notification: {
-        title: `${who}'s phone hasn't checked in`,
-        body: "It hasn't opened Dosely since yesterday. This is not a missed dose — their app did not run.",
-      },
-      androidChannelId: CARE_ALERT_CHANNEL_ID,
-      data: {
-        event: "device_silent",
-        patientId: row.patient_id,
-      },
-    });
-    await admin.from("care_alerts").update({ delivered_count: delivered }).eq("id", claimed[0].id);
+    // In a finally so a row reclaimed into RETRY_IN_FLIGHT above is always
+    // resolved back to a real count, even if deliver() itself throws.
+    let delivered = 0;
+    try {
+      delivered = await deliver(admin, tokens, {
+        notification: {
+          title: `${who}'s phone hasn't checked in`,
+          body: "It hasn't opened Dosely since yesterday. This is not a missed dose — their app did not run.",
+        },
+        androidChannelId: CARE_ALERT_CHANNEL_ID,
+        data: {
+          event: "device_silent",
+          patientId: row.patient_id,
+        },
+      });
+    } finally {
+      await admin.from("care_alerts").update({ delivered_count: delivered }).eq("id", claimedId);
+    }
     sent += 1;
     deliveredTotal += delivered;
   }

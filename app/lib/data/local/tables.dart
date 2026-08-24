@@ -15,8 +15,13 @@ class Medicines extends Table {
   TextColumn get strength => text().withDefault(const Constant(''))();
   TextColumn get form => text().withDefault(const Constant(''))();
   TextColumn get doseAmount => text().withDefault(const Constant(''))();
-  // Null means the bottle is not being tracked. Taken decrements it on this
-  // device; a caregiver save of a new count is how a refill is logged.
+  // Null means the bottle is not being tracked. This is a baseline, not a
+  // live count: it only changes when a save (either side of a care link)
+  // writes a new number, which is how a refill is logged. The count actually
+  // shown anywhere derives this against doses taken since [updatedAt] — see
+  // `derivedTabletsRemaining` — rather than being decremented in place, so a
+  // caregiver's concurrent edit can never revert a dose this device already
+  // took.
   IntColumn get tabletsRemaining => integer().nullable()();
   IntColumn get tabletsPerDose => integer().nullable()();
   TextColumn get notes => text().withDefault(const Constant(''))();

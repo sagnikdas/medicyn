@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -46,19 +45,19 @@ void main() async {
       // isolate starts up or a message arriving with the app dead has nowhere
       // to go. It no-ops when Firebase isn't configured in this build.
       await PushService.instance.init();
-      final launchResponse = await NotificationService.instance
+      final launch = await NotificationService.instance
           .consumeLaunchNotificationResponse();
-      runApp(DoselyApp(launchNotificationResponse: launchResponse));
+      runApp(DoselyApp(launchNotification: launch));
     },
   );
 }
 
 class DoselyApp extends StatefulWidget {
-  const DoselyApp({super.key, this.launchNotificationResponse});
+  const DoselyApp({super.key, this.launchNotification});
 
   /// Set when the app was launched (cold start) by a notification tap —
   /// see [NotificationService.consumeLaunchNotificationResponse].
-  final NotificationResponse? launchNotificationResponse;
+  final LaunchNotification? launchNotification;
 
   @override
   State<DoselyApp> createState() => _DoselyAppState();
@@ -68,14 +67,20 @@ class _DoselyAppState extends State<DoselyApp> {
   @override
   void initState() {
     super.initState();
-    final response = widget.launchNotificationResponse;
-    if (response != null) {
+    final launch = widget.launchNotification;
+    if (launch != null) {
       // The navigator isn't attached yet during this build, so defer until
       // after the first frame — by then navigatorKey.currentState is live.
-      WidgetsBinding.instance.addPostFrameCallback(
-        (_) => handleNotificationResponse(response),
-      );
+      WidgetsBinding.instance.addPostFrameCallback((_) => _handleLaunch(launch));
     }
+  }
+
+  /// Marks the launch handled only once it has actually been acted on — see
+  /// NotificationService.consumeLaunchNotificationResponse for why that
+  /// order matters.
+  Future<void> _handleLaunch(LaunchNotification launch) async {
+    await handleNotificationResponse(launch.response);
+    await NotificationService.instance.markLaunchHandled(launch.fingerprint);
   }
 
   @override

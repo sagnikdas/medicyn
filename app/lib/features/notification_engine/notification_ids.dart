@@ -12,3 +12,22 @@ int notificationIdFor(String scheduleId, String slotKey) {
   }
   return hash == 0 ? 1 : hash;
 }
+
+/// The `timeLabel` a snooze one-off carries. Not an `HH:mm`, deliberately:
+/// it marks the notification as the re-reminder rather than a slot in the
+/// recurring series, which is how [NotificationService.reconcile] knows to
+/// leave it armed.
+const String snoozeTimeLabel = 'snooze';
+
+/// The id of the single snooze re-reminder for one dose.
+///
+/// Keyed on the occurrence, so pressing Snooze again replaces the alarm
+/// instead of adding one. Cannot collide with the recurring series: those
+/// slot keys are `HH:mm`, `<day>-HH:mm`, `slot-N` or `due-HH:mm`, none of
+/// which start with `snooze@`.
+int snoozeNotificationId(String scheduleId, DateTime scheduledAt) =>
+    notificationIdFor(
+      scheduleId,
+      'snooze@${scheduledAt.toUtc().toIso8601String()}',
+    );
+

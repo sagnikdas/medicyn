@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io' show Platform;
 import 'dart:typed_data' show Int32List;
 
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -68,6 +69,15 @@ bool shouldOpenFromLaunchDetails({
   required String? alreadyHandled,
 }) => alreadyHandled != fingerprint;
 
+/// A cold-start launch response paired with the fingerprint that will mark
+/// it handled — see [NotificationService.consumeLaunchNotificationResponse]
+/// and [NotificationService.markLaunchHandled].
+class LaunchNotification {
+  const LaunchNotification(this.response, this.fingerprint);
+  final NotificationResponse response;
+  final String fingerprint;
+}
+
 /// Care alerts default to private: the recipient does not need the drug name
 /// on a locked phone. Unlike the patient's own reminder, there is no opt-in
 /// to show it — a care alert is not something you act on through the lock
@@ -115,6 +125,33 @@ bool isPatientReminderNotification({required String? channelId}) {
   return channelId == null || channelId.isEmpty;
 }
 
+/// The next calendar day at the same wall-clock time.
+///
+/// Rebuilt through the constructor rather than by adding 24 hours.
+/// `TZDateTime.add` is absolute-time arithmetic, so across a DST change "a
+/// day later" lands an hour off on the clock: 08:00 the day before the
+/// spring change became 09:00, and before the autumn change 07:00.
+///
+/// That mattered twice over. The alarm rang at the wrong hour, and
+/// `expectedDoses` — which builds its occurrences from the wall clock —
+/// carried on expecting 08:00, so `MissedDoseDetector` judged a dose missed
+/// that the device had armed for an hour later, and pushed a family a
+/// notification saying their parent had skipped their medication. For
+/// `specificDays` the alarm repeats weekly, so the wrong hour would persist
+/// for a whole week per un-reconciled schedule.
+///
+/// Kept top-level so the arithmetic can be tested without the notification
+/// plugin, like [reminderLockScreenCopy] above.
+tz.TZDateTime nextWallClockDay(tz.TZDateTime from, ClockTime time) =>
+    tz.TZDateTime(
+      tz.local,
+      from.year,
+      from.month,
+      from.day + 1,
+      time.hour,
+      time.minute,
+    );
+
 // Android's Notification.FLAG_INSISTENT: repeats the sound/vibration on loop
 // until the notification is dismissed or tapped, instead of playing once.
 const int _flagInsistent = 4;
@@ -143,8 +180,14 @@ class NotificationService {
     try {
       final deviceTz = await FlutterTimezone.getLocalTimezone();
       tz.setLocalLocation(tz.getLocation(deviceTz.identifier));
-    } catch (_) {
-      // Fallback to UTC if timezone lookup fails to prevent initialization crash
+    } catch (e) {
+      // Falls back to UTC so init() can still complete rather than crash —
+      // but every alarm this process arms is now off by the device's UTC
+      // offset, silently, for its whole lifetime (see the `_initialized`
+      // guard above: this only runs once). That was previously swallowed
+      // with no trace at all; logged now so a report of reminders firing at
+      // the wrong time has somewhere to start.
+      debugPrint('[dosely] device timezone lookup failed, falling back to UTC: $e');
       tz.setLocalLocation(tz.getLocation('UTC'));
     }
 
@@ -202,7 +245,14 @@ class NotificationService {
   /// The plugin reports the *last* notification launch on every later start,
   /// including Run from the IDE. We remember the one we already opened today
   /// so a normal launch does not replay the Taken/Snooze screen.
-  Future<NotificationResponse?> consumeLaunchNotificationResponse() async {
+  /// Checks the launch response against the dedup pref, but does not write
+  /// it — that happens in [markLaunchHandled], only once the response has
+  /// actually finished being acted on. Writing it here, before `main()` even
+  /// calls `runApp`, meant a process killed between this returning and
+  /// `handleNotificationResponse` finishing (which records the dose) lost
+  /// the Taken for good: already marked handled, so no later cold start —
+  /// even one seeing the same stale launch intent — would ever retry it.
+  Future<LaunchNotification?> consumeLaunchNotificationResponse() async {
     final details = await _plugin.getNotificationAppLaunchDetails();
     if (details?.didNotificationLaunchApp != true) return null;
     final response = details?.notificationResponse;
@@ -217,8 +267,14 @@ class NotificationService {
     )) {
       return null;
     }
+    return LaunchNotification(response, fingerprint);
+  }
+
+  /// See [consumeLaunchNotificationResponse]. Call only after the response it
+  /// returned has actually been handled.
+  Future<void> markLaunchHandled(String fingerprint) async {
+    final prefs = await SharedPreferences.getInstance();
     await prefs.setString(handledNotificationLaunchPref, fingerprint);
-    return response;
   }
 
   Future<bool> requestPermissions() async {
@@ -323,6 +379,8 @@ class NotificationService {
       time.minute,
     );
 
+    tz.TZDateTime nextDay(tz.TZDateTime from) => nextWallClockDay(from, time);
+
     if (weekday != null) {
       final targetDartWeekday = weekday == 0 ? 7 : weekday;
       // A matching weekday is always within seven steps, so this bound is
@@ -333,19 +391,31 @@ class NotificationService {
         if (scheduled.weekday == targetDartWeekday && scheduled.isAfter(now)) {
           return scheduled;
         }
-        scheduled = scheduled.add(const Duration(days: 1));
+        scheduled = nextDay(scheduled);
       }
       return null;
     }
 
     if (!scheduled.isAfter(now)) {
-      scheduled = scheduled.add(const Duration(days: 1));
+      scheduled = nextDay(scheduled);
     }
     return scheduled;
   }
 
-  String _payload(String scheduleId, String timeLabel) =>
-      jsonEncode({'scheduleId': scheduleId, 'timeLabel': timeLabel});
+  /// [scheduledAt] is what the answer gets attributed to.
+  ///
+  /// `timeLabel` alone could not say which occurrence rang. A snoozed
+  /// reminder carried the literal 'snooze', and every occurrence of an
+  /// every-X-hours schedule carried its anchor time — so answering the 16:00
+  /// slot recorded a dose at 08:00, and answering a snoozed 08:00 reminder
+  /// recorded one at whatever time the person happened to tap. The label is
+  /// still written for notifications that an older build may read back.
+  String _payload(String scheduleId, String timeLabel, DateTime scheduledAt) =>
+      jsonEncode({
+        'scheduleId': scheduleId,
+        'timeLabel': timeLabel,
+        'scheduledAt': scheduledAt.toUtc().toIso8601String(),
+      });
 
   /// [skipCancel] is for callers that have already cleared this schedule's
   /// alarms in a wider sweep — see [reconcile]. Cancelling costs a full
@@ -399,7 +469,7 @@ class NotificationService {
             notificationDetails: details,
             androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
             matchDateTimeComponents: DateTimeComponents.time,
-            payload: _payload(schedule.id, time.label),
+            payload: _payload(schedule.id, time.label, when),
           );
         }
         break;
@@ -417,7 +487,7 @@ class NotificationService {
               notificationDetails: details,
               androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
               matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
-              payload: _payload(schedule.id, time.label),
+              payload: _payload(schedule.id, time.label, when),
             );
           }
         }
@@ -491,7 +561,7 @@ class NotificationService {
             ),
             notificationDetails: details,
             androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-            payload: _payload(schedule.id, anchor.label),
+            payload: _payload(schedule.id, anchor.label, when),
           );
         }
         break;
@@ -512,7 +582,7 @@ class NotificationService {
   /// which also naturally cancels any outstanding snooze one-off.
   Future<void> cancelForSchedule(Schedule schedule) async {
     await init();
-    await _cancelWhere((scheduleId) => scheduleId == schedule.id);
+    await _cancelWhere((scheduleId, _) => scheduleId == schedule.id);
   }
 
   /// Cancels every pending notification whose payload's `scheduleId`
@@ -520,44 +590,50 @@ class NotificationService {
   /// (there shouldn't be any, but a plugin-internal or malformed one isn't
   /// impossible) are left alone rather than guessed at.
   Future<void> _cancelWhere(
-    bool Function(String scheduleId) shouldCancel,
+    bool Function(String scheduleId, Map<String, dynamic> payload) shouldCancel,
   ) async {
     final pending = await _plugin.pendingNotificationRequests();
     for (final request in pending) {
       final payload = request.payload;
       if (payload == null || payload.isEmpty) continue;
       String? scheduleId;
+      Map<String, dynamic> decoded;
       try {
-        scheduleId =
-            (jsonDecode(payload) as Map<String, dynamic>)['scheduleId']
-                as String?;
+        decoded = jsonDecode(payload) as Map<String, dynamic>;
+        scheduleId = decoded['scheduleId'] as String?;
       } catch (_) {
         continue;
       }
-      if (scheduleId != null && shouldCancel(scheduleId)) {
+      if (scheduleId != null && shouldCancel(scheduleId, decoded)) {
         await _plugin.cancel(id: request.id);
       }
     }
   }
 
+  /// Arms the one re-reminder for [scheduledAt]'s dose, [delay] from now.
+  ///
+  /// The id is derived from the dose, not from the moment of the tap. It used
+  /// to embed `DateTime.now().millisecondsSinceEpoch`, which made every press
+  /// a *different* notification — so holding the reminder and pressing Snooze
+  /// five times armed five alarms and the phone went off five times ten
+  /// minutes later. That is also the opposite of what notification_ids.dart
+  /// exists for: a stable id means re-arming overwrites rather than piles up.
   Future<void> scheduleSnooze({
     required String scheduleId,
     required Medicine medicine,
     required Duration delay,
+    required DateTime scheduledAt,
   }) async {
     await init();
     final copy = await _copyFor(medicine);
     await _plugin.zonedSchedule(
-      id: notificationIdFor(
-        scheduleId,
-        'snooze-${DateTime.now().millisecondsSinceEpoch}',
-      ),
+      id: snoozeNotificationId(scheduleId, scheduledAt),
       title: copy.title,
       body: copy.body,
       scheduledDate: tz.TZDateTime.now(tz.local).add(delay),
       notificationDetails: _details(visibility: copy.visibility),
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      payload: _payload(scheduleId, 'snooze'),
+      payload: _payload(scheduleId, snoozeTimeLabel, scheduledAt),
     );
   }
 
@@ -671,7 +747,17 @@ class NotificationService {
     // (orphans) and alarms belonging to one that's about to be re-armed
     // below. Doing both here is what lets the per-schedule calls skip their
     // own cancel pass — see [scheduleForScheduleWithMedicine].
-    await _cancelWhere((_) => true);
+    //
+    // Except a pending snooze. Nothing below re-arms one — it exists only as
+    // the alarm itself, never as a row — so sweeping it up silently threw the
+    // re-reminder away. Since reconcile runs on every foreground and on the
+    // background isolate for a `data_changed` push, snoozing a dose and then
+    // opening the app meant the reminder never came back. A snooze for a
+    // schedule that is genuinely going away is still cancelled, by
+    // [cancelForSchedule] on the stop/delete path.
+    await _cancelWhere(
+      (_, payload) => payload['timeLabel'] != snoozeTimeLabel,
+    );
 
     // Every schedule gets its own try/catch, because the sweep above has
     // already happened: without this, the first schedule that cannot be
@@ -685,6 +771,13 @@ class NotificationService {
       } catch (error) {
         failures[sm.schedule.id] = error;
       }
+    }
+    if (failures.isNotEmpty) {
+      // None of the four callers inspect the returned report today, so this
+      // was previously the only trace a failed-to-arm schedule left anywhere
+      // — logged here once, centrally, rather than asking every call site to
+      // remember to check `allArmed` itself.
+      debugPrint('[dosely] reconcile: ${failures.length} schedule(s) failed to arm: $failures');
     }
     return ReconcileReport(
       armed: active.length - failures.length,
@@ -733,7 +826,7 @@ class NotificationService {
       title: copy.title,
       body: copy.body,
       notificationDetails: _details(visibility: copy.visibility),
-      payload: _payload(scheduleId, timeLabel),
+      payload: _payload(scheduleId, timeLabel, scheduledAt),
     );
   }
 
@@ -752,9 +845,10 @@ class NotificationService {
 
 /// What [NotificationService.reconcile] managed to arm.
 ///
-/// Returned rather than logged so a caller can tell the user that a specific
-/// reminder is not running. Nothing surfaces it yet; the value of returning
-/// it now is that the information stops being thrown away.
+/// A failure is logged inside [NotificationService.reconcile] itself, since
+/// none of its callers inspect this. Still returned, not only logged, so a
+/// caller can eventually tell the user that a specific reminder is not
+/// running — that part of the design is unbuilt, not the reason this exists.
 class ReconcileReport {
   const ReconcileReport({required this.armed, required this.failures});
 
