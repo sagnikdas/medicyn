@@ -41,6 +41,7 @@ class HomeScreen extends StatefulWidget {
     required this.db,
     this.onNames,
     this.onNeedsAttention,
+    this.active = true,
   });
   final AppDatabase db;
 
@@ -50,6 +51,10 @@ class HomeScreen extends StatefulWidget {
   /// Switch to the Today tab when a dose needs answering, so opening the
   /// app from Plan or Insights still lands on Taken / Snooze.
   final VoidCallback? onNeedsAttention;
+
+  /// The shell keeps Today mounted in an IndexedStack. Reset its calendar
+  /// list when the user enters the tab so it always opens at the beginning.
+  final bool active;
 
   @override
   HomeScreenState createState() => HomeScreenState();
@@ -75,6 +80,7 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   List<DayOccurrence> _ringIfLeft = const [];
   final _dismissedAttentionUntil = <String, DateTime>{};
   final _attentionScheduleVersions = <String, DateTime>{};
+  var _attentionWasPresent = false;
 
   @override
   void initState() {
@@ -101,6 +107,17 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     doseResponseEvents.removeListener(_onDoseResponse);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant HomeScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!oldWidget.active && widget.active) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_scroll.hasClients) return;
+        _scroll.jumpTo(0);
+      });
+    }
   }
 
   void _onDoseResponse() {
@@ -475,7 +492,12 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     return ListenableBuilder(
       listenable: ReminderHealthStore.instance,
       builder: (context, _) => Scaffold(
-        appBar: const DoselyTopBar(),
+        appBar: AppBar(
+          automaticallyImplyLeading: false,
+          toolbarHeight: 64,
+          titleSpacing: 20,
+          title: const DoselyBrandMark(compact: true),
+        ),
         body: StreamBuilder<List<ScheduleWithMedicine>>(
           stream: _schedulesStream,
           builder: (context, scheduleSnap) {
@@ -591,7 +613,17 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       for (final o in attention)
         if (doseStillRings(o.status)) o,
     ];
-    if (attention.isNotEmpty) {
+    // Focus Today once when an unanswered dose first appears. The panel stays
+    // available there, but repeatedly requesting the shell to jump back on
+    // every rebuild would trap the user on Today and make the other tabs
+    // impossible to use until they answered the dose.
+    if (attention.isEmpty) {
+      _attentionWasPresent = false;
+    } else if (attentionNeedsInitialFocus(
+      wasPresent: _attentionWasPresent,
+      isPresent: true,
+    )) {
+      _attentionWasPresent = true;
       final jump = widget.onNeedsAttention;
       if (jump != null) {
         WidgetsBinding.instance.addPostFrameCallback((_) => jump());
@@ -852,6 +884,14 @@ String _attentionKey(DayOccurrence occurrence) =>
 
 String _attentionKeyForValues(String scheduleId, DateTime scheduledAt) =>
     '$scheduleId|${scheduledAt.toUtc().toIso8601String()}';
+
+/// Returns true only when an unanswered dose first appears. Rebuilds while it
+/// remains unanswered must not steal focus from another tab the user chose.
+@visibleForTesting
+bool attentionNeedsInitialFocus({
+  required bool wasPresent,
+  required bool isPresent,
+}) => isPresent && !wasPresent;
 
 class _NextDoseCard extends StatefulWidget {
   const _NextDoseCard({required this.occurrence, required this.onMarkTaken});

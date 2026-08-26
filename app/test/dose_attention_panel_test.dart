@@ -3,6 +3,7 @@ import 'package:dosely/data/local/database.dart';
 import 'package:dosely/data/local/tables.dart';
 import 'package:dosely/features/reminders_home/day_occurrences.dart';
 import 'package:dosely/features/reminders_home/dose_attention_panel.dart';
+import 'package:dosely/features/reminders_home/home_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -134,5 +135,20 @@ void main() {
     await tester.tap(find.text('Mark as Taken'));
     await tester.pump();
     expect(taken?.scheduledAt, DateTime(2026, 8, 21, 8, 0));
+  });
+
+  test('an unanswered dose focuses Today only when it first appears', () {
+    expect(
+      attentionNeedsInitialFocus(wasPresent: false, isPresent: true),
+      isTrue,
+    );
+    expect(
+      attentionNeedsInitialFocus(wasPresent: true, isPresent: true),
+      isFalse,
+    );
+    expect(
+      attentionNeedsInitialFocus(wasPresent: true, isPresent: false),
+      isFalse,
+    );
   });
 }

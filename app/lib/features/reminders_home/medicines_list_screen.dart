@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/widgets/dosely_chrome.dart';
 import '../../core/widgets/dosely_layout.dart';
 import '../../core/widgets/dosely_motion.dart';
 import '../../data/local/database.dart';
@@ -9,7 +10,7 @@ import 'reminder_card.dart';
 
 /// The cabinet: every reminder, plus the place to add another. Home is the
 /// calendar of a day; this screen is what you are taking.
-class MedicinesListScreen extends StatelessWidget {
+class MedicinesListScreen extends StatefulWidget {
   const MedicinesListScreen({
     super.key,
     required this.db,
@@ -18,6 +19,7 @@ class MedicinesListScreen extends StatelessWidget {
     required this.onEdit,
     required this.onDelete,
     this.embedded = false,
+    this.active = true,
   });
 
   final AppDatabase db;
@@ -26,13 +28,45 @@ class MedicinesListScreen extends StatelessWidget {
   final Future<void> Function(ScheduleWithMedicine) onEdit;
   final Future<void> Function(ScheduleWithMedicine) onDelete;
   final bool embedded;
+  final bool active;
+
+  @override
+  State<MedicinesListScreen> createState() => _MedicinesListScreenState();
+}
+
+class _MedicinesListScreenState extends State<MedicinesListScreen> {
+  late final ScrollController _scrollController = ScrollController();
+
+  @override
+  void didUpdateWidget(covariant MedicinesListScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!oldWidget.active && widget.active) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_scrollController.hasClients) return;
+        _scrollController.jumpTo(0);
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: embedded ? null : AppBar(title: const Text('My medicines')),
+      appBar: widget.embedded
+          ? AppBar(
+              automaticallyImplyLeading: false,
+              toolbarHeight: 64,
+              titleSpacing: 20,
+              title: const DoselyBrandMark(compact: true),
+            )
+          : AppBar(title: const Text('My medicines')),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: onAdd,
+        onPressed: widget.onAdd,
         icon: const Icon(Icons.add),
         label: const Text('Add medicine'),
       ),
@@ -41,7 +75,7 @@ class MedicinesListScreen extends StatelessWidget {
           // Lifecycle states are intentionally shown here too: a paused or
           // completed course must remain reachable so the user can review
           // history or resume it without recreating the reminder.
-          stream: db.watchSchedulesWithMedicines(),
+          stream: widget.db.watchSchedulesWithMedicines(),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting &&
                 !snapshot.hasData) {
@@ -67,18 +101,20 @@ class MedicinesListScreen extends StatelessWidget {
             }
             final items = snapshot.data ?? const <ScheduleWithMedicine>[];
             if (items.isEmpty) {
-              return DoselyFadeIn(child: _EmptyState(embedded: embedded));
+              return DoselyFadeIn(
+                child: _EmptyState(embedded: widget.embedded),
+              );
             }
             return DoselyFadeIn(
               child: ListView.separated(
-                padding: EdgeInsets.fromLTRB(20, embedded ? 24 : 16, 20, 96),
-                itemCount: items.length + (embedded ? 1 : 0),
+                controller: _scrollController,
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 96),
+                itemCount: items.length + (widget.embedded ? 1 : 0),
                 separatorBuilder: (context, i) {
-                  if (embedded && i == 0) return const SizedBox(height: 16);
                   return const SizedBox(height: 12);
                 },
                 itemBuilder: (context, i) {
-                  if (embedded && i == 0) {
+                  if (widget.embedded && i == 0) {
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -99,10 +135,10 @@ class MedicinesListScreen extends StatelessWidget {
                       ],
                     );
                   }
-                  final item = items[embedded ? i - 1 : i];
+                  final item = items[widget.embedded ? i - 1 : i];
                   return ReminderCard(
                     item: item,
-                    db: db,
+                    db: widget.db,
                     attribution: editAttributionLine(
                       updatedBy:
                           item.schedule.updatedBy ?? item.medicine.updatedBy,
@@ -114,10 +150,10 @@ class MedicinesListScreen extends StatelessWidget {
                           : item.medicine.updatedAt,
                       createdAt: item.medicine.createdAt,
                       currentUserId: AuthService.instance.currentUser?.id,
-                      nameOf: (id) => names[id],
+                      nameOf: (id) => widget.names[id],
                     ),
-                    onTap: () => onEdit(item),
-                    onDelete: () => onDelete(item),
+                    onTap: () => widget.onEdit(item),
+                    onDelete: () => widget.onDelete(item),
                   );
                 },
               ),

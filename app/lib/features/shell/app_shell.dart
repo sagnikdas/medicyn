@@ -43,6 +43,7 @@ class _AppShellState extends State<AppShell> {
             HomeScreen(
               key: _homeKey,
               db: widget.db,
+              active: _index == 0,
               onNeedsAttention: () {
                 if (_index == 0) return;
                 setState(() => _index = 0);
@@ -56,6 +57,7 @@ class _AppShellState extends State<AppShell> {
               db: widget.db,
               names: _names,
               embedded: true,
+              active: _index == 1,
               onAdd: () {
                 unawaited(
                   _homeKey.currentState?.startCapture() ?? Future.value(),
@@ -68,8 +70,8 @@ class _AppShellState extends State<AppShell> {
                 await _homeKey.currentState?.delete(item);
               },
             ),
-            InsightsScreen(db: widget.db),
-            SettingsScreen(db: widget.db, embedded: true),
+            InsightsScreen(db: widget.db, active: _index == 2),
+            SettingsScreen(db: widget.db, embedded: true, active: _index == 3),
           ],
         ),
       ),
