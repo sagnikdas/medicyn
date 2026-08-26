@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../core/app_settings.dart';
 import '../../core/theme.dart';
 import '../../core/widgets/dosely_motion.dart';
 import '../../data/local/database.dart';
@@ -90,7 +91,11 @@ class ReminderCard extends StatelessWidget {
                             style: Theme.of(context).textTheme.bodySmall,
                           ),
                         ],
-                        _SnoozeStatus(db: db, scheduleId: item.schedule.id),
+                        _SnoozeStatus(
+                          db: db,
+                          scheduleId: item.schedule.id,
+                          scheduleUpdatedAt: item.schedule.updatedAt,
+                        ),
                       ],
                     ),
                   ),
@@ -109,8 +114,27 @@ class ReminderCard extends StatelessWidget {
   }
 }
 
+/// Returns the expiry of an active snooze, or null when the latest log is not
+/// a snooze or its configured window has elapsed.
+DateTime? activeSnoozeUntil({
+  required String? action,
+  required DateTime? loggedAt,
+  required DateTime scheduleUpdatedAt,
+  required Duration snoozeWindow,
+  required DateTime now,
+}) {
+  if (action != DoseAction.snoozed.name ||
+      loggedAt == null ||
+      loggedAt.isBefore(scheduleUpdatedAt)) {
+    return null;
+  }
+  final candidate = loggedAt.add(snoozeWindow);
+  return candidate.isAfter(now) ? candidate : null;
+}
+
 /// Shows "Snoozed until HH:mm" under a reminder while its most recent dose
-/// log is an active (< 10 minutes old) snooze, then disappears on its own.
+/// log is an active snooze for the configured duration. A snooze from before
+/// the reminder was edited is ignored: the edit starts a new reminder version.
 ///
 /// Polls rather than watches: the notification engine records Taken/Snooze
 /// through its own `AppDatabase` instance — often from a background isolate
@@ -118,9 +142,14 @@ class ReminderCard extends StatelessWidget {
 /// writes don't push to a `.watch()` stream on a different instance. See
 /// [AppDatabase.latestDoseLogOnce].
 class _SnoozeStatus extends StatefulWidget {
-  const _SnoozeStatus({required this.db, required this.scheduleId});
+  const _SnoozeStatus({
+    required this.db,
+    required this.scheduleId,
+    required this.scheduleUpdatedAt,
+  });
   final AppDatabase db;
   final String scheduleId;
+  final DateTime scheduleUpdatedAt;
 
   @override
   State<_SnoozeStatus> createState() => _SnoozeStatusState();
@@ -142,13 +171,34 @@ class _SnoozeStatusState extends State<_SnoozeStatus> {
   @override
   void initState() {
     super.initState();
+    AppSettings.instance.addListener(_onSettingsChanged);
     _tick();
   }
 
   @override
   void dispose() {
+    AppSettings.instance.removeListener(_onSettingsChanged);
     _poll?.cancel();
     super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant _SnoozeStatus oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.scheduleId != widget.scheduleId ||
+        oldWidget.scheduleUpdatedAt != widget.scheduleUpdatedAt) {
+      // A local or remote reminder edit can invalidate the old snooze while
+      // this state object is reused by the list. Do not wait for the poller
+      // to notice that the card now represents a new schedule version.
+      unawaited(_refresh());
+    }
+  }
+
+  void _onSettingsChanged() {
+    if (!mounted) return;
+    // A newly selected duration must update an already-visible Plan card
+    // immediately instead of waiting for the next polling tick.
+    unawaited(_refresh());
   }
 
   Future<void> _tick() async {
@@ -163,11 +213,13 @@ class _SnoozeStatusState extends State<_SnoozeStatus> {
   Future<void> _refresh() async {
     final log = await widget.db.latestDoseLogOnce(widget.scheduleId);
     if (!mounted) return;
-    DateTime? until;
-    if (log != null && log.action == DoseAction.snoozed.name) {
-      final candidate = log.loggedAt.add(const Duration(minutes: 10));
-      if (candidate.isAfter(DateTime.now())) until = candidate;
-    }
+    final until = activeSnoozeUntil(
+      action: log?.action,
+      loggedAt: log?.loggedAt,
+      scheduleUpdatedAt: widget.scheduleUpdatedAt,
+      snoozeWindow: Duration(minutes: AppSettings.instance.snoozeMinutes),
+      now: DateTime.now(),
+    );
     if (until != _snoozedUntil) setState(() => _snoozedUntil = until);
   }
 
@@ -220,7 +272,10 @@ class _RefillStatus extends StatelessWidget {
       builder: (context, snapshot) {
         final warning = refillWarningLine(
           refillDaysLeft(
-            tabletsRemaining: derivedTabletsRemaining(item.medicine, snapshot.data ?? 0),
+            tabletsRemaining: derivedTabletsRemaining(
+              item.medicine,
+              snapshot.data ?? 0,
+            ),
             tabletsPerDose: item.medicine.tabletsPerDose,
             schedules: [item.schedule],
           ),
@@ -230,9 +285,9 @@ class _RefillStatus extends StatelessWidget {
           padding: const EdgeInsets.only(top: 4),
           child: Text(
             warning,
-            style: Theme.of(
-              context,
-            ).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.error),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.error,
+            ),
           ),
         );
       },

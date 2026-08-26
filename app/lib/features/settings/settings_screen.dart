@@ -285,7 +285,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ],
                         onChanged: (value) {
                           if (value != null) {
-                            AppSettings.instance.setSnoozeMinutes(value);
+                            unawaited(_setSnoozeMinutes(value));
                           }
                         },
                       ),
@@ -549,6 +549,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
       await NotificationService.instance.reconcileFromDisk();
     } catch (_) {
       // Next foreground re-arms; the pref is already stored.
+    }
+  }
+
+  Future<void> _setSnoozeMinutes(int minutes) async {
+    await AppSettings.instance.setSnoozeMinutes(minutes);
+    // Notification action labels and payload details are stored when the
+    // alarm is armed. Reconcile so an already-armed notification does not
+    // continue offering the previous duration.
+    try {
+      await NotificationService.instance.reconcileFromDisk();
+    } catch (_) {
+      // The preference is already saved; the next foreground reconcile will
+      // update any existing alarms.
     }
   }
 

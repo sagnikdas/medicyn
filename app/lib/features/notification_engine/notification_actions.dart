@@ -160,6 +160,14 @@ Future<void> recordDoseTaken(
     action: DoseAction.taken,
     source: source,
   );
+  // Taking a dose through Home or the confirmation screen must cancel any
+  // pending snooze re-reminder. The notification action itself is normally
+  // auto-cancelled by Android, but these in-app paths otherwise leave the
+  // one-off alarm armed and produce a false reminder later.
+  await NotificationService.instance.cancelSnooze(
+    scheduleId: scheduleId,
+    scheduledAt: scheduledAt,
+  );
 }
 
 /// Logs the snooze, then arms a one-off reminder [delay] out.
@@ -189,6 +197,18 @@ Future<void> recordDoseSnoozed(
     scheduledAt: scheduledAt,
     action: DoseAction.snoozed,
   );
+  // A Taken response can arrive just before a delayed Snooze callback. Keep
+  // the audit facts, but never arm a re-reminder for a dose already settled.
+  if (await db.doseLogById(
+        doseLogIdFor(scheduleId, scheduledAt, DoseAction.taken),
+      ) !=
+      null) {
+    await NotificationService.instance.cancelSnooze(
+      scheduleId: scheduleId,
+      scheduledAt: scheduledAt,
+    );
+    return;
+  }
   doseResponseEvents.value = DoseResponseEvent(
     scheduleId: scheduleId,
     scheduledAt: scheduledAt,

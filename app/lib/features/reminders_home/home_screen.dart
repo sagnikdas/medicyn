@@ -78,6 +78,7 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   bool _calendarMonth = false;
   List<DayOccurrence> _ringIfLeft = const [];
   final _dismissedAttentionUntil = <String, DateTime>{};
+  final _attentionScheduleVersions = <String, DateTime>{};
 
   @override
   void initState() {
@@ -504,6 +505,28 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     required List<ScheduleWithMedicine> schedules,
     required List<DoseLog> logs,
   }) {
+    // A snooze dismissal is tied to the reminder version the user answered.
+    // If that reminder is edited while the same occurrence is still visible,
+    // clear the old attention suppression so the new definition can surface
+    // immediately instead of waiting for the old snooze timeout.
+    final scheduleVersions = {
+      for (final item in schedules) item.schedule.id: item.schedule.updatedAt,
+    };
+    final editedScheduleIds = <String>{};
+    for (final entry in scheduleVersions.entries) {
+      final previous = _attentionScheduleVersions[entry.key];
+      if (previous != null && previous != entry.value) {
+        editedScheduleIds.add(entry.key);
+      }
+    }
+    if (editedScheduleIds.isNotEmpty) {
+      _dismissedAttentionUntil.removeWhere(
+        (key, _) => editedScheduleIds.contains(key.split('|').first),
+      );
+    }
+    _attentionScheduleVersions
+      ..clear()
+      ..addAll(scheduleVersions);
     final now = DateTime.now();
     final snoozeWindow = Duration(minutes: AppSettings.instance.snoozeMinutes);
     final records = <DoseRecord>[

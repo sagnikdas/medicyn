@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/app_settings.dart';
 import '../../core/motion.dart';
 import '../../core/theme.dart';
 import '../../core/widgets/dosely_chrome.dart';
@@ -77,17 +78,30 @@ class _InsightsBody extends StatelessWidget {
     // One index for all five walks below. Each of them would otherwise
     // rebuild it, and consistencyStreak alone walks a year of days.
     final logIndex = DoseRecordIndex(records);
-    final week = weekAdherence(items: schedules, index: logIndex, now: now);
-    final days = weekDayAdherence(items: schedules, index: logIndex, now: now);
+    final snoozeWindow = Duration(minutes: AppSettings.instance.snoozeMinutes);
+    final week = weekAdherence(
+      items: schedules,
+      index: logIndex,
+      now: now,
+      snoozeWindow: snoozeWindow,
+    );
+    final days = weekDayAdherence(
+      items: schedules,
+      index: logIndex,
+      now: now,
+      snoozeWindow: snoozeWindow,
+    );
     final streak = consistencyStreak(
       items: schedules,
       index: logIndex,
       now: now,
+      snoozeWindow: snoozeWindow,
     );
     final missedPart = mostMissedDayPart(
       items: schedules,
       index: logIndex,
       now: now,
+      snoozeWindow: snoozeWindow,
     );
     var missed = 0;
     for (final day in days) {
@@ -102,6 +116,7 @@ class _InsightsBody extends StatelessWidget {
           items: schedules,
           now: now,
           part: part,
+          snoozeWindow: snoozeWindow,
         ),
     ];
     final mostConsistent = partRates
@@ -384,6 +399,7 @@ class _InsightsBody extends StatelessWidget {
     required List<ScheduleWithMedicine> items,
     required DateTime now,
     required DayPart part,
+    required Duration snoozeWindow,
   }) {
     // Re-walk the week for this part only — cheap, and keeps scoring
     // identical to occurrencesOnDay.
@@ -395,6 +411,7 @@ class _InsightsBody extends StatelessWidget {
         index: index,
         day: day.day,
         now: now,
+        snoozeWindow: snoozeWindow,
       );
       for (final o in occs) {
         if (dayPartOf(o.scheduledAt) != part) continue;
