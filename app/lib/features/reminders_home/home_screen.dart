@@ -8,6 +8,7 @@ import '../../core/widgets/dosely_chrome.dart';
 import '../../core/widgets/dosely_motion.dart';
 import '../../core/telemetry.dart';
 import '../../data/local/database.dart';
+import '../../data/local/tables.dart';
 import '../../data/remote/care_notifier.dart';
 import '../../data/remote/sync_service.dart';
 import '../../data/remote/sync_status.dart';
@@ -82,6 +83,7 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    doseResponseEvents.addListener(_onDoseResponse);
     _bootstrap(firstLoad: true);
     // Upcoming → pending has to flip when the clock time passes, not only
     // when the user comes back from another screen. Fifteen seconds is
@@ -99,8 +101,25 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void dispose() {
     _clock?.cancel();
     _scroll.dispose();
+    doseResponseEvents.removeListener(_onDoseResponse);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  void _onDoseResponse() {
+    final event = doseResponseEvents.value;
+    if (!mounted || event == null || event.action != DoseAction.snoozed) {
+      return;
+    }
+    final delay = Duration(minutes: AppSettings.instance.snoozeMinutes);
+    setState(() {
+      _dismissedAttentionUntil[_attentionKeyForValues(
+        event.scheduleId,
+        event.scheduledAt,
+      )] = DateTime.now().add(
+        delay,
+      );
+    });
   }
 
   @override
@@ -545,10 +564,11 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
     final attention = [
       for (final occurrence in allAttention)
-        if (!(_dismissedAttentionUntil[_attentionKey(occurrence)]?.isAfter(
-              nowForAttention,
-            ) ??
-            false))
+        if (occurrence.status != DayDoseStatus.snoozed &&
+            !(_dismissedAttentionUntil[_attentionKey(occurrence)]?.isAfter(
+                  nowForAttention,
+                ) ??
+                false))
           occurrence,
     ];
     _ringIfLeft = [
@@ -812,7 +832,10 @@ class _ReminderHealthCard extends StatelessWidget {
 }
 
 String _attentionKey(DayOccurrence occurrence) =>
-    '${occurrence.item.schedule.id}|${occurrence.scheduledAt.toUtc().toIso8601String()}';
+    _attentionKeyForValues(occurrence.item.schedule.id, occurrence.scheduledAt);
+
+String _attentionKeyForValues(String scheduleId, DateTime scheduledAt) =>
+    '$scheduleId|${scheduledAt.toUtc().toIso8601String()}';
 
 class _NextDoseCard extends StatefulWidget {
   const _NextDoseCard({required this.occurrence, required this.onMarkTaken});

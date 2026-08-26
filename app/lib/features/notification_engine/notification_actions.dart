@@ -14,6 +14,24 @@ import '../dose_confirm/dose_confirm_screen.dart';
 import 'missed_doses.dart';
 import 'notification_service.dart';
 
+/// Foreground screens do not receive Drift invalidation from the short-lived
+/// database connection used by notification taps. This event bridges that
+/// gap immediately; the database row remains the source of truth for later
+/// rebuilds and background-isolate actions.
+final doseResponseEvents = ValueNotifier<DoseResponseEvent?>(null);
+
+class DoseResponseEvent {
+  const DoseResponseEvent({
+    required this.scheduleId,
+    required this.scheduledAt,
+    required this.action,
+  });
+
+  final String scheduleId;
+  final DateTime scheduledAt;
+  final DoseAction action;
+}
+
 /// Runs in a separate background isolate when the user taps a notification
 /// action while the app isn't in the foreground. Per flutter_local_notifications'
 /// documented pattern, the Flutter binding must be (re)initialized before
@@ -167,6 +185,11 @@ Future<void> recordDoseSnoozed(
       delay ?? Duration(minutes: AppSettings.instance.snoozeMinutes);
   await db.recordDoseAction(
     id: doseLogIdFor(scheduleId, scheduledAt, DoseAction.snoozed),
+    scheduleId: scheduleId,
+    scheduledAt: scheduledAt,
+    action: DoseAction.snoozed,
+  );
+  doseResponseEvents.value = DoseResponseEvent(
     scheduleId: scheduleId,
     scheduledAt: scheduledAt,
     action: DoseAction.snoozed,
