@@ -10,11 +10,10 @@ import '../../core/telemetry.dart';
 import '../../data/local/database.dart';
 import '../../data/remote/care_notifier.dart';
 import '../../data/remote/sync_service.dart';
+import '../../data/remote/sync_status.dart';
 import '../auth/auth_service.dart';
 import '../capture_ocr/ocr_capture_screen.dart';
 import '../care/care_service.dart';
-import '../consent/consent_purpose.dart';
-import '../consent/consent_service.dart';
 import '../history/dose_history_screen.dart';
 import '../notification_engine/missed_doses.dart';
 import '../notification_engine/notification_actions.dart';
@@ -32,6 +31,8 @@ import 'dose_calendar.dart';
 import 'refill.dart';
 
 enum _ReminderDisposition { stop, deleteHistory }
+
+enum _CaptureMethod { scan, speak, manual }
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
@@ -138,6 +139,12 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       unawaited(PushService.instance.registerToken());
     }
     final sync = signedIn ? SyncService(widget.db) : null;
+    final syncOwner = AppSettings.instance.consentOwnerId;
+    if (sync != null &&
+        syncOwner != null &&
+        AppSettings.instance.consentCloudBackup) {
+      await SyncStatusStore.instance.markSyncing(syncOwner);
+    }
     // Pull before reconcile: a fresh install/new device has no local
     // schedules yet, so restoring them from Supabase first means reconcile
     // arms their alarms in this same pass instead of waiting for the next
@@ -191,6 +198,13 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     await const MissedDoseDetector().sweep(widget.db);
     if (sync == null) return;
     await sync.syncAll();
+    if (syncOwner != null) {
+      await SyncStatusStore.instance.refresh(
+        ownerId: syncOwner,
+        db: widget.db,
+        successful: AppSettings.instance.consentCloudBackup,
+      );
+    }
 
     // Care alerts name dose-log ids the server reads back. Without cloud
     // backup there is no push, so there is nothing to announce.
@@ -275,29 +289,90 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Future<void> delete(ScheduleWithMedicine item) => _delete(item);
 
   Future<void> _startCapture() async {
-    final ocrText = await Navigator.of(
-      context,
-    ).push<String>(MaterialPageRoute(builder: (_) => const OcrCaptureScreen()));
-    if (ocrText == null || !mounted) return;
-
-    var transcript = '';
-    if (ConsentService.instance.isGranted(ConsentPurpose.googleSpeech)) {
-      final spoken = await Navigator.of(context).push<String>(
-        MaterialPageRoute(builder: (_) => const VoiceCaptureScreen()),
-      );
-      if (spoken == null || !mounted) return;
-      transcript = spoken;
-    }
-
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => ReviewEditScreen(
-          ocrText: ocrText,
-          transcript: transcript,
-          db: widget.db,
+    // Selecting a method is intentionally separate from opening the capture
+    // screen: camera and microphone permissions are requested only after the
+    // user has made that choice.
+    final method = await showModalBottomSheet<_CaptureMethod>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'How do you want to add it?',
+                style: Theme.of(sheetContext).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Choose one. You can check every detail before saving.',
+                style: Theme.of(sheetContext).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 12),
+              ListTile(
+                minTileHeight: 56,
+                leading: const Icon(Icons.document_scanner_outlined),
+                title: const Text('Scan label'),
+                subtitle: const Text('Use your camera to read the label'),
+                onTap: () => Navigator.pop(sheetContext, _CaptureMethod.scan),
+              ),
+              ListTile(
+                minTileHeight: 56,
+                leading: const Icon(Icons.mic_outlined),
+                title: const Text('Speak details'),
+                subtitle: const Text('Say the medicine and schedule'),
+                onTap: () => Navigator.pop(sheetContext, _CaptureMethod.speak),
+              ),
+              ListTile(
+                minTileHeight: 56,
+                leading: const Icon(Icons.edit_outlined),
+                title: const Text('Enter manually'),
+                subtitle: const Text('Type the details yourself'),
+                onTap: () => Navigator.pop(sheetContext, _CaptureMethod.manual),
+              ),
+            ],
+          ),
         ),
       ),
     );
+    if (!mounted || method == null) return;
+
+    await DoselyTelemetry.instance.record(
+      DoselyEvent.addStarted,
+      properties: {'method': method.name},
+    );
+    if (!mounted) return;
+    final navigator = Navigator.of(context);
+    switch (method) {
+      case _CaptureMethod.scan:
+        final ocrText = await navigator.push<String>(
+          MaterialPageRoute(builder: (_) => const OcrCaptureScreen()),
+        );
+        if (ocrText == null || !mounted) return;
+        await navigator.push(
+          MaterialPageRoute(
+            builder: (_) => ReviewEditScreen(ocrText: ocrText, db: widget.db),
+          ),
+        );
+      case _CaptureMethod.speak:
+        final transcript = await navigator.push<String>(
+          MaterialPageRoute(builder: (_) => const VoiceCaptureScreen()),
+        );
+        if (transcript == null || !mounted) return;
+        await navigator.push(
+          MaterialPageRoute(
+            builder: (_) =>
+                ReviewEditScreen(transcript: transcript, db: widget.db),
+          ),
+        );
+      case _CaptureMethod.manual:
+        await navigator.push(
+          MaterialPageRoute(builder: (_) => ReviewEditScreen(db: widget.db)),
+        );
+    }
   }
 
   Future<void> _edit(ScheduleWithMedicine item) => Navigator.of(context).push(
@@ -621,6 +696,7 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       widget.db,
       scheduleId: occurrence.item.schedule.id,
       scheduledAt: occurrence.scheduledAt,
+      delay: Duration(minutes: AppSettings.instance.snoozeMinutes),
     );
     if (AuthService.instance.currentUser == null) return;
     unawaited(SyncService(widget.db).syncAll());

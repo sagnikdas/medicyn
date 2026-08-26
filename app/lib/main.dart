@@ -106,14 +106,20 @@ class _DoselyAppState extends State<DoselyApp> {
         darkTheme: DoselyTheme.dark(),
         // Light/dark/system, as chosen in Settings; system by default.
         themeMode: AppSettings.instance.themeMode,
-        // Applies the user's chosen text size (Settings) to every screen —
-        // scales text and, with it, most touch targets.
-        builder: (context, child) => MediaQuery(
-          data: MediaQuery.of(context).copyWith(
-            textScaler: TextScaler.linear(AppSettings.instance.textScale),
-          ),
-          child: DeviceLockGate(child: child!),
-        ),
+        // Applies the optional in-app multiplier on top of the device's own
+        // text scaler. A system accessibility choice must never be replaced
+        // by a Dosely preference.
+        builder: (context, child) {
+          final deviceScale = MediaQuery.of(context).textScaler.scale(1);
+          return MediaQuery(
+            data: MediaQuery.of(context).copyWith(
+              textScaler: TextScaler.linear(
+                deviceScale * AppSettings.instance.textScale,
+              ),
+            ),
+            child: DeviceLockGate(child: child!),
+          );
+        },
         home: const _OnboardingGate(),
       ),
     );
@@ -173,7 +179,7 @@ class _ConsentGate extends StatelessWidget {
 /// local-only mode, then the app itself.
 /// `currentSession` is checked on every rebuild (including the initial
 /// build), and `onAuthStateChange` triggers rebuilds as sign-in/sign-out
-/// happen. Choosing "Use without an account" notifies via [AppSettings].
+/// happen. Choosing "Add a reminder first" notifies via [AppSettings].
 ///
 /// The database connection is per Google account: a second person signing
 /// in on this phone must not inherit the previous person's file. The same

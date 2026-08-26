@@ -27,8 +27,8 @@ class InsightsScreen extends StatefulWidget {
 }
 
 class _InsightsScreenState extends State<InsightsScreen> {
-  late final Stream<List<ScheduleWithMedicine>> _schedulesStream =
-      widget.db.watchSchedulesWithMedicines();
+  late final Stream<List<ScheduleWithMedicine>> _schedulesStream = widget.db
+      .watchSchedulesWithMedicines();
   late final Stream<List<DoseLog>> _doseLogsStream = widget.db.watchDoseLogs();
 
   @override
@@ -94,13 +94,22 @@ class _InsightsBody extends StatelessWidget {
       if (day.expected > day.taken) missed += day.expected - day.taken;
     }
     final avg = week.expected == 0 ? 0.0 : week.taken / week.expected;
-    final morning = _partRate(
-      days: days,
-      index: logIndex,
-      items: schedules,
-      now: now,
-      part: DayPart.morning,
-    );
+    final partRates = [
+      for (final part in DayPart.values)
+        _partRate(
+          days: days,
+          index: logIndex,
+          items: schedules,
+          now: now,
+          part: part,
+        ),
+    ];
+    final mostConsistent = partRates
+        .where((part) => part.expected > 0)
+        .fold<({String label, double rate, int expected})?>(
+          null,
+          (best, part) => best == null || part.rate > best.rate ? part : best,
+        );
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
@@ -204,9 +213,9 @@ class _InsightsBody extends StatelessWidget {
                   : 'Every due dose taken, walking back from today.',
             );
             final consistentCard = InsightsMostConsistentCard(
-              label: morning.label,
-              rate: morning.rate,
-              expected: morning.expected,
+              label: mostConsistent?.label ?? 'No doses yet',
+              rate: mostConsistent?.rate ?? 0,
+              expected: mostConsistent?.expected ?? 0,
             );
             final pair = constraints.maxWidth < 420
                 ? Column(
@@ -582,7 +591,7 @@ class InsightsMostConsistentCard extends StatelessWidget {
               alignment: Alignment.centerRight,
               child: Text(
                 expected == 0
-                    ? 'No morning doses'
+                    ? 'No scheduled doses'
                     : '${(rate * 100).round()}% taken',
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,

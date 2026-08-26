@@ -40,7 +40,29 @@ class MedicinesListScreen extends StatelessWidget {
         child: StreamBuilder<List<ScheduleWithMedicine>>(
           stream: db.watchActiveSchedules(),
           builder: (context, snapshot) {
-            final items = snapshot.data ?? [];
+            if (snapshot.connectionState == ConnectionState.waiting &&
+                !snapshot.hasData) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (snapshot.hasError) {
+              return Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(32),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.cloud_off_outlined, size: 48),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Could not load your reminders. Your saved data is still on this phone.',
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }
+            final items = snapshot.data ?? const <ScheduleWithMedicine>[];
             if (items.isEmpty) {
               return DoselyFadeIn(
                 child: _EmptyState(onAdd: onAdd, embedded: embedded),

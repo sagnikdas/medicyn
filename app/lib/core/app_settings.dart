@@ -29,6 +29,7 @@ class AppSettings extends ChangeNotifier {
   static const _hasSeenOnboardingKey = 'has_seen_onboarding';
   static const _showMedicineOnLockScreenKey = 'show_medicine_on_lock_screen';
   static const _localOnlyKey = 'local_only';
+  static const _snoozeMinutesKey = 'snooze_minutes';
   static const _hasRecordedConsentsKey = 'has_recorded_consents';
   static const _consentCloudBackupKey = 'consent_cloud_backup';
   static const _consentAnthropicParseKey = 'consent_anthropic_parse';
@@ -85,6 +86,10 @@ class AppSettings extends ChangeNotifier {
   bool _localOnly = false;
   bool get localOnly => _localOnly;
 
+  static const snoozeOptions = <int>[5, 10, 20, 30];
+  int _snoozeMinutes = 10;
+  int get snoozeMinutes => _snoozeMinutes;
+
   /// False until the consent screen's Continue is tapped — including on
   /// existing installs that already skipped onboarding. Implied consent is
   /// never grandfathered.
@@ -135,6 +140,8 @@ class AppSettings extends ChangeNotifier {
       _showMedicineOnLockScreen =
           prefs.getBool(_showMedicineOnLockScreenKey) ?? false;
       _localOnly = prefs.getBool(_localOnlyKey) ?? false;
+      final savedSnooze = prefs.getInt(_snoozeMinutesKey);
+      _snoozeMinutes = snoozeOptions.contains(savedSnooze) ? savedSnooze! : 10;
       _devicePreferencesLoaded = true;
     }
     final requestedOwner =
@@ -282,6 +289,14 @@ class AppSettings extends ChangeNotifier {
     await prefs.setBool(_localOnlyKey, value);
   }
 
+  Future<void> setSnoozeMinutes(int minutes) async {
+    if (!snoozeOptions.contains(minutes) || minutes == _snoozeMinutes) return;
+    _snoozeMinutes = minutes;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_snoozeMinutesKey, minutes);
+  }
+
   Future<void> setHasRecordedConsents() async {
     await _ensureConsentOwner();
     _hasRecordedConsents = true;
@@ -350,6 +365,7 @@ class AppSettings extends ChangeNotifier {
     _hasSeenOnboarding = false;
     _showMedicineOnLockScreen = false;
     _localOnly = false;
+    _snoozeMinutes = 10;
     _clearConsentValues();
   }
 }
