@@ -98,6 +98,27 @@ void main() {
       expect(AppSettings.instance.consentCareShare, isTrue);
     });
 
+    test(
+      'first-run choices follow the first Google account once, then stay isolated',
+      () async {
+        await AppSettings.instance.setConsentCloudBackup(true);
+        await AppSettings.instance.setConsentGoogleSpeech(true);
+        await AppSettings.instance.setHasRecordedConsents();
+
+        await AppSettings.instance.activateConsentOwnerAfterSignIn(
+          'first-account',
+        );
+        expect(AppSettings.instance.hasRecordedConsents, isTrue);
+        expect(AppSettings.instance.consentCloudBackup, isTrue);
+        expect(AppSettings.instance.consentGoogleSpeech, isTrue);
+
+        await AppSettings.instance.activateConsentOwner('second-account');
+        expect(AppSettings.instance.hasRecordedConsents, isFalse);
+        expect(AppSettings.instance.consentCloudBackup, isFalse);
+        expect(AppSettings.instance.consentGoogleSpeech, isFalse);
+      },
+    );
+
     test('legacy device-wide choices migrate only to local owner', () async {
       SharedPreferences.setMockInitialValues({
         'has_recorded_consents': true,

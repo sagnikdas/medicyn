@@ -73,6 +73,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget build(BuildContext context) {
     final email = AuthService.instance.currentUser?.email ?? '';
     final name = email.contains('@') ? email.split('@').first : email;
+    final avatarUrl = AuthService.instance.currentUserAvatarUrl;
     return Scaffold(
       appBar: widget.embedded ? null : AppBar(title: const Text('Settings')),
       body: SafeArea(
@@ -94,6 +95,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           foregroundColor: Theme.of(
                             context,
                           ).colorScheme.onSecondaryContainer,
+                          foregroundImage: avatarUrl == null
+                              ? null
+                              : NetworkImage(avatarUrl),
                           child: Text(
                             (name.isEmpty ? 'D' : name.substring(0, 1))
                                 .toUpperCase(),

@@ -23,13 +23,23 @@ class DoselyBrandMark extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(Icons.medication, color: color, size: compact ? 22 : 26),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(compact ? 8 : 10),
+          child: Image.asset(
+            'android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png',
+            width: compact ? 34 : 40,
+            height: compact ? 34 : 40,
+            filterQuality: FilterQuality.high,
+            excludeFromSemantics: true,
+          ),
+        ),
         const SizedBox(width: 8),
         Text(
           'Dosely',
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
             color: color,
             fontWeight: FontWeight.w700,
+            fontSize: compact ? 24 : 26,
           ),
         ),
       ],
@@ -37,63 +47,9 @@ class DoselyBrandMark extends StatelessWidget {
   }
 }
 
-/// 32px circle used as the top-bar avatar. Tapping it opens Profile.
-class DoselyAvatarButton extends StatelessWidget {
-  const DoselyAvatarButton({super.key, required this.label, this.onTap});
-
-  /// First letter of the signed-in email, or a generic person icon.
-  final String? label;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final letter = (label ?? '').trim();
-    final initial = letter.isEmpty
-        ? null
-        : letter.substring(0, 1).toUpperCase();
-    return SizedBox(
-      width: 48,
-      height: 48,
-      child: Center(
-        child: InkWell(
-          onTap: onTap,
-          customBorder: const CircleBorder(),
-          child: Ink(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: scheme.surfaceContainerHighest,
-              border: Border.all(color: scheme.outlineVariant),
-            ),
-            child: Center(
-              child: initial == null
-                  ? Icon(Icons.person, size: 18, color: scheme.onSurfaceVariant)
-                  : Text(
-                      initial,
-                      style: Theme.of(
-                        context,
-                      ).textTheme.labelLarge?.copyWith(color: scheme.primary),
-                    ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class DoselyTopBar extends StatelessWidget implements PreferredSizeWidget {
-  const DoselyTopBar({
-    super.key,
-    this.onAvatarTap,
-    this.avatarLabel,
-    this.trailing,
-  });
+  const DoselyTopBar({super.key, this.trailing});
 
-  final VoidCallback? onAvatarTap;
-  final String? avatarLabel;
   final Widget? trailing;
 
   @override
@@ -110,9 +66,7 @@ class DoselyTopBar extends StatelessWidget implements PreferredSizeWidget {
         child: Row(
           children: [
             const DoselyBrandMark(compact: true),
-            const Spacer(),
-            trailing ??
-                DoselyAvatarButton(label: avatarLabel, onTap: onAvatarTap),
+            if (trailing != null) ...[const Spacer(), trailing!],
           ],
         ),
       ),
@@ -300,10 +254,12 @@ class DoselyBottomNav extends StatelessWidget {
     super.key,
     required this.index,
     required this.onChanged,
+    this.profileImageUrl,
   });
 
   final int index;
   final ValueChanged<int> onChanged;
+  final String? profileImageUrl;
 
   static const items = [
     (
@@ -359,6 +315,7 @@ class DoselyBottomNav extends StatelessWidget {
                     child: _NavItem(
                       item: items[i],
                       selected: i == index,
+                      profileImageUrl: i == 3 ? profileImageUrl : null,
                       onTap: () => onChanged(i),
                     ),
                   ),
@@ -375,31 +332,47 @@ class _NavItem extends StatelessWidget {
   const _NavItem({
     required this.item,
     required this.selected,
+    this.profileImageUrl,
     required this.onTap,
   });
 
   final ({IconData icon, IconData selected, String label}) item;
   final bool selected;
+  final String? profileImageUrl;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final color = selected
-        ? scheme.onPrimaryContainer
-        : scheme.onSurfaceVariant;
+    final color = selected ? scheme.primary : scheme.onSurfaceVariant;
     final child = Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         AnimatedSwitcher(
           duration: DoselyMotion.duration(context, DoselyMotion.fast),
           switchInCurve: DoselyMotion.decelerate,
-          child: Icon(
-            selected ? item.selected : item.icon,
-            key: ValueKey<bool>(selected),
-            size: 22,
-            color: color,
-          ),
+          child: profileImageUrl == null
+              ? Icon(
+                  selected ? item.selected : item.icon,
+                  key: ValueKey<bool>(selected),
+                  size: 22,
+                  color: color,
+                )
+              : ClipOval(
+                  key: const ValueKey('profile-image'),
+                  child: Image.network(
+                    profileImageUrl!,
+                    width: 22,
+                    height: 22,
+                    fit: BoxFit.cover,
+                    excludeFromSemantics: true,
+                    errorBuilder: (context, error, stackTrace) => Icon(
+                      selected ? item.selected : item.icon,
+                      size: 22,
+                      color: color,
+                    ),
+                  ),
+                ),
         ),
         const SizedBox(height: 4),
         FittedBox(
@@ -431,11 +404,11 @@ class _NavItem extends StatelessWidget {
             duration: DoselyMotion.duration(context, DoselyMotion.fast),
             curve: DoselyMotion.decelerate,
             padding: selected
-                ? const EdgeInsets.symmetric(horizontal: 10, vertical: 6)
+                ? const EdgeInsets.symmetric(horizontal: 12, vertical: 6)
                 : const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
             decoration: BoxDecoration(
-              color: selected ? scheme.primaryContainer : Colors.transparent,
-              borderRadius: BorderRadius.circular(24),
+              color: selected ? scheme.secondaryContainer : Colors.transparent,
+              borderRadius: BorderRadius.circular(16),
             ),
             child: child,
           ),

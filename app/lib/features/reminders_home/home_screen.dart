@@ -39,14 +39,10 @@ class HomeScreen extends StatefulWidget {
   const HomeScreen({
     super.key,
     required this.db,
-    this.onAvatarTap,
     this.onNames,
     this.onNeedsAttention,
   });
   final AppDatabase db;
-
-  /// Opens the Profile tab when this screen is hosted in [AppShell].
-  final VoidCallback? onAvatarTap;
 
   /// Lets the Plan tab show the same edit-attribution names Home loaded.
   final ValueChanged<Map<String, String>>? onNames;
@@ -479,10 +475,7 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     return ListenableBuilder(
       listenable: ReminderHealthStore.instance,
       builder: (context, _) => Scaffold(
-        appBar: DoselyTopBar(
-          onAvatarTap: widget.onAvatarTap,
-          avatarLabel: AuthService.instance.currentUser?.email,
-        ),
+        appBar: const DoselyTopBar(),
         body: StreamBuilder<List<ScheduleWithMedicine>>(
           stream: _schedulesStream,
           builder: (context, scheduleSnap) {

@@ -7,6 +7,7 @@ import '../../core/widgets/dosely_chrome.dart';
 import '../../core/widgets/dosely_layout.dart';
 import '../../core/widgets/dosely_motion.dart';
 import '../../data/local/database.dart';
+import '../auth/auth_service.dart';
 import '../insights/insights_screen.dart';
 import '../reminders_home/home_screen.dart';
 import '../reminders_home/medicines_list_screen.dart';
@@ -42,7 +43,6 @@ class _AppShellState extends State<AppShell> {
             HomeScreen(
               key: _homeKey,
               db: widget.db,
-              onAvatarTap: () => setState(() => _index = 3),
               onNeedsAttention: () {
                 if (_index == 0) return;
                 setState(() => _index = 0);
@@ -68,16 +68,14 @@ class _AppShellState extends State<AppShell> {
                 await _homeKey.currentState?.delete(item);
               },
             ),
-            InsightsScreen(
-              db: widget.db,
-              onAvatarTap: () => setState(() => _index = 3),
-            ),
+            InsightsScreen(db: widget.db),
             SettingsScreen(db: widget.db, embedded: true),
           ],
         ),
       ),
       bottomNavigationBar: DoselyBottomNav(
         index: _index,
+        profileImageUrl: AuthService.instance.currentUserAvatarUrl,
         onChanged: (i) {
           if (i == _index) return;
           DoselyMotion.selection(context);

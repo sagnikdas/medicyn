@@ -67,9 +67,7 @@ class MedicinesListScreen extends StatelessWidget {
             }
             final items = snapshot.data ?? const <ScheduleWithMedicine>[];
             if (items.isEmpty) {
-              return DoselyFadeIn(
-                child: _EmptyState(onAdd: onAdd, embedded: embedded),
-              );
+              return DoselyFadeIn(child: _EmptyState(embedded: embedded));
             }
             return DoselyFadeIn(
               child: ListView.separated(
@@ -132,8 +130,7 @@ class MedicinesListScreen extends StatelessWidget {
 }
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState({required this.onAdd, this.embedded = false});
-  final VoidCallback onAdd;
+  const _EmptyState({this.embedded = false});
   final bool embedded;
 
   @override
@@ -168,12 +165,6 @@ class _EmptyState extends StatelessWidget {
               'Scan a label or speak the details.',
               style: Theme.of(context).textTheme.bodyMedium,
               textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            FilledButton.icon(
-              onPressed: onAdd,
-              icon: const Icon(Icons.add),
-              label: const Text('Add medicine'),
             ),
           ],
         ),

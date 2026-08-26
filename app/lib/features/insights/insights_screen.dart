@@ -18,10 +18,9 @@ import '../reminders_home/day_occurrences.dart';
 /// StreamBuilder re-subscribe — and both queries re-run over the whole of
 /// dose_logs — every time this tab rebuilt for any reason.
 class InsightsScreen extends StatefulWidget {
-  const InsightsScreen({super.key, required this.db, this.onAvatarTap});
+  const InsightsScreen({super.key, required this.db});
 
   final AppDatabase db;
-  final VoidCallback? onAvatarTap;
 
   @override
   State<InsightsScreen> createState() => _InsightsScreenState();
@@ -35,10 +34,7 @@ class _InsightsScreenState extends State<InsightsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: DoselyTopBar(
-        onAvatarTap: widget.onAvatarTap,
-        avatarLabel: AuthService.instance.currentUser?.email,
-      ),
+      appBar: const DoselyTopBar(),
       body: StreamBuilder<List<ScheduleWithMedicine>>(
         stream: _schedulesStream,
         builder: (context, scheduleSnap) {
@@ -569,7 +565,7 @@ class InsightsMostConsistentCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(Icons.wb_sunny_outlined, color: scheme.tertiary, size: 18),
+                Icon(Icons.wb_sunny_outlined, color: scheme.primary, size: 18),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
@@ -598,7 +594,7 @@ class InsightsMostConsistentCard extends StatelessWidget {
                 builder: (context, value) => LinearProgressIndicator(
                   value: value,
                   minHeight: 8,
-                  color: scheme.tertiary,
+                  color: scheme.primary,
                   backgroundColor: scheme.surfaceContainerHigh,
                 ),
               ),
