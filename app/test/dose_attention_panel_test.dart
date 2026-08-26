@@ -96,8 +96,10 @@ void main() {
       expect(find.text('DUE NOW · 08:00'), findsOneWidget);
       expect(find.text('Metformin 500mg'), findsOneWidget);
       expect(find.text('Take 1 tablet'), findsOneWidget);
-      expect(find.text('Mark as Taken'), findsOneWidget);
-      expect(find.text('Snooze 10m'), findsOneWidget);
+      expect(find.text('Taken'), findsOneWidget);
+      expect(find.text('Snooze'), findsOneWidget);
+      expect(find.text('Mark as Taken'), findsNothing);
+      expect(find.text('Snooze 10m'), findsNothing);
     },
   );
 
@@ -115,12 +117,53 @@ void main() {
     );
 
     expect(find.text('YESTERDAY · 20:00'), findsOneWidget);
-    expect(find.text('Mark as Taken'), findsOneWidget);
-    expect(find.text('Snooze 10m'), findsNothing);
+    expect(find.text('Taken'), findsOneWidget);
+    expect(find.text('Snooze'), findsNothing);
+    expect(find.text('Mark as Taken'), findsNothing);
   });
 
-  testWidgets('Taken on the panel records that dose', (tester) async {
+  testWidgets('swiping the front card right marks taken and reveals the next', (
+    tester,
+  ) async {
     DayOccurrence? taken;
+    await pumpPanel(
+      tester,
+      occurrences: [
+        occurrence(
+          scheduledAt: DateTime(2026, 8, 21, 8, 0),
+          status: DayDoseStatus.pending,
+          name: 'Morning dose',
+        ),
+        occurrence(
+          scheduledAt: DateTime(2026, 8, 21, 12, 0),
+          status: DayDoseStatus.pending,
+          name: 'Lunch dose',
+        ),
+      ],
+      onTaken: (o) async => taken = o,
+    );
+
+    await tester.drag(find.byType(Dismissible), const Offset(400, 0));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Confirm dose'), findsOneWidget);
+    expect(taken, isNull);
+    await tester.tap(find.text('Not yet'));
+    await tester.pumpAndSettle();
+    expect(find.text('Morning dose 500mg'), findsOneWidget);
+
+    await tester.drag(find.byType(Dismissible), const Offset(400, 0));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Yes, I took it'));
+    await tester.pumpAndSettle();
+
+    expect(taken?.scheduledAt, DateTime(2026, 8, 21, 8, 0));
+    expect(find.text('Lunch dose 500mg'), findsOneWidget);
+    expect(find.text('Morning dose 500mg'), findsNothing);
+  });
+
+  testWidgets('swiping the front card left snoozes it', (tester) async {
+    DayOccurrence? snoozed;
     await pumpPanel(
       tester,
       occurrences: [
@@ -129,12 +172,13 @@ void main() {
           status: DayDoseStatus.pending,
         ),
       ],
-      onTaken: (o) async => taken = o,
+      onSnooze: (o) async => snoozed = o,
     );
 
-    await tester.tap(find.text('Mark as Taken'));
-    await tester.pump();
-    expect(taken?.scheduledAt, DateTime(2026, 8, 21, 8, 0));
+    await tester.drag(find.byType(Dismissible), const Offset(-400, 0));
+    await tester.pumpAndSettle();
+
+    expect(snoozed?.scheduledAt, DateTime(2026, 8, 21, 8, 0));
   });
 
   test('an unanswered dose focuses Today only when it first appears', () {

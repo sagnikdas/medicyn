@@ -629,9 +629,6 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         WidgetsBinding.instance.addPostFrameCallback((_) => jump());
       }
     }
-    final next = isSameCalendarDay(_selectedDay, now)
-        ? nextUpcomingDose(todayOccs)
-        : null;
     final takenCount = occurrences
         .where((o) => o.status == DayDoseStatus.taken)
         .length;
@@ -707,24 +704,6 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               onMonthExpandedChanged: _onMonthExpandedChanged,
               onSelectDay: (day) => setState(() => _selectedDay = day),
             ),
-          ),
-        ),
-        SliverToBoxAdapter(
-          child: AnimatedSize(
-            duration: DoselyMotion.duration(context, DoselyMotion.medium),
-            curve: DoselyMotion.decelerate,
-            alignment: Alignment.topCenter,
-            child: next == null
-                ? const SizedBox.shrink()
-                : Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-                    child: DoselyFadeIn(
-                      child: _NextDoseCard(
-                        occurrence: next,
-                        onMarkTaken: () => _markTaken(next),
-                      ),
-                    ),
-                  ),
           ),
         ),
         if (expectedCount > 0)
@@ -892,125 +871,6 @@ bool attentionNeedsInitialFocus({
   required bool wasPresent,
   required bool isPresent,
 }) => isPresent && !wasPresent;
-
-class _NextDoseCard extends StatefulWidget {
-  const _NextDoseCard({required this.occurrence, required this.onMarkTaken});
-
-  final DayOccurrence occurrence;
-  final Future<void> Function() onMarkTaken;
-
-  @override
-  State<_NextDoseCard> createState() => _NextDoseCardState();
-}
-
-class _NextDoseCardState extends State<_NextDoseCard> {
-  bool _busy = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final medicine = widget.occurrence.item.medicine;
-    final local = widget.occurrence.scheduledAt.toLocal();
-    final time =
-        '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
-    final subtitle = [
-      if (medicine.strength.isNotEmpty) medicine.strength,
-      if (medicine.notes.isNotEmpty) medicine.notes,
-    ].join(' • ');
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: scheme.primary,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x3300685F),
-            blurRadius: 16,
-            offset: Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Flexible(
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: scheme.primaryContainer,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      'NEXT DOSE',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: scheme.onPrimaryContainer,
-                        letterSpacing: 1,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                time,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(color: scheme.onPrimary),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            medicine.drugName,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(
-              context,
-            ).textTheme.headlineSmall?.copyWith(color: scheme.onPrimary),
-          ),
-          if (subtitle.isNotEmpty) ...[
-            const SizedBox(height: 4),
-            Text(
-              subtitle,
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(color: scheme.inversePrimary),
-            ),
-          ],
-          const SizedBox(height: 16),
-          FilledButton(
-            onPressed: _busy
-                ? null
-                : () async {
-                    setState(() => _busy = true);
-                    try {
-                      await widget.onMarkTaken();
-                    } finally {
-                      if (mounted) setState(() => _busy = false);
-                    }
-                  },
-            style: FilledButton.styleFrom(
-              backgroundColor: scheme.onPrimary,
-              foregroundColor: scheme.primary,
-            ),
-            child: const Text('Mark as Taken'),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 class _EmptyState extends StatelessWidget {
   const _EmptyState({required this.onAdd});
