@@ -25,6 +25,7 @@
 --     -f supabase/migrations/20260820210000_stamp_writer_per_table.sql \
 --     -f supabase/migrations/20260820220000_phase3_care_extras.sql \
 --     -f supabase/migrations/20260820230000_claim_invite_no_dblink.sql \
+--     -f supabase/migrations/20260826100000_phase3_lifecycle.sql \
 --     -f supabase/tests/care_links_rls_test.sql
 --
 -- and the push tables' own assertions, which need a fresh database because

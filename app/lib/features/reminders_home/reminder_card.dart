@@ -6,6 +6,7 @@ import '../../core/app_settings.dart';
 import '../../core/theme.dart';
 import '../../core/widgets/dosely_motion.dart';
 import '../../data/local/database.dart';
+import '../../data/local/lifecycle.dart';
 import '../../data/local/tables.dart';
 import 'refill.dart';
 import 'reminder_copy.dart';
@@ -83,6 +84,7 @@ class ReminderCard extends StatelessWidget {
                           describeSchedule(item.schedule),
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
+                        _LifecycleStatus(schedule: item.schedule),
                         _RefillStatus(db: db, item: item),
                         if (attribution != null) ...[
                           const SizedBox(height: 4),
@@ -111,6 +113,40 @@ class ReminderCard extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class _LifecycleStatus extends StatelessWidget {
+  const _LifecycleStatus({required this.schedule});
+  final Schedule schedule;
+
+  @override
+  Widget build(BuildContext context) {
+    final status = reminderStatus(schedule);
+    if (status == ReminderStatus.active) return const SizedBox.shrink();
+    final label = switch (status) {
+      ReminderStatus.paused =>
+        schedule.pauseUntil == null
+            ? 'Paused'
+            : 'Paused until ${_format(schedule.pauseUntil!)}',
+      ReminderStatus.completed => 'Completed',
+      ReminderStatus.asNeeded => 'As needed',
+      ReminderStatus.active => '',
+    };
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+          color: Theme.of(context).colorScheme.tertiary,
+        ),
+      ),
+    );
+  }
+
+  String _format(DateTime value) {
+    final local = value.toLocal();
+    return '${local.day}/${local.month}/${local.year}';
   }
 }
 

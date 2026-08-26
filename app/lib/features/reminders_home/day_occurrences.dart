@@ -2,6 +2,7 @@ import 'package:timezone/timezone.dart' as tz;
 
 import '../../data/local/database.dart';
 import '../../data/local/tables.dart';
+import '../../data/local/lifecycle.dart';
 import '../notification_engine/expected_doses.dart';
 import '../notification_engine/missed_doses.dart';
 
@@ -192,7 +193,10 @@ List<DayOccurrence> occurrencesOnDay({
     // or missed log from a reminder that was later turned off. History has
     // to stay visible; we just must not invent pending/notRecorded for a
     // schedule that is no longer firing.
-    final live = schedule.active && !schedule.deleted && !item.medicine.deleted;
+    final live =
+        reminderIsActive(schedule, at: now) &&
+        !schedule.deleted &&
+        !item.medicine.deleted;
     if (!live) {
       out.addAll(
         _occurrencesFromLogsOnly(

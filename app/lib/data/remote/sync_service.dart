@@ -214,8 +214,14 @@ class SyncService {
   Future<void> _syncMedicines(String userId) async {
     final rows = await _db.unsyncedMedicines();
     if (rows.isEmpty) return;
-    final toDelete = [for (final m in rows) if (m.deleted) m];
-    final toUpsert = [for (final m in rows) if (!m.deleted) m];
+    final toDelete = [
+      for (final m in rows)
+        if (m.deleted) m,
+    ];
+    final toUpsert = [
+      for (final m in rows)
+        if (!m.deleted) m,
+    ];
 
     if (toDelete.isNotEmpty) {
       await _pushBatchOrFallback<Medicine>(
@@ -225,7 +231,11 @@ class SyncService {
             .delete()
             .inFilter('id', [for (final m in ms) m.id])
             .timeout(_networkTimeout),
-        pushOne: (m) => _client.from('medicines').delete().eq('id', m.id).timeout(_networkTimeout),
+        pushOne: (m) => _client
+            .from('medicines')
+            .delete()
+            .eq('id', m.id)
+            .timeout(_networkTimeout),
         markSynced: (m) async {
           _pushedEdits = true;
           await _db.markMedicineSynced(m.id);
@@ -235,26 +245,27 @@ class SyncService {
 
     if (toUpsert.isEmpty) return;
     Map<String, dynamic> row(Medicine m) => {
-          'id': m.id,
-          'user_id': userId,
-          'drug_name': m.drugName,
-          'strength': m.strength,
-          'form': m.form,
-          'dose_amount': m.doseAmount,
-          'tablets_remaining': m.tabletsRemaining,
-          'tablets_per_dose': m.tabletsPerDose,
-          'notes': m.notes,
-          'created_at': isoUtc(m.createdAt),
-          'updated_at': isoUtc(m.updatedAt),
-          'updated_by': m.updatedBy,
-        };
+      'id': m.id,
+      'user_id': userId,
+      'drug_name': m.drugName,
+      'strength': m.strength,
+      'form': m.form,
+      'dose_amount': m.doseAmount,
+      'tablets_remaining': m.tabletsRemaining,
+      'tablets_per_dose': m.tabletsPerDose,
+      'notes': m.notes,
+      'created_at': isoUtc(m.createdAt),
+      'updated_at': isoUtc(m.updatedAt),
+      'updated_by': m.updatedBy,
+    };
     await _pushBatchOrFallback<Medicine>(
       rows: toUpsert,
       pushBatch: (ms) => _client
           .from('medicines')
           .upsert([for (final m in ms) row(m)])
           .timeout(_networkTimeout),
-      pushOne: (m) => _client.from('medicines').upsert(row(m)).timeout(_networkTimeout),
+      pushOne: (m) =>
+          _client.from('medicines').upsert(row(m)).timeout(_networkTimeout),
       markSynced: (m) async {
         _pushedEdits = true;
         await _db.markMedicineSynced(m.id);
@@ -265,8 +276,14 @@ class SyncService {
   Future<void> _syncSchedules(String userId) async {
     final rows = await _db.unsyncedSchedules();
     if (rows.isEmpty) return;
-    final toDelete = [for (final s in rows) if (s.deleted) s];
-    final toUpsert = [for (final s in rows) if (!s.deleted) s];
+    final toDelete = [
+      for (final s in rows)
+        if (s.deleted) s,
+    ];
+    final toUpsert = [
+      for (final s in rows)
+        if (!s.deleted) s,
+    ];
 
     if (toDelete.isNotEmpty) {
       await _pushBatchOrFallback<Schedule>(
@@ -276,7 +293,11 @@ class SyncService {
             .delete()
             .inFilter('id', [for (final s in ss) s.id])
             .timeout(_networkTimeout),
-        pushOne: (s) => _client.from('schedules').delete().eq('id', s.id).timeout(_networkTimeout),
+        pushOne: (s) => _client
+            .from('schedules')
+            .delete()
+            .eq('id', s.id)
+            .timeout(_networkTimeout),
         markSynced: (s) async {
           _pushedEdits = true;
           await _db.markScheduleSynced(s.id);
@@ -286,25 +307,30 @@ class SyncService {
 
     if (toUpsert.isEmpty) return;
     Map<String, dynamic> row(Schedule s) => {
-          'id': s.id,
-          'medicine_id': s.medicineId,
-          'user_id': userId,
-          'frequency_type': s.frequencyType,
-          'times': s.times,
-          'days_of_week': s.daysOfWeek,
-          'interval_hours': s.intervalHours,
-          'active': s.active,
-          'created_at': isoUtc(s.createdAt),
-          'updated_at': isoUtc(s.updatedAt),
-          'updated_by': s.updatedBy,
-        };
+      'id': s.id,
+      'medicine_id': s.medicineId,
+      'user_id': userId,
+      'frequency_type': s.frequencyType,
+      'times': s.times,
+      'days_of_week': s.daysOfWeek,
+      'interval_hours': s.intervalHours,
+      'status': s.status,
+      'start_date': s.startDate == null ? null : isoUtc(s.startDate!),
+      'end_date': s.endDate == null ? null : isoUtc(s.endDate!),
+      'pause_until': s.pauseUntil == null ? null : isoUtc(s.pauseUntil!),
+      'active': s.active,
+      'created_at': isoUtc(s.createdAt),
+      'updated_at': isoUtc(s.updatedAt),
+      'updated_by': s.updatedBy,
+    };
     await _pushBatchOrFallback<Schedule>(
       rows: toUpsert,
       pushBatch: (ss) => _client
           .from('schedules')
           .upsert([for (final s in ss) row(s)])
           .timeout(_networkTimeout),
-      pushOne: (s) => _client.from('schedules').upsert(row(s)).timeout(_networkTimeout),
+      pushOne: (s) =>
+          _client.from('schedules').upsert(row(s)).timeout(_networkTimeout),
       markSynced: (s) async {
         _pushedEdits = true;
         await _db.markScheduleSynced(s.id);
@@ -316,21 +342,22 @@ class SyncService {
     final rows = await _db.unsyncedDoseLogs();
     if (rows.isEmpty) return;
     Map<String, dynamic> row(DoseLog log) => {
-          'id': log.id,
-          'schedule_id': log.scheduleId,
-          'user_id': userId,
-          'scheduled_at': isoUtc(log.scheduledAt),
-          'action': log.action,
-          'logged_at': isoUtc(log.loggedAt),
-          'source': log.source,
-        };
+      'id': log.id,
+      'schedule_id': log.scheduleId,
+      'user_id': userId,
+      'scheduled_at': isoUtc(log.scheduledAt),
+      'action': log.action,
+      'logged_at': isoUtc(log.loggedAt),
+      'source': log.source,
+    };
     await _pushBatchOrFallback<DoseLog>(
       rows: rows,
       pushBatch: (logs) => _client
           .from('dose_logs')
           .upsert([for (final log in logs) row(log)])
           .timeout(_networkTimeout),
-      pushOne: (log) => _client.from('dose_logs').upsert(row(log)).timeout(_networkTimeout),
+      pushOne: (log) =>
+          _client.from('dose_logs').upsert(row(log)).timeout(_networkTimeout),
       markSynced: (log) => _db.markDoseLogSynced(log.id),
     );
   }
@@ -339,30 +366,40 @@ class SyncService {
     final rows = await _db.unsyncedDoseLogContests();
     if (rows.isEmpty) return;
     Map<String, dynamic> row(DoseLogContest c) => {
-          'dose_log_id': c.doseLogId,
-          'user_id': userId,
-          'note': c.note,
-          'created_at': isoUtc(c.createdAt),
-          'updated_at': isoUtc(c.updatedAt),
-        };
+      'dose_log_id': c.doseLogId,
+      'user_id': userId,
+      'note': c.note,
+      'created_at': isoUtc(c.createdAt),
+      'updated_at': isoUtc(c.updatedAt),
+    };
     await _pushBatchOrFallback<DoseLogContest>(
       rows: rows,
       pushBatch: (cs) => _client
           .from('dose_log_contests')
           .upsert([for (final c in cs) row(c)])
           .timeout(_networkTimeout),
-      pushOne: (c) => _client.from('dose_log_contests').upsert(row(c)).timeout(_networkTimeout),
+      pushOne: (c) => _client
+          .from('dose_log_contests')
+          .upsert(row(c))
+          .timeout(_networkTimeout),
       markSynced: (c) => _db.markDoseLogContestSynced(c.doseLogId),
     );
   }
 
   Future<void> _pullMedicines(String userId) async {
     try {
-      final rows = await _client.from('medicines').select().eq('user_id', userId).timeout(_networkTimeout);
+      final rows = await _client
+          .from('medicines')
+          .select()
+          .eq('user_id', userId)
+          .timeout(_networkTimeout);
       // Extracted before the per-row try below, since an id is always
       // present on a row Postgrest actually returned — a row missing from
       // this set genuinely no longer exists remotely, not just unparsed.
-      final remoteIds = rows.map((r) => r['id'] as String?).whereType<String>().toSet();
+      final remoteIds = rows
+          .map((r) => r['id'] as String?)
+          .whereType<String>()
+          .toSet();
       final local = await _db.medicineVersions();
       final winners = <MedicinesCompanion>[];
       for (final r in rows) {
@@ -376,23 +413,25 @@ class SyncService {
           final id = r['id'] as String;
           final remoteStamp = remoteUpdatedAt(r);
           if (!remoteWins(local[id], remoteStamp)) continue;
-          winners.add(MedicinesCompanion.insert(
-            id: id,
-            drugName: r['drug_name'] as String,
-            strength: Value((r['strength'] as String?) ?? ''),
-            form: Value((r['form'] as String?) ?? ''),
-            doseAmount: Value((r['dose_amount'] as String?) ?? ''),
-            notes: Value((r['notes'] as String?) ?? ''),
-            tabletsRemaining: Value(_asInt(r['tablets_remaining'])),
-            tabletsPerDose: Value(_asInt(r['tablets_per_dose'])),
-            createdAt: Value(DateTime.parse(r['created_at'] as String)),
-            updatedAt: Value(remoteStamp),
-            updatedBy: Value(r['updated_by'] as String?),
-            // This copy came *from* the server, so there is nothing to push
-            // back. Leaving it dirty would bounce the same row up again on
-            // the next sync and re-stamp it as the newest edit.
-            pendingSync: const Value(false),
-          ));
+          winners.add(
+            MedicinesCompanion.insert(
+              id: id,
+              drugName: r['drug_name'] as String,
+              strength: Value((r['strength'] as String?) ?? ''),
+              form: Value((r['form'] as String?) ?? ''),
+              doseAmount: Value((r['dose_amount'] as String?) ?? ''),
+              notes: Value((r['notes'] as String?) ?? ''),
+              tabletsRemaining: Value(_asInt(r['tablets_remaining'])),
+              tabletsPerDose: Value(_asInt(r['tablets_per_dose'])),
+              createdAt: Value(DateTime.parse(r['created_at'] as String)),
+              updatedAt: Value(remoteStamp),
+              updatedBy: Value(r['updated_by'] as String?),
+              // This copy came *from* the server, so there is nothing to push
+              // back. Leaving it dirty would bounce the same row up again on
+              // the next sync and re-stamp it as the newest edit.
+              pendingSync: const Value(false),
+            ),
+          );
         } catch (_) {
           // Skip just this row; retried on the next pullAll() call.
         }
@@ -410,8 +449,15 @@ class SyncService {
 
   Future<void> _pullSchedules(String userId) async {
     try {
-      final rows = await _client.from('schedules').select().eq('user_id', userId).timeout(_networkTimeout);
-      final remoteIds = rows.map((r) => r['id'] as String?).whereType<String>().toSet();
+      final rows = await _client
+          .from('schedules')
+          .select()
+          .eq('user_id', userId)
+          .timeout(_networkTimeout);
+      final remoteIds = rows
+          .map((r) => r['id'] as String?)
+          .whereType<String>()
+          .toSet();
       final local = await _db.scheduleVersions();
       final winners = <SchedulesCompanion>[];
       for (final r in rows) {
@@ -435,8 +481,13 @@ class SyncService {
           // edit is recoverable; losing the alarms is not.
           final fields = sanitiseScheduleFields(
             frequencyType: r['frequency_type'] as String?,
-            times: (r['times'] as List?)?.whereType<String>().toList() ?? const [],
-            daysOfWeek: (r['days_of_week'] as List?)?.whereType<num>().map((e) => e.toInt()).toList() ??
+            times:
+                (r['times'] as List?)?.whereType<String>().toList() ?? const [],
+            daysOfWeek:
+                (r['days_of_week'] as List?)
+                    ?.whereType<num>()
+                    .map((e) => e.toInt())
+                    .toList() ??
                 const [],
             intervalHours: r['interval_hours'] as int?,
           );
@@ -445,19 +496,25 @@ class SyncService {
             continue;
           }
 
-          winners.add(SchedulesCompanion.insert(
-            id: id,
-            medicineId: r['medicine_id'] as String,
-            frequencyType: fields.frequency.name,
-            times: fields.times,
-            daysOfWeek: Value(fields.daysOfWeek),
-            intervalHours: Value(fields.intervalHours),
-            active: Value(r['active'] as bool),
-            createdAt: Value(DateTime.parse(r['created_at'] as String)),
-            updatedAt: Value(remoteStamp),
-            updatedBy: Value(r['updated_by'] as String?),
-            pendingSync: const Value(false),
-          ));
+          winners.add(
+            SchedulesCompanion.insert(
+              id: id,
+              medicineId: r['medicine_id'] as String,
+              frequencyType: fields.frequency.name,
+              times: fields.times,
+              daysOfWeek: Value(fields.daysOfWeek),
+              intervalHours: Value(fields.intervalHours),
+              status: Value(r['status'] as String?),
+              startDate: Value(_asDate(r['start_date'])),
+              endDate: Value(_asDate(r['end_date'])),
+              pauseUntil: Value(_asDate(r['pause_until'])),
+              active: Value(r['active'] as bool),
+              createdAt: Value(DateTime.parse(r['created_at'] as String)),
+              updatedAt: Value(remoteStamp),
+              updatedBy: Value(r['updated_by'] as String?),
+              pendingSync: const Value(false),
+            ),
+          );
         } catch (_) {
           // Skip just this row; retried on the next pullAll() call.
         }
@@ -482,7 +539,11 @@ class SyncService {
 
   Future<void> _pullDoseLogs(String userId) async {
     try {
-      final rows = await _client.from('dose_logs').select().eq('user_id', userId).timeout(_networkTimeout);
+      final rows = await _client
+          .from('dose_logs')
+          .select()
+          .eq('user_id', userId)
+          .timeout(_networkTimeout);
       final known = await _db.doseLogIds();
       final incoming = <DoseLogsCompanion>[];
       for (final r in rows) {
@@ -491,15 +552,17 @@ class SyncService {
         try {
           final id = r['id'] as String;
           if (known.contains(id)) continue;
-          incoming.add(DoseLogsCompanion.insert(
-            id: id,
-            scheduleId: r['schedule_id'] as String,
-            scheduledAt: DateTime.parse(r['scheduled_at'] as String),
-            action: r['action'] as String,
-            loggedAt: Value(DateTime.parse(r['logged_at'] as String)),
-            source: Value(r['source'] as String),
-            pendingSync: const Value(false),
-          ));
+          incoming.add(
+            DoseLogsCompanion.insert(
+              id: id,
+              scheduleId: r['schedule_id'] as String,
+              scheduledAt: DateTime.parse(r['scheduled_at'] as String),
+              action: r['action'] as String,
+              loggedAt: Value(DateTime.parse(r['logged_at'] as String)),
+              source: Value(r['source'] as String),
+              pendingSync: const Value(false),
+            ),
+          );
         } catch (_) {
           // Skip just this row; retried on the next pullAll() call.
         }
@@ -530,13 +593,15 @@ class SyncService {
           if (note.isEmpty) continue;
           final remoteStamp = remoteUpdatedAt(r);
           if (!remoteWins(local[doseLogId], remoteStamp)) continue;
-          winners.add(DoseLogContestsCompanion.insert(
-            doseLogId: doseLogId,
-            note: note,
-            createdAt: Value(DateTime.parse(r['created_at'] as String)),
-            updatedAt: Value(remoteStamp),
-            pendingSync: const Value(false),
-          ));
+          winners.add(
+            DoseLogContestsCompanion.insert(
+              doseLogId: doseLogId,
+              note: note,
+              createdAt: Value(DateTime.parse(r['created_at'] as String)),
+              updatedAt: Value(remoteStamp),
+              pendingSync: const Value(false),
+            ),
+          );
         } catch (_) {
           // Skip just this row; retried on the next pullAll() call.
         }
@@ -552,4 +617,9 @@ int? _asInt(Object? value) {
   if (value is int) return value;
   if (value is num) return value.toInt();
   return null;
+}
+
+DateTime? _asDate(Object? value) {
+  if (value is! String || value.isEmpty) return null;
+  return DateTime.tryParse(value);
 }

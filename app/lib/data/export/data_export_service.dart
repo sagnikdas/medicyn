@@ -25,6 +25,10 @@ class DataExportService {
   final SupabaseClient? _client;
 
   static const appVersion = kConsentAppVersion;
+
+  /// Increment when the shape of an export changes. Consumers can migrate a
+  /// saved export without guessing which optional fields were present.
+  static const exportSchemaVersion = 2;
   static const _networkTimeout = Duration(seconds: 8);
 
   /// JSON-encodable map. Safe to call with no network and no account.
@@ -40,6 +44,7 @@ class DataExportService {
       'metadata': <String, dynamic>{
         'exported_at': exportedAt.toIso8601String(),
         'app_version': appVersion,
+        'schema_version': exportSchemaVersion,
         'local_only': !signedIn,
       },
       'medicines': [for (final m in medicines) _medicine(m)],
@@ -64,7 +69,10 @@ class DataExportService {
   }
 
   /// Writes the JSON under the app temp dir and opens the system share sheet.
-  Future<void> exportAndShare({DateTime? now, Rect? sharePositionOrigin}) async {
+  Future<void> exportAndShare({
+    DateTime? now,
+    Rect? sharePositionOrigin,
+  }) async {
     final json = await encodeExport(now: now);
     final dir = await getTemporaryDirectory();
     final stamp = (now ?? DateTime.now())
@@ -74,13 +82,23 @@ class DataExportService {
         .replaceAll('.', '');
     final file = File(p.join(dir.path, 'dosely-data-$stamp.json'));
     await file.writeAsString(json);
-    await SharePlus.instance.share(
-      ShareParams(
-        files: [XFile(file.path, mimeType: 'application/json')],
-        subject: 'My Dosely data',
-        sharePositionOrigin: sharePositionOrigin,
-      ),
-    );
+    try {
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(file.path, mimeType: 'application/json')],
+          subject: 'My Dosely data',
+          sharePositionOrigin: sharePositionOrigin,
+        ),
+      );
+    } finally {
+      // The share sheet has received its copy; do not leave a plaintext
+      // export containing health history in the app cache.
+      try {
+        if (await file.exists()) await file.delete();
+      } catch (_) {
+        // Best-effort cleanup. The export itself was already delivered.
+      }
+    }
   }
 
   Future<void> _addRemote(Map<String, dynamic> export) async {
@@ -101,21 +119,33 @@ class DataExportService {
           .eq('user_id', userId)
           .limit(1)
           .timeout(_networkTimeout);
-      export['profile'] = rows.isEmpty ? null : Map<String, dynamic>.from(rows.first);
+      export['profile'] = rows.isEmpty
+          ? null
+          : Map<String, dynamic>.from(rows.first);
     } catch (_) {
       gaps.add('profile');
     }
 
     try {
-      final rows = await client.from('care_links').select().timeout(_networkTimeout);
-      export['care_links'] = [for (final r in rows) Map<String, dynamic>.from(r)];
+      final rows = await client
+          .from('care_links')
+          .select()
+          .timeout(_networkTimeout);
+      export['care_links'] = [
+        for (final r in rows) Map<String, dynamic>.from(r),
+      ];
     } catch (_) {
       gaps.add('care_links');
     }
 
     try {
-      final rows = await client.from('care_alerts').select().timeout(_networkTimeout);
-      export['care_alerts'] = [for (final r in rows) Map<String, dynamic>.from(r)];
+      final rows = await client
+          .from('care_alerts')
+          .select()
+          .timeout(_networkTimeout);
+      export['care_alerts'] = [
+        for (final r in rows) Map<String, dynamic>.from(r),
+      ];
     } catch (_) {
       gaps.add('care_alerts');
     }
@@ -126,7 +156,9 @@ class DataExportService {
           .select()
           .eq('owner_id', userId)
           .timeout(_networkTimeout);
-      export['medicine_edits'] = [for (final r in rows) Map<String, dynamic>.from(r)];
+      export['medicine_edits'] = [
+        for (final r in rows) Map<String, dynamic>.from(r),
+      ];
     } catch (_) {
       gaps.add('medicine_edits');
     }
@@ -156,47 +188,57 @@ class DataExportService {
   }
 
   Map<String, dynamic> _medicine(Medicine m) => {
-        'id': m.id,
-        'drug_name': m.drugName,
-        'strength': m.strength,
-        'form': m.form,
-        'dose_amount': m.doseAmount,
-        'notes': m.notes,
-        'created_at': _iso(m.createdAt),
-        'updated_at': _iso(m.updatedAt),
-        'updated_by': m.updatedBy,
-        'deleted': m.deleted,
-      };
+    'id': m.id,
+    'drug_name': m.drugName,
+    'strength': m.strength,
+    'form': m.form,
+    'dose_amount': m.doseAmount,
+    'tablets_remaining': m.tabletsRemaining,
+    'tablets_per_dose': m.tabletsPerDose,
+    'notes': m.notes,
+    'created_at': _iso(m.createdAt),
+    'updated_at': _iso(m.updatedAt),
+    'updated_by': m.updatedBy,
+    'deleted': m.deleted,
+    'pending_sync': m.pendingSync,
+  };
 
   Map<String, dynamic> _schedule(Schedule s) => {
-        'id': s.id,
-        'medicine_id': s.medicineId,
-        'frequency_type': s.frequencyType,
-        'times': s.times,
-        'days_of_week': s.daysOfWeek,
-        'interval_hours': s.intervalHours,
-        'active': s.active,
-        'created_at': _iso(s.createdAt),
-        'updated_at': _iso(s.updatedAt),
-        'updated_by': s.updatedBy,
-        'deleted': s.deleted,
-      };
+    'id': s.id,
+    'medicine_id': s.medicineId,
+    'frequency_type': s.frequencyType,
+    'times': s.times,
+    'days_of_week': s.daysOfWeek,
+    'interval_hours': s.intervalHours,
+    'status': s.status,
+    'start_date': s.startDate?.toIso8601String(),
+    'end_date': s.endDate?.toIso8601String(),
+    'pause_until': s.pauseUntil?.toIso8601String(),
+    'active': s.active,
+    'created_at': _iso(s.createdAt),
+    'updated_at': _iso(s.updatedAt),
+    'updated_by': s.updatedBy,
+    'deleted': s.deleted,
+    'pending_sync': s.pendingSync,
+  };
 
   Map<String, dynamic> _doseLog(DoseLog l) => {
-        'id': l.id,
-        'schedule_id': l.scheduleId,
-        'scheduled_at': _iso(l.scheduledAt),
-        'action': l.action,
-        'logged_at': _iso(l.loggedAt),
-        'source': l.source,
-      };
+    'id': l.id,
+    'schedule_id': l.scheduleId,
+    'scheduled_at': _iso(l.scheduledAt),
+    'action': l.action,
+    'logged_at': _iso(l.loggedAt),
+    'source': l.source,
+    'pending_sync': l.pendingSync,
+  };
 
   Map<String, dynamic> _contest(DoseLogContest c) => {
-        'dose_log_id': c.doseLogId,
-        'note': c.note,
-        'created_at': _iso(c.createdAt),
-        'updated_at': _iso(c.updatedAt),
-      };
+    'dose_log_id': c.doseLogId,
+    'note': c.note,
+    'created_at': _iso(c.createdAt),
+    'updated_at': _iso(c.updatedAt),
+    'pending_sync': c.pendingSync,
+  };
 
   static String _iso(DateTime value) => value.toUtc().toIso8601String();
 }
@@ -204,8 +246,4 @@ class DataExportService {
 /// Visible so a test can assert we never put secrets in the file. The
 /// export builder does not read these stores; this list is the documentation.
 @visibleForTesting
-const exportExcludedSecrets = [
-  'fcm_token',
-  'encryption_key',
-  'refresh_token',
-];
+const exportExcludedSecrets = ['fcm_token', 'encryption_key', 'refresh_token'];

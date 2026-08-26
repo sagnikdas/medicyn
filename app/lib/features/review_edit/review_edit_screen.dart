@@ -10,6 +10,7 @@ import '../../core/telemetry.dart';
 import '../../core/widgets/dosely_layout.dart';
 import '../../core/widgets/dosely_motion.dart';
 import '../../data/local/database.dart';
+import '../../data/local/lifecycle.dart';
 import '../../data/local/tables.dart';
 import '../../data/remote/care_notifier.dart';
 import '../../data/remote/medicine_parser.dart';
@@ -257,6 +258,83 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
     );
   }
 
+  Future<void> _changeLifecycle(
+    ReminderStatus target, {
+    DateTime? pauseUntil,
+  }) async {
+    if (_forSomeoneElse || widget.existing == null) return;
+    final schedule = widget.existing!.schedule;
+    final by = AuthService.instance.currentUser?.id;
+    try {
+      if (target == ReminderStatus.paused) {
+        await widget.db.pauseSchedule(schedule.id, until: pauseUntil, by: by);
+        await NotificationService.instance.cancelForSchedule(schedule);
+      } else if (target == ReminderStatus.completed) {
+        await widget.db.completeSchedule(schedule.id, by: by);
+        await NotificationService.instance.cancelForSchedule(schedule);
+      } else if (target == ReminderStatus.active) {
+        await widget.db.resumeSchedule(schedule.id, by: by);
+        final refreshed = await widget.db.schedulesWithMedicinesOnce(
+          activeOnly: true,
+        );
+        final item = refreshed.where((x) => x.schedule.id == schedule.id);
+        if (item.isNotEmpty) {
+          await NotificationService.instance.scheduleForScheduleWithMedicine(
+            item.first,
+          );
+        }
+      }
+      unawaited(SyncService(widget.db).syncAll());
+      if (mounted) Navigator.of(context).pop(true);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not update this reminder.')),
+        );
+      }
+    }
+  }
+
+  Future<void> _pauseWithChoice() async {
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const ListTile(
+              title: Text('Pause reminder'),
+              subtitle: Text('You can resume it any time.'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.today_outlined),
+              title: const Text('Until tomorrow'),
+              onTap: () => Navigator.pop(sheetContext, 'tomorrow'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.date_range_outlined),
+              title: const Text('For one week'),
+              onTap: () => Navigator.pop(sheetContext, 'week'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.pause_circle_outline),
+              title: const Text('Indefinitely'),
+              onTap: () => Navigator.pop(sheetContext, 'forever'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || choice == null) return;
+    final now = DateTime.now();
+    final until = switch (choice) {
+      'tomorrow' => DateTime(now.year, now.month, now.day + 1),
+      'week' => now.add(const Duration(days: 7)),
+      _ => null,
+    };
+    await _changeLifecycle(ReminderStatus.paused, pauseUntil: until);
+  }
+
   Future<void> _addTime() async {
     final picked = await showTimePicker(
       context: context,
@@ -426,6 +504,12 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
       intervalHours: _frequency == FrequencyType.everyXHours
           ? _enteredIntervalHours
           : null,
+      status: _frequency == FrequencyType.asNeeded
+          ? ReminderStatus.asNeeded.name
+          : (widget.existing?.schedule.status ?? ReminderStatus.active.name),
+      startDate: widget.existing?.schedule.startDate,
+      endDate: widget.existing?.schedule.endDate,
+      pauseUntil: widget.existing?.schedule.pauseUntil,
       savedAt: savedAt,
       medicineCreatedAt: widget.existing?.medicine.createdAt,
       scheduleCreatedAt: widget.existing?.schedule.createdAt,
@@ -483,7 +567,17 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
       intervalHours: _frequency == FrequencyType.everyXHours
           ? _enteredIntervalHours
           : null,
-      active: true,
+      status: _frequency == FrequencyType.asNeeded
+          ? ReminderStatus.asNeeded.name
+          : (widget.existing?.schedule.status ?? ReminderStatus.active.name),
+      startDate: widget.existing?.schedule.startDate,
+      endDate: widget.existing?.schedule.endDate,
+      pauseUntil: widget.existing?.schedule.pauseUntil,
+      active:
+          widget.existing?.schedule.status == ReminderStatus.paused.name ||
+              widget.existing?.schedule.status == ReminderStatus.completed.name
+          ? false
+          : true,
       createdAt: DateTime.now(),
       updatedAt: savedAt,
       updatedBy: savedBy,
@@ -498,6 +592,10 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
         times: _times,
         daysOfWeek: Value(schedule.daysOfWeek),
         intervalHours: Value(schedule.intervalHours),
+        status: Value(schedule.status),
+        startDate: Value(schedule.startDate),
+        endDate: Value(schedule.endDate),
+        pauseUntil: Value(schedule.pauseUntil),
         // Same reasoning as the medicine upsert above — force it dirty so an
         // edit to an already-synced schedule actually gets pushed.
         pendingSync: const Value(true),
@@ -819,6 +917,8 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
           const SizedBox(height: 20),
           const Divider(),
           const SizedBox(height: 8),
+          if (!_forSomeoneElse) _lifecycleActions(),
+          if (!_forSomeoneElse) const SizedBox(height: 8),
           if (!_forSomeoneElse)
             OutlinedButton.icon(
               onPressed: _viewHistory,
@@ -841,6 +941,52 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
           ],
         ],
         const SizedBox(height: 12),
+      ],
+    );
+  }
+
+  Widget _lifecycleActions() {
+    final status = reminderStatus(widget.existing!.schedule);
+    final label = switch (status) {
+      ReminderStatus.active => 'Active',
+      ReminderStatus.paused => 'Paused',
+      ReminderStatus.completed => 'Completed',
+      ReminderStatus.asNeeded => 'As needed',
+    };
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text('Reminder status: $label'),
+        const SizedBox(height: 8),
+        if (status == ReminderStatus.active) ...[
+          OutlinedButton.icon(
+            onPressed: _pauseWithChoice,
+            icon: const Icon(Icons.pause_circle_outline),
+            label: const Text('Pause reminder'),
+          ),
+          OutlinedButton.icon(
+            onPressed: () => _changeLifecycle(ReminderStatus.completed),
+            icon: const Icon(Icons.check_circle_outline),
+            label: const Text('Mark course complete'),
+          ),
+        ] else if (status == ReminderStatus.paused) ...[
+          FilledButton.icon(
+            onPressed: () => _changeLifecycle(ReminderStatus.active),
+            icon: const Icon(Icons.play_arrow),
+            label: const Text('Resume reminder'),
+          ),
+          OutlinedButton.icon(
+            onPressed: () => _changeLifecycle(ReminderStatus.completed),
+            icon: const Icon(Icons.check_circle_outline),
+            label: const Text('Mark course complete'),
+          ),
+        ] else if (status == ReminderStatus.completed) ...[
+          FilledButton.icon(
+            onPressed: () => _changeLifecycle(ReminderStatus.active),
+            icon: const Icon(Icons.play_arrow),
+            label: const Text('Restart reminder'),
+          ),
+        ],
       ],
     );
   }
