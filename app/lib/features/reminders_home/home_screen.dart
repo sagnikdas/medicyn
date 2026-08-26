@@ -76,6 +76,7 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   final _scroll = ScrollController();
   bool _calendarMonth = false;
   List<DayOccurrence> _ringIfLeft = const [];
+  final _dismissedAttentionUntil = <String, DateTime>{};
 
   @override
   void initState() {
@@ -526,10 +527,22 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       day: addCalendarDays(today, -1),
       now: now,
     );
-    final attention = attentionDoses(
+    final allAttention = attentionDoses(
       today: todayOccs,
       yesterday: yesterdayOccs,
     );
+    final nowForAttention = DateTime.now();
+    _dismissedAttentionUntil.removeWhere(
+      (_, until) => !until.isAfter(nowForAttention),
+    );
+    final attention = [
+      for (final occurrence in allAttention)
+        if (!(_dismissedAttentionUntil[_attentionKey(occurrence)]?.isAfter(
+              nowForAttention,
+            ) ??
+            false))
+          occurrence,
+    ];
     _ringIfLeft = [
       for (final o in attention)
         if (doseStillRings(o.status)) o,
@@ -692,12 +705,33 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _snooze(DayOccurrence occurrence) async {
-    await recordDoseSnoozed(
-      widget.db,
-      scheduleId: occurrence.item.schedule.id,
-      scheduledAt: occurrence.scheduledAt,
-      delay: Duration(minutes: AppSettings.instance.snoozeMinutes),
-    );
+    final delay = Duration(minutes: AppSettings.instance.snoozeMinutes);
+    // Remove the card before waiting on SQLite or the notification plugin.
+    // The scheduled one-off reminder remains the way this dose returns to the
+    // user's attention after the snooze window.
+    if (mounted) {
+      setState(() {
+        _dismissedAttentionUntil[_attentionKey(occurrence)] = DateTime.now()
+            .add(delay);
+      });
+    }
+    try {
+      await recordDoseSnoozed(
+        widget.db,
+        scheduleId: occurrence.item.schedule.id,
+        scheduledAt: occurrence.scheduledAt,
+        delay: delay,
+      );
+    } catch (_) {
+      // If saving the snooze failed, restore the card so the dose is still
+      // actionable instead of silently hiding it.
+      if (mounted) {
+        setState(
+          () => _dismissedAttentionUntil.remove(_attentionKey(occurrence)),
+        );
+      }
+      rethrow;
+    }
     if (AuthService.instance.currentUser == null) return;
     unawaited(SyncService(widget.db).syncAll());
   }
@@ -768,6 +802,9 @@ class _ReminderHealthCard extends StatelessWidget {
     );
   }
 }
+
+String _attentionKey(DayOccurrence occurrence) =>
+    '${occurrence.item.schedule.id}|${occurrence.scheduledAt.toUtc().toIso8601String()}';
 
 class _NextDoseCard extends StatefulWidget {
   const _NextDoseCard({required this.occurrence, required this.onMarkTaken});
