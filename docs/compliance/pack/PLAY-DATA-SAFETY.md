@@ -1,13 +1,13 @@
 # 3.8 — Play Console copy (Data Safety, Health apps, restricted permissions)
 
-**Date:** 20 August 2026.
-**Matches:** `PRIVACY.md` last updated 20 August 2026, `main` @ `f73aed5`.
+**Date:** 26 August 2026.
+**Matches:** `app/assets/PRIVACY.md` and the Phase 1 permission model.
 **Status:** Answers for the operator to paste. Nothing in this file submits
 the form. Do not submit until it still matches the policy.
 
-`USE_FULL_SCREEN_INTENT` is already in
-`app/android/app/src/main/AndroidManifest.xml`. The remaining work is the
-Play declaration, not another permission line.
+The public-page source is deployed by `.github/workflows/pages.yml`. The
+operator must enable GitHub Pages for the repository and verify the URLs before
+submitting the Play listing.
 
 ## Data Safety — collected
 
@@ -40,9 +40,8 @@ Declare **shared** for:
 | Audio | Google (platform speech), if voice input is on | App functionality |
 
 Encrypted in transit: **Yes** (TLS; cleartext disallowed).
-Users can request deletion: **Yes** (Settings → Delete account; web page
-exists but is currently a private GitHub URL — Play wants a **public**
-URL; host `../../play-store/delete-account.md` somewhere public before review).
+Users can request deletion: **Yes** (Settings → Delete account and the public
+Pages URL `https://sagnikdas.github.io/dosely/delete-account/`).
 Data collected for app functionality: **Yes**.
 Sold: **No**.
 Optional, account-creation not required: **Yes** (local-only mode).
@@ -59,18 +58,12 @@ AI-filled field.
 Declare, with the same justification already used in `PLAN.md` / the
 manifest:
 
-- `SCHEDULE_EXACT_ALARM` / `USE_EXACT_ALARM` — the reminder must fire at
-  the wall-clock time the user set, with the screen locked, without a
-  live process.
-- `USE_FULL_SCREEN_INTENT` — a due dose is an alarm, not a heads-up chat
-  message. `fullScreenIntent: true` is set on the patient reminder
-  notification so it is unmissable. Care alerts must **not** hijack the
-  screen the same way; they are a notification on someone else's phone.
+- `SCHEDULE_EXACT_ALARM` — requested only when a saved reminder needs exact
+  timing. If it is unavailable, Dosely uses Android's inexact-while-idle
+  fallback and tells the user that timing may be delayed.
 - `POST_NOTIFICATIONS`
 - `CAMERA` — label OCR only; photo deleted.
 - `RECORD_AUDIO` — voice input only, and only if that consent is on.
-- `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` — OEMs otherwise kill exact
-  alarms. Optional for the user.
 
 ## After submit
 

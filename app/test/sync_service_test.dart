@@ -31,9 +31,12 @@ void main() {
   late AppDatabase db;
 
   setUp(() async {
-    SharedPreferences.setMockInitialValues({'consent_cloud_backup': true});
+    SharedPreferences.setMockInitialValues({});
     AppSettings.instance.resetForTest();
     await AppSettings.instance.init();
+    // Consents are account-scoped; use the local owner fixture explicitly so
+    // each test starts from a fresh, granted backup choice.
+    await AppSettings.instance.setConsentCloudBackup(true);
     backend.tables.clear();
     backend.requests.clear();
     backend.failing.clear();
@@ -140,6 +143,7 @@ void main() {
       SharedPreferences.setMockInitialValues({'consent_cloud_backup': false});
       AppSettings.instance.resetForTest();
       await AppSettings.instance.init();
+      await AppSettings.instance.setConsentCloudBackup(false);
       await seedLocalMedicine();
 
       await SyncService(db).syncAll();

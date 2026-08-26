@@ -121,7 +121,9 @@ class AuthService {
         'Google signed you in, but this app could not complete sign-in. (${e.message})',
       );
     } catch (e) {
-      throw GoogleSignInFailure('Could not sign in with Google. Check your connection and try again. ($e)');
+      throw GoogleSignInFailure(
+        'Could not sign in with Google. Check your connection and try again. ($e)',
+      );
     }
   }
 
@@ -141,6 +143,16 @@ class AuthService {
       provider: OAuthProvider.google,
       idToken: idToken,
     );
+    final signedInUser = _client.auth.currentUser;
+    if (signedInUser == null) {
+      throw const GoogleSignInFailure(
+        'Google signed you in, but no account session was returned.',
+      );
+    }
+    // Fail closed before any account-related processing starts. A new owner
+    // sees every external-processing choice off; a returning owner restores
+    // only their namespace.
+    await AppSettings.instance.activateConsentOwner(signedInUser.id);
     // Local-only is the unbundled path; a live Google session means
     // backup and Care Link are available, so drop the flag.
     await AppSettings.instance.setLocalOnly(false);
@@ -148,11 +160,9 @@ class AuthService {
     // first screen renders. A failure here costs a display name, not a
     // session, so it never throws.
     await CareService.instance.upsertOwnProfile();
-    // Not awaited: a device that fails to register receives no care alerts,
-    // which is a degraded link rather than a failed sign-in, and every
-    // foreground retries it.
-    unawaited(PushService.instance.registerToken());
-    unawaited(ConsentService.instance.syncToServer());
+    if (AppSettings.instance.hasRecordedConsents) {
+      unawaited(ConsentService.instance.syncToServer());
+    }
   }
 
   /// Runs [signInWithGoogle] and returns a message fit to show, or null on
@@ -202,6 +212,7 @@ class AuthService {
     // stop receiving the previous account's alerts now, not whenever FCM next
     // reissues its token.
     await PushService.instance.unregisterToken();
+    await PushService.instance.detachAccountListeners();
     if (_googleSignInInitialized) {
       try {
         await GoogleSignIn.instance.signOut();
@@ -211,5 +222,8 @@ class AuthService {
       }
     }
     await _client.auth.signOut();
+    await AppSettings.instance.activateConsentOwner(
+      AppSettings.localConsentOwnerId,
+    );
   }
 }

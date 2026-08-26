@@ -198,7 +198,8 @@ says the build is sound and let it run while Phases 1–3 proceed.
 - [ ] Release keystore and `app/android/key.properties` (see
       `app/README.md` → Release signing)
 - [ ] Play Console: Data safety form, and it must agree with `../compliance/PRIVACY.md`
-- [ ] Declare `USE_EXACT_ALARM` and `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`
+- [ ] Complete the Play declaration for `SCHEDULE_EXACT_ALARM`; do not request
+  battery-optimization exemption unless a later policy review supports it.
 - [ ] `flutter build appbundle --release`, upload to internal testing
 - [ ] Register an Android OAuth client for **each** SHA-1 Play shows — app
       signing key *and* upload key — and add both to Supabase's Client IDs

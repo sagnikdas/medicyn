@@ -15,6 +15,7 @@ import '../care/care_service.dart';
 import '../consent/consent_purpose.dart';
 import '../consent/consent_service.dart';
 import '../notification_engine/notification_service.dart';
+import '../notification_engine/reminder_reliability_screen.dart';
 
 /// Deliberately sparse — there's almost nothing to configure by design.
 /// Notification sound/vibration follow the OS channel settings (opened via
@@ -219,6 +220,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               builder: (_) => CareScreen(db: widget.db),
                             ),
                           ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Text(
+                      'Reminder reliability',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    ProfileMenuRow(
+                      icon: Icons.notifications_active_outlined,
+                      title: 'Check reminder access',
+                      subtitle:
+                          'See whether notifications and timing are ready, then send a test reminder.',
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              ReminderReliabilityScreen(db: widget.db),
                         ),
                       ),
                     ),
@@ -485,7 +506,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       // failed — fail open rather than block turning consent off.
     }
     final linkedAsPatient =
-        link != null && link.status == CareLinkStatus.active && link.patientId == me;
+        link != null &&
+        link.status == CareLinkStatus.active &&
+        link.patientId == me;
     if (!linkedAsPatient) {
       await ConsentService.instance.setGranted(purpose, value);
       return;

@@ -420,8 +420,9 @@ Declare Health info as collected **and shared**; name, email, user IDs; device
 identifiers including the FCM token and Firebase installation ID; and **Audio —
 voice recordings**, because the mic path sends audio to Google even though
 Dosely never stores it. Complete the Health apps declaration. Add
-`USE_FULL_SCREEN_INTENT` to the restricted-permission declarations alongside the
-exact-alarm ones already tracked in `PLAN.md`.
+the contextual `SCHEDULE_EXACT_ALARM` permission to the restricted-permission
+declarations tracked in `PLAN.md`. Full-screen intent and direct battery
+exemption are not requested by the current build.
 
 ---
 
@@ -533,9 +534,9 @@ technical leftovers (4.3c–e) live on this branch until it is merged to `main`.
 | 1.2 | Wipe local DB on sign-out so a second Google account cannot see the previous person's medicines | App | **Done differently** — #33 | Not a wipe: encrypted `dosely-<userId>.sqlite` per Google account. Same account keeps reminders; a different account opens a different file. Dialog copy was updated. |
 | 1.3 | Consent screen (unticked purposes) + `consents` table + Settings toggles | App + DB | **Done** — #40 | Onboarding → consent → auth. Unticked purposes: `cloud_backup`, `anthropic_parse`, `google_speech`. Care-share at Care Link. Settings withdraw. Hosted `consents` migration applied. |
 | 1.4 | Local-only mode so reminders work without signing in / cloud | App | **Done** — #38 | “Use without an account” writes `dosely-local.sqlite`. Sync / push / Care Link stay off until Google sign-in; first sign-in can adopt the local file. |
-| 1.5 | In-app account deletion + `delete_account` function + wipe local DB + web URL | App + backend | **Done** — #39 | In-app two-step delete, hosted `delete_account` function, local sqlite wipe, `../play-store/delete-account.md`. Play still needs a *public* web URL; the GitHub page is on a private repo. |
+| 1.5 | In-app account deletion + `delete_account` function + wipe local DB + web URL | App + backend | **Partial** — Phase 1 | In-app two-step delete, hosted `delete_account` function, local sqlite wipe, and a public Pages workflow. The operator must enable Pages and verify the published URL before Play submission. |
 | 1.6 | Name the Care Link claimant (name + email); fail closed; longer code; claim throttle | App + DB | **Done** — #34 | 8-digit codes; 10 claims / 15 min; hosted migration applied. |
-| 1.7 | Fill `PRIVACY.md` placeholders and link the policy in-app | Docs + app | **Done** — #37, #41 | Placeholders filled. The GitHub blob URL 404s because the repo is private; the app opens a bundled `PRIVACY.md` instead. Play still needs a public web policy URL. |
+| 1.7 | Fill `PRIVACY.md` placeholders and link the policy in-app | Docs + app | **Partial** — Phase 1 | The app opens a bundled `PRIVACY.md` offline and the Pages workflow publishes the same source. The operator must enable Pages and verify the public policy URL. |
 | 2.1 | Rewrite `PRIVACY.md` for Art. 13 (bases, transfers, retention, rights, Art. 22) | Docs | **Done** — #43 | Legal bases, Singapore/US transfers (no invented SCCs), retention, six rights + withdraw/complain, Art. 22 human review. |
 | 2.2 | Stop claiming a `care_alerts` screen and guaranteed FCM-token deletion that the code does not do | Docs or app | **Done** — #43 | Alerts are recorded to avoid duplicates; there is no in-app list. FCM delete on sign-out is best-effort. |
 | 2.3 | Disclose timezone, `last_seen_at`, Firebase install id; fix README “on-device” speech | Docs | **Done** — #43 | Timezone / `last_seen_at` / `push_install_id` disclosed. README no longer says speech is on-device. |
@@ -549,8 +550,8 @@ technical leftovers (4.3c–e) live on this branch until it is merged to `main`.
 | 3.4 | Record of processing — `pack/ROPA.md` | Paper | **Done (document)** — `pack/ROPA.md` | Art. 30; small-org exemption does not apply. |
 | 3.5 | Breach plan, register, reachable contact; backfill timezone-corruption incident | Paper | **Done (document)** — `pack/BREACH.md` | Register includes B-2026-08-19-A (naive timestamps) and B-2026-08-19-B (fabricated missed doses). Contact: sagnikd91@gmail.com. |
 | 3.6 | Decide EEA distribution; Art. 27 representative if yes; privacy contact (no DPO required) | Paper | **Partial** — `pack/SCOPE.md` | EEA/UK distribution is intended. No DPO. Privacy contact is the controller email. Art. 27 representative **not appointed** — required before an EEA Play listing. |
-| 3.7 | Separate Washington MHMD consumer health data policy | Docs | **Done (document)** — `MHMD.md` | Names Supabase, Anthropic, Google; second consent before sharing. Still needs a *public* URL (repo is private). |
-| 3.8 | Play Data Safety + Health apps declaration + `USE_FULL_SCREEN_INTENT` | Store | **Partial** — `pack/PLAY-DATA-SAFETY.md` | Form answers written to match the policy. `USE_FULL_SCREEN_INTENT` is already in the manifest. Operator must paste into Play Console. Play still needs public policy/deletion URLs. |
+| 3.7 | Separate Washington MHMD consumer health data policy | Docs | **Done (document)** — `MHMD.md` | Names Supabase, Anthropic, Google; second consent before sharing. Public hosting remains an operator action if Washington distribution is enabled. |
+| 3.8 | Play Data Safety + Health apps declaration + contextual exact-alarm permission | Store | **Partial** — `pack/PLAY-DATA-SAFETY.md` | Form answers match the current permission model. Operator must paste into Play Console and enable the public Pages URLs. Exact-alarm eligibility still needs Play review. |
 | 4.1 | Append-only `phi_access_log` + “who looked” screen | App + DB | **Deferred** | HIPAA track. Also useful for FTC HBNR / MHMD. Start when a B2B deal exists. |
 | 4.2 | BAAs (Supabase Team+HIPAA add-on; Anthropic; no BAA for platform speech) | Paper | **Deferred** | |
 | 4.3a | Encrypt local medical database | App | **Done** — #33 | sqlite3mc hooks + Keystore, not the EOL `sqlcipher_flutter_libs` package the plan named. |

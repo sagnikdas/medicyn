@@ -11,6 +11,7 @@ import 'core/motion.dart';
 import 'core/sentry_config.dart';
 import 'core/supabase_init.dart';
 import 'core/theme.dart';
+import 'core/telemetry.dart';
 import 'core/widgets/dosely_motion.dart';
 import 'data/local/database.dart';
 import 'data/local/database_encryption.dart';
@@ -32,11 +33,15 @@ void main() async {
   await SentryFlutter.init(
     (options) {
       options.dsn = SentryConfig.dsn;
+      options.beforeSend = redactSentryEvent;
     },
     appRunner: () async {
       WidgetsFlutterBinding.ensureInitialized();
       await initializeSupabase();
-      await AppSettings.instance.init();
+      await AppSettings.instance.init(
+        consentOwnerId:
+            Supabase.instance.client.auth.currentUser?.id ?? localOwnerUserId,
+      );
       // Must happen before checking the launch response below — the plugin
       // has to be initialized first to answer getNotificationAppLaunchDetails.
       await NotificationService.instance.init();
@@ -71,7 +76,9 @@ class _DoselyAppState extends State<DoselyApp> {
     if (launch != null) {
       // The navigator isn't attached yet during this build, so defer until
       // after the first frame — by then navigatorKey.currentState is live.
-      WidgetsBinding.instance.addPostFrameCallback((_) => _handleLaunch(launch));
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _handleLaunch(launch),
+      );
     }
   }
 
@@ -243,7 +250,10 @@ class _AuthGateState extends State<_AuthGate> {
               _releaseDatabase();
               child = const SignInScreen(key: ValueKey('sign-in'));
             } else {
-              if (user != null && _syncedConsentUserId != user.id) {
+              if (user != null &&
+                  AppSettings.instance.consentOwnerIs(user.id) &&
+                  AppSettings.instance.hasRecordedConsents &&
+                  _syncedConsentUserId != user.id) {
                 _syncedConsentUserId = user.id;
                 unawaited(ConsentService.instance.syncToServer());
               }

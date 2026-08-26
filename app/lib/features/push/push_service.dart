@@ -7,6 +7,7 @@ import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../core/app_settings.dart';
 import '../../core/ids.dart';
 import '../../data/local/database.dart';
 import '../notification_engine/notification_service.dart';
@@ -82,17 +83,28 @@ class PushService {
   /// navigator to open a feed on at that point.
   Future<void> attachForegroundListeners({required AppDatabase db}) async {
     if (!_available) return;
+    final ownerId = Supabase.instance.client.auth.currentUser?.id;
+    if (ownerId == null ||
+        !AppSettings.instance.consentOwnerIs(ownerId) ||
+        !AppSettings.instance.hasRecordedConsents ||
+        !AppSettings.instance.consentCareShare) {
+      await detachAccountListeners();
+      return;
+    }
     // Cancel first: signing out and back in builds a fresh HomeScreen state,
     // and two live listeners would apply every arriving change twice.
-    unawaited(_foregroundSubscription?.cancel() ?? Future.value());
-    unawaited(_openedSubscription?.cancel() ?? Future.value());
+    await _foregroundSubscription?.cancel();
+    await _openedSubscription?.cancel();
 
     _foregroundSubscription = FirebaseMessaging.onMessage.listen((message) {
-      unawaited(_handleForeground(message, db));
+      if (!_isCurrentOwner(ownerId)) return;
+      unawaited(_handleForeground(message, db, ownerId));
     });
-    _openedSubscription = FirebaseMessaging.onMessageOpenedApp.listen(
-      handleCareAlertTap,
-    );
+    _openedSubscription = FirebaseMessaging.onMessageOpenedApp.listen((
+      message,
+    ) {
+      if (_isCurrentOwner(ownerId)) handleCareAlertTap(message);
+    });
 
     // A tap that cold-started the process is not delivered to the stream
     // above — it is waiting here instead, exactly as with a local
@@ -120,7 +132,12 @@ class PushService {
     }
   }
 
-  Future<void> _handleForeground(RemoteMessage message, AppDatabase db) async {
+  Future<void> _handleForeground(
+    RemoteMessage message,
+    AppDatabase db,
+    String ownerId,
+  ) async {
+    if (!_isCurrentOwner(ownerId)) return;
     switch (message.data[pushEventKey]) {
       case pushEventDataChanged:
         // Passing the app's own database matters: the foreground UI is driven
@@ -149,15 +166,22 @@ class PushService {
   /// that beyond the token itself having changed.
   Future<void> registerToken() async {
     if (!_available) return;
-    if (Supabase.instance.client.auth.currentUser == null) return;
+    final ownerId = Supabase.instance.client.auth.currentUser?.id;
+    if (ownerId == null ||
+        !AppSettings.instance.consentOwnerIs(ownerId) ||
+        !AppSettings.instance.hasRecordedConsents ||
+        !AppSettings.instance.consentCareShare) {
+      return;
+    }
 
     // Only ever set up once. Doing it inside register rather than init is
     // deliberate: the stream fires with a *new* token, which is useless before
     // there is a session to attach it to.
-    _refreshSubscription ??= FirebaseMessaging.instance.onTokenRefresh.listen((
+    await _refreshSubscription?.cancel();
+    _refreshSubscription = FirebaseMessaging.instance.onTokenRefresh.listen((
       token,
     ) {
-      unawaited(_upsert(token));
+      if (_isCurrentOwner(ownerId)) unawaited(_upsert(token, ownerId));
     });
 
     String? token;
@@ -169,10 +193,11 @@ class PushService {
       return;
     }
     if (token == null || token.isEmpty) return;
-    await _upsert(token);
+    await _upsert(token, ownerId);
   }
 
-  Future<void> _upsert(String token) async {
+  Future<void> _upsert(String token, String ownerId) async {
+    if (!_isCurrentOwner(ownerId)) return;
     try {
       // Through an RPC rather than a table write, and that is load-bearing: an
       // FCM token belongs to an app *install*, not an account, so signing in as
@@ -190,6 +215,7 @@ class PushService {
           'p_install_id': await _ensureInstallId(),
         },
       );
+      if (!_isCurrentOwner(ownerId)) return;
       _registeredToken = token;
     } catch (_) {
       // Best-effort. A device that fails to register receives no alerts, which
@@ -240,6 +266,30 @@ class PushService {
     }
     _registeredToken = null;
   }
+
+  /// Cancels every callback that captured an account or its open database.
+  /// Kept separate from token deletion because sign-out must delete while its
+  /// authenticated session still exists, then detach regardless of whether
+  /// that network request succeeded.
+  Future<void> detachAccountListeners() async {
+    final subscriptions = [
+      _foregroundSubscription,
+      _openedSubscription,
+      _refreshSubscription,
+    ];
+    _foregroundSubscription = null;
+    _openedSubscription = null;
+    _refreshSubscription = null;
+    for (final subscription in subscriptions) {
+      await subscription?.cancel();
+    }
+  }
+
+  bool _isCurrentOwner(String ownerId) =>
+      Supabase.instance.client.auth.currentUser?.id == ownerId &&
+      AppSettings.instance.consentOwnerIs(ownerId) &&
+      AppSettings.instance.hasRecordedConsents &&
+      AppSettings.instance.consentCareShare;
 
   Future<String?> _currentTokenQuietly() async {
     try {

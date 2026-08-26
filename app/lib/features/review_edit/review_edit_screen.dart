@@ -322,6 +322,10 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
   }
 
   Future<void> _save() async {
+    if (!_forSomeoneElse && _frequency != FrequencyType.asNeeded) {
+      await _prepareReminderAccess();
+      if (!mounted) return;
+    }
     setState(() => _saving = true);
     try {
       if (_forSomeoneElse) {
@@ -335,6 +339,45 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Could not save: $e')));
+    }
+  }
+
+  /// Explains Android's reminder permissions at the moment they matter: when
+  /// the user saves their first scheduled reminder. Declining never discards
+  /// the medicine; the schedule is saved and the reliability center explains
+  /// the degraded state with an inexact fallback or a fix action.
+  Future<void> _prepareReminderAccess() async {
+    final permission = await NotificationService.instance.readPermissionState();
+    if (permission.notificationsAllowed && permission.exactAlarmsAllowed) {
+      return;
+    }
+    if (!mounted) return;
+    final proceed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Enable this reminder'),
+        content: const Text(
+          'Dosely needs notification access to alert you. Exact timing is '
+          'optional; if you skip it, Android may deliver the reminder a little later.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Not now'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Continue'),
+          ),
+        ],
+      ),
+    );
+    if (proceed != true) return;
+    if (!permission.notificationsAllowed) {
+      await NotificationService.instance.requestNotificationPermission();
+    }
+    if (!permission.exactAlarmsAllowed) {
+      await NotificationService.instance.requestExactAlarmPermission();
     }
   }
 

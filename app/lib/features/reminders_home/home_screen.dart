@@ -6,6 +6,7 @@ import '../../core/app_settings.dart';
 import '../../core/motion.dart';
 import '../../core/widgets/dosely_chrome.dart';
 import '../../core/widgets/dosely_motion.dart';
+import '../../core/telemetry.dart';
 import '../../data/local/database.dart';
 import '../../data/remote/care_notifier.dart';
 import '../../data/remote/sync_service.dart';
@@ -17,7 +18,9 @@ import '../consent/consent_service.dart';
 import '../history/dose_history_screen.dart';
 import '../notification_engine/missed_doses.dart';
 import '../notification_engine/notification_actions.dart';
+import '../notification_engine/reminder_health.dart';
 import '../notification_engine/notification_service.dart';
+import '../notification_engine/reminder_reliability_screen.dart';
 import '../push/push_service.dart';
 import '../review_edit/review_edit_screen.dart';
 import '../voice_capture/voice_capture_screen.dart';
@@ -66,8 +69,8 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   // every calendar day tap. Over a full 24 months of retained history that
   // measured 24ms of query and subscription churn per rebuild against
   // 2.5ms for a stream opened once.
-  late final Stream<List<ScheduleWithMedicine>> _schedulesStream =
-      widget.db.watchSchedulesWithMedicines();
+  late final Stream<List<ScheduleWithMedicine>> _schedulesStream = widget.db
+      .watchSchedulesWithMedicines();
   late final Stream<List<DoseLog>> _doseLogsStream = widget.db.watchDoseLogs();
   final _scroll = ScrollController();
   bool _calendarMonth = false;
@@ -77,7 +80,7 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _bootstrap(requestPermissions: true);
+    _bootstrap(firstLoad: true);
     // Upcoming → pending has to flip when the clock time passes, not only
     // when the user comes back from another screen. Fifteen seconds is
     // short enough to notice an alarm that fired while the app is open.
@@ -107,11 +110,8 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (state == AppLifecycleState.paused) unawaited(_reRingUnanswered());
   }
 
-  /// [requestPermissions] only on the first run, from `initState`. Asking on
-  /// every resume meant that anyone who declined the battery-optimisation
-  /// exemption got the system dialog thrown at them again every single time
-  /// they returned to the app — the permission requests are one-time asks,
-  /// while the re-arming below is what actually needs to happen on resume.
+  /// Permission prompts belong to reminder Save, where the user understands
+  /// why Android is asking. Home only reads and surfaces the resulting state.
   ///
   /// The same flag gates the *full* Supabase pull, for the same reason:
   /// restoring dose-log history wholesale matters on a fresh install or a new
@@ -120,25 +120,21 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   /// schedules, and contest notes are cheap, and skipping them would let the
   /// push that follows blind-overwrite an edit made elsewhere while this
   /// device was away.
-  Future<void> _bootstrap({bool requestPermissions = false}) async {
+  Future<void> _bootstrap({bool firstLoad = false}) async {
     await NotificationService.instance.init();
-    if (requestPermissions) {
-      await NotificationService.instance.requestPermissions();
-    }
     final signedIn = AuthService.instance.currentUser != null;
-    if (signedIn && requestPermissions) {
+    if (signedIn && firstLoad) {
       // Also backfills a profile for anyone who signed in before profiles
       // existed — without it their name never appears on the other side of a
       // link, and nothing would ever create the row.
       unawaited(CareService.instance.upsertOwnProfile());
-      // Only needs the navigator, which exists by now. Not in `main`, where
-      // PushService.init runs: a tapped alert has nowhere to open a feed
-      // before runApp.
-      unawaited(PushService.instance.attachForegroundListeners(db: widget.db));
     }
     // Local-only has no JWT, so Care Link RPCs and FCM registration stay
     // off until the user signs in from Settings.
-    if (signedIn) {
+    if (signedIn && AppSettings.instance.consentCareShare) {
+      // Only needs the navigator, which exists by now. It is deliberately
+      // account/consent gated rather than attached globally at startup.
+      unawaited(PushService.instance.attachForegroundListeners(db: widget.db));
       unawaited(PushService.instance.registerToken());
     }
     final sync = signedIn ? SyncService(widget.db) : null;
@@ -147,7 +143,7 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     // arms their alarms in this same pass instead of waiting for the next
     // resume.
     if (sync != null) {
-      if (requestPermissions) {
+      if (firstLoad) {
         await sync.pullAll();
       } else {
         await sync.pullEditableTables();
@@ -158,7 +154,28 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     // Reconcile afterwards puts the repeating series back (cancel of a
     // fired daily id also drops AlarmManager for that id).
     await NotificationService.instance.dismissActiveReminderNotifications();
-    await NotificationService.instance.reconcile(widget.db);
+    final reconcile = await NotificationService.instance.reconcile(widget.db);
+    final ownerId = AppSettings.instance.consentOwnerId;
+    if (ownerId != null) {
+      final permissions = await NotificationService.instance
+          .readPermissionState();
+      await ReminderHealthStore.instance.updateFromReconcile(
+        ownerId: ownerId,
+        report: reconcile,
+        permissions: permissions,
+        timezoneReady: NotificationService.instance.timezoneReady,
+      );
+      await DoselyTelemetry.instance.record(
+        DoselyEvent.reminderArmResult,
+        properties: {
+          'result': reconcile.allArmed ? 'all_armed' : 'degraded',
+          'count_bucket': DoselyTelemetry.countBucket(reconcile.armed),
+          'error_code': reconcile.failures.isEmpty
+              ? null
+              : 'platform_schedule_failed',
+        },
+      );
+    }
     if (signedIn) {
       unawaited(_reportHealth());
       unawaited(_refreshNames());
@@ -360,24 +377,27 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: DoselyTopBar(
-        onAvatarTap: widget.onAvatarTap,
-        avatarLabel: AuthService.instance.currentUser?.email,
-      ),
-      body: StreamBuilder<List<ScheduleWithMedicine>>(
-        stream: _schedulesStream,
-        builder: (context, scheduleSnap) {
-          return StreamBuilder<List<DoseLog>>(
-            stream: _doseLogsStream,
-            builder: (context, logSnap) {
-              return _calendarBody(
-                schedules: scheduleSnap.data ?? const [],
-                logs: logSnap.data ?? const [],
-              );
-            },
-          );
-        },
+    return ListenableBuilder(
+      listenable: ReminderHealthStore.instance,
+      builder: (context, _) => Scaffold(
+        appBar: DoselyTopBar(
+          onAvatarTap: widget.onAvatarTap,
+          avatarLabel: AuthService.instance.currentUser?.email,
+        ),
+        body: StreamBuilder<List<ScheduleWithMedicine>>(
+          stream: _schedulesStream,
+          builder: (context, scheduleSnap) {
+            return StreamBuilder<List<DoseLog>>(
+              stream: _doseLogsStream,
+              builder: (context, logSnap) {
+                return _calendarBody(
+                  schedules: scheduleSnap.data ?? const [],
+                  logs: logSnap.data ?? const [],
+                );
+              },
+            );
+          },
+        ),
       ),
     );
   }
@@ -499,6 +519,19 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               ),
             ),
           ),
+        if (ReminderHealthStore.instance.hasIssues)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+              child: _ReminderHealthCard(
+                onFix: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => ReminderReliabilityScreen(db: widget.db),
+                  ),
+                ),
+              ),
+            ),
+          ),
         HomeCalendarSliver(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
@@ -599,6 +632,61 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         builder: (_) => DoseHistoryScreen(
           scheduleId: occurrence.item.schedule.id,
           db: widget.db,
+        ),
+      ),
+    );
+  }
+}
+
+class _ReminderHealthCard extends StatelessWidget {
+  const _ReminderHealthCard({required this.onFix});
+
+  final VoidCallback onFix;
+
+  @override
+  Widget build(BuildContext context) {
+    final issues = ReminderHealthStore.instance.issues.length;
+    return Card(
+      color: Theme.of(context).colorScheme.errorContainer,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              Icons.notifications_off_outlined,
+              color: Theme.of(context).colorScheme.onErrorContainer,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '$issues reminder${issues == 1 ? '' : 's'} need setup',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onErrorContainer,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Your medicine is saved. Check reminder access so the next dose is not missed.',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onErrorContainer,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton(
+                      onPressed: onFix,
+                      child: const Text('Fix reminders'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );

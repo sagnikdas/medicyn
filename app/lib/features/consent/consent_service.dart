@@ -2,7 +2,9 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/app_settings.dart';
+import '../../core/telemetry.dart';
 import '../care/care_service.dart';
+import '../push/push_service.dart';
 import 'consent_purpose.dart';
 
 /// Local prefs are the source of truth for gating. The server row is the
@@ -31,6 +33,21 @@ class ConsentService {
     }
     await _persistLocal(purpose, granted);
     await _recordOnServer(purpose, granted);
+    await DoselyTelemetry.instance.record(
+      DoselyEvent.permissionResult,
+      properties: {
+        'permission_type': 'consent_${purpose.id}',
+        'result': granted ? 'granted' : 'withheld',
+      },
+    );
+    if (purpose == ConsentPurpose.careShare) {
+      if (granted) {
+        await PushService.instance.registerToken();
+      } else {
+        await PushService.instance.unregisterToken();
+        await PushService.instance.detachAccountListeners();
+      }
+    }
   }
 
   /// First-screen Continue: store the three choices (care-share is not
@@ -49,6 +66,7 @@ class ConsentService {
   /// Best-effort upsert of the four local flags after a session exists.
   /// Safe to call more than once; the device remains the gating source.
   Future<void> syncToServer() async {
+    if (!AppSettings.instance.hasRecordedConsents) return;
     for (final purpose in ConsentPurpose.values) {
       await _recordOnServer(purpose, isGranted(purpose));
     }
@@ -58,7 +76,9 @@ class ConsentService {
     final settings = AppSettings.instance;
     return switch (purpose) {
       ConsentPurpose.cloudBackup => settings.setConsentCloudBackup(granted),
-      ConsentPurpose.anthropicParse => settings.setConsentAnthropicParse(granted),
+      ConsentPurpose.anthropicParse => settings.setConsentAnthropicParse(
+        granted,
+      ),
       ConsentPurpose.googleSpeech => settings.setConsentGoogleSpeech(granted),
       ConsentPurpose.careShare => settings.setConsentCareShare(granted),
     };

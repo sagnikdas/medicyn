@@ -1,0 +1,86 @@
+name: Publish public legal pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - app/assets/PRIVACY.md
+      - docs/play-store/delete-account.md
+      - .github/workflows/pages.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Assemble public pages from source documents
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p public
+          {
+            printf '%s\n' '---' 'layout: default' 'title: Dosely privacy policy' 'permalink: /privacy/' '---'
+            cat app/assets/PRIVACY.md
+          } > public/privacy.md
+          {
+            printf '%s\n' '---' 'layout: default' 'title: Delete your Dosely account' 'permalink: /delete-account/' '---'
+            cat docs/play-store/delete-account.md
+          } > public/delete-account.md
+          cat > public/support.md <<'EOF'
+          ---
+          layout: default
+          title: Dosely support
+          permalink: /support/
+          ---
+
+          # Dosely support
+
+          For account, reminder, privacy, or deletion help, email
+          **sagnikd91@gmail.com**. Please include your app version and device
+          model, but do not include medicine names or other health information.
+
+          We aim to reply within three business days.
+          EOF
+          cat > public/index.md <<'EOF'
+          ---
+          layout: default
+          title: Dosely
+          permalink: /
+          ---
+
+          Dosely is a private medication reminder that works offline.
+
+          - [Privacy policy](/dosely/privacy/)
+          - [Delete your account](/dosely/delete-account/)
+          - [Support](/dosely/support/)
+          EOF
+
+      - name: Build Pages site
+        uses: actions/jekyll-build-pages@v1
+        with:
+          source: public
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+
+      - name: Deploy Pages site
+        id: deployment
+        uses: actions/deploy-pages@v4

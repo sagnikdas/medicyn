@@ -11,6 +11,7 @@ import '../auth/auth_service.dart';
 import '../consent/consent_purpose.dart';
 import '../consent/consent_screen.dart';
 import '../consent/consent_service.dart';
+import '../push/push_service.dart';
 import 'care_service.dart';
 import 'dose_feed_screen.dart';
 import 'patient_reminders_screen.dart';
@@ -145,6 +146,7 @@ class _CareScreenState extends State<CareScreen> {
     );
     if (granted == true) {
       await ConsentService.instance.setGranted(ConsentPurpose.careShare, true);
+      await PushService.instance.attachForegroundListeners(db: widget.db);
       return true;
     }
     return false;
