@@ -12,6 +12,7 @@ import '../../core/app_settings.dart';
 import '../../core/telemetry.dart';
 import '../../data/local/database.dart';
 import '../../data/local/tables.dart';
+import '../../data/local/lifecycle.dart';
 import 'device_health.dart';
 import 'interval_dose_sequence.dart';
 import 'missed_doses.dart';
@@ -500,7 +501,7 @@ class NotificationService {
 
     if (!skipCancel) await cancelForSchedule(schedule);
 
-    if (!schedule.active || frequency == FrequencyType.asNeeded) {
+    if (!reminderIsActive(schedule) || frequency == FrequencyType.asNeeded) {
       return ScheduleArmResult.notRequired(schedule.id);
     }
 

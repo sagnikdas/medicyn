@@ -1,5 +1,6 @@
 import '../../data/local/database.dart';
 import '../../data/local/tables.dart';
+import '../../data/local/lifecycle.dart';
 import '../notification_engine/schedule_validation.dart';
 
 /// Warn when the bottle would run out in this many days, not when a single
@@ -12,7 +13,7 @@ const int refillWarnDays = 5;
 /// As-needed schedules contribute nothing: there is no honest daily rate,
 /// and inventing one would cry empty on a bottle that is being used slowly.
 double dailyDoseCount(Schedule schedule) {
-  if (!schedule.active) return 0;
+  if (!reminderIsActive(schedule)) return 0;
   final frequency = frequencyTypeFromName(schedule.frequencyType);
   if (frequency == null) return 0;
   switch (frequency) {
@@ -44,7 +45,9 @@ int? refillDaysLeft({
 }) {
   if (tabletsRemaining == null) return null;
   if (tabletsRemaining <= 0) return 0;
-  final perDose = (tabletsPerDose == null || tabletsPerDose < 1) ? 1 : tabletsPerDose;
+  final perDose = (tabletsPerDose == null || tabletsPerDose < 1)
+      ? 1
+      : tabletsPerDose;
   var daily = 0.0;
   for (final schedule in schedules) {
     daily += dailyDoseCount(schedule);
@@ -53,7 +56,8 @@ int? refillDaysLeft({
   return (tabletsRemaining / perDose / daily).floor();
 }
 
-bool refillIsLow(int? daysLeft) => daysLeft != null && daysLeft <= refillWarnDays;
+bool refillIsLow(int? daysLeft) =>
+    daysLeft != null && daysLeft <= refillWarnDays;
 
 /// The bottle's count right now: the last explicitly-entered baseline minus
 /// what has been taken since.
@@ -68,7 +72,8 @@ bool refillIsLow(int? daysLeft) => daysLeft != null && daysLeft <= refillWarnDay
 int? derivedTabletsRemaining(Medicine medicine, int takenSinceBaseline) {
   final baseline = medicine.tabletsRemaining;
   if (baseline == null) return null;
-  final perDose = (medicine.tabletsPerDose == null || medicine.tabletsPerDose! < 1)
+  final perDose =
+      (medicine.tabletsPerDose == null || medicine.tabletsPerDose! < 1)
       ? 1
       : medicine.tabletsPerDose!;
   final remaining = baseline - perDose * takenSinceBaseline;
@@ -93,11 +98,16 @@ bool anyRefillLow(
   }
   for (final id in remaining.keys) {
     final medicine = remaining[id]!;
-    if (refillIsLow(refillDaysLeft(
-      tabletsRemaining: derivedTabletsRemaining(medicine, takenSinceBaseline[id] ?? 0),
-      tabletsPerDose: medicine.tabletsPerDose,
-      schedules: byMedicine[id]!,
-    ))) {
+    if (refillIsLow(
+      refillDaysLeft(
+        tabletsRemaining: derivedTabletsRemaining(
+          medicine,
+          takenSinceBaseline[id] ?? 0,
+        ),
+        tabletsPerDose: medicine.tabletsPerDose,
+        schedules: byMedicine[id]!,
+      ),
+    )) {
       return true;
     }
   }

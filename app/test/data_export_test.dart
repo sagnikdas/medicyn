@@ -16,16 +16,20 @@ void main() {
     AppSettings.instance.resetForTest();
     await AppSettings.instance.init();
     db = AppDatabase.forTesting(NativeDatabase.memory());
-    await db.upsertMedicine(MedicinesCompanion.insert(
-      id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
-      drugName: 'Metformin',
-    ));
-    await db.upsertSchedule(SchedulesCompanion.insert(
-      id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
-      medicineId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
-      frequencyType: FrequencyType.daily.name,
-      times: const ['09:00'],
-    ));
+    await db.upsertMedicine(
+      MedicinesCompanion.insert(
+        id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+        drugName: 'Metformin',
+      ),
+    );
+    await db.upsertSchedule(
+      SchedulesCompanion.insert(
+        id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+        medicineId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+        frequencyType: FrequencyType.daily.name,
+        times: const ['09:00'],
+      ),
+    );
     await db.recordDoseAction(
       id: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
       scheduleId: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
@@ -41,15 +45,19 @@ void main() {
   });
 
   test('export JSON contains the drug name and log action', () async {
-    final export = await DataExportService(db).buildExport(
-      now: DateTime.utc(2026, 8, 20, 12),
-    );
+    final export = await DataExportService(
+      db,
+    ).buildExport(now: DateTime.utc(2026, 8, 20, 12));
     final encoded = jsonEncode(export);
 
     expect(encoded, contains('Metformin'));
     expect(encoded, contains('taken'));
 
     expect(export['metadata']['app_version'], '0.1.0+1');
+    expect(
+      export['metadata']['schema_version'],
+      DataExportService.exportSchemaVersion,
+    );
     expect(export['metadata']['exported_at'], '2026-08-20T12:00:00.000Z');
     expect(export['metadata']['local_only'], isTrue);
     expect(export['medicines'], isNotEmpty);

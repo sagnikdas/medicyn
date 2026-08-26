@@ -36,7 +36,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -64,6 +64,24 @@ class AppDatabase extends _$AppDatabase {
       }
       if (from < 5) {
         await _storeDateTimesAsText(m);
+      }
+      if (from < 6) {
+        // Phase 3 lifecycle metadata. All fields are nullable for a safe
+        // upgrade: legacy rows continue to use `active`, while new writes
+        // can distinguish paused and completed reminders and preserve their
+        // course boundaries.
+        // The v5 table-rebuild already uses the current table definition, so
+        // databases crossing v4 -> v6 have these columns already. Only the
+        // v5 -> v6 path needs ALTER TABLE additions.
+        if (from >= 5) {
+          await m.addColumn(schedules, schedules.status);
+          await m.addColumn(schedules, schedules.startDate);
+          await m.addColumn(schedules, schedules.endDate);
+          await m.addColumn(schedules, schedules.pauseUntil);
+        }
+        await customStatement(
+          "UPDATE schedules SET status = CASE WHEN frequency_type = 'asNeeded' THEN 'asNeeded' WHEN active = 1 THEN 'active' ELSE 'completed' END WHERE status IS NULL",
+        );
       }
     },
   );
@@ -201,7 +219,11 @@ class AppDatabase extends _$AppDatabase {
       [innerJoin(medicines, medicines.id.equalsExp(schedules.medicineId))],
     )..where(schedules.deleted.equals(false) & medicines.deleted.equals(false));
     if (activeOnly) {
-      query.where(schedules.active.equals(true));
+      query.where(
+        schedules.active.equals(true) |
+            (schedules.status.equals(ReminderStatus.paused.name) &
+                schedules.pauseUntil.isSmallerOrEqualValue(DateTime.now())),
+      );
     }
     return query.watch().map(
       (rows) => rows
@@ -230,7 +252,11 @@ class AppDatabase extends _$AppDatabase {
       [innerJoin(medicines, medicines.id.equalsExp(schedules.medicineId))],
     )..where(schedules.deleted.equals(false) & medicines.deleted.equals(false));
     if (activeOnly) {
-      query.where(schedules.active.equals(true));
+      query.where(
+        schedules.active.equals(true) |
+            (schedules.status.equals(ReminderStatus.paused.name) &
+                schedules.pauseUntil.isSmallerOrEqualValue(DateTime.now())),
+      );
     }
     final rows = await query.get();
     return rows
@@ -254,11 +280,56 @@ class AppDatabase extends _$AppDatabase {
       (update(schedules)..where((t) => t.id.equals(id))).write(
         SchedulesCompanion(
           active: const Value(false),
+          status: const Value('completed'),
+          pauseUntil: const Value(null),
           pendingSync: const Value(true),
           updatedAt: Value(DateTime.now()),
           updatedBy: Value(by),
         ),
       );
+
+  Future<void> pauseSchedule(String id, {DateTime? until, String? by}) =>
+      _setScheduleLifecycle(
+        id,
+        status: ReminderStatus.paused,
+        active: false,
+        pauseUntil: until,
+        by: by,
+      );
+
+  Future<void> resumeSchedule(String id, {String? by}) => _setScheduleLifecycle(
+    id,
+    status: ReminderStatus.active,
+    active: true,
+    pauseUntil: null,
+    by: by,
+  );
+
+  Future<void> completeSchedule(String id, {String? by}) =>
+      _setScheduleLifecycle(
+        id,
+        status: ReminderStatus.completed,
+        active: false,
+        pauseUntil: null,
+        by: by,
+      );
+
+  Future<void> _setScheduleLifecycle(
+    String id, {
+    required ReminderStatus status,
+    required bool active,
+    required DateTime? pauseUntil,
+    String? by,
+  }) => (update(schedules)..where((t) => t.id.equals(id))).write(
+    SchedulesCompanion(
+      status: Value(status.name),
+      active: Value(active),
+      pauseUntil: Value(pauseUntil),
+      pendingSync: const Value(true),
+      updatedAt: Value(DateTime.now()),
+      updatedBy: Value(by),
+    ),
+  );
 
   /// Removes this medicine's dose history and tombstones the medicine and its
   /// schedules. The rows stay locally with [Medicines.deleted] /
@@ -289,6 +360,8 @@ class AppDatabase extends _$AppDatabase {
           SchedulesCompanion(
             deleted: const Value(true),
             active: const Value(false),
+            status: const Value('completed'),
+            pauseUntil: const Value(null),
             pendingSync: const Value(true),
             updatedAt: Value(now),
             updatedBy: Value(by),

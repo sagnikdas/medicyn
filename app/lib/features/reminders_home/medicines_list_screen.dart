@@ -38,7 +38,10 @@ class MedicinesListScreen extends StatelessWidget {
       ),
       body: DoselyContent(
         child: StreamBuilder<List<ScheduleWithMedicine>>(
-          stream: db.watchActiveSchedules(),
+          // Lifecycle states are intentionally shown here too: a paused or
+          // completed course must remain reachable so the user can review
+          // history or resume it without recreating the reminder.
+          stream: db.watchSchedulesWithMedicines(),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting &&
                 !snapshot.hasData) {

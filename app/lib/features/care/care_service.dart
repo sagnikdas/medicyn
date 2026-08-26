@@ -3,6 +3,7 @@ import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../data/local/database.dart';
+import '../../data/local/tables.dart';
 import '../notification_engine/device_health.dart';
 import '../notification_engine/schedule_validation.dart';
 
@@ -67,7 +68,8 @@ class CareLink {
 
   /// The other person in the pair, from [userId]'s point of view. Null while
   /// an invite is still unclaimed.
-  String? otherPartyId(String userId) => isPatient(userId) ? caregiverId : patientId;
+  String? otherPartyId(String userId) =>
+      isPatient(userId) ? caregiverId : patientId;
 
   /// The number [userId] should dial to reach the other person.
   String? phoneToCall(String userId) =>
@@ -78,17 +80,17 @@ class CareLink {
       isPatient(userId) ? patientPhone : caregiverPhone;
 
   static CareLink fromRow(Map<String, dynamic> row) => CareLink(
-        id: row['id'] as String,
-        patientId: row['patient_id'] as String,
-        caregiverId: row['caregiver_id'] as String?,
-        status: CareLinkStatus.values.byName(row['status'] as String),
-        inviteCode: row['invite_code'] as String?,
-        expiresAt: row['expires_at'] == null
-            ? null
-            : DateTime.parse(row['expires_at'] as String).toLocal(),
-        patientPhone: row['patient_phone'] as String?,
-        caregiverPhone: row['caregiver_phone'] as String?,
-      );
+    id: row['id'] as String,
+    patientId: row['patient_id'] as String,
+    caregiverId: row['caregiver_id'] as String?,
+    status: CareLinkStatus.values.byName(row['status'] as String),
+    inviteCode: row['invite_code'] as String?,
+    expiresAt: row['expires_at'] == null
+        ? null
+        : DateTime.parse(row['expires_at'] as String).toLocal(),
+    patientPhone: row['patient_phone'] as String?,
+    caregiverPhone: row['caregiver_phone'] as String?,
+  );
 }
 
 /// The person who claimed a pending invite, as shown on the patient's
@@ -182,13 +184,13 @@ class MedicineEdit {
   final DateTime createdAt;
 
   static MedicineEdit fromRow(Map<String, dynamic> row) => MedicineEdit(
-        id: row['id'] as String,
-        medicineId: row['medicine_id'] as String,
-        ownerId: row['owner_id'] as String,
-        actorId: row['actor_id'] as String?,
-        summary: row['summary'] as String? ?? '',
-        createdAt: DateTime.parse(row['created_at'] as String),
-      );
+    id: row['id'] as String,
+    medicineId: row['medicine_id'] as String,
+    ownerId: row['owner_id'] as String,
+    actorId: row['actor_id'] as String?,
+    summary: row['summary'] as String? ?? '',
+    createdAt: DateTime.parse(row['created_at'] as String),
+  );
 }
 
 /// One recorded response to a dose reminder.
@@ -275,7 +277,9 @@ class DoseEvent {
     final loggedByOther = recordedBy != null && recordedBy != patientId;
     if (loggedByOther) return 'Logged by someone else';
     final sourceUnusual =
-        source != null && source!.isNotEmpty && !_deviceSources.contains(source);
+        source != null &&
+        source!.isNotEmpty &&
+        !_deviceSources.contains(source);
     if (sourceUnusual) return 'Not from the reminder';
     return null;
   }
@@ -288,7 +292,8 @@ class DoseEvent {
     final medicine = (schedule?['medicines'] as Map?)?.cast<String, dynamic>();
     return DoseEvent(
       id: row['id'] as String,
-      scheduleId: (row['schedule_id'] as String?) ?? (schedule?['id'] as String?),
+      scheduleId:
+          (row['schedule_id'] as String?) ?? (schedule?['id'] as String?),
       scheduledAt: DateTime.parse(row['scheduled_at'] as String),
       loggedAt: DateTime.parse(row['logged_at'] as String),
       action: row['action'] as String,
@@ -340,7 +345,9 @@ class CareService {
     try {
       await _client.from('profiles').upsert({
         'user_id': user.id,
-        'display_name': name?.trim().isNotEmpty == true ? name!.trim() : user.email,
+        'display_name': name?.trim().isNotEmpty == true
+            ? name!.trim()
+            : user.email,
         'timezone': ?timezone,
         'last_seen_at': DateTime.now().toUtc().toIso8601String(),
       });
@@ -582,6 +589,10 @@ class CareService {
     required List<String> times,
     required List<int> daysOfWeek,
     required int? intervalHours,
+    String? status,
+    DateTime? startDate,
+    DateTime? endDate,
+    DateTime? pauseUntil,
     required DateTime savedAt,
     DateTime? medicineCreatedAt,
     DateTime? scheduleCreatedAt,
@@ -614,7 +625,14 @@ class CareService {
         'times': times,
         'days_of_week': daysOfWeek,
         'interval_hours': intervalHours,
-        'active': true,
+        'status': status,
+        'start_date': startDate == null ? null : _isoUtc(startDate),
+        'end_date': endDate == null ? null : _isoUtc(endDate),
+        'pause_until': pauseUntil == null ? null : _isoUtc(pauseUntil),
+        'active':
+            status == null ||
+            status == ReminderStatus.active.name ||
+            status == ReminderStatus.asNeeded.name,
         'created_at': scheduleCreated,
         'updated_at': stamp,
         'updated_by': caller,
@@ -635,7 +653,9 @@ class CareService {
           .eq('medicine_id', medicineId)
           .order('created_at', ascending: false)
           .limit(100);
-      return rows.map((r) => MedicineEdit.fromRow(Map<String, dynamic>.from(r))).toList();
+      return rows
+          .map((r) => MedicineEdit.fromRow(Map<String, dynamic>.from(r)))
+          .toList();
     } catch (e) {
       throw CareLinkFailure(_describe(e));
     }
@@ -647,14 +667,17 @@ class CareService {
     final user = _client.auth.currentUser;
     if (user == null) return;
     try {
-      await _client.from('profiles').update({
-        'notifications_allowed': health.notificationsAllowed,
-        'exact_alarms_allowed': health.exactAlarmsAllowed,
-        'battery_exemption': health.batteryExemption,
-        'armed_alarm_count': health.armedAlarmCount,
-        'health_checked_at': _isoUtc(health.checkedAt),
-        'last_seen_at': _isoUtc(health.checkedAt),
-      }).eq('user_id', user.id);
+      await _client
+          .from('profiles')
+          .update({
+            'notifications_allowed': health.notificationsAllowed,
+            'exact_alarms_allowed': health.exactAlarmsAllowed,
+            'battery_exemption': health.batteryExemption,
+            'armed_alarm_count': health.armedAlarmCount,
+            'health_checked_at': _isoUtc(health.checkedAt),
+            'last_seen_at': _isoUtc(health.checkedAt),
+          })
+          .eq('user_id', user.id);
     } catch (_) {
       // Same as upsertOwnProfile: never block a foreground on this.
     }
@@ -670,14 +693,21 @@ class CareService {
     final fields = sanitiseScheduleFields(
       frequencyType: row['frequency_type'] as String?,
       times: (row['times'] as List?)?.whereType<String>().toList() ?? const [],
-      daysOfWeek: (row['days_of_week'] as List?)?.whereType<num>().map((e) => e.toInt()).toList() ??
+      daysOfWeek:
+          (row['days_of_week'] as List?)
+              ?.whereType<num>()
+              .map((e) => e.toInt())
+              .toList() ??
           const [],
       intervalHours: _asInt(row['interval_hours']),
     );
     if (fields == null) return null;
-    final medicineUpdated = _asDate(medicineRow['updated_at']) ?? DateTime.fromMillisecondsSinceEpoch(0);
+    final medicineUpdated =
+        _asDate(medicineRow['updated_at']) ??
+        DateTime.fromMillisecondsSinceEpoch(0);
     final scheduleUpdated = _asDate(row['updated_at']) ?? medicineUpdated;
-    final medicineCreated = _asDate(medicineRow['created_at']) ?? medicineUpdated;
+    final medicineCreated =
+        _asDate(medicineRow['created_at']) ?? medicineUpdated;
     final scheduleCreated = _asDate(row['created_at']) ?? scheduleUpdated;
     final medicine = Medicine(
       id: medicineRow['id'] as String,
@@ -701,6 +731,10 @@ class CareService {
       times: fields.times,
       daysOfWeek: fields.daysOfWeek,
       intervalHours: fields.intervalHours,
+      status: row['status'] as String?,
+      startDate: _asDate(row['start_date']),
+      endDate: _asDate(row['end_date']),
+      pauseUntil: _asDate(row['pause_until']),
       active: row['active'] as bool? ?? true,
       createdAt: scheduleCreated,
       updatedAt: scheduleUpdated,

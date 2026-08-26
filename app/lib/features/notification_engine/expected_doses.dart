@@ -1,18 +1,14 @@
 import '../../data/local/database.dart';
 import '../../data/local/tables.dart';
+import '../../data/local/lifecycle.dart';
 import 'interval_dose_sequence.dart';
 import 'schedule_validation.dart';
 
 /// Builds a civil wall time. The default is the device's local [DateTime].
 /// A caregiver viewing someone in another zone passes a constructor that
 /// yields `TZDateTime`s in that zone, so "08:00" is their morning, not ours.
-typedef WallClock = DateTime Function(
-  int year,
-  int month,
-  int day,
-  int hour,
-  int minute,
-);
+typedef WallClock =
+    DateTime Function(int year, int month, int day, int hour, int minute);
 
 DateTime _localWallClock(int year, int month, int day, int hour, int minute) =>
     DateTime(year, month, day, hour, minute);
@@ -36,7 +32,12 @@ List<DateTime> expectedDoses(
   required DateTime to,
   WallClock? wallClock,
 }) {
-  if (!schedule.active || schedule.times.isEmpty) return const [];
+  if (reminderStatus(schedule, now: from) != ReminderStatus.active ||
+      !schedule.active ||
+      (schedule.endDate != null && !schedule.endDate!.isAfter(from)) ||
+      schedule.times.isEmpty) {
+    return const [];
+  }
   final clock = wallClock ?? _localWallClock;
 
   // A row stored before these fields were validated can still be here, and a
@@ -47,13 +48,18 @@ List<DateTime> expectedDoses(
   if (frequency == null) return const [];
   switch (frequency) {
     case FrequencyType.daily:
-      return _atClockTimes(schedule.times, from: from, to: to, wallClock: clock);
+      return _atClockTimes(
+        schedule.times,
+        from: _afterStart(schedule, from),
+        to: _beforeEnd(schedule, to),
+        wallClock: clock,
+      );
     case FrequencyType.specificDays:
       if (schedule.daysOfWeek.isEmpty) return const [];
       return _atClockTimes(
         schedule.times,
-        from: from,
-        to: to,
+        from: _afterStart(schedule, from),
+        to: _beforeEnd(schedule, to),
         onDays: schedule.daysOfWeek.toSet(),
         wallClock: clock,
       );
@@ -74,12 +80,22 @@ List<DateTime> expectedDoses(
       return intervalDoseSequence(
         origin: origin,
         intervalHours: interval,
-        from: from,
-        to: to,
+        from: _afterStart(schedule, from),
+        to: _beforeEnd(schedule, to),
       );
     case FrequencyType.asNeeded:
       return const [];
   }
+}
+
+DateTime _afterStart(Schedule schedule, DateTime from) {
+  final start = schedule.startDate;
+  return start != null && start.isAfter(from) ? start : from;
+}
+
+DateTime _beforeEnd(Schedule schedule, DateTime to) {
+  final end = schedule.endDate;
+  return end != null && end.isBefore(to) ? end : to;
 }
 
 /// Every occurrence of the given "HH:mm" times falling inside the window,
