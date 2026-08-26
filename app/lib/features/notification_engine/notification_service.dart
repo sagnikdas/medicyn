@@ -381,7 +381,7 @@ class NotificationService {
             ),
             AndroidNotificationAction(
               actionSnooze,
-              'Snooze 10m',
+              'Snooze ${AppSettings.instance.snoozeMinutes}m',
               showsUserInterface: true,
             ),
           ],

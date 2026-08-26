@@ -56,7 +56,7 @@ class MissedDoseDetector {
   /// foreground, so the dose is judged on the next one once the snooze has
   /// lapsed. The calendar draws the same distinction — see
   /// `_statusFromRecord` in day_occurrences.dart.
-  static bool _answersTheDose(DoseLog log, DateTime at) {
+  static bool _answersTheDose(DoseLog log, DateTime at, Duration snoozeWindow) {
     if (log.action != DoseAction.snoozed.name) return true;
     return log.loggedAt.add(snoozeWindow).isAfter(at);
   }
@@ -98,7 +98,12 @@ class MissedDoseDetector {
   /// Idempotent: ids are derived from the schedule and the due time, so two
   /// sweeps — or two devices signed into the same account — converge on the
   /// same row rather than filling the feed with duplicates.
-  Future<int> sweep(AppDatabase db, {DateTime? now, Duration? lookback}) async {
+  Future<int> sweep(
+    AppDatabase db, {
+    DateTime? now,
+    Duration? lookback,
+    Duration snoozeWindow = MissedDoseDetector.snoozeWindow,
+  }) async {
     final at = now ?? DateTime.now();
     final windowStart = at.subtract(lookback ?? MissedDoseDetector.lookback);
     // Nothing within the grace period is judged yet.
@@ -119,11 +124,7 @@ class MissedDoseDetector {
       final schedule = item.schedule;
       // Look a little past the cutoff so each occurrence knows when the next
       // one was, which is what bounds its answering window.
-      final occurrences = expectedDoses(
-        schedule,
-        from: windowStart,
-        to: at,
-      );
+      final occurrences = expectedDoses(schedule, from: windowStart, to: at);
       if (occurrences.isEmpty) continue;
 
       final scheduleLogs = byScheduleId[schedule.id] ?? const <DoseLog>[];
@@ -142,18 +143,20 @@ class MissedDoseDetector {
           (log) =>
               !log.loggedAt.isBefore(due) &&
               log.loggedAt.isBefore(nextDue) &&
-              _answersTheDose(log, at),
+              _answersTheDose(log, at, snoozeWindow),
         );
         if (answered) continue;
 
-        missed.add(DoseLogsCompanion.insert(
-          id: missedDoseId(schedule.id, due),
-          scheduleId: schedule.id,
-          scheduledAt: due,
-          action: DoseAction.missed.name,
-          loggedAt: Value(due.add(grace)),
-          source: const Value('auto'),
-        ));
+        missed.add(
+          DoseLogsCompanion.insert(
+            id: missedDoseId(schedule.id, due),
+            scheduleId: schedule.id,
+            scheduledAt: due,
+            action: DoseAction.missed.name,
+            loggedAt: Value(due.add(grace)),
+            source: const Value('auto'),
+          ),
+        );
         if (missed.length >= _maxPerSweep) break;
       }
       if (missed.length >= _maxPerSweep) break;
@@ -173,10 +176,7 @@ class MissedDoseDetector {
 /// bits of uuid, and two occurrences of one schedule can't without colliding
 /// the hash of two different timestamps.
 String missedDoseId(String scheduleId, DateTime scheduledAt) =>
-    _deterministicDoseLogId(
-      scheduleId,
-      scheduledAt.toUtc().toIso8601String(),
-    );
+    _deterministicDoseLogId(scheduleId, scheduledAt.toUtc().toIso8601String());
 
 /// The same idea for an answer the user gave: one row per dose occurrence
 /// per kind of answer.
@@ -193,11 +193,14 @@ String missedDoseId(String scheduleId, DateTime scheduledAt) =>
 /// ids are how two devices and the server agree that they are looking at the
 /// same missed dose, so they have to keep hashing exactly what they always
 /// hashed.
-String doseLogIdFor(String scheduleId, DateTime scheduledAt, DoseAction action) =>
-    _deterministicDoseLogId(
-      scheduleId,
-      '${action.name}|${scheduledAt.toUtc().toIso8601String()}',
-    );
+String doseLogIdFor(
+  String scheduleId,
+  DateTime scheduledAt,
+  DoseAction action,
+) => _deterministicDoseLogId(
+  scheduleId,
+  '${action.name}|${scheduledAt.toUtc().toIso8601String()}',
+);
 
 String _deterministicDoseLogId(String scheduleId, String seed) {
   final hex = scheduleId.replaceAll('-', '').toLowerCase();
@@ -213,7 +216,8 @@ String _deterministicDoseLogId(String scheduleId, String seed) {
     hash = (hash * 0x01000193) & 0xffffffff;
   }
 
-  final combined = hex.substring(0, 24) + hash.toRadixString(16).padLeft(8, '0');
+  final combined =
+      hex.substring(0, 24) + hash.toRadixString(16).padLeft(8, '0');
   return '${combined.substring(0, 8)}-${combined.substring(8, 12)}-'
       '${combined.substring(12, 16)}-${combined.substring(16, 20)}-'
       '${combined.substring(20, 32)}';

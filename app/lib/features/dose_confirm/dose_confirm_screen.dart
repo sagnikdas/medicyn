@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/app_settings.dart';
 import '../../core/motion.dart';
 import '../../core/widgets/dosely_layout.dart';
 import '../../core/widgets/dosely_motion.dart';
@@ -89,10 +90,12 @@ class _DoseConfirmScreenState extends State<DoseConfirmScreen> {
     if (!taken) {
       Navigator.of(context).maybePop();
       try {
+        final delay = Duration(minutes: AppSettings.instance.snoozeMinutes);
         await recordDoseSnoozed(
           widget.db,
           scheduleId: widget.scheduleId,
           scheduledAt: widget.scheduledAt,
+          delay: delay,
         );
       } finally {
         _closeDb();
@@ -218,7 +221,7 @@ class _DoseConfirmScreenState extends State<DoseConfirmScreen> {
           const SizedBox(height: 12),
           OutlinedButton(
             onPressed: _submitting ? null : () => _respond(false),
-            child: const Text('Snooze 10m'),
+            child: Text('Snooze ${AppSettings.instance.snoozeMinutes}m'),
           ),
         ],
       ),

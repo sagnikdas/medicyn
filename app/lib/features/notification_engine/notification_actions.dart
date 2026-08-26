@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import '../../core/app_navigation.dart';
+import '../../core/app_settings.dart';
 import '../../data/local/database.dart';
 import '../../data/local/tables.dart';
 import '../care/dose_feed_screen.dart';
@@ -97,10 +98,18 @@ Future<void> handleNotificationResponse(NotificationResponse response) async {
   final db = AppDatabase();
   try {
     if (actionId == actionTaken) {
-      await recordDoseTaken(db, scheduleId: scheduleId, scheduledAt: scheduledAt);
+      await recordDoseTaken(
+        db,
+        scheduleId: scheduleId,
+        scheduledAt: scheduledAt,
+      );
       return;
     }
-    await recordDoseSnoozed(db, scheduleId: scheduleId, scheduledAt: scheduledAt);
+    await recordDoseSnoozed(
+      db,
+      scheduleId: scheduleId,
+      scheduledAt: scheduledAt,
+    );
   } finally {
     await db.close();
   }
@@ -148,8 +157,14 @@ Future<void> recordDoseSnoozed(
   AppDatabase db, {
   required String scheduleId,
   required DateTime scheduledAt,
-  Duration delay = MissedDoseDetector.snoozeWindow,
+  Duration? delay,
 }) async {
+  // Notification actions can run in a background isolate, where the app
+  // startup path has not loaded preferences yet. Resolve the configured
+  // duration here so tray actions and in-app actions behave identically.
+  if (delay == null) await AppSettings.instance.init();
+  final effectiveDelay =
+      delay ?? Duration(minutes: AppSettings.instance.snoozeMinutes);
   await db.recordDoseAction(
     id: doseLogIdFor(scheduleId, scheduledAt, DoseAction.snoozed),
     scheduleId: scheduleId,
@@ -164,7 +179,7 @@ Future<void> recordDoseSnoozed(
   await NotificationService.instance.scheduleSnooze(
     scheduleId: scheduleId,
     medicine: medicine,
-    delay: delay,
+    delay: effectiveDelay,
     scheduledAt: scheduledAt,
   );
 }

@@ -196,7 +196,10 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
     // Before the push, so a dose recorded as missed goes up in the same pass
     // and reaches the other side without waiting for another foreground.
-    await const MissedDoseDetector().sweep(widget.db);
+    await const MissedDoseDetector().sweep(
+      widget.db,
+      snoozeWindow: Duration(minutes: AppSettings.instance.snoozeMinutes),
+    );
     if (sync == null) return;
     await sync.syncAll();
     if (syncOwner != null) {
@@ -483,6 +486,7 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     required List<DoseLog> logs,
   }) {
     final now = DateTime.now();
+    final snoozeWindow = Duration(minutes: AppSettings.instance.snoozeMinutes);
     final records = <DoseRecord>[
       for (final log in logs) ?DoseRecord.tryFromLog(log),
     ];
@@ -495,6 +499,7 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       rangeStart: rangeStart,
       rangeEnd: rangeEnd,
       now: now,
+      snoozeWindow: snoozeWindow,
     );
     final calendarMarks = {
       for (final e in cellMarks.entries)
@@ -511,6 +516,7 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       index: logIndex,
       day: _selectedDay,
       now: now,
+      snoozeWindow: snoozeWindow,
     );
     final today = calendarDay(now);
     final todayOccs = isSameCalendarDay(_selectedDay, now)
@@ -520,12 +526,14 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             logs: records,
             day: today,
             now: now,
+            snoozeWindow: snoozeWindow,
           );
     final yesterdayOccs = occurrencesOnDay(
       items: schedules,
       logs: records,
       day: addCalendarDays(today, -1),
       now: now,
+      snoozeWindow: snoozeWindow,
     );
     final allAttention = attentionDoses(
       today: todayOccs,
