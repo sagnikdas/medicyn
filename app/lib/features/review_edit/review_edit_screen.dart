@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 
 import '../../core/ids.dart';
 import '../../core/motion.dart';
+import '../../core/telemetry.dart';
 import '../../core/widgets/dosely_layout.dart';
 import '../../core/widgets/dosely_motion.dart';
 import '../../data/local/database.dart';
@@ -336,9 +337,15 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _saving = false);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Could not save: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            e is UnschedulableSchedule
+                ? 'This reminder needs a valid frequency, time, or interval.'
+                : 'Could not save this reminder. Check the details and try again.',
+          ),
+        ),
+      );
     }
   }
 
@@ -351,6 +358,10 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
     if (permission.notificationsAllowed && permission.exactAlarmsAllowed) {
       return;
     }
+    await DoselyTelemetry.instance.record(
+      DoselyEvent.permissionPrompted,
+      properties: {'permission_type': 'reminder_access'},
+    );
     if (!mounted) return;
     final proceed = await showDialog<bool>(
       context: context,
@@ -379,6 +390,16 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
     if (!permission.exactAlarmsAllowed) {
       await NotificationService.instance.requestExactAlarmPermission();
     }
+    final after = await NotificationService.instance.readPermissionState();
+    await DoselyTelemetry.instance.record(
+      DoselyEvent.permissionResult,
+      properties: {
+        'permission_type': 'reminder_access',
+        'result': after.notificationsAllowed
+            ? 'notifications_granted'
+            : 'notifications_denied',
+      },
+    );
   }
 
   Future<void> _saveRemote() async {
@@ -500,8 +521,10 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
         // the save or strand the spinner — surface it and move on.
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Saved, but the alarm could not be scheduled: $e'),
+            const SnackBar(
+              content: Text(
+                'Saved, but the reminder could not be armed. Check Reminder reliability in Settings.',
+              ),
             ),
           );
         }

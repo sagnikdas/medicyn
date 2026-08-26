@@ -14,6 +14,7 @@ import '../../data/local/database.dart';
 import '../../data/local/tables.dart';
 import 'device_health.dart';
 import 'interval_dose_sequence.dart';
+import 'missed_doses.dart';
 import 'notification_actions.dart';
 import 'notification_ids.dart';
 import 'schedule_validation.dart';
@@ -381,7 +382,7 @@ class NotificationService {
             ),
             AndroidNotificationAction(
               actionSnooze,
-              'Snooze 10m',
+              'Snooze ${AppSettings.instance.snoozeMinutes}m',
               showsUserInterface: true,
             ),
           ],
@@ -679,6 +680,69 @@ class NotificationService {
     }
   }
 
+  /// Removes snooze alarms that no longer represent an active dose occurrence.
+  ///
+  /// Ordinary reconciliation deliberately preserves snoozes because they are
+  /// one-off alarms that are not regenerated from a schedule. That exception
+  /// must not preserve an alarm after a schedule edit/deactivation, or after
+  /// the dose was marked Taken through Home: those paths otherwise leave a
+  /// false re-reminder behind. This also covers edits arriving through the
+  /// caregiver sync path, where [cancelForSchedule] is not called locally.
+  Future<void> _cancelInvalidSnoozes(
+    AppDatabase db,
+    List<ScheduleWithMedicine> active,
+  ) async {
+    final activeById = {
+      for (final item in active) item.schedule.id: item.schedule,
+    };
+    final pending = await _plugin.pendingNotificationRequests();
+    for (final request in pending) {
+      final payloadRaw = request.payload;
+      if (payloadRaw == null || payloadRaw.isEmpty) continue;
+      final Map<String, dynamic> payload;
+      try {
+        payload = jsonDecode(payloadRaw) as Map<String, dynamic>;
+      } catch (_) {
+        continue;
+      }
+      if (payload['timeLabel'] != snoozeTimeLabel) continue;
+      final scheduleId = payload['scheduleId'] as String?;
+      if (scheduleId == null || scheduleId.isEmpty) continue;
+
+      var invalid = !activeById.containsKey(scheduleId);
+      final rawScheduledAt = payload['scheduledAt'] as String?;
+      final scheduledAt = rawScheduledAt == null
+          ? null
+          : DateTime.tryParse(rawScheduledAt)?.toLocal();
+      // Every snooze armed by this build carries the exact occurrence. A
+      // malformed/legacy payload cannot be matched safely, so discard it
+      // instead of allowing an untraceable re-reminder to survive a sweep.
+      if (scheduledAt == null) invalid = true;
+      final schedule = activeById[scheduleId];
+
+      if (!invalid) {
+        // A schedule may have several daily occurrences, each with its own
+        // valid snooze. Looking only at the schedule's latest log would
+        // incorrectly cancel every older occurrence when a later one was
+        // snoozed, so resolve the deterministic log for this exact slot.
+        final log = await db.doseLogById(
+          doseLogIdFor(scheduleId, scheduledAt!, DoseAction.snoozed),
+        );
+        invalid = log == null || log.action != DoseAction.snoozed.name;
+        if (!invalid) {
+          // Compare the response time, not only the dose's due time. A
+          // future dose can be snoozed before a reminder edit; its due time
+          // is still after updatedAt, but the snooze itself is stale and must
+          // not mask the newly edited reminder.
+          invalid =
+              log.loggedAt.isBefore(schedule!.updatedAt) ||
+              !log.scheduledAt.isAtSameMomentAs(scheduledAt);
+        }
+      }
+      if (invalid) await _plugin.cancel(id: request.id);
+    }
+  }
+
   /// Arms the one re-reminder for [scheduledAt]'s dose, [delay] from now.
   ///
   /// The id is derived from the dose, not from the moment of the tap. It used
@@ -696,15 +760,35 @@ class NotificationService {
     await init();
     await _requireTimezone();
     final copy = await _copyFor(medicine);
+    // Snoozes must use the same exact/inexact permission fallback as normal
+    // reminders. Requesting exactAllowWhileIdle unconditionally could record
+    // the snooze but fail to arm its re-reminder when special access is off.
+    final scheduleMode = await _scheduleMode();
     await _plugin.zonedSchedule(
       id: snoozeNotificationId(scheduleId, scheduledAt),
       title: copy.title,
       body: copy.body,
       scheduledDate: tz.TZDateTime.now(tz.local).add(delay),
       notificationDetails: _details(visibility: copy.visibility),
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      androidScheduleMode: scheduleMode,
       payload: _payload(scheduleId, snoozeTimeLabel, scheduledAt),
     );
+  }
+
+  /// Cancels the one-off re-reminder for a dose that was answered by another
+  /// path (for example Mark as Taken from Home while it is snoozed).
+  /// Missing-plugin hosts and an already-fired notification are harmless.
+  Future<void> cancelSnooze({
+    required String scheduleId,
+    required DateTime scheduledAt,
+  }) async {
+    try {
+      await init();
+      await _plugin.cancel(id: snoozeNotificationId(scheduleId, scheduledAt));
+    } catch (_) {
+      // The dose action is already persisted; reconcile will clean up any
+      // stale platform alarm on the next foreground if cancellation failed.
+    }
   }
 
   /// Shows a care alert this device received while in the foreground.
@@ -841,6 +925,7 @@ class NotificationService {
     // opening the app meant the reminder never came back. A snooze for a
     // schedule that is genuinely going away is still cancelled, by
     // [cancelForSchedule] on the stop/delete path.
+    await _cancelInvalidSnoozes(db, active);
     await _cancelWhere((_, payload) => payload['timeLabel'] != snoozeTimeLabel);
 
     // Every schedule gets its own try/catch, because the sweep above has

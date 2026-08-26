@@ -8,13 +8,13 @@ import '../../core/widgets/dosely_chrome.dart';
 import '../../core/widgets/dosely_motion.dart';
 import '../../core/telemetry.dart';
 import '../../data/local/database.dart';
+import '../../data/local/tables.dart';
 import '../../data/remote/care_notifier.dart';
 import '../../data/remote/sync_service.dart';
+import '../../data/remote/sync_status.dart';
 import '../auth/auth_service.dart';
 import '../capture_ocr/ocr_capture_screen.dart';
 import '../care/care_service.dart';
-import '../consent/consent_purpose.dart';
-import '../consent/consent_service.dart';
 import '../history/dose_history_screen.dart';
 import '../notification_engine/missed_doses.dart';
 import '../notification_engine/notification_actions.dart';
@@ -32,6 +32,8 @@ import 'dose_calendar.dart';
 import 'refill.dart';
 
 enum _ReminderDisposition { stop, deleteHistory }
+
+enum _CaptureMethod { scan, speak, manual }
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
@@ -75,11 +77,14 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   final _scroll = ScrollController();
   bool _calendarMonth = false;
   List<DayOccurrence> _ringIfLeft = const [];
+  final _dismissedAttentionUntil = <String, DateTime>{};
+  final _attentionScheduleVersions = <String, DateTime>{};
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    doseResponseEvents.addListener(_onDoseResponse);
     _bootstrap(firstLoad: true);
     // Upcoming → pending has to flip when the clock time passes, not only
     // when the user comes back from another screen. Fifteen seconds is
@@ -97,8 +102,25 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void dispose() {
     _clock?.cancel();
     _scroll.dispose();
+    doseResponseEvents.removeListener(_onDoseResponse);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  void _onDoseResponse() {
+    final event = doseResponseEvents.value;
+    if (!mounted || event == null || event.action != DoseAction.snoozed) {
+      return;
+    }
+    final delay = Duration(minutes: AppSettings.instance.snoozeMinutes);
+    setState(() {
+      _dismissedAttentionUntil[_attentionKeyForValues(
+        event.scheduleId,
+        event.scheduledAt,
+      )] = DateTime.now().add(
+        delay,
+      );
+    });
   }
 
   @override
@@ -138,6 +160,12 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       unawaited(PushService.instance.registerToken());
     }
     final sync = signedIn ? SyncService(widget.db) : null;
+    final syncOwner = AppSettings.instance.consentOwnerId;
+    if (sync != null &&
+        syncOwner != null &&
+        AppSettings.instance.consentCloudBackup) {
+      await SyncStatusStore.instance.markSyncing(syncOwner);
+    }
     // Pull before reconcile: a fresh install/new device has no local
     // schedules yet, so restoring them from Supabase first means reconcile
     // arms their alarms in this same pass instead of waiting for the next
@@ -188,9 +216,19 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
     // Before the push, so a dose recorded as missed goes up in the same pass
     // and reaches the other side without waiting for another foreground.
-    await const MissedDoseDetector().sweep(widget.db);
+    await const MissedDoseDetector().sweep(
+      widget.db,
+      snoozeWindow: Duration(minutes: AppSettings.instance.snoozeMinutes),
+    );
     if (sync == null) return;
     await sync.syncAll();
+    if (syncOwner != null) {
+      await SyncStatusStore.instance.refresh(
+        ownerId: syncOwner,
+        db: widget.db,
+        successful: AppSettings.instance.consentCloudBackup,
+      );
+    }
 
     // Care alerts name dose-log ids the server reads back. Without cloud
     // backup there is no push, so there is nothing to announce.
@@ -275,29 +313,90 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Future<void> delete(ScheduleWithMedicine item) => _delete(item);
 
   Future<void> _startCapture() async {
-    final ocrText = await Navigator.of(
-      context,
-    ).push<String>(MaterialPageRoute(builder: (_) => const OcrCaptureScreen()));
-    if (ocrText == null || !mounted) return;
-
-    var transcript = '';
-    if (ConsentService.instance.isGranted(ConsentPurpose.googleSpeech)) {
-      final spoken = await Navigator.of(context).push<String>(
-        MaterialPageRoute(builder: (_) => const VoiceCaptureScreen()),
-      );
-      if (spoken == null || !mounted) return;
-      transcript = spoken;
-    }
-
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => ReviewEditScreen(
-          ocrText: ocrText,
-          transcript: transcript,
-          db: widget.db,
+    // Selecting a method is intentionally separate from opening the capture
+    // screen: camera and microphone permissions are requested only after the
+    // user has made that choice.
+    final method = await showModalBottomSheet<_CaptureMethod>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'How do you want to add it?',
+                style: Theme.of(sheetContext).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Choose one. You can check every detail before saving.',
+                style: Theme.of(sheetContext).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 12),
+              ListTile(
+                minTileHeight: 56,
+                leading: const Icon(Icons.document_scanner_outlined),
+                title: const Text('Scan label'),
+                subtitle: const Text('Use your camera to read the label'),
+                onTap: () => Navigator.pop(sheetContext, _CaptureMethod.scan),
+              ),
+              ListTile(
+                minTileHeight: 56,
+                leading: const Icon(Icons.mic_outlined),
+                title: const Text('Speak details'),
+                subtitle: const Text('Say the medicine and schedule'),
+                onTap: () => Navigator.pop(sheetContext, _CaptureMethod.speak),
+              ),
+              ListTile(
+                minTileHeight: 56,
+                leading: const Icon(Icons.edit_outlined),
+                title: const Text('Enter manually'),
+                subtitle: const Text('Type the details yourself'),
+                onTap: () => Navigator.pop(sheetContext, _CaptureMethod.manual),
+              ),
+            ],
+          ),
         ),
       ),
     );
+    if (!mounted || method == null) return;
+
+    await DoselyTelemetry.instance.record(
+      DoselyEvent.addStarted,
+      properties: {'method': method.name},
+    );
+    if (!mounted) return;
+    final navigator = Navigator.of(context);
+    switch (method) {
+      case _CaptureMethod.scan:
+        final ocrText = await navigator.push<String>(
+          MaterialPageRoute(builder: (_) => const OcrCaptureScreen()),
+        );
+        if (ocrText == null || !mounted) return;
+        await navigator.push(
+          MaterialPageRoute(
+            builder: (_) => ReviewEditScreen(ocrText: ocrText, db: widget.db),
+          ),
+        );
+      case _CaptureMethod.speak:
+        final transcript = await navigator.push<String>(
+          MaterialPageRoute(builder: (_) => const VoiceCaptureScreen()),
+        );
+        if (transcript == null || !mounted) return;
+        await navigator.push(
+          MaterialPageRoute(
+            builder: (_) =>
+                ReviewEditScreen(transcript: transcript, db: widget.db),
+          ),
+        );
+      case _CaptureMethod.manual:
+        await navigator.push(
+          MaterialPageRoute(builder: (_) => ReviewEditScreen(db: widget.db)),
+        );
+    }
   }
 
   Future<void> _edit(ScheduleWithMedicine item) => Navigator.of(context).push(
@@ -406,7 +505,30 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     required List<ScheduleWithMedicine> schedules,
     required List<DoseLog> logs,
   }) {
+    // A snooze dismissal is tied to the reminder version the user answered.
+    // If that reminder is edited while the same occurrence is still visible,
+    // clear the old attention suppression so the new definition can surface
+    // immediately instead of waiting for the old snooze timeout.
+    final scheduleVersions = {
+      for (final item in schedules) item.schedule.id: item.schedule.updatedAt,
+    };
+    final editedScheduleIds = <String>{};
+    for (final entry in scheduleVersions.entries) {
+      final previous = _attentionScheduleVersions[entry.key];
+      if (previous != null && previous != entry.value) {
+        editedScheduleIds.add(entry.key);
+      }
+    }
+    if (editedScheduleIds.isNotEmpty) {
+      _dismissedAttentionUntil.removeWhere(
+        (key, _) => editedScheduleIds.contains(key.split('|').first),
+      );
+    }
+    _attentionScheduleVersions
+      ..clear()
+      ..addAll(scheduleVersions);
     final now = DateTime.now();
+    final snoozeWindow = Duration(minutes: AppSettings.instance.snoozeMinutes);
     final records = <DoseRecord>[
       for (final log in logs) ?DoseRecord.tryFromLog(log),
     ];
@@ -419,6 +541,7 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       rangeStart: rangeStart,
       rangeEnd: rangeEnd,
       now: now,
+      snoozeWindow: snoozeWindow,
     );
     final calendarMarks = {
       for (final e in cellMarks.entries)
@@ -435,6 +558,7 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       index: logIndex,
       day: _selectedDay,
       now: now,
+      snoozeWindow: snoozeWindow,
     );
     final today = calendarDay(now);
     final todayOccs = isSameCalendarDay(_selectedDay, now)
@@ -444,17 +568,32 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             logs: records,
             day: today,
             now: now,
+            snoozeWindow: snoozeWindow,
           );
     final yesterdayOccs = occurrencesOnDay(
       items: schedules,
       logs: records,
       day: addCalendarDays(today, -1),
       now: now,
+      snoozeWindow: snoozeWindow,
     );
-    final attention = attentionDoses(
+    final allAttention = attentionDoses(
       today: todayOccs,
       yesterday: yesterdayOccs,
     );
+    final nowForAttention = DateTime.now();
+    _dismissedAttentionUntil.removeWhere(
+      (_, until) => !until.isAfter(nowForAttention),
+    );
+    final attention = [
+      for (final occurrence in allAttention)
+        if (occurrence.status != DayDoseStatus.snoozed &&
+            !(_dismissedAttentionUntil[_attentionKey(occurrence)]?.isAfter(
+                  nowForAttention,
+                ) ??
+                false))
+          occurrence,
+    ];
     _ringIfLeft = [
       for (final o in attention)
         if (doseStillRings(o.status)) o,
@@ -617,11 +756,33 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _snooze(DayOccurrence occurrence) async {
-    await recordDoseSnoozed(
-      widget.db,
-      scheduleId: occurrence.item.schedule.id,
-      scheduledAt: occurrence.scheduledAt,
-    );
+    final delay = Duration(minutes: AppSettings.instance.snoozeMinutes);
+    // Remove the card before waiting on SQLite or the notification plugin.
+    // The scheduled one-off reminder remains the way this dose returns to the
+    // user's attention after the snooze window.
+    if (mounted) {
+      setState(() {
+        _dismissedAttentionUntil[_attentionKey(occurrence)] = DateTime.now()
+            .add(delay);
+      });
+    }
+    try {
+      await recordDoseSnoozed(
+        widget.db,
+        scheduleId: occurrence.item.schedule.id,
+        scheduledAt: occurrence.scheduledAt,
+        delay: delay,
+      );
+    } catch (_) {
+      // If saving the snooze failed, restore the card so the dose is still
+      // actionable instead of silently hiding it.
+      if (mounted) {
+        setState(
+          () => _dismissedAttentionUntil.remove(_attentionKey(occurrence)),
+        );
+      }
+      rethrow;
+    }
     if (AuthService.instance.currentUser == null) return;
     unawaited(SyncService(widget.db).syncAll());
   }
@@ -692,6 +853,12 @@ class _ReminderHealthCard extends StatelessWidget {
     );
   }
 }
+
+String _attentionKey(DayOccurrence occurrence) =>
+    _attentionKeyForValues(occurrence.item.schedule.id, occurrence.scheduledAt);
+
+String _attentionKeyForValues(String scheduleId, DateTime scheduledAt) =>
+    '$scheduleId|${scheduledAt.toUtc().toIso8601String()}';
 
 class _NextDoseCard extends StatefulWidget {
   const _NextDoseCard({required this.occurrence, required this.onMarkTaken});

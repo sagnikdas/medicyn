@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/app_settings.dart';
 import '../../core/motion.dart';
 import '../../core/widgets/dosely_layout.dart';
 import '../../core/widgets/dosely_motion.dart';
@@ -35,6 +36,11 @@ class _DoseConfirmScreenState extends State<DoseConfirmScreen> {
   bool _loading = true;
   bool _notFound = false;
   bool _submitting = false;
+  // A snooze dismisses this route before the platform alarm call completes.
+  // Keep ownership of the short-lived database until that work is finished;
+  // otherwise dispose would close it underneath the write.
+  bool _actionStarted = false;
+  bool _dbClosed = false;
 
   @override
   void initState() {
@@ -44,8 +50,14 @@ class _DoseConfirmScreenState extends State<DoseConfirmScreen> {
 
   @override
   void dispose() {
-    widget.db.close();
+    if (!_actionStarted) _closeDb();
     super.dispose();
+  }
+
+  void _closeDb() {
+    if (_dbClosed) return;
+    _dbClosed = true;
+    widget.db.close();
   }
 
   Future<void> _load() async {
@@ -68,22 +80,39 @@ class _DoseConfirmScreenState extends State<DoseConfirmScreen> {
   }
 
   Future<void> _respond(bool taken) async {
+    if (_submitting) return;
     setState(() => _submitting = true);
-    if (taken) {
+    _actionStarted = true;
+
+    // Snooze is explicitly a "not now" response. Dismiss the prompt first
+    // so a slow notification/database platform call never traps the user in
+    // the alarm screen; the re-reminder is still armed in the background.
+    if (!taken) {
+      Navigator.of(context).maybePop();
+      try {
+        final delay = Duration(minutes: AppSettings.instance.snoozeMinutes);
+        await recordDoseSnoozed(
+          widget.db,
+          scheduleId: widget.scheduleId,
+          scheduledAt: widget.scheduledAt,
+          delay: delay,
+        );
+      } finally {
+        _closeDb();
+      }
+      return;
+    }
+
+    try {
       await recordDoseTaken(
         widget.db,
         scheduleId: widget.scheduleId,
         scheduledAt: widget.scheduledAt,
       );
-    } else {
-      await recordDoseSnoozed(
-        widget.db,
-        scheduleId: widget.scheduleId,
-        scheduledAt: widget.scheduledAt,
-      );
+    } finally {
+      if (mounted) Navigator.of(context).maybePop();
+      _closeDb();
     }
-    if (!mounted) return;
-    Navigator.of(context).maybePop();
   }
 
   @override
@@ -192,7 +221,7 @@ class _DoseConfirmScreenState extends State<DoseConfirmScreen> {
           const SizedBox(height: 12),
           OutlinedButton(
             onPressed: _submitting ? null : () => _respond(false),
-            child: const Text('Snooze 10m'),
+            child: Text('Snooze ${AppSettings.instance.snoozeMinutes}m'),
           ),
         ],
       ),

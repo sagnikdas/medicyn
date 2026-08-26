@@ -215,13 +215,24 @@ List<DayOccurrence> occurrencesOnDay({
               ),
             )
             .toList();
+    // A snooze belongs to the reminder definition that was active when the
+    // user pressed it. If the schedule was edited afterwards, ignore that
+    // old snooze so it cannot hide the newly edited occurrence (the immutable
+    // log remains available in History).
+    final currentScheduleLogs = scheduleLogs
+        .where(
+          (log) =>
+              log.action != DoseAction.snoozed ||
+              !log.loggedAt.isBefore(schedule.updatedAt),
+        )
+        .toList();
     for (var i = 0; i < dues.length; i++) {
       final due = dues[i];
       final nextDue = i + 1 < dues.length ? dues[i + 1] : dayEnd;
       final record = _winningLog(
         due: due,
         nextDue: nextDue,
-        logs: scheduleLogs,
+        logs: currentScheduleLogs,
         now: now,
         snoozeWindow: snoozeWindow,
       );

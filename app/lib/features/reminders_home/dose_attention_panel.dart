@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/app_settings.dart';
 import '../../core/motion.dart';
 import 'day_occurrences.dart';
 import 'reminder_copy.dart';
@@ -159,7 +160,7 @@ class _AttentionCardState extends State<_AttentionCard> {
                 side: BorderSide(color: scheme.onPrimary),
                 minimumSize: const Size.fromHeight(48),
               ),
-              child: const Text('Snooze 10m'),
+              child: Text('Snooze ${AppSettings.instance.snoozeMinutes}m'),
             ),
           ],
         ],

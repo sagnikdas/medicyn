@@ -90,11 +90,11 @@ class _SignInScreenState extends State<SignInScreen> {
                       const SizedBox(height: 12),
                       OutlinedButton(
                         onPressed: _busy ? null : _useWithoutAccount,
-                        child: const Text('Use without an account'),
+                        child: const Text('Add a reminder first'),
                       ),
                       const SizedBox(height: 12),
                       Text(
-                        'Reminders stay on this phone. Backup and family sharing need Google later.',
+                        'Start on this phone without an account. You can sign in later to enable backup and family sharing.',
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ],

@@ -52,26 +52,32 @@ class DoselyAvatarButton extends StatelessWidget {
     final initial = letter.isEmpty
         ? null
         : letter.substring(0, 1).toUpperCase();
-    return InkWell(
-      onTap: onTap,
-      customBorder: const CircleBorder(),
-      child: Ink(
-        width: 32,
-        height: 32,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: scheme.surfaceContainerHighest,
-          border: Border.all(color: scheme.outlineVariant),
-        ),
-        child: Center(
-          child: initial == null
-              ? Icon(Icons.person, size: 18, color: scheme.onSurfaceVariant)
-              : Text(
-                  initial,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.labelLarge?.copyWith(color: scheme.primary),
-                ),
+    return SizedBox(
+      width: 48,
+      height: 48,
+      child: Center(
+        child: InkWell(
+          onTap: onTap,
+          customBorder: const CircleBorder(),
+          child: Ink(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: scheme.surfaceContainerHighest,
+              border: Border.all(color: scheme.outlineVariant),
+            ),
+            child: Center(
+              child: initial == null
+                  ? Icon(Icons.person, size: 18, color: scheme.onSurfaceVariant)
+                  : Text(
+                      initial,
+                      style: Theme.of(
+                        context,
+                      ).textTheme.labelLarge?.copyWith(color: scheme.primary),
+                    ),
+            ),
+          ),
         ),
       ),
     );

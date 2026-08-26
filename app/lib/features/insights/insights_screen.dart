@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/app_settings.dart';
 import '../../core/motion.dart';
 import '../../core/theme.dart';
 import '../../core/widgets/dosely_chrome.dart';
@@ -27,8 +28,8 @@ class InsightsScreen extends StatefulWidget {
 }
 
 class _InsightsScreenState extends State<InsightsScreen> {
-  late final Stream<List<ScheduleWithMedicine>> _schedulesStream =
-      widget.db.watchSchedulesWithMedicines();
+  late final Stream<List<ScheduleWithMedicine>> _schedulesStream = widget.db
+      .watchSchedulesWithMedicines();
   late final Stream<List<DoseLog>> _doseLogsStream = widget.db.watchDoseLogs();
 
   @override
@@ -77,30 +78,53 @@ class _InsightsBody extends StatelessWidget {
     // One index for all five walks below. Each of them would otherwise
     // rebuild it, and consistencyStreak alone walks a year of days.
     final logIndex = DoseRecordIndex(records);
-    final week = weekAdherence(items: schedules, index: logIndex, now: now);
-    final days = weekDayAdherence(items: schedules, index: logIndex, now: now);
+    final snoozeWindow = Duration(minutes: AppSettings.instance.snoozeMinutes);
+    final week = weekAdherence(
+      items: schedules,
+      index: logIndex,
+      now: now,
+      snoozeWindow: snoozeWindow,
+    );
+    final days = weekDayAdherence(
+      items: schedules,
+      index: logIndex,
+      now: now,
+      snoozeWindow: snoozeWindow,
+    );
     final streak = consistencyStreak(
       items: schedules,
       index: logIndex,
       now: now,
+      snoozeWindow: snoozeWindow,
     );
     final missedPart = mostMissedDayPart(
       items: schedules,
       index: logIndex,
       now: now,
+      snoozeWindow: snoozeWindow,
     );
     var missed = 0;
     for (final day in days) {
       if (day.expected > day.taken) missed += day.expected - day.taken;
     }
     final avg = week.expected == 0 ? 0.0 : week.taken / week.expected;
-    final morning = _partRate(
-      days: days,
-      index: logIndex,
-      items: schedules,
-      now: now,
-      part: DayPart.morning,
-    );
+    final partRates = [
+      for (final part in DayPart.values)
+        _partRate(
+          days: days,
+          index: logIndex,
+          items: schedules,
+          now: now,
+          part: part,
+          snoozeWindow: snoozeWindow,
+        ),
+    ];
+    final mostConsistent = partRates
+        .where((part) => part.expected > 0)
+        .fold<({String label, double rate, int expected})?>(
+          null,
+          (best, part) => best == null || part.rate > best.rate ? part : best,
+        );
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
@@ -204,9 +228,9 @@ class _InsightsBody extends StatelessWidget {
                   : 'Every due dose taken, walking back from today.',
             );
             final consistentCard = InsightsMostConsistentCard(
-              label: morning.label,
-              rate: morning.rate,
-              expected: morning.expected,
+              label: mostConsistent?.label ?? 'No doses yet',
+              rate: mostConsistent?.rate ?? 0,
+              expected: mostConsistent?.expected ?? 0,
             );
             final pair = constraints.maxWidth < 420
                 ? Column(
@@ -375,6 +399,7 @@ class _InsightsBody extends StatelessWidget {
     required List<ScheduleWithMedicine> items,
     required DateTime now,
     required DayPart part,
+    required Duration snoozeWindow,
   }) {
     // Re-walk the week for this part only — cheap, and keeps scoring
     // identical to occurrencesOnDay.
@@ -386,6 +411,7 @@ class _InsightsBody extends StatelessWidget {
         index: index,
         day: day.day,
         now: now,
+        snoozeWindow: snoozeWindow,
       );
       for (final o in occs) {
         if (dayPartOf(o.scheduledAt) != part) continue;
@@ -582,7 +608,7 @@ class InsightsMostConsistentCard extends StatelessWidget {
               alignment: Alignment.centerRight,
               child: Text(
                 expected == 0
-                    ? 'No morning doses'
+                    ? 'No scheduled doses'
                     : '${(rate * 100).round()}% taken',
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,

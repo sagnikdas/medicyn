@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import '../../core/app_navigation.dart';
+import '../../core/app_settings.dart';
 import '../../data/local/database.dart';
 import '../../data/local/tables.dart';
 import '../care/dose_feed_screen.dart';
@@ -12,6 +13,24 @@ import '../care/phone_dial.dart';
 import '../dose_confirm/dose_confirm_screen.dart';
 import 'missed_doses.dart';
 import 'notification_service.dart';
+
+/// Foreground screens do not receive Drift invalidation from the short-lived
+/// database connection used by notification taps. This event bridges that
+/// gap immediately; the database row remains the source of truth for later
+/// rebuilds and background-isolate actions.
+final doseResponseEvents = ValueNotifier<DoseResponseEvent?>(null);
+
+class DoseResponseEvent {
+  const DoseResponseEvent({
+    required this.scheduleId,
+    required this.scheduledAt,
+    required this.action,
+  });
+
+  final String scheduleId;
+  final DateTime scheduledAt;
+  final DoseAction action;
+}
 
 /// Runs in a separate background isolate when the user taps a notification
 /// action while the app isn't in the foreground. Per flutter_local_notifications'
@@ -97,10 +116,18 @@ Future<void> handleNotificationResponse(NotificationResponse response) async {
   final db = AppDatabase();
   try {
     if (actionId == actionTaken) {
-      await recordDoseTaken(db, scheduleId: scheduleId, scheduledAt: scheduledAt);
+      await recordDoseTaken(
+        db,
+        scheduleId: scheduleId,
+        scheduledAt: scheduledAt,
+      );
       return;
     }
-    await recordDoseSnoozed(db, scheduleId: scheduleId, scheduledAt: scheduledAt);
+    await recordDoseSnoozed(
+      db,
+      scheduleId: scheduleId,
+      scheduledAt: scheduledAt,
+    );
   } finally {
     await db.close();
   }
@@ -133,6 +160,14 @@ Future<void> recordDoseTaken(
     action: DoseAction.taken,
     source: source,
   );
+  // Taking a dose through Home or the confirmation screen must cancel any
+  // pending snooze re-reminder. The notification action itself is normally
+  // auto-cancelled by Android, but these in-app paths otherwise leave the
+  // one-off alarm armed and produce a false reminder later.
+  await NotificationService.instance.cancelSnooze(
+    scheduleId: scheduleId,
+    scheduledAt: scheduledAt,
+  );
 }
 
 /// Logs the snooze, then arms a one-off reminder [delay] out.
@@ -148,10 +183,33 @@ Future<void> recordDoseSnoozed(
   AppDatabase db, {
   required String scheduleId,
   required DateTime scheduledAt,
-  Duration delay = MissedDoseDetector.snoozeWindow,
+  Duration? delay,
 }) async {
+  // Notification actions can run in a background isolate, where the app
+  // startup path has not loaded preferences yet. Resolve the configured
+  // duration here so tray actions and in-app actions behave identically.
+  if (delay == null) await AppSettings.instance.init();
+  final effectiveDelay =
+      delay ?? Duration(minutes: AppSettings.instance.snoozeMinutes);
   await db.recordDoseAction(
     id: doseLogIdFor(scheduleId, scheduledAt, DoseAction.snoozed),
+    scheduleId: scheduleId,
+    scheduledAt: scheduledAt,
+    action: DoseAction.snoozed,
+  );
+  // A Taken response can arrive just before a delayed Snooze callback. Keep
+  // the audit facts, but never arm a re-reminder for a dose already settled.
+  if (await db.doseLogById(
+        doseLogIdFor(scheduleId, scheduledAt, DoseAction.taken),
+      ) !=
+      null) {
+    await NotificationService.instance.cancelSnooze(
+      scheduleId: scheduleId,
+      scheduledAt: scheduledAt,
+    );
+    return;
+  }
+  doseResponseEvents.value = DoseResponseEvent(
     scheduleId: scheduleId,
     scheduledAt: scheduledAt,
     action: DoseAction.snoozed,
@@ -164,7 +222,7 @@ Future<void> recordDoseSnoozed(
   await NotificationService.instance.scheduleSnooze(
     scheduleId: scheduleId,
     medicine: medicine,
-    delay: delay,
+    delay: effectiveDelay,
     scheduledAt: scheduledAt,
   );
 }
