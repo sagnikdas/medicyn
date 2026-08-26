@@ -415,14 +415,6 @@ List<DayOccurrence> attentionDoses({
   return out;
 }
 
-/// Upcoming later today — not already on the attention list.
-DayOccurrence? nextUpcomingDose(List<DayOccurrence> todayOccs) {
-  final upcoming =
-      todayOccs.where((o) => o.status == DayDoseStatus.upcoming).toList()
-        ..sort((a, b) => a.scheduledAt.compareTo(b.scheduledAt));
-  return upcoming.isEmpty ? null : upcoming.first;
-}
-
 bool doseCanSnooze(DayDoseStatus status) {
   switch (status) {
     case DayDoseStatus.pending:

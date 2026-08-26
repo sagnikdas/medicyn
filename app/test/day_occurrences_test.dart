@@ -291,12 +291,6 @@ void main() {
     expect(doseCanSnooze(DayDoseStatus.missed), isFalse);
   });
 
-  test('nextUpcomingDose skips the due morning dose', () {
-    final next = nextUpcomingDose(onDay(day: now));
-    expect(next?.scheduledAt, DateTime(2026, 8, 21, 20, 0));
-    expect(next?.status, DayDoseStatus.upcoming);
-  });
-
   test('dayPartOf splits morning afternoon evening', () {
     expect(dayPartOf(DateTime(2026, 8, 21, 8, 0)), DayPart.morning);
     expect(dayPartOf(DateTime(2026, 8, 21, 13, 0)), DayPart.afternoon);

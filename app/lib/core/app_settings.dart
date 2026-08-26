@@ -35,6 +35,7 @@ class AppSettings extends ChangeNotifier {
   static const _consentAnthropicParseKey = 'consent_anthropic_parse';
   static const _consentGoogleSpeechKey = 'consent_google_speech';
   static const _consentCareShareKey = 'consent_care_share';
+  static const _pendingConsentHandoffKey = 'pending_consent_handoff';
 
   /// The consent owner used before a Google account is selected. This is the
   /// same sentinel as the local-only encrypted database, kept here as a
@@ -96,6 +97,12 @@ class AppSettings extends ChangeNotifier {
   bool _hasRecordedConsents = false;
   bool get hasRecordedConsents => _hasRecordedConsents;
 
+  /// True only for the first-run choices waiting to follow the user into the
+  /// Google account they select next. This is cleared after that one handoff
+  /// (or when local-only mode is selected), so another account on the device
+  /// can never inherit the previous account's processing choices.
+  bool _pendingConsentHandoff = false;
+
   /// All four default off / unticked. Local-only until sign-in; the device
   /// is what the gates read.
   bool _consentCloudBackup = false;
@@ -140,6 +147,8 @@ class AppSettings extends ChangeNotifier {
       _showMedicineOnLockScreen =
           prefs.getBool(_showMedicineOnLockScreenKey) ?? false;
       _localOnly = prefs.getBool(_localOnlyKey) ?? false;
+      _pendingConsentHandoff =
+          prefs.getBool(_pendingConsentHandoffKey) ?? false;
       final savedSnooze = prefs.getInt(_snoozeMinutesKey);
       _snoozeMinutes = snoozeOptions.contains(savedSnooze) ? savedSnooze! : 10;
       _devicePreferencesLoaded = true;
@@ -157,6 +166,7 @@ class AppSettings extends ChangeNotifier {
   Future<void> activateConsentOwner(
     String ownerId, {
     SharedPreferences? prefs,
+    bool notify = true,
   }) async {
     if (ownerId.isEmpty) {
       throw ArgumentError.value(ownerId, 'ownerId', 'Consent owner is empty');
@@ -169,7 +179,7 @@ class AppSettings extends ChangeNotifier {
 
     _consentOwnerId = null;
     _clearConsentValues();
-    notifyListeners();
+    if (notify) notifyListeners();
 
     final store = prefs ?? await SharedPreferences.getInstance();
     await _migrateLegacyLocalConsentsIfNeeded(store, ownerId);
@@ -184,15 +194,15 @@ class AppSettings extends ChangeNotifier {
     _consentCareShare =
         store.getBool(_ownerKey(ownerId, _consentCareShareKey)) ?? false;
     _consentOwnerId = ownerId;
-    notifyListeners();
+    if (notify) notifyListeners();
   }
 
   static String _ownerKey(String ownerId, String setting) =>
       '$_ownerConsentPrefix.${Uri.encodeComponent(ownerId)}.$setting';
 
   /// Legacy global choices can only become the local-only owner's choices.
-  /// They are never copied into a Google account: a signed-in person must
-  /// record their own choices, even on an upgraded install.
+  /// They are never copied into a Google account: an upgraded install must
+  /// record its own choices.
   Future<void> _migrateLegacyLocalConsentsIfNeeded(
     SharedPreferences prefs,
     String ownerId,
@@ -284,9 +294,11 @@ class AppSettings extends ChangeNotifier {
   Future<void> setLocalOnly(bool value) async {
     if (value == _localOnly) return;
     _localOnly = value;
+    if (value) _pendingConsentHandoff = false;
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_localOnlyKey, value);
+    if (value) await prefs.setBool(_pendingConsentHandoffKey, false);
   }
 
   Future<void> setSnoozeMinutes(int minutes) async {
@@ -300,12 +312,82 @@ class AppSettings extends ChangeNotifier {
   Future<void> setHasRecordedConsents() async {
     await _ensureConsentOwner();
     _hasRecordedConsents = true;
+    final shouldOfferAccountHandoff =
+        _consentOwnerId == localConsentOwnerId && !_localOnly;
+    if (shouldOfferAccountHandoff) _pendingConsentHandoff = true;
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(
       _ownerKey(_consentOwnerId!, _hasRecordedConsentsKey),
       true,
     );
+    if (shouldOfferAccountHandoff) {
+      await prefs.setBool(_pendingConsentHandoffKey, true);
+    }
+  }
+
+  /// Activates a signed-in owner and, only for the immediate first-run
+  /// handoff, carries forward the choices the user just recorded before
+  /// selecting Google sign-in. Returning or alternate accounts never use
+  /// this path and therefore remain isolated.
+  Future<void> activateConsentOwnerAfterSignIn(String ownerId) async {
+    if (ownerId.isEmpty) {
+      throw ArgumentError.value(ownerId, 'ownerId', 'Consent owner is empty');
+    }
+    final prefs = await SharedPreferences.getInstance();
+    final localRecorded = _consentOwnerId == localConsentOwnerId
+        ? _hasRecordedConsents
+        : prefs.getBool(
+                _ownerKey(localConsentOwnerId, _hasRecordedConsentsKey),
+              ) ??
+              false;
+    final handoff = _pendingConsentHandoff && localRecorded && !_localOnly;
+    final localCloudBackup = _consentOwnerId == localConsentOwnerId
+        ? _consentCloudBackup
+        : prefs.getBool(
+                _ownerKey(localConsentOwnerId, _consentCloudBackupKey),
+              ) ??
+              false;
+    final localAnthropicParse = _consentOwnerId == localConsentOwnerId
+        ? _consentAnthropicParse
+        : prefs.getBool(
+                _ownerKey(localConsentOwnerId, _consentAnthropicParseKey),
+              ) ??
+              false;
+    final localGoogleSpeech = _consentOwnerId == localConsentOwnerId
+        ? _consentGoogleSpeech
+        : prefs.getBool(
+                _ownerKey(localConsentOwnerId, _consentGoogleSpeechKey),
+              ) ??
+              false;
+
+    // Suppress the intermediate empty-account notification during the
+    // handoff so the consent gate cannot flash the same page again.
+    await activateConsentOwner(ownerId, prefs: prefs, notify: !handoff);
+    if (handoff && !_hasRecordedConsents) {
+      _consentCloudBackup = localCloudBackup;
+      _consentAnthropicParse = localAnthropicParse;
+      _consentGoogleSpeech = localGoogleSpeech;
+      _hasRecordedConsents = true;
+      await prefs.setBool(
+        _ownerKey(ownerId, _consentCloudBackupKey),
+        localCloudBackup,
+      );
+      await prefs.setBool(
+        _ownerKey(ownerId, _consentAnthropicParseKey),
+        localAnthropicParse,
+      );
+      await prefs.setBool(
+        _ownerKey(ownerId, _consentGoogleSpeechKey),
+        localGoogleSpeech,
+      );
+      await prefs.setBool(_ownerKey(ownerId, _hasRecordedConsentsKey), true);
+    }
+    if (handoff) {
+      _pendingConsentHandoff = false;
+      await prefs.setBool(_pendingConsentHandoffKey, false);
+      notifyListeners();
+    }
   }
 
   Future<void> setConsentCloudBackup(bool value) => _setConsentFlag(
@@ -366,6 +448,7 @@ class AppSettings extends ChangeNotifier {
     _showMedicineOnLockScreen = false;
     _localOnly = false;
     _snoozeMinutes = 10;
+    _pendingConsentHandoff = false;
     _clearConsentValues();
   }
 }

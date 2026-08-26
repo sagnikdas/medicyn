@@ -649,6 +649,10 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        // Keep the fixed app bar visually separate from the form while the
+        // user scrolls. Without this, a wrapped chip row can appear to run
+        // underneath the title bar when the form is positioned mid-scroll.
+        scrolledUnderElevation: 2,
         title: Text(
           _isEditing
               ? 'Edit reminder'
@@ -818,12 +822,7 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
           ),
         ),
         const SizedBox(height: 20),
-        Text(
-          'Frequency',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: Theme.of(context).colorScheme.secondary,
-          ),
-        ),
+        Text('Frequency', style: Theme.of(context).textTheme.titleSmall),
         const SizedBox(height: 8),
         Wrap(
           spacing: 8,
@@ -959,35 +958,65 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
         Text('Reminder status: $label'),
         const SizedBox(height: 8),
         if (status == ReminderStatus.active) ...[
-          OutlinedButton.icon(
+          _lifecycleButton(
             onPressed: _pauseWithChoice,
-            icon: const Icon(Icons.pause_circle_outline),
-            label: const Text('Pause reminder'),
+            icon: Icons.pause_circle_outline,
+            label: 'Pause reminder',
           ),
-          OutlinedButton.icon(
+          const SizedBox(height: 8),
+          _lifecycleButton(
             onPressed: () => _changeLifecycle(ReminderStatus.completed),
-            icon: const Icon(Icons.check_circle_outline),
-            label: const Text('Mark course complete'),
+            icon: Icons.check_circle_outline,
+            label: 'Mark course complete',
           ),
         ] else if (status == ReminderStatus.paused) ...[
-          FilledButton.icon(
+          _lifecycleButton(
             onPressed: () => _changeLifecycle(ReminderStatus.active),
-            icon: const Icon(Icons.play_arrow),
-            label: const Text('Resume reminder'),
+            icon: Icons.play_arrow,
+            label: 'Resume reminder',
+            filled: true,
           ),
-          OutlinedButton.icon(
+          const SizedBox(height: 8),
+          _lifecycleButton(
             onPressed: () => _changeLifecycle(ReminderStatus.completed),
-            icon: const Icon(Icons.check_circle_outline),
-            label: const Text('Mark course complete'),
+            icon: Icons.check_circle_outline,
+            label: 'Mark course complete',
           ),
         ] else if (status == ReminderStatus.completed) ...[
-          FilledButton.icon(
+          _lifecycleButton(
             onPressed: () => _changeLifecycle(ReminderStatus.active),
-            icon: const Icon(Icons.play_arrow),
-            label: const Text('Restart reminder'),
+            icon: Icons.play_arrow,
+            label: 'Restart reminder',
+            filled: true,
           ),
         ],
       ],
     );
+  }
+
+  Widget _lifecycleButton({
+    required VoidCallback onPressed,
+    required IconData icon,
+    required String label,
+    bool filled = false,
+  }) {
+    final child = filled
+        ? FilledButton.icon(
+            onPressed: onPressed,
+            icon: Icon(icon),
+            label: Text(label),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(48),
+            ),
+          )
+        : OutlinedButton.icon(
+            onPressed: onPressed,
+            icon: Icon(icon),
+            label: Text(label),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size.fromHeight(48),
+            ),
+          );
+    return child;
   }
 }

@@ -31,13 +31,22 @@ import '../notification_engine/reminder_reliability_screen.dart';
 /// unless the user overrides it here, and whether a locked phone may show
 /// which medicine is due.
 class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({super.key, required this.db, this.embedded = false});
+  const SettingsScreen({
+    super.key,
+    required this.db,
+    this.embedded = false,
+    this.active = true,
+  });
 
   final AppDatabase db;
 
   /// True when this screen is the Profile tab, so it draws the Stitch
   /// header instead of a "Settings" app bar.
   final bool embedded;
+
+  /// The shell keeps Profile mounted in an IndexedStack. Reset the settings
+  /// list when the tab becomes active so it always opens at the beginning.
+  final bool active;
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -47,11 +56,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _signingIn = false;
   String? _signInError;
   bool _exporting = false;
+  late final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
     unawaited(_refreshSyncStatus());
+  }
+
+  @override
+  void didUpdateWidget(covariant SettingsScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!oldWidget.active && widget.active) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_scrollController.hasClients) return;
+        _scrollController.jumpTo(0);
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 
   bool get _signedIn => AuthService.instance.isSignedIn;
@@ -73,11 +100,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget build(BuildContext context) {
     final email = AuthService.instance.currentUser?.email ?? '';
     final name = email.contains('@') ? email.split('@').first : email;
+    final avatarUrl = AuthService.instance.currentUserAvatarUrl;
     return Scaffold(
       appBar: widget.embedded ? null : AppBar(title: const Text('Settings')),
       body: SafeArea(
         child: DoselyContent(
           child: ListView(
+            controller: _scrollController,
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
             children: [
               if (widget.embedded) ...[
@@ -94,6 +123,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           foregroundColor: Theme.of(
                             context,
                           ).colorScheme.onSecondaryContainer,
+                          foregroundImage: avatarUrl == null
+                              ? null
+                              : NetworkImage(avatarUrl),
                           child: Text(
                             (name.isEmpty ? 'D' : name.substring(0, 1))
                                 .toUpperCase(),

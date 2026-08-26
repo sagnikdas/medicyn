@@ -58,6 +58,18 @@ class AuthService {
 
   User? get currentUser => _client.auth.currentUser;
   bool get isSignedIn => currentUser != null;
+
+  /// Google includes the account photo in Supabase user metadata. Keep the
+  /// UI on a safe HTTPS URL and fall back to initials when it is unavailable.
+  String? get currentUserAvatarUrl {
+    final metadata = currentUser?.userMetadata;
+    final raw = metadata?['avatar_url'] ?? metadata?['picture'];
+    if (raw is! String || raw.trim().isEmpty) return null;
+    final uri = Uri.tryParse(raw.trim());
+    if (uri == null || uri.scheme != 'https' || uri.host.isEmpty) return null;
+    return uri.toString();
+  }
+
   Stream<AuthState> get onAuthStateChange => _client.auth.onAuthStateChange;
 
   bool _googleSignInInitialized = false;
@@ -149,10 +161,10 @@ class AuthService {
         'Google signed you in, but no account session was returned.',
       );
     }
-    // Fail closed before any account-related processing starts. A new owner
-    // sees every external-processing choice off; a returning owner restores
-    // only their namespace.
-    await AppSettings.instance.activateConsentOwner(signedInUser.id);
+    // Switch processing gates to this account. The first-run consent choices
+    // can make a one-time handoff from the temporary local owner; returning
+    // and alternate accounts still load only their own namespace.
+    await AppSettings.instance.activateConsentOwnerAfterSignIn(signedInUser.id);
     // Local-only is the unbundled path; a live Google session means
     // backup and Care Link are available, so drop the flag.
     await AppSettings.instance.setLocalOnly(false);

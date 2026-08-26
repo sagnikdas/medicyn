@@ -39,14 +39,11 @@ class HomeScreen extends StatefulWidget {
   const HomeScreen({
     super.key,
     required this.db,
-    this.onAvatarTap,
     this.onNames,
     this.onNeedsAttention,
+    this.active = true,
   });
   final AppDatabase db;
-
-  /// Opens the Profile tab when this screen is hosted in [AppShell].
-  final VoidCallback? onAvatarTap;
 
   /// Lets the Plan tab show the same edit-attribution names Home loaded.
   final ValueChanged<Map<String, String>>? onNames;
@@ -54,6 +51,10 @@ class HomeScreen extends StatefulWidget {
   /// Switch to the Today tab when a dose needs answering, so opening the
   /// app from Plan or Insights still lands on Taken / Snooze.
   final VoidCallback? onNeedsAttention;
+
+  /// The shell keeps Today mounted in an IndexedStack. Reset its calendar
+  /// list when the user enters the tab so it always opens at the beginning.
+  final bool active;
 
   @override
   HomeScreenState createState() => HomeScreenState();
@@ -79,6 +80,7 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   List<DayOccurrence> _ringIfLeft = const [];
   final _dismissedAttentionUntil = <String, DateTime>{};
   final _attentionScheduleVersions = <String, DateTime>{};
+  var _attentionWasPresent = false;
 
   @override
   void initState() {
@@ -105,6 +107,17 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     doseResponseEvents.removeListener(_onDoseResponse);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant HomeScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!oldWidget.active && widget.active) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_scroll.hasClients) return;
+        _scroll.jumpTo(0);
+      });
+    }
   }
 
   void _onDoseResponse() {
@@ -479,9 +492,11 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     return ListenableBuilder(
       listenable: ReminderHealthStore.instance,
       builder: (context, _) => Scaffold(
-        appBar: DoselyTopBar(
-          onAvatarTap: widget.onAvatarTap,
-          avatarLabel: AuthService.instance.currentUser?.email,
+        appBar: AppBar(
+          automaticallyImplyLeading: false,
+          toolbarHeight: 64,
+          titleSpacing: 20,
+          title: const DoselyBrandMark(compact: true),
         ),
         body: StreamBuilder<List<ScheduleWithMedicine>>(
           stream: _schedulesStream,
@@ -598,15 +613,22 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       for (final o in attention)
         if (doseStillRings(o.status)) o,
     ];
-    if (attention.isNotEmpty) {
+    // Focus Today once when an unanswered dose first appears. The panel stays
+    // available there, but repeatedly requesting the shell to jump back on
+    // every rebuild would trap the user on Today and make the other tabs
+    // impossible to use until they answered the dose.
+    if (attention.isEmpty) {
+      _attentionWasPresent = false;
+    } else if (attentionNeedsInitialFocus(
+      wasPresent: _attentionWasPresent,
+      isPresent: true,
+    )) {
+      _attentionWasPresent = true;
       final jump = widget.onNeedsAttention;
       if (jump != null) {
         WidgetsBinding.instance.addPostFrameCallback((_) => jump());
       }
     }
-    final next = isSameCalendarDay(_selectedDay, now)
-        ? nextUpcomingDose(todayOccs)
-        : null;
     final takenCount = occurrences
         .where((o) => o.status == DayDoseStatus.taken)
         .length;
@@ -682,24 +704,6 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               onMonthExpandedChanged: _onMonthExpandedChanged,
               onSelectDay: (day) => setState(() => _selectedDay = day),
             ),
-          ),
-        ),
-        SliverToBoxAdapter(
-          child: AnimatedSize(
-            duration: DoselyMotion.duration(context, DoselyMotion.medium),
-            curve: DoselyMotion.decelerate,
-            alignment: Alignment.topCenter,
-            child: next == null
-                ? const SizedBox.shrink()
-                : Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-                    child: DoselyFadeIn(
-                      child: _NextDoseCard(
-                        occurrence: next,
-                        onMarkTaken: () => _markTaken(next),
-                      ),
-                    ),
-                  ),
           ),
         ),
         if (expectedCount > 0)
@@ -860,124 +864,13 @@ String _attentionKey(DayOccurrence occurrence) =>
 String _attentionKeyForValues(String scheduleId, DateTime scheduledAt) =>
     '$scheduleId|${scheduledAt.toUtc().toIso8601String()}';
 
-class _NextDoseCard extends StatefulWidget {
-  const _NextDoseCard({required this.occurrence, required this.onMarkTaken});
-
-  final DayOccurrence occurrence;
-  final Future<void> Function() onMarkTaken;
-
-  @override
-  State<_NextDoseCard> createState() => _NextDoseCardState();
-}
-
-class _NextDoseCardState extends State<_NextDoseCard> {
-  bool _busy = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final medicine = widget.occurrence.item.medicine;
-    final local = widget.occurrence.scheduledAt.toLocal();
-    final time =
-        '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
-    final subtitle = [
-      if (medicine.strength.isNotEmpty) medicine.strength,
-      if (medicine.notes.isNotEmpty) medicine.notes,
-    ].join(' • ');
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: scheme.primary,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x3300685F),
-            blurRadius: 16,
-            offset: Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Flexible(
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: scheme.primaryContainer,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      'NEXT DOSE',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: scheme.onPrimaryContainer,
-                        letterSpacing: 1,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                time,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(color: scheme.onPrimary),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            medicine.drugName,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(
-              context,
-            ).textTheme.headlineSmall?.copyWith(color: scheme.onPrimary),
-          ),
-          if (subtitle.isNotEmpty) ...[
-            const SizedBox(height: 4),
-            Text(
-              subtitle,
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(color: scheme.inversePrimary),
-            ),
-          ],
-          const SizedBox(height: 16),
-          FilledButton(
-            onPressed: _busy
-                ? null
-                : () async {
-                    setState(() => _busy = true);
-                    try {
-                      await widget.onMarkTaken();
-                    } finally {
-                      if (mounted) setState(() => _busy = false);
-                    }
-                  },
-            style: FilledButton.styleFrom(
-              backgroundColor: scheme.onPrimary,
-              foregroundColor: scheme.primary,
-            ),
-            child: const Text('Mark as Taken'),
-          ),
-        ],
-      ),
-    );
-  }
-}
+/// Returns true only when an unanswered dose first appears. Rebuilds while it
+/// remains unanswered must not steal focus from another tab the user chose.
+@visibleForTesting
+bool attentionNeedsInitialFocus({
+  required bool wasPresent,
+  required bool isPresent,
+}) => isPresent && !wasPresent;
 
 class _EmptyState extends StatelessWidget {
   const _EmptyState({required this.onAdd});

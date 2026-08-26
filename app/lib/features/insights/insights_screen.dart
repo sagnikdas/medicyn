@@ -18,10 +18,14 @@ import '../reminders_home/day_occurrences.dart';
 /// StreamBuilder re-subscribe — and both queries re-run over the whole of
 /// dose_logs — every time this tab rebuilt for any reason.
 class InsightsScreen extends StatefulWidget {
-  const InsightsScreen({super.key, required this.db, this.onAvatarTap});
+  const InsightsScreen({super.key, required this.db, this.active = true});
 
   final AppDatabase db;
-  final VoidCallback? onAvatarTap;
+
+  /// The shell keeps this screen mounted in an IndexedStack. The active
+  /// edge lets us reset the report to its beginning whenever the user enters
+  /// the tab, rather than reopening halfway through a previous scroll.
+  final bool active;
 
   @override
   State<InsightsScreen> createState() => _InsightsScreenState();
@@ -31,13 +35,36 @@ class _InsightsScreenState extends State<InsightsScreen> {
   late final Stream<List<ScheduleWithMedicine>> _schedulesStream = widget.db
       .watchSchedulesWithMedicines();
   late final Stream<List<DoseLog>> _doseLogsStream = widget.db.watchDoseLogs();
+  late final ScrollController _scrollController = ScrollController();
+
+  @override
+  void didUpdateWidget(covariant InsightsScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!oldWidget.active && widget.active) {
+      // The IndexedStack keeps the scrollable attached, but schedule the jump
+      // after this frame so this remains safe if the tab is activated before
+      // its first layout has completed.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_scrollController.hasClients) return;
+        _scrollController.jumpTo(0);
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: DoselyTopBar(
-        onAvatarTap: widget.onAvatarTap,
-        avatarLabel: AuthService.instance.currentUser?.email,
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        toolbarHeight: 64,
+        titleSpacing: 20,
+        title: const DoselyBrandMark(compact: true),
       ),
       body: StreamBuilder<List<ScheduleWithMedicine>>(
         stream: _schedulesStream,
@@ -49,6 +76,7 @@ class _InsightsScreenState extends State<InsightsScreen> {
                 db: widget.db,
                 schedules: scheduleSnap.data ?? const [],
                 logs: logSnap.data ?? const [],
+                scrollController: _scrollController,
               );
             },
           );
@@ -63,11 +91,13 @@ class _InsightsBody extends StatelessWidget {
     required this.db,
     required this.schedules,
     required this.logs,
+    required this.scrollController,
   });
 
   final AppDatabase db;
   final List<ScheduleWithMedicine> schedules;
   final List<DoseLog> logs;
+  final ScrollController scrollController;
 
   @override
   Widget build(BuildContext context) {
@@ -127,6 +157,7 @@ class _InsightsBody extends StatelessWidget {
         );
 
     return ListView(
+      controller: scrollController,
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
       children: [
         DoselyFadeIn(
@@ -569,7 +600,7 @@ class InsightsMostConsistentCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(Icons.wb_sunny_outlined, color: scheme.tertiary, size: 18),
+                Icon(Icons.wb_sunny_outlined, color: scheme.primary, size: 18),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
@@ -598,7 +629,7 @@ class InsightsMostConsistentCard extends StatelessWidget {
                 builder: (context, value) => LinearProgressIndicator(
                   value: value,
                   minHeight: 8,
-                  color: scheme.tertiary,
+                  color: scheme.primary,
                   backgroundColor: scheme.surfaceContainerHigh,
                 ),
               ),
