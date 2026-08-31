@@ -58,6 +58,18 @@ class AuthService {
 
   User? get currentUser => _client.auth.currentUser;
   bool get isSignedIn => currentUser != null;
+
+  /// Google includes the account photo in Supabase user metadata. Keep the
+  /// UI on a safe HTTPS URL and fall back to initials when it is unavailable.
+  String? get currentUserAvatarUrl {
+    final metadata = currentUser?.userMetadata;
+    final raw = metadata?['avatar_url'] ?? metadata?['picture'];
+    if (raw is! String || raw.trim().isEmpty) return null;
+    final uri = Uri.tryParse(raw.trim());
+    if (uri == null || uri.scheme != 'https' || uri.host.isEmpty) return null;
+    return uri.toString();
+  }
+
   Stream<AuthState> get onAuthStateChange => _client.auth.onAuthStateChange;
 
   bool _googleSignInInitialized = false;
@@ -121,7 +133,9 @@ class AuthService {
         'Google signed you in, but this app could not complete sign-in. (${e.message})',
       );
     } catch (e) {
-      throw GoogleSignInFailure('Could not sign in with Google. Check your connection and try again. ($e)');
+      throw GoogleSignInFailure(
+        'Could not sign in with Google. Check your connection and try again. ($e)',
+      );
     }
   }
 
@@ -141,6 +155,16 @@ class AuthService {
       provider: OAuthProvider.google,
       idToken: idToken,
     );
+    final signedInUser = _client.auth.currentUser;
+    if (signedInUser == null) {
+      throw const GoogleSignInFailure(
+        'Google signed you in, but no account session was returned.',
+      );
+    }
+    // Switch processing gates to this account. The first-run consent choices
+    // can make a one-time handoff from the temporary local owner; returning
+    // and alternate accounts still load only their own namespace.
+    await AppSettings.instance.activateConsentOwnerAfterSignIn(signedInUser.id);
     // Local-only is the unbundled path; a live Google session means
     // backup and Care Link are available, so drop the flag.
     await AppSettings.instance.setLocalOnly(false);
@@ -148,11 +172,9 @@ class AuthService {
     // first screen renders. A failure here costs a display name, not a
     // session, so it never throws.
     await CareService.instance.upsertOwnProfile();
-    // Not awaited: a device that fails to register receives no care alerts,
-    // which is a degraded link rather than a failed sign-in, and every
-    // foreground retries it.
-    unawaited(PushService.instance.registerToken());
-    unawaited(ConsentService.instance.syncToServer());
+    if (AppSettings.instance.hasRecordedConsents) {
+      unawaited(ConsentService.instance.syncToServer());
+    }
   }
 
   /// Runs [signInWithGoogle] and returns a message fit to show, or null on
@@ -202,6 +224,7 @@ class AuthService {
     // stop receiving the previous account's alerts now, not whenever FCM next
     // reissues its token.
     await PushService.instance.unregisterToken();
+    await PushService.instance.detachAccountListeners();
     if (_googleSignInInitialized) {
       try {
         await GoogleSignIn.instance.signOut();
@@ -211,5 +234,8 @@ class AuthService {
       }
     }
     await _client.auth.signOut();
+    await AppSettings.instance.activateConsentOwner(
+      AppSettings.localConsentOwnerId,
+    );
   }
 }

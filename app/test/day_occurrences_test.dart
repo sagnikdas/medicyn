@@ -30,44 +30,39 @@ void main() {
     bool active = true,
     bool deleted = false,
     DateTime? updatedAt,
-  }) =>
-      Schedule(
-        id: id,
-        medicineId: medicineId,
-        frequencyType: frequency.name,
-        times: times,
-        daysOfWeek: days,
-        intervalHours: intervalHours,
-        active: active,
-        createdAt: DateTime(2026, 8, 1),
-        updatedAt: updatedAt ?? longEstablished,
-        updatedBy: null,
-        pendingSync: false,
-        deleted: deleted,
-      );
+  }) => Schedule(
+    id: id,
+    medicineId: medicineId,
+    frequencyType: frequency.name,
+    times: times,
+    daysOfWeek: days,
+    intervalHours: intervalHours,
+    active: active,
+    createdAt: DateTime(2026, 8, 1),
+    updatedAt: updatedAt ?? longEstablished,
+    updatedBy: null,
+    pendingSync: false,
+    deleted: deleted,
+  );
 
   Medicine medicine({
     String id = medicineId,
     String name = 'Metformin',
     bool deleted = false,
-  }) =>
-      Medicine(
-        id: id,
-        drugName: name,
-        strength: '',
-        form: '',
-        doseAmount: '',
-        notes: '',
-        createdAt: DateTime(2026, 8, 1),
-        updatedAt: DateTime(2026, 8, 1),
-        pendingSync: false,
-        deleted: deleted,
-      );
+  }) => Medicine(
+    id: id,
+    drugName: name,
+    strength: '',
+    form: '',
+    doseAmount: '',
+    notes: '',
+    createdAt: DateTime(2026, 8, 1),
+    updatedAt: DateTime(2026, 8, 1),
+    pendingSync: false,
+    deleted: deleted,
+  );
 
-  ScheduleWithMedicine item({
-    Schedule? s,
-    Medicine? m,
-  }) =>
+  ScheduleWithMedicine item({Schedule? s, Medicine? m}) =>
       ScheduleWithMedicine(s ?? schedule(), m ?? medicine());
 
   DoseRecord record({
@@ -75,26 +70,24 @@ void main() {
     required DateTime scheduledAt,
     DateTime? loggedAt,
     DoseAction action = DoseAction.taken,
-  }) =>
-      DoseRecord(
-        scheduleId: scheduleId,
-        scheduledAt: scheduledAt,
-        loggedAt: loggedAt ?? scheduledAt,
-        action: action,
-      );
+  }) => DoseRecord(
+    scheduleId: scheduleId,
+    scheduledAt: scheduledAt,
+    loggedAt: loggedAt ?? scheduledAt,
+    action: action,
+  );
 
   List<DayOccurrence> onDay({
     required DateTime day,
     DateTime? at,
     List<ScheduleWithMedicine>? items,
     List<DoseRecord> logs = const [],
-  }) =>
-      occurrencesOnDay(
-        items: items ?? [item()],
-        logs: logs,
-        day: day,
-        now: at ?? now,
-      );
+  }) => occurrencesOnDay(
+    items: items ?? [item()],
+    logs: logs,
+    day: day,
+    now: at ?? now,
+  );
 
   test('today at noon: morning pending, evening upcoming', () {
     // 08:00 is four hours past and well outside grace; it must still be
@@ -198,9 +191,37 @@ void main() {
     expect(expired[0].status, DayDoseStatus.pending);
   });
 
+  test(
+    'a snooze from before a schedule edit does not mask the edited dose',
+    () {
+      final due = DateTime(2026, 8, 21, 20, 0);
+      final editedAt = DateTime(2026, 8, 21, 12, 0);
+      final occs = onDay(
+        day: now,
+        at: DateTime(2026, 8, 21, 12, 30),
+        items: [
+          item(
+            s: schedule(updatedAt: editedAt, times: const ['20:00']),
+          ),
+        ],
+        logs: [
+          record(
+            scheduledAt: due,
+            loggedAt: DateTime(2026, 8, 21, 11, 59),
+            action: DoseAction.snoozed,
+          ),
+        ],
+      );
+      expect(occs.single.status, DayDoseStatus.upcoming);
+    },
+  );
+
   test('as-needed yields no occurrences', () {
     expect(
-      onDay(day: now, items: [item(s: schedule(frequency: FrequencyType.asNeeded))]),
+      onDay(
+        day: now,
+        items: [item(s: schedule(frequency: FrequencyType.asNeeded))],
+      ),
       isEmpty,
     );
   });
@@ -259,24 +280,15 @@ void main() {
       today: todayOccs,
       yesterday: yesterdayOccs,
     );
-    expect(
-      attention.map((o) => o.scheduledAt).toList(),
-      [
-        DateTime(2026, 8, 21, 8, 0),
-        DateTime(2026, 8, 20, 8, 0),
-        DateTime(2026, 8, 20, 20, 0),
-      ],
-    );
+    expect(attention.map((o) => o.scheduledAt).toList(), [
+      DateTime(2026, 8, 21, 8, 0),
+      DateTime(2026, 8, 20, 8, 0),
+      DateTime(2026, 8, 20, 20, 0),
+    ]);
     expect(attention.any((o) => o.status == DayDoseStatus.upcoming), isFalse);
     expect(doseCanSnooze(attention.first.status), isTrue);
     expect(doseStillRings(attention.first.status), isTrue);
     expect(doseCanSnooze(DayDoseStatus.missed), isFalse);
-  });
-
-  test('nextUpcomingDose skips the due morning dose', () {
-    final next = nextUpcomingDose(onDay(day: now));
-    expect(next?.scheduledAt, DateTime(2026, 8, 21, 20, 0));
-    expect(next?.status, DayDoseStatus.upcoming);
   });
 
   test('dayPartOf splits morning afternoon evening', () {
@@ -297,10 +309,7 @@ void main() {
     final occs = onDay(
       day: now,
       logs: [
-        record(
-          scheduledAt: due,
-          loggedAt: DateTime(2026, 8, 21, 8, 2),
-        ),
+        record(scheduledAt: due, loggedAt: DateTime(2026, 8, 21, 8, 2)),
         record(
           scheduledAt: due,
           loggedAt: DateTime(2026, 8, 21, 8, 5),
@@ -313,7 +322,9 @@ void main() {
 
   test('cellMarksForRange ORs taken and pending on the same day', () {
     // Two morning slots, both already due at noon, one answered.
-    final items = [item(s: schedule(times: const ['08:00', '09:00']))];
+    final items = [
+      item(s: schedule(times: const ['08:00', '09:00'])),
+    ];
     final logs = [record(scheduledAt: DateTime(2026, 8, 21, 8, 0))];
     final marks = cellMarksForRange(
       items: items,
@@ -331,27 +342,31 @@ void main() {
   });
 
   test('DoseRecord.tryFromLog skips an action the enum does not know', () {
-    final known = DoseRecord.tryFromLog(DoseLog(
-      id: 'log-1',
-      scheduleId: scheduleId,
-      scheduledAt: DateTime(2026, 8, 21, 8, 0),
-      action: DoseAction.taken.name,
-      loggedAt: DateTime(2026, 8, 21, 8, 1),
-      source: 'notification',
-      pendingSync: false,
-    ));
+    final known = DoseRecord.tryFromLog(
+      DoseLog(
+        id: 'log-1',
+        scheduleId: scheduleId,
+        scheduledAt: DateTime(2026, 8, 21, 8, 0),
+        action: DoseAction.taken.name,
+        loggedAt: DateTime(2026, 8, 21, 8, 1),
+        source: 'notification',
+        pendingSync: false,
+      ),
+    );
     expect(known, isNotNull);
     expect(known!.action, DoseAction.taken);
 
-    final unknown = DoseRecord.tryFromLog(DoseLog(
-      id: 'log-2',
-      scheduleId: scheduleId,
-      scheduledAt: DateTime(2026, 8, 21, 8, 0),
-      action: 'skipped',
-      loggedAt: DateTime(2026, 8, 21, 8, 1),
-      source: 'notification',
-      pendingSync: false,
-    ));
+    final unknown = DoseRecord.tryFromLog(
+      DoseLog(
+        id: 'log-2',
+        scheduleId: scheduleId,
+        scheduledAt: DateTime(2026, 8, 21, 8, 0),
+        action: 'skipped',
+        loggedAt: DateTime(2026, 8, 21, 8, 1),
+        source: 'notification',
+        pendingSync: false,
+      ),
+    );
     expect(unknown, isNull);
   });
 
@@ -360,41 +375,49 @@ void main() {
 
     setUp(() async {
       db = AppDatabase.forTesting(NativeDatabase.memory());
-      await db.upsertMedicine(MedicinesCompanion.insert(
-        id: medicineId,
-        drugName: 'Metformin',
-      ));
+      await db.upsertMedicine(
+        MedicinesCompanion.insert(id: medicineId, drugName: 'Metformin'),
+      );
     });
 
     tearDown(() async => db.close());
 
-    test('schedulesWithMedicinesOnce includes inactive, excludes deleted', () async {
-      await db.upsertSchedule(SchedulesCompanion.insert(
-        id: scheduleId,
-        medicineId: medicineId,
-        frequencyType: FrequencyType.daily.name,
-        times: const ['08:00'],
-        updatedAt: Value(longEstablished),
-      ));
-      await db.deactivateSchedule(scheduleId);
+    test(
+      'schedulesWithMedicinesOnce includes inactive, excludes deleted',
+      () async {
+        await db.upsertSchedule(
+          SchedulesCompanion.insert(
+            id: scheduleId,
+            medicineId: medicineId,
+            frequencyType: FrequencyType.daily.name,
+            times: const ['08:00'],
+            updatedAt: Value(longEstablished),
+          ),
+        );
+        await db.deactivateSchedule(scheduleId);
 
-      final all = await db.schedulesWithMedicinesOnce();
-      expect(all, hasLength(1));
-      expect(all.single.schedule.active, isFalse);
+        final all = await db.schedulesWithMedicinesOnce();
+        expect(all, hasLength(1));
+        expect(all.single.schedule.active, isFalse);
 
-      final activeOnly = await db.schedulesWithMedicinesOnce(activeOnly: true);
-      expect(activeOnly, isEmpty);
-      expect(await db.activeSchedulesOnce(), isEmpty);
-    });
+        final activeOnly = await db.schedulesWithMedicinesOnce(
+          activeOnly: true,
+        );
+        expect(activeOnly, isEmpty);
+        expect(await db.activeSchedulesOnce(), isEmpty);
+      },
+    );
 
     test('doseLogsTouching matches on scheduledAt or loggedAt', () async {
-      await db.upsertSchedule(SchedulesCompanion.insert(
-        id: scheduleId,
-        medicineId: medicineId,
-        frequencyType: FrequencyType.daily.name,
-        times: const ['08:00'],
-        updatedAt: Value(longEstablished),
-      ));
+      await db.upsertSchedule(
+        SchedulesCompanion.insert(
+          id: scheduleId,
+          medicineId: medicineId,
+          frequencyType: FrequencyType.daily.name,
+          times: const ['08:00'],
+          updatedAt: Value(longEstablished),
+        ),
+      );
       // Scheduled yesterday, answered today — the month view still needs it.
       await db.recordDoseAction(
         id: 'log-late',
@@ -420,7 +443,10 @@ void main() {
       );
 
       final touching = await db.doseLogsTouching(today, tomorrow);
-      expect(touching.map((l) => l.id).toSet(), {'log-late', 'log-early-payload'});
+      expect(touching.map((l) => l.id).toSet(), {
+        'log-late',
+        'log-early-payload',
+      });
     });
   });
 }

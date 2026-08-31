@@ -36,37 +36,55 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
-        onUpgrade: (m, from, to) async {
-          if (from < 2) {
-            // Row versioning, so a pull can overwrite an older local copy
-            // instead of only inserting rows it has never seen.
-            await m.addColumn(medicines, medicines.updatedAt);
-            await m.addColumn(medicines, medicines.updatedBy);
-            await m.addColumn(schedules, schedules.updatedAt);
-            await m.addColumn(schedules, schedules.updatedBy);
-            // Existing rows have never been edited, so their last change was
-            // their creation. The column default would otherwise stamp them
-            // all with the moment of upgrade, letting them beat genuinely
-            // newer edits waiting on the server.
-            await customStatement('UPDATE medicines SET updated_at = created_at');
-            await customStatement('UPDATE schedules SET updated_at = created_at');
-          }
-          if (from < 3) {
-            await m.createTable(doseLogContests);
-          }
-          if (from < 4) {
-            await m.addColumn(medicines, medicines.tabletsRemaining);
-            await m.addColumn(medicines, medicines.tabletsPerDose);
-          }
-          if (from < 5) {
-            await _storeDateTimesAsText(m);
-          }
-        },
-      );
+    onUpgrade: (m, from, to) async {
+      if (from < 2) {
+        // Row versioning, so a pull can overwrite an older local copy
+        // instead of only inserting rows it has never seen.
+        await m.addColumn(medicines, medicines.updatedAt);
+        await m.addColumn(medicines, medicines.updatedBy);
+        await m.addColumn(schedules, schedules.updatedAt);
+        await m.addColumn(schedules, schedules.updatedBy);
+        // Existing rows have never been edited, so their last change was
+        // their creation. The column default would otherwise stamp them
+        // all with the moment of upgrade, letting them beat genuinely
+        // newer edits waiting on the server.
+        await customStatement('UPDATE medicines SET updated_at = created_at');
+        await customStatement('UPDATE schedules SET updated_at = created_at');
+      }
+      if (from < 3) {
+        await m.createTable(doseLogContests);
+      }
+      if (from < 4) {
+        await m.addColumn(medicines, medicines.tabletsRemaining);
+        await m.addColumn(medicines, medicines.tabletsPerDose);
+      }
+      if (from < 5) {
+        await _storeDateTimesAsText(m);
+      }
+      if (from < 6) {
+        // Phase 3 lifecycle metadata. All fields are nullable for a safe
+        // upgrade: legacy rows continue to use `active`, while new writes
+        // can distinguish paused and completed reminders and preserve their
+        // course boundaries.
+        // The v5 table-rebuild already uses the current table definition, so
+        // databases crossing v4 -> v6 have these columns already. Only the
+        // v5 -> v6 path needs ALTER TABLE additions.
+        if (from >= 5) {
+          await m.addColumn(schedules, schedules.status);
+          await m.addColumn(schedules, schedules.startDate);
+          await m.addColumn(schedules, schedules.endDate);
+          await m.addColumn(schedules, schedules.pauseUntil);
+        }
+        await customStatement(
+          "UPDATE schedules SET status = CASE WHEN frequency_type = 'asNeeded' THEN 'asNeeded' WHEN active = 1 THEN 'active' ELSE 'completed' END WHERE status IS NULL",
+        );
+      }
+    },
+  );
 
   /// Schema v4's DateTime columns were unix-seconds integers, truncating
   /// sub-second precision — two writes landing within the same second were
@@ -152,12 +170,14 @@ class AppDatabase extends _$AppDatabase {
   /// Doses answered Taken on [scheduleId] strictly after [since] — the count
   /// [derivedTabletsRemaining] subtracts from a medicine's stored baseline.
   Future<int> takenCountSince(String scheduleId, DateTime since) async {
-    final rows = await (select(doseLogs)
-          ..where((t) =>
-              t.scheduleId.equals(scheduleId) &
-              t.action.equals(DoseAction.taken.name) &
-              t.loggedAt.isBiggerThanValue(since)))
-        .get();
+    final rows =
+        await (select(doseLogs)..where(
+              (t) =>
+                  t.scheduleId.equals(scheduleId) &
+                  t.action.equals(DoseAction.taken.name) &
+                  t.loggedAt.isBiggerThanValue(since),
+            ))
+            .get();
     return rows.length;
   }
 
@@ -169,7 +189,10 @@ class AppDatabase extends _$AppDatabase {
   ) async {
     final out = <String, int>{};
     for (final item in items) {
-      final n = await takenCountSince(item.schedule.id, item.medicine.updatedAt);
+      final n = await takenCountSince(
+        item.schedule.id,
+        item.medicine.updatedAt,
+      );
       out[item.medicine.id] = (out[item.medicine.id] ?? 0) + n;
     }
     return out;
@@ -192,21 +215,26 @@ class AppDatabase extends _$AppDatabase {
   Stream<List<ScheduleWithMedicine>> watchSchedulesWithMedicines({
     bool activeOnly = false,
   }) {
-    final query = select(schedules).join([
-      innerJoin(medicines, medicines.id.equalsExp(schedules.medicineId)),
-    ])
-      ..where(schedules.deleted.equals(false) & medicines.deleted.equals(false));
+    final query = select(schedules).join(
+      [innerJoin(medicines, medicines.id.equalsExp(schedules.medicineId))],
+    )..where(schedules.deleted.equals(false) & medicines.deleted.equals(false));
     if (activeOnly) {
-      query.where(schedules.active.equals(true));
+      query.where(
+        schedules.active.equals(true) |
+            (schedules.status.equals(ReminderStatus.paused.name) &
+                schedules.pauseUntil.isSmallerOrEqualValue(DateTime.now())),
+      );
     }
     return query.watch().map(
-          (rows) => rows
-              .map((r) => ScheduleWithMedicine(
-                    r.readTable(schedules),
-                    r.readTable(medicines),
-                  ))
-              .toList(),
-        );
+      (rows) => rows
+          .map(
+            (r) => ScheduleWithMedicine(
+              r.readTable(schedules),
+              r.readTable(medicines),
+            ),
+          )
+          .toList(),
+    );
   }
 
   Future<List<ScheduleWithMedicine>> activeSchedulesOnce() =>
@@ -220,19 +248,24 @@ class AppDatabase extends _$AppDatabase {
   Future<List<ScheduleWithMedicine>> schedulesWithMedicinesOnce({
     bool activeOnly = false,
   }) async {
-    final query = select(schedules).join([
-      innerJoin(medicines, medicines.id.equalsExp(schedules.medicineId)),
-    ])
-      ..where(schedules.deleted.equals(false) & medicines.deleted.equals(false));
+    final query = select(schedules).join(
+      [innerJoin(medicines, medicines.id.equalsExp(schedules.medicineId))],
+    )..where(schedules.deleted.equals(false) & medicines.deleted.equals(false));
     if (activeOnly) {
-      query.where(schedules.active.equals(true));
+      query.where(
+        schedules.active.equals(true) |
+            (schedules.status.equals(ReminderStatus.paused.name) &
+                schedules.pauseUntil.isSmallerOrEqualValue(DateTime.now())),
+      );
     }
     final rows = await query.get();
     return rows
-        .map((r) => ScheduleWithMedicine(
-              r.readTable(schedules),
-              r.readTable(medicines),
-            ))
+        .map(
+          (r) => ScheduleWithMedicine(
+            r.readTable(schedules),
+            r.readTable(medicines),
+          ),
+        )
         .toList();
   }
 
@@ -247,11 +280,56 @@ class AppDatabase extends _$AppDatabase {
       (update(schedules)..where((t) => t.id.equals(id))).write(
         SchedulesCompanion(
           active: const Value(false),
+          status: const Value('completed'),
+          pauseUntil: const Value(null),
           pendingSync: const Value(true),
           updatedAt: Value(DateTime.now()),
           updatedBy: Value(by),
         ),
       );
+
+  Future<void> pauseSchedule(String id, {DateTime? until, String? by}) =>
+      _setScheduleLifecycle(
+        id,
+        status: ReminderStatus.paused,
+        active: false,
+        pauseUntil: until,
+        by: by,
+      );
+
+  Future<void> resumeSchedule(String id, {String? by}) => _setScheduleLifecycle(
+    id,
+    status: ReminderStatus.active,
+    active: true,
+    pauseUntil: null,
+    by: by,
+  );
+
+  Future<void> completeSchedule(String id, {String? by}) =>
+      _setScheduleLifecycle(
+        id,
+        status: ReminderStatus.completed,
+        active: false,
+        pauseUntil: null,
+        by: by,
+      );
+
+  Future<void> _setScheduleLifecycle(
+    String id, {
+    required ReminderStatus status,
+    required bool active,
+    required DateTime? pauseUntil,
+    String? by,
+  }) => (update(schedules)..where((t) => t.id.equals(id))).write(
+    SchedulesCompanion(
+      status: Value(status.name),
+      active: Value(active),
+      pauseUntil: Value(pauseUntil),
+      pendingSync: const Value(true),
+      updatedAt: Value(DateTime.now()),
+      updatedBy: Value(by),
+    ),
+  );
 
   /// Removes this medicine's dose history and tombstones the medicine and its
   /// schedules. The rows stay locally with [Medicines.deleted] /
@@ -264,18 +342,26 @@ class AppDatabase extends _$AppDatabase {
     final scheduleIds = [for (final s in related) s.id];
     await transaction(() async {
       if (scheduleIds.isNotEmpty) {
-        final logs = await (select(doseLogs)
-              ..where((t) => t.scheduleId.isIn(scheduleIds)))
-            .get();
+        final logs = await (select(
+          doseLogs,
+        )..where((t) => t.scheduleId.isIn(scheduleIds))).get();
         final logIds = [for (final l in logs) l.id];
         if (logIds.isNotEmpty) {
-          await (delete(doseLogContests)..where((t) => t.doseLogId.isIn(logIds))).go();
+          await (delete(
+            doseLogContests,
+          )..where((t) => t.doseLogId.isIn(logIds))).go();
         }
-        await (delete(doseLogs)..where((t) => t.scheduleId.isIn(scheduleIds))).go();
-        await (update(schedules)..where((t) => t.medicineId.equals(medicineId))).write(
+        await (delete(
+          doseLogs,
+        )..where((t) => t.scheduleId.isIn(scheduleIds))).go();
+        await (update(
+          schedules,
+        )..where((t) => t.medicineId.equals(medicineId))).write(
           SchedulesCompanion(
             deleted: const Value(true),
             active: const Value(false),
+            status: const Value('completed'),
+            pauseUntil: const Value(null),
             pendingSync: const Value(true),
             updatedAt: Value(now),
             updatedBy: Value(by),
@@ -299,9 +385,10 @@ class AppDatabase extends _$AppDatabase {
   /// accepted so a caller that already knows when the action happened — a
   /// backfill, or a test simulating a particular day — can say so instead.
   ///
-  /// Stamped explicitly rather than left for the column default: this row's
-  /// [id] is a fresh uuid for every real Taken/Snooze, so it is always an
-  /// insert, never a conflict update the default would need to leave alone.
+  /// Stamped explicitly rather than left for the column default: repeated
+  /// responses for one occurrence intentionally reuse the same deterministic
+  /// id, so the conflict update also refreshes the response time and keeps the
+  /// snooze window anchored to the latest tap.
   Future<void> recordDoseAction({
     required String id,
     required String scheduleId,
@@ -329,32 +416,33 @@ class AppDatabase extends _$AppDatabase {
   /// month dots without a round-trip each time the visible month changes.
   Stream<List<DoseLog>> watchDoseLogs() => select(doseLogs).watch();
 
-  Stream<List<DoseLogWithContest>> watchDoseLogsWithContests(String scheduleId) {
+  Stream<List<DoseLogWithContest>> watchDoseLogsWithContests(
+    String scheduleId,
+  ) {
     final query = select(doseLogs).join([
       leftOuterJoin(
         doseLogContests,
         doseLogContests.doseLogId.equalsExp(doseLogs.id),
       ),
-    ])
-      ..where(doseLogs.scheduleId.equals(scheduleId));
+    ])..where(doseLogs.scheduleId.equals(scheduleId));
     return query.watch().map(
-          (rows) => rows
-              .map(
-                (r) => DoseLogWithContest(
-                  r.readTable(doseLogs),
-                  r.readTableOrNull(doseLogContests),
-                ),
-              )
-              .toList(),
-        );
+      (rows) => rows
+          .map(
+            (r) => DoseLogWithContest(
+              r.readTable(doseLogs),
+              r.readTableOrNull(doseLogContests),
+            ),
+          )
+          .toList(),
+    );
   }
 
   Future<DoseLog?> doseLogById(String id) =>
       (select(doseLogs)..where((t) => t.id.equals(id))).getSingleOrNull();
 
-  Future<DoseLogContest?> contestForDoseLog(String doseLogId) =>
-      (select(doseLogContests)..where((t) => t.doseLogId.equals(doseLogId)))
-          .getSingleOrNull();
+  Future<DoseLogContest?> contestForDoseLog(String doseLogId) => (select(
+    doseLogContests,
+  )..where((t) => t.doseLogId.equals(doseLogId))).getSingleOrNull();
 
   /// Attaches or replaces the correction note. Does not touch the log row.
   Future<void> upsertDoseLogContest({
@@ -378,8 +466,9 @@ class AppDatabase extends _$AppDatabase {
       );
       return;
     }
-    await (update(doseLogContests)..where((t) => t.doseLogId.equals(doseLogId)))
-        .write(
+    await (update(
+      doseLogContests,
+    )..where((t) => t.doseLogId.equals(doseLogId))).write(
       DoseLogContestsCompanion(
         note: Value(trimmed),
         updatedAt: Value(now),
@@ -393,28 +482,31 @@ class AppDatabase extends _$AppDatabase {
   /// `AppDatabase` instance (often a different isolate entirely), and those
   /// writes don't push to a `.watch()` stream opened on this one — so
   /// callers that need this fresh must re-poll.
-  Future<DoseLog?> latestDoseLogOnce(String scheduleId) => (select(doseLogs)
-        ..where((t) => t.scheduleId.equals(scheduleId))
-        ..orderBy([(t) => OrderingTerm.desc(t.loggedAt)])
-        ..limit(1))
-      .getSingleOrNull();
+  Future<DoseLog?> latestDoseLogOnce(String scheduleId) =>
+      (select(doseLogs)
+            ..where((t) => t.scheduleId.equals(scheduleId))
+            ..orderBy([(t) => OrderingTerm.desc(t.loggedAt)])
+            ..limit(1))
+          .getSingleOrNull();
 
   /// Every dose log written since [since], across all schedules — one query
   /// for a missed-dose sweep rather than one per reminder.
-  Future<List<DoseLog>> doseLogsSince(DateTime since) =>
-      (select(doseLogs)..where((t) => t.loggedAt.isBiggerOrEqualValue(since))).get();
+  Future<List<DoseLog>> doseLogsSince(DateTime since) => (select(
+    doseLogs,
+  )..where((t) => t.loggedAt.isBiggerOrEqualValue(since))).get();
 
   /// Logs whose [DoseLogs.scheduledAt] or [DoseLogs.loggedAt] falls in
   /// `[from, to)`. Used to paint a month: a late answer can carry a
   /// `scheduledAt` on another day, and matching only one column would
   /// leave that cell blank.
   Future<List<DoseLog>> doseLogsTouching(DateTime from, DateTime to) =>
-      (select(doseLogs)
-            ..where((t) =>
+      (select(doseLogs)..where(
+            (t) =>
                 (t.scheduledAt.isBiggerOrEqualValue(from) &
                     t.scheduledAt.isSmallerThanValue(to)) |
                 (t.loggedAt.isBiggerOrEqualValue(from) &
-                    t.loggedAt.isSmallerThanValue(to))))
+                    t.loggedAt.isSmallerThanValue(to)),
+          ))
           .get();
 
   /// Ids of missed doses recorded since [since] that are known to be on the
@@ -435,15 +527,21 @@ class AppDatabase extends _$AppDatabase {
   ///
   /// Newest first and capped, so a phone returning from a long absence sends a
   /// bounded request rather than every dose in the lookback window.
-  Future<List<String>> syncedMissedDoseIdsSince(DateTime since, {int limit = 200}) async {
-    final rows = await (select(doseLogs)
-          ..where((t) =>
-              t.action.equals(DoseAction.missed.name) &
-              t.pendingSync.equals(false) &
-              t.loggedAt.isBiggerOrEqualValue(since))
-          ..orderBy([(t) => OrderingTerm.desc(t.loggedAt)])
-          ..limit(limit))
-        .get();
+  Future<List<String>> syncedMissedDoseIdsSince(
+    DateTime since, {
+    int limit = 200,
+  }) async {
+    final rows =
+        await (select(doseLogs)
+              ..where(
+                (t) =>
+                    t.action.equals(DoseAction.missed.name) &
+                    t.pendingSync.equals(false) &
+                    t.loggedAt.isBiggerOrEqualValue(since),
+              )
+              ..orderBy([(t) => OrderingTerm.desc(t.loggedAt)])
+              ..limit(limit))
+            .get();
     return [for (final r in rows) r.id];
   }
 
@@ -474,14 +572,15 @@ class AppDatabase extends _$AppDatabase {
       clock.microsecond,
     );
     return transaction(() async {
-      final expiring = await (select(doseLogs)
-            ..where((t) => t.loggedAt.isSmallerThanValue(cutoff)))
-          .get();
+      final expiring = await (select(
+        doseLogs,
+      )..where((t) => t.loggedAt.isSmallerThanValue(cutoff))).get();
       if (expiring.isEmpty) return 0;
       final ids = [for (final log in expiring) log.id];
       await (delete(doseLogContests)..where((t) => t.doseLogId.isIn(ids))).go();
-      return (delete(doseLogs)..where((t) => t.loggedAt.isSmallerThanValue(cutoff)))
-          .go();
+      return (delete(
+        doseLogs,
+      )..where((t) => t.loggedAt.isSmallerThanValue(cutoff))).go();
     });
   }
 
@@ -490,7 +589,9 @@ class AppDatabase extends _$AppDatabase {
   /// rather than filling the feed with duplicates of the same skipped dose.
   Future<void> recordMissedDoses(List<DoseLogsCompanion> rows) async {
     if (rows.isEmpty) return;
-    await batch((b) => b.insertAll(doseLogs, rows, mode: InsertMode.insertOrIgnore));
+    await batch(
+      (b) => b.insertAll(doseLogs, rows, mode: InsertMode.insertOrIgnore),
+    );
   }
 
   // --- Sync helpers ----------------------------------------------------
@@ -508,16 +609,19 @@ class AppDatabase extends _$AppDatabase {
       (select(doseLogContests)..where((t) => t.pendingSync.equals(true))).get();
 
   Future<void> markMedicineSynced(String id) =>
-      (update(medicines)..where((t) => t.id.equals(id)))
-          .write(const MedicinesCompanion(pendingSync: Value(false)));
+      (update(medicines)..where((t) => t.id.equals(id))).write(
+        const MedicinesCompanion(pendingSync: Value(false)),
+      );
 
   Future<void> markScheduleSynced(String id) =>
-      (update(schedules)..where((t) => t.id.equals(id)))
-          .write(const SchedulesCompanion(pendingSync: Value(false)));
+      (update(schedules)..where((t) => t.id.equals(id))).write(
+        const SchedulesCompanion(pendingSync: Value(false)),
+      );
 
   Future<void> markDoseLogSynced(String id) =>
-      (update(doseLogs)..where((t) => t.id.equals(id)))
-          .write(const DoseLogsCompanion(pendingSync: Value(false)));
+      (update(doseLogs)..where((t) => t.id.equals(id))).write(
+        const DoseLogsCompanion(pendingSync: Value(false)),
+      );
 
   Future<void> markDoseLogContestSynced(String doseLogId) =>
       (update(doseLogContests)..where((t) => t.doseLogId.equals(doseLogId)))
@@ -550,18 +654,28 @@ class AppDatabase extends _$AppDatabase {
   /// SELECT that actually succeeded (the caller's try/catch sees to that), so
   /// its absence there is the server's word that this row is really gone.
   Future<List<String>> medicineIdsMissingRemotely(Set<String> remoteIds) async {
-    final rows = await (select(medicines)
-          ..where((t) => t.pendingSync.equals(false) & t.deleted.equals(false)))
-        .get();
-    return [for (final r in rows) if (!remoteIds.contains(r.id)) r.id];
+    final rows =
+        await (select(medicines)..where(
+              (t) => t.pendingSync.equals(false) & t.deleted.equals(false),
+            ))
+            .get();
+    return [
+      for (final r in rows)
+        if (!remoteIds.contains(r.id)) r.id,
+    ];
   }
 
   /// See [medicineIdsMissingRemotely].
   Future<List<String>> scheduleIdsMissingRemotely(Set<String> remoteIds) async {
-    final rows = await (select(schedules)
-          ..where((t) => t.pendingSync.equals(false) & t.deleted.equals(false)))
-        .get();
-    return [for (final r in rows) if (!remoteIds.contains(r.id)) r.id];
+    final rows =
+        await (select(schedules)..where(
+              (t) => t.pendingSync.equals(false) & t.deleted.equals(false),
+            ))
+            .get();
+    return [
+      for (final r in rows)
+        if (!remoteIds.contains(r.id)) r.id,
+    ];
   }
 
   /// Tombstones medicines a pull found gone from the server — the local half
@@ -644,21 +758,29 @@ class AppDatabase extends _$AppDatabase {
         if (!_isTombstoned(_companionId(row.scheduleId), blocked)) row,
     ];
     if (accepted.isEmpty) return;
-    await batch((b) => b.insertAll(doseLogs, accepted, mode: InsertMode.insertOrIgnore));
+    await batch(
+      (b) => b.insertAll(doseLogs, accepted, mode: InsertMode.insertOrIgnore),
+    );
   }
 
-  Future<void> applyRemoteDoseLogContests(List<DoseLogContestsCompanion> rows) async {
+  Future<void> applyRemoteDoseLogContests(
+    List<DoseLogContestsCompanion> rows,
+  ) async {
     if (rows.isEmpty) return;
     await batch((b) => b.insertAllOnConflictUpdate(doseLogContests, rows));
   }
 
   Future<Set<String>> _deletedMedicineIds() async {
-    final rows = await (select(medicines)..where((t) => t.deleted.equals(true))).get();
+    final rows = await (select(
+      medicines,
+    )..where((t) => t.deleted.equals(true))).get();
     return {for (final r in rows) r.id};
   }
 
   Future<Set<String>> _deletedScheduleIds() async {
-    final rows = await (select(schedules)..where((t) => t.deleted.equals(true))).get();
+    final rows = await (select(
+      schedules,
+    )..where((t) => t.deleted.equals(true))).get();
     return {for (final r in rows) r.id};
   }
 
@@ -669,12 +791,10 @@ class AppDatabase extends _$AppDatabase {
     final deletedSchedules = await _deletedScheduleIds();
     final deletedMedicines = await _deletedMedicineIds();
     if (deletedMedicines.isEmpty) return deletedSchedules;
-    final fromDeletedMedicines =
-        await (select(schedules)..where((t) => t.medicineId.isIn(deletedMedicines))).get();
-    return {
-      ...deletedSchedules,
-      for (final s in fromDeletedMedicines) s.id,
-    };
+    final fromDeletedMedicines = await (select(
+      schedules,
+    )..where((t) => t.medicineId.isIn(deletedMedicines))).get();
+    return {...deletedSchedules, for (final s in fromDeletedMedicines) s.id};
   }
 
   static String? _companionId(Value<String> id) => id.present ? id.value : null;

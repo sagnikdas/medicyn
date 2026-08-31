@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/app_settings.dart';
 import '../../core/motion.dart';
 import '../../core/theme.dart';
 import '../../core/widgets/dosely_chrome.dart';
@@ -17,26 +18,53 @@ import '../reminders_home/day_occurrences.dart';
 /// StreamBuilder re-subscribe — and both queries re-run over the whole of
 /// dose_logs — every time this tab rebuilt for any reason.
 class InsightsScreen extends StatefulWidget {
-  const InsightsScreen({super.key, required this.db, this.onAvatarTap});
+  const InsightsScreen({super.key, required this.db, this.active = true});
 
   final AppDatabase db;
-  final VoidCallback? onAvatarTap;
+
+  /// The shell keeps this screen mounted in an IndexedStack. The active
+  /// edge lets us reset the report to its beginning whenever the user enters
+  /// the tab, rather than reopening halfway through a previous scroll.
+  final bool active;
 
   @override
   State<InsightsScreen> createState() => _InsightsScreenState();
 }
 
 class _InsightsScreenState extends State<InsightsScreen> {
-  late final Stream<List<ScheduleWithMedicine>> _schedulesStream =
-      widget.db.watchSchedulesWithMedicines();
+  late final Stream<List<ScheduleWithMedicine>> _schedulesStream = widget.db
+      .watchSchedulesWithMedicines();
   late final Stream<List<DoseLog>> _doseLogsStream = widget.db.watchDoseLogs();
+  late final ScrollController _scrollController = ScrollController();
+
+  @override
+  void didUpdateWidget(covariant InsightsScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!oldWidget.active && widget.active) {
+      // The IndexedStack keeps the scrollable attached, but schedule the jump
+      // after this frame so this remains safe if the tab is activated before
+      // its first layout has completed.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_scrollController.hasClients) return;
+        _scrollController.jumpTo(0);
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: DoselyTopBar(
-        onAvatarTap: widget.onAvatarTap,
-        avatarLabel: AuthService.instance.currentUser?.email,
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        toolbarHeight: 64,
+        titleSpacing: 20,
+        title: const DoselyBrandMark(compact: true),
       ),
       body: StreamBuilder<List<ScheduleWithMedicine>>(
         stream: _schedulesStream,
@@ -48,6 +76,7 @@ class _InsightsScreenState extends State<InsightsScreen> {
                 db: widget.db,
                 schedules: scheduleSnap.data ?? const [],
                 logs: logSnap.data ?? const [],
+                scrollController: _scrollController,
               );
             },
           );
@@ -62,11 +91,13 @@ class _InsightsBody extends StatelessWidget {
     required this.db,
     required this.schedules,
     required this.logs,
+    required this.scrollController,
   });
 
   final AppDatabase db;
   final List<ScheduleWithMedicine> schedules;
   final List<DoseLog> logs;
+  final ScrollController scrollController;
 
   @override
   Widget build(BuildContext context) {
@@ -77,32 +108,56 @@ class _InsightsBody extends StatelessWidget {
     // One index for all five walks below. Each of them would otherwise
     // rebuild it, and consistencyStreak alone walks a year of days.
     final logIndex = DoseRecordIndex(records);
-    final week = weekAdherence(items: schedules, index: logIndex, now: now);
-    final days = weekDayAdherence(items: schedules, index: logIndex, now: now);
+    final snoozeWindow = Duration(minutes: AppSettings.instance.snoozeMinutes);
+    final week = weekAdherence(
+      items: schedules,
+      index: logIndex,
+      now: now,
+      snoozeWindow: snoozeWindow,
+    );
+    final days = weekDayAdherence(
+      items: schedules,
+      index: logIndex,
+      now: now,
+      snoozeWindow: snoozeWindow,
+    );
     final streak = consistencyStreak(
       items: schedules,
       index: logIndex,
       now: now,
+      snoozeWindow: snoozeWindow,
     );
     final missedPart = mostMissedDayPart(
       items: schedules,
       index: logIndex,
       now: now,
+      snoozeWindow: snoozeWindow,
     );
     var missed = 0;
     for (final day in days) {
       if (day.expected > day.taken) missed += day.expected - day.taken;
     }
     final avg = week.expected == 0 ? 0.0 : week.taken / week.expected;
-    final morning = _partRate(
-      days: days,
-      index: logIndex,
-      items: schedules,
-      now: now,
-      part: DayPart.morning,
-    );
+    final partRates = [
+      for (final part in DayPart.values)
+        _partRate(
+          days: days,
+          index: logIndex,
+          items: schedules,
+          now: now,
+          part: part,
+          snoozeWindow: snoozeWindow,
+        ),
+    ];
+    final mostConsistent = partRates
+        .where((part) => part.expected > 0)
+        .fold<({String label, double rate, int expected})?>(
+          null,
+          (best, part) => best == null || part.rate > best.rate ? part : best,
+        );
 
     return ListView(
+      controller: scrollController,
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
       children: [
         DoselyFadeIn(
@@ -204,9 +259,9 @@ class _InsightsBody extends StatelessWidget {
                   : 'Every due dose taken, walking back from today.',
             );
             final consistentCard = InsightsMostConsistentCard(
-              label: morning.label,
-              rate: morning.rate,
-              expected: morning.expected,
+              label: mostConsistent?.label ?? 'No doses yet',
+              rate: mostConsistent?.rate ?? 0,
+              expected: mostConsistent?.expected ?? 0,
             );
             final pair = constraints.maxWidth < 420
                 ? Column(
@@ -375,6 +430,7 @@ class _InsightsBody extends StatelessWidget {
     required List<ScheduleWithMedicine> items,
     required DateTime now,
     required DayPart part,
+    required Duration snoozeWindow,
   }) {
     // Re-walk the week for this part only — cheap, and keeps scoring
     // identical to occurrencesOnDay.
@@ -386,6 +442,7 @@ class _InsightsBody extends StatelessWidget {
         index: index,
         day: day.day,
         now: now,
+        snoozeWindow: snoozeWindow,
       );
       for (final o in occs) {
         if (dayPartOf(o.scheduledAt) != part) continue;
@@ -543,7 +600,7 @@ class InsightsMostConsistentCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(Icons.wb_sunny_outlined, color: scheme.tertiary, size: 18),
+                Icon(Icons.wb_sunny_outlined, color: scheme.primary, size: 18),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
@@ -572,7 +629,7 @@ class InsightsMostConsistentCard extends StatelessWidget {
                 builder: (context, value) => LinearProgressIndicator(
                   value: value,
                   minHeight: 8,
-                  color: scheme.tertiary,
+                  color: scheme.primary,
                   backgroundColor: scheme.surfaceContainerHigh,
                 ),
               ),
@@ -582,7 +639,7 @@ class InsightsMostConsistentCard extends StatelessWidget {
               alignment: Alignment.centerRight,
               child: Text(
                 expected == 0
-                    ? 'No morning doses'
+                    ? 'No scheduled doses'
                     : '${(rate * 100).round()}% taken',
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,

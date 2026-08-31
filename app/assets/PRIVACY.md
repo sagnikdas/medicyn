@@ -290,7 +290,7 @@ accident.
 If you cannot open the app, email **sagnikd91@gmail.com** from the Google
 address you signed in with, or use this page:
 
-https://github.com/sagnikdas/dosely/blob/main/docs/play-store/delete-account.md
+https://sagnikdas.github.io/dosely/delete-account/
 
 That deletes your account, the cloud backup, any family link, and
 notification tokens. Uninstalling the app removes the copy on your phone

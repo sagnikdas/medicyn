@@ -835,6 +835,48 @@ class $SchedulesTable extends Schedules
     type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _statusMeta = const VerificationMeta('status');
+  @override
+  late final GeneratedColumn<String> status = GeneratedColumn<String>(
+    'status',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _startDateMeta = const VerificationMeta(
+    'startDate',
+  );
+  @override
+  late final GeneratedColumn<DateTime> startDate = GeneratedColumn<DateTime>(
+    'start_date',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _endDateMeta = const VerificationMeta(
+    'endDate',
+  );
+  @override
+  late final GeneratedColumn<DateTime> endDate = GeneratedColumn<DateTime>(
+    'end_date',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _pauseUntilMeta = const VerificationMeta(
+    'pauseUntil',
+  );
+  @override
+  late final GeneratedColumn<DateTime> pauseUntil = GeneratedColumn<DateTime>(
+    'pause_until',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _activeMeta = const VerificationMeta('active');
   @override
   late final GeneratedColumn<bool> active = GeneratedColumn<bool>(
@@ -921,6 +963,10 @@ class $SchedulesTable extends Schedules
     times,
     daysOfWeek,
     intervalHours,
+    status,
+    startDate,
+    endDate,
+    pauseUntil,
     active,
     createdAt,
     updatedAt,
@@ -971,6 +1017,30 @@ class $SchedulesTable extends Schedules
           data['interval_hours']!,
           _intervalHoursMeta,
         ),
+      );
+    }
+    if (data.containsKey('status')) {
+      context.handle(
+        _statusMeta,
+        status.isAcceptableOrUnknown(data['status']!, _statusMeta),
+      );
+    }
+    if (data.containsKey('start_date')) {
+      context.handle(
+        _startDateMeta,
+        startDate.isAcceptableOrUnknown(data['start_date']!, _startDateMeta),
+      );
+    }
+    if (data.containsKey('end_date')) {
+      context.handle(
+        _endDateMeta,
+        endDate.isAcceptableOrUnknown(data['end_date']!, _endDateMeta),
+      );
+    }
+    if (data.containsKey('pause_until')) {
+      context.handle(
+        _pauseUntilMeta,
+        pauseUntil.isAcceptableOrUnknown(data['pause_until']!, _pauseUntilMeta),
       );
     }
     if (data.containsKey('active')) {
@@ -1049,6 +1119,22 @@ class $SchedulesTable extends Schedules
         DriftSqlType.int,
         data['${effectivePrefix}interval_hours'],
       ),
+      status: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}status'],
+      ),
+      startDate: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}start_date'],
+      ),
+      endDate: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}end_date'],
+      ),
+      pauseUntil: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}pause_until'],
+      ),
       active: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}active'],
@@ -1094,6 +1180,13 @@ class Schedule extends DataClass implements Insertable<Schedule> {
   final List<String> times;
   final List<int> daysOfWeek;
   final int? intervalHours;
+
+  /// Nullable so databases upgraded from v5 can be read before the migration
+  /// has populated a value, and so existing callers remain source-compatible.
+  final String? status;
+  final DateTime? startDate;
+  final DateTime? endDate;
+  final DateTime? pauseUntil;
   final bool active;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -1107,6 +1200,10 @@ class Schedule extends DataClass implements Insertable<Schedule> {
     required this.times,
     required this.daysOfWeek,
     this.intervalHours,
+    this.status,
+    this.startDate,
+    this.endDate,
+    this.pauseUntil,
     required this.active,
     required this.createdAt,
     required this.updatedAt,
@@ -1133,6 +1230,18 @@ class Schedule extends DataClass implements Insertable<Schedule> {
     if (!nullToAbsent || intervalHours != null) {
       map['interval_hours'] = Variable<int>(intervalHours);
     }
+    if (!nullToAbsent || status != null) {
+      map['status'] = Variable<String>(status);
+    }
+    if (!nullToAbsent || startDate != null) {
+      map['start_date'] = Variable<DateTime>(startDate);
+    }
+    if (!nullToAbsent || endDate != null) {
+      map['end_date'] = Variable<DateTime>(endDate);
+    }
+    if (!nullToAbsent || pauseUntil != null) {
+      map['pause_until'] = Variable<DateTime>(pauseUntil);
+    }
     map['active'] = Variable<bool>(active);
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
@@ -1154,6 +1263,18 @@ class Schedule extends DataClass implements Insertable<Schedule> {
       intervalHours: intervalHours == null && nullToAbsent
           ? const Value.absent()
           : Value(intervalHours),
+      status: status == null && nullToAbsent
+          ? const Value.absent()
+          : Value(status),
+      startDate: startDate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(startDate),
+      endDate: endDate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(endDate),
+      pauseUntil: pauseUntil == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pauseUntil),
       active: Value(active),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
@@ -1181,6 +1302,10 @@ class Schedule extends DataClass implements Insertable<Schedule> {
         serializer.fromJson<Object?>(json['daysOfWeek']),
       ),
       intervalHours: serializer.fromJson<int?>(json['intervalHours']),
+      status: serializer.fromJson<String?>(json['status']),
+      startDate: serializer.fromJson<DateTime?>(json['startDate']),
+      endDate: serializer.fromJson<DateTime?>(json['endDate']),
+      pauseUntil: serializer.fromJson<DateTime?>(json['pauseUntil']),
       active: serializer.fromJson<bool>(json['active']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
@@ -1203,6 +1328,10 @@ class Schedule extends DataClass implements Insertable<Schedule> {
         $SchedulesTable.$converterdaysOfWeek.toJson(daysOfWeek),
       ),
       'intervalHours': serializer.toJson<int?>(intervalHours),
+      'status': serializer.toJson<String?>(status),
+      'startDate': serializer.toJson<DateTime?>(startDate),
+      'endDate': serializer.toJson<DateTime?>(endDate),
+      'pauseUntil': serializer.toJson<DateTime?>(pauseUntil),
       'active': serializer.toJson<bool>(active),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
@@ -1219,6 +1348,10 @@ class Schedule extends DataClass implements Insertable<Schedule> {
     List<String>? times,
     List<int>? daysOfWeek,
     Value<int?> intervalHours = const Value.absent(),
+    Value<String?> status = const Value.absent(),
+    Value<DateTime?> startDate = const Value.absent(),
+    Value<DateTime?> endDate = const Value.absent(),
+    Value<DateTime?> pauseUntil = const Value.absent(),
     bool? active,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -1234,6 +1367,10 @@ class Schedule extends DataClass implements Insertable<Schedule> {
     intervalHours: intervalHours.present
         ? intervalHours.value
         : this.intervalHours,
+    status: status.present ? status.value : this.status,
+    startDate: startDate.present ? startDate.value : this.startDate,
+    endDate: endDate.present ? endDate.value : this.endDate,
+    pauseUntil: pauseUntil.present ? pauseUntil.value : this.pauseUntil,
     active: active ?? this.active,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
@@ -1257,6 +1394,12 @@ class Schedule extends DataClass implements Insertable<Schedule> {
       intervalHours: data.intervalHours.present
           ? data.intervalHours.value
           : this.intervalHours,
+      status: data.status.present ? data.status.value : this.status,
+      startDate: data.startDate.present ? data.startDate.value : this.startDate,
+      endDate: data.endDate.present ? data.endDate.value : this.endDate,
+      pauseUntil: data.pauseUntil.present
+          ? data.pauseUntil.value
+          : this.pauseUntil,
       active: data.active.present ? data.active.value : this.active,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
@@ -1277,6 +1420,10 @@ class Schedule extends DataClass implements Insertable<Schedule> {
           ..write('times: $times, ')
           ..write('daysOfWeek: $daysOfWeek, ')
           ..write('intervalHours: $intervalHours, ')
+          ..write('status: $status, ')
+          ..write('startDate: $startDate, ')
+          ..write('endDate: $endDate, ')
+          ..write('pauseUntil: $pauseUntil, ')
           ..write('active: $active, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
@@ -1295,6 +1442,10 @@ class Schedule extends DataClass implements Insertable<Schedule> {
     times,
     daysOfWeek,
     intervalHours,
+    status,
+    startDate,
+    endDate,
+    pauseUntil,
     active,
     createdAt,
     updatedAt,
@@ -1312,6 +1463,10 @@ class Schedule extends DataClass implements Insertable<Schedule> {
           other.times == this.times &&
           other.daysOfWeek == this.daysOfWeek &&
           other.intervalHours == this.intervalHours &&
+          other.status == this.status &&
+          other.startDate == this.startDate &&
+          other.endDate == this.endDate &&
+          other.pauseUntil == this.pauseUntil &&
           other.active == this.active &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt &&
@@ -1327,6 +1482,10 @@ class SchedulesCompanion extends UpdateCompanion<Schedule> {
   final Value<List<String>> times;
   final Value<List<int>> daysOfWeek;
   final Value<int?> intervalHours;
+  final Value<String?> status;
+  final Value<DateTime?> startDate;
+  final Value<DateTime?> endDate;
+  final Value<DateTime?> pauseUntil;
   final Value<bool> active;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
@@ -1341,6 +1500,10 @@ class SchedulesCompanion extends UpdateCompanion<Schedule> {
     this.times = const Value.absent(),
     this.daysOfWeek = const Value.absent(),
     this.intervalHours = const Value.absent(),
+    this.status = const Value.absent(),
+    this.startDate = const Value.absent(),
+    this.endDate = const Value.absent(),
+    this.pauseUntil = const Value.absent(),
     this.active = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -1356,6 +1519,10 @@ class SchedulesCompanion extends UpdateCompanion<Schedule> {
     required List<String> times,
     this.daysOfWeek = const Value.absent(),
     this.intervalHours = const Value.absent(),
+    this.status = const Value.absent(),
+    this.startDate = const Value.absent(),
+    this.endDate = const Value.absent(),
+    this.pauseUntil = const Value.absent(),
     this.active = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -1374,6 +1541,10 @@ class SchedulesCompanion extends UpdateCompanion<Schedule> {
     Expression<String>? times,
     Expression<String>? daysOfWeek,
     Expression<int>? intervalHours,
+    Expression<String>? status,
+    Expression<DateTime>? startDate,
+    Expression<DateTime>? endDate,
+    Expression<DateTime>? pauseUntil,
     Expression<bool>? active,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
@@ -1389,6 +1560,10 @@ class SchedulesCompanion extends UpdateCompanion<Schedule> {
       if (times != null) 'times': times,
       if (daysOfWeek != null) 'days_of_week': daysOfWeek,
       if (intervalHours != null) 'interval_hours': intervalHours,
+      if (status != null) 'status': status,
+      if (startDate != null) 'start_date': startDate,
+      if (endDate != null) 'end_date': endDate,
+      if (pauseUntil != null) 'pause_until': pauseUntil,
       if (active != null) 'active': active,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
@@ -1406,6 +1581,10 @@ class SchedulesCompanion extends UpdateCompanion<Schedule> {
     Value<List<String>>? times,
     Value<List<int>>? daysOfWeek,
     Value<int?>? intervalHours,
+    Value<String?>? status,
+    Value<DateTime?>? startDate,
+    Value<DateTime?>? endDate,
+    Value<DateTime?>? pauseUntil,
     Value<bool>? active,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
@@ -1421,6 +1600,10 @@ class SchedulesCompanion extends UpdateCompanion<Schedule> {
       times: times ?? this.times,
       daysOfWeek: daysOfWeek ?? this.daysOfWeek,
       intervalHours: intervalHours ?? this.intervalHours,
+      status: status ?? this.status,
+      startDate: startDate ?? this.startDate,
+      endDate: endDate ?? this.endDate,
+      pauseUntil: pauseUntil ?? this.pauseUntil,
       active: active ?? this.active,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -1456,6 +1639,18 @@ class SchedulesCompanion extends UpdateCompanion<Schedule> {
     if (intervalHours.present) {
       map['interval_hours'] = Variable<int>(intervalHours.value);
     }
+    if (status.present) {
+      map['status'] = Variable<String>(status.value);
+    }
+    if (startDate.present) {
+      map['start_date'] = Variable<DateTime>(startDate.value);
+    }
+    if (endDate.present) {
+      map['end_date'] = Variable<DateTime>(endDate.value);
+    }
+    if (pauseUntil.present) {
+      map['pause_until'] = Variable<DateTime>(pauseUntil.value);
+    }
     if (active.present) {
       map['active'] = Variable<bool>(active.value);
     }
@@ -1489,6 +1684,10 @@ class SchedulesCompanion extends UpdateCompanion<Schedule> {
           ..write('times: $times, ')
           ..write('daysOfWeek: $daysOfWeek, ')
           ..write('intervalHours: $intervalHours, ')
+          ..write('status: $status, ')
+          ..write('startDate: $startDate, ')
+          ..write('endDate: $endDate, ')
+          ..write('pauseUntil: $pauseUntil, ')
           ..write('active: $active, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
@@ -2860,6 +3059,10 @@ typedef $$SchedulesTableCreateCompanionBuilder =
       required List<String> times,
       Value<List<int>> daysOfWeek,
       Value<int?> intervalHours,
+      Value<String?> status,
+      Value<DateTime?> startDate,
+      Value<DateTime?> endDate,
+      Value<DateTime?> pauseUntil,
       Value<bool> active,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
@@ -2876,6 +3079,10 @@ typedef $$SchedulesTableUpdateCompanionBuilder =
       Value<List<String>> times,
       Value<List<int>> daysOfWeek,
       Value<int?> intervalHours,
+      Value<String?> status,
+      Value<DateTime?> startDate,
+      Value<DateTime?> endDate,
+      Value<DateTime?> pauseUntil,
       Value<bool> active,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
@@ -2959,6 +3166,26 @@ class $$SchedulesTableFilterComposer
 
   ColumnFilters<int> get intervalHours => $composableBuilder(
     column: $table.intervalHours,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get startDate => $composableBuilder(
+    column: $table.startDate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get endDate => $composableBuilder(
+    column: $table.endDate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get pauseUntil => $composableBuilder(
+    column: $table.pauseUntil,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -3075,6 +3302,26 @@ class $$SchedulesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get startDate => $composableBuilder(
+    column: $table.startDate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get endDate => $composableBuilder(
+    column: $table.endDate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get pauseUntil => $composableBuilder(
+    column: $table.pauseUntil,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get active => $composableBuilder(
     column: $table.active,
     builder: (column) => ColumnOrderings(column),
@@ -3157,6 +3404,20 @@ class $$SchedulesTableAnnotationComposer
 
   GeneratedColumn<int> get intervalHours => $composableBuilder(
     column: $table.intervalHours,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get startDate =>
+      $composableBuilder(column: $table.startDate, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get endDate =>
+      $composableBuilder(column: $table.endDate, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get pauseUntil => $composableBuilder(
+    column: $table.pauseUntil,
     builder: (column) => column,
   );
 
@@ -3263,6 +3524,10 @@ class $$SchedulesTableTableManager
                 Value<List<String>> times = const Value.absent(),
                 Value<List<int>> daysOfWeek = const Value.absent(),
                 Value<int?> intervalHours = const Value.absent(),
+                Value<String?> status = const Value.absent(),
+                Value<DateTime?> startDate = const Value.absent(),
+                Value<DateTime?> endDate = const Value.absent(),
+                Value<DateTime?> pauseUntil = const Value.absent(),
                 Value<bool> active = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
@@ -3277,6 +3542,10 @@ class $$SchedulesTableTableManager
                 times: times,
                 daysOfWeek: daysOfWeek,
                 intervalHours: intervalHours,
+                status: status,
+                startDate: startDate,
+                endDate: endDate,
+                pauseUntil: pauseUntil,
                 active: active,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
@@ -3293,6 +3562,10 @@ class $$SchedulesTableTableManager
                 required List<String> times,
                 Value<List<int>> daysOfWeek = const Value.absent(),
                 Value<int?> intervalHours = const Value.absent(),
+                Value<String?> status = const Value.absent(),
+                Value<DateTime?> startDate = const Value.absent(),
+                Value<DateTime?> endDate = const Value.absent(),
+                Value<DateTime?> pauseUntil = const Value.absent(),
                 Value<bool> active = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
@@ -3307,6 +3580,10 @@ class $$SchedulesTableTableManager
                 times: times,
                 daysOfWeek: daysOfWeek,
                 intervalHours: intervalHours,
+                status: status,
+                startDate: startDate,
+                endDate: endDate,
+                pauseUntil: pauseUntil,
                 active: active,
                 createdAt: createdAt,
                 updatedAt: updatedAt,

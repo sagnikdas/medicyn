@@ -7,11 +7,15 @@ import 'package:flutter/services.dart';
 /// 404s for anyone who is not signed in to GitHub.
 const privacyPolicyAsset = 'assets/PRIVACY.md';
 
+/// Public policy endpoint used for Play Console. The bundled asset remains
+/// the offline source of truth for users who have no network.
+const privacyPolicyWebUrl = 'https://sagnikdas.github.io/dosely/privacy/';
+
 /// Opens the in-app policy so the user can actually read it, even offline.
 void openPrivacyPolicy(BuildContext context) {
-  Navigator.of(context).push(
-    MaterialPageRoute<void>(builder: (_) => const PrivacyPolicyScreen()),
-  );
+  Navigator.of(
+    context,
+  ).push(MaterialPageRoute<void>(builder: (_) => const PrivacyPolicyScreen()));
 }
 
 class PrivacyPolicyScreen extends StatelessWidget {
@@ -65,19 +69,26 @@ List<Widget> _policyBlocks(String markdown, TextTheme text) {
       continue;
     }
     if (line.startsWith('# ')) {
-      widgets.add(SelectableText(_unbold(line.substring(2)), style: text.headlineSmall));
+      widgets.add(
+        SelectableText(_unbold(line.substring(2)), style: text.headlineSmall),
+      );
       continue;
     }
     if (line.startsWith('## ')) {
       widgets.add(const SizedBox(height: 8));
-      widgets.add(SelectableText(_unbold(line.substring(3)), style: text.titleMedium));
+      widgets.add(
+        SelectableText(_unbold(line.substring(3)), style: text.titleMedium),
+      );
       continue;
     }
     if (line.startsWith('- ')) {
       widgets.add(
         Padding(
           padding: const EdgeInsets.only(left: 8, bottom: 8),
-          child: SelectableText('• ${_unbold(line.substring(2))}', style: text.bodyLarge),
+          child: SelectableText(
+            '• ${_unbold(line.substring(2))}',
+            style: text.bodyLarge,
+          ),
         ),
       );
       continue;

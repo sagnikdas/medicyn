@@ -19,29 +19,46 @@ void main() {
   setUp(() => AppSettings.instance.resetForTest());
 
   test('an unloaded AppSettings reports consent as withheld', () async {
-    SharedPreferences.setMockInitialValues({'consent_cloud_backup': true});
+    SharedPreferences.setMockInitialValues({
+      'consent_owner_v1.user-a.consent_cloud_backup': true,
+    });
 
-    expect(AppSettings.instance.consentCloudBackup, isFalse,
-        reason: 'this is the state a fresh background isolate starts in');
+    expect(
+      AppSettings.instance.consentCloudBackup,
+      isFalse,
+      reason: 'this is the state a fresh background isolate starts in',
+    );
 
-    await AppSettings.instance.init();
+    await AppSettings.instance.init(consentOwnerId: 'user-a');
 
-    expect(AppSettings.instance.consentCloudBackup, isTrue,
-        reason: 'the handler has to load it before it can sync');
+    expect(
+      AppSettings.instance.consentCloudBackup,
+      isTrue,
+      reason: 'the handler has to load it before it can sync',
+    );
   });
 
   test('the background handler loads settings before it pulls', () {
     // Asserted against the source: the handler itself needs Firebase and a
     // live platform channel, and the ordering is the whole fix — init has to
     // happen before applyRemoteDataChange, not after it.
-    final source =
-        File('lib/features/push/push_handlers.dart').readAsStringSync();
-    final init = source.indexOf('AppSettings.instance.init()');
+    final source = File(
+      'lib/features/push/push_handlers.dart',
+    ).readAsStringSync();
+    final owner = source.indexOf('auth.currentUser?.id');
+    final init = source.indexOf(
+      'AppSettings.instance.init(consentOwnerId: ownerId)',
+    );
     final pull = source.indexOf('applyRemoteDataChange()');
 
-    expect(init, isNonNegative,
-        reason: 'without this the silent push is a no-op');
+    expect(owner, isNonNegative);
+    expect(
+      init,
+      isNonNegative,
+      reason: 'without this the silent push is a no-op',
+    );
     expect(pull, isNonNegative);
+    expect(owner, lessThan(init));
     expect(init, lessThan(pull));
   });
 }

@@ -1,15 +1,18 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../core/app_settings.dart';
 import '../../core/motion.dart';
+import '../../core/telemetry.dart';
 import '../../core/widgets/dosely_chrome.dart';
 import '../../core/widgets/dosely_layout.dart';
 import '../../core/widgets/dosely_motion.dart';
 
 /// Shown once, before sign-in, on first launch only (see the
-/// `_OnboardingGate` in main.dart). Three plain-language pages explaining
-/// what the app does — no fine print, no jargon, large icon + headline +
-/// one short sentence per page, matching the tone of the capture screens.
+/// `_OnboardingGate` in main.dart). One concise value/privacy screen keeps
+/// the first session moving: the user sees what Dosely does and that their
+/// reminders work offline before choosing how to add a medicine.
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
 
@@ -33,23 +36,19 @@ const _pages = [
     icon: Icons.document_scanner_outlined,
     headline: 'Scan your medicine label',
     body:
-        'Point your camera at the label and Dosely reads the details for you.',
-  ),
-  _OnboardingPage(
-    icon: Icons.mic_outlined,
-    headline: 'Say your dosage out loud',
-    body: 'Just speak how and when to take it — no typing needed.',
-  ),
-  _OnboardingPage(
-    icon: Icons.notifications_active_outlined,
-    headline: 'Get reminded — even offline',
-    body: 'Dosely alerts you right on time, whether or not you\'re connected.',
+        'Add a reminder by scanning, speaking, or typing. Your medicine details stay on this phone unless you choose backup, and reminders work offline.',
   ),
 ];
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
   final _controller = PageController();
   int _page = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(DoselyTelemetry.instance.record(DoselyEvent.onboardingViewed));
+  }
 
   @override
   void dispose() {
@@ -59,7 +58,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   /// Nothing to call back to: persisting the flag notifies `AppSettings`,
   /// and the gate in main.dart rebuilds itself off that.
-  Future<void> _finish() => AppSettings.instance.setHasSeenOnboarding();
+  Future<void> _finish() async {
+    await AppSettings.instance.setHasSeenOnboarding();
+    await DoselyTelemetry.instance.record(DoselyEvent.onboardingCompleted);
+  }
 
   void _next() {
     if (_page == _pages.length - 1) {

@@ -11,6 +11,7 @@ import 'core/motion.dart';
 import 'core/sentry_config.dart';
 import 'core/supabase_init.dart';
 import 'core/theme.dart';
+import 'core/telemetry.dart';
 import 'core/widgets/dosely_motion.dart';
 import 'data/local/database.dart';
 import 'data/local/database_encryption.dart';
@@ -32,11 +33,15 @@ void main() async {
   await SentryFlutter.init(
     (options) {
       options.dsn = SentryConfig.dsn;
+      options.beforeSend = redactSentryEvent;
     },
     appRunner: () async {
       WidgetsFlutterBinding.ensureInitialized();
       await initializeSupabase();
-      await AppSettings.instance.init();
+      await AppSettings.instance.init(
+        consentOwnerId:
+            Supabase.instance.client.auth.currentUser?.id ?? localOwnerUserId,
+      );
       // Must happen before checking the launch response below — the plugin
       // has to be initialized first to answer getNotificationAppLaunchDetails.
       await NotificationService.instance.init();
@@ -71,7 +76,9 @@ class _DoselyAppState extends State<DoselyApp> {
     if (launch != null) {
       // The navigator isn't attached yet during this build, so defer until
       // after the first frame — by then navigatorKey.currentState is live.
-      WidgetsBinding.instance.addPostFrameCallback((_) => _handleLaunch(launch));
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _handleLaunch(launch),
+      );
     }
   }
 
@@ -99,14 +106,20 @@ class _DoselyAppState extends State<DoselyApp> {
         darkTheme: DoselyTheme.dark(),
         // Light/dark/system, as chosen in Settings; system by default.
         themeMode: AppSettings.instance.themeMode,
-        // Applies the user's chosen text size (Settings) to every screen —
-        // scales text and, with it, most touch targets.
-        builder: (context, child) => MediaQuery(
-          data: MediaQuery.of(context).copyWith(
-            textScaler: TextScaler.linear(AppSettings.instance.textScale),
-          ),
-          child: DeviceLockGate(child: child!),
-        ),
+        // Applies the optional in-app multiplier on top of the device's own
+        // text scaler. A system accessibility choice must never be replaced
+        // by a Dosely preference.
+        builder: (context, child) {
+          final deviceScale = MediaQuery.of(context).textScaler.scale(1);
+          return MediaQuery(
+            data: MediaQuery.of(context).copyWith(
+              textScaler: TextScaler.linear(
+                deviceScale * AppSettings.instance.textScale,
+              ),
+            ),
+            child: DeviceLockGate(child: child!),
+          );
+        },
         home: const _OnboardingGate(),
       ),
     );
@@ -166,7 +179,7 @@ class _ConsentGate extends StatelessWidget {
 /// local-only mode, then the app itself.
 /// `currentSession` is checked on every rebuild (including the initial
 /// build), and `onAuthStateChange` triggers rebuilds as sign-in/sign-out
-/// happen. Choosing "Use without an account" notifies via [AppSettings].
+/// happen. Choosing "Add a reminder first" notifies via [AppSettings].
 ///
 /// The database connection is per Google account: a second person signing
 /// in on this phone must not inherit the previous person's file. The same
@@ -243,7 +256,10 @@ class _AuthGateState extends State<_AuthGate> {
               _releaseDatabase();
               child = const SignInScreen(key: ValueKey('sign-in'));
             } else {
-              if (user != null && _syncedConsentUserId != user.id) {
+              if (user != null &&
+                  AppSettings.instance.consentOwnerIs(user.id) &&
+                  AppSettings.instance.hasRecordedConsents &&
+                  _syncedConsentUserId != user.id) {
                 _syncedConsentUserId = user.id;
                 unawaited(ConsentService.instance.syncToServer());
               }

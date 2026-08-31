@@ -6,6 +6,11 @@ import 'converters.dart';
 /// the DB — kept as an enum in Dart for exhaustiveness checks everywhere else.
 enum FrequencyType { daily, specificDays, everyXHours, asNeeded }
 
+/// Lifecycle state of a reminder definition. `null` on legacy rows means the
+/// pre-Phase-3 model; callers should use [reminderStatus] to get the safe
+/// backwards-compatible interpretation.
+enum ReminderStatus { active, paused, completed, asNeeded }
+
 /// What happened to a scheduled dose. Stored as plain text (`.name`).
 enum DoseAction { taken, snoozed, missed }
 
@@ -51,6 +56,13 @@ class Schedules extends Table {
   // Only set when frequencyType == everyXHours; times[0] is the anchor time
   // of the first dose, repeats every intervalHours after that.
   IntColumn get intervalHours => integer().nullable()();
+
+  /// Nullable so databases upgraded from v5 can be read before the migration
+  /// has populated a value, and so existing callers remain source-compatible.
+  TextColumn get status => text().nullable()();
+  DateTimeColumn get startDate => dateTime().nullable()();
+  DateTimeColumn get endDate => dateTime().nullable()();
+  DateTimeColumn get pauseUntil => dateTime().nullable()();
   BoolColumn get active => boolean().withDefault(const Constant(true))();
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
   DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();

@@ -1,30 +1,32 @@
 import 'dart:convert';
 import 'dart:io' show Platform;
-import 'dart:typed_data' show Int32List;
 
 import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest_all.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 
 import '../../core/app_settings.dart';
+import '../../core/telemetry.dart';
 import '../../data/local/database.dart';
 import '../../data/local/tables.dart';
+import '../../data/local/lifecycle.dart';
 import 'device_health.dart';
 import 'interval_dose_sequence.dart';
+import 'missed_doses.dart';
 import 'notification_actions.dart';
 import 'notification_ids.dart';
 import 'schedule_validation.dart';
 
-// v4: Bumped again to ensure sound and alarm settings are applied fresh.
-// New channel ID forces a fresh channel with sound enabled for everyone.
-const String reminderChannelId = 'dosely_reminders_v4';
-const String reminderChannelName = 'Medicine Alarms';
+// v5 removes the old full-screen, looping, maximum-importance alarm defaults.
+// Android channel behavior is immutable, so the policy-safe behavior needs a
+// new id rather than attempting to edit v4 in place.
+const String reminderChannelId = 'dosely_reminders_v5';
+const String reminderChannelName = 'Medicine reminders';
 const String reminderChannelDescription =
-    'Critical alerts for your medication schedule.';
+    'High-priority reminders for your medication schedule.';
 
 /// A care alert is not an alarm and must not share the alarm channel: that
 /// channel loops its sound until the notification is dismissed, which is right
@@ -152,10 +154,6 @@ tz.TZDateTime nextWallClockDay(tz.TZDateTime from, ClockTime time) =>
       time.minute,
     );
 
-// Android's Notification.FLAG_INSISTENT: repeats the sound/vibration on loop
-// until the notification is dismissed or tapped, instead of playing once.
-const int _flagInsistent = 4;
-
 /// The only thing that actually matters in this app: getting a notification
 /// to fire, on time, whether or not the app is running.
 class NotificationService {
@@ -165,6 +163,8 @@ class NotificationService {
   final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
   bool _initialized = false;
+  bool _timezoneReady = false;
+  Object? _lastTimezoneError;
 
   /// Every-X-hours schedules keep this many upcoming doses armed at once.
   static const int _everyXHoursWindowDays = 14;
@@ -175,21 +175,8 @@ class NotificationService {
   static const int _maxWeekdaySearchDays = 8;
 
   Future<void> init() async {
+    if (!_timezoneReady) await retryTimezoneInitialization();
     if (_initialized) return;
-    tz_data.initializeTimeZones();
-    try {
-      final deviceTz = await FlutterTimezone.getLocalTimezone();
-      tz.setLocalLocation(tz.getLocation(deviceTz.identifier));
-    } catch (e) {
-      // Falls back to UTC so init() can still complete rather than crash —
-      // but every alarm this process arms is now off by the device's UTC
-      // offset, silently, for its whole lifetime (see the `_initialized`
-      // guard above: this only runs once). That was previously swallowed
-      // with no trace at all; logged now so a report of reminders firing at
-      // the wrong time has somewhere to start.
-      debugPrint('[dosely] device timezone lookup failed, falling back to UTC: $e');
-      tz.setLocalLocation(tz.getLocation('UTC'));
-    }
 
     const androidSettings = AndroidInitializationSettings(
       '@mipmap/ic_launcher',
@@ -212,6 +199,45 @@ class NotificationService {
     );
     await _createCareAlertChannel();
     _initialized = true;
+  }
+
+  /// Resolves the device's IANA timezone without ever substituting UTC. A
+  /// failure leaves scheduling disabled but notification UI available, and
+  /// this method remains retryable for resume/settings recovery.
+  Future<bool> retryTimezoneInitialization() async {
+    tz_data.initializeTimeZones();
+    try {
+      final deviceTz = await FlutterTimezone.getLocalTimezone();
+      tz.setLocalLocation(tz.getLocation(deviceTz.identifier));
+      _timezoneReady = true;
+      _lastTimezoneError = null;
+      return true;
+    } catch (error) {
+      _timezoneReady = false;
+      _lastTimezoneError = error;
+      debugPrint('[dosely] device timezone lookup failed: $error');
+      return false;
+    }
+  }
+
+  bool get timezoneReady => _timezoneReady;
+
+  Future<void> _requireTimezone() async {
+    if (_timezoneReady || await retryTimezoneInitialization()) return;
+    throw TimezoneUnavailableException(_lastTimezoneError);
+  }
+
+  Future<AndroidScheduleMode> _scheduleMode() async {
+    if (!Platform.isAndroid) return AndroidScheduleMode.exactAllowWhileIdle;
+    final android = _plugin
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
+    if (android == null) return AndroidScheduleMode.inexactAllowWhileIdle;
+    final exact = await android.canScheduleExactNotifications() ?? true;
+    return exact
+        ? AndroidScheduleMode.exactAllowWhileIdle
+        : AndroidScheduleMode.inexactAllowWhileIdle;
   }
 
   /// Creates the care-alert channel up front rather than on first use.
@@ -277,7 +303,8 @@ class NotificationService {
     await prefs.setString(handledNotificationLaunchPref, fingerprint);
   }
 
-  Future<bool> requestPermissions() async {
+  Future<bool> requestNotificationPermission() async {
+    await init();
     if (Platform.isIOS) {
       final ios = _plugin
           .resolvePlatformSpecificImplementation<
@@ -297,17 +324,43 @@ class NotificationService {
           AndroidFlutterLocalNotificationsPlugin
         >();
     if (android == null) return true;
+    return await android.requestNotificationsPermission() ?? false;
+  }
 
-    final notifGranted =
-        await android.requestNotificationsPermission() ?? false;
-    final exactGranted = await android.requestExactAlarmsPermission() ?? false;
+  Future<bool> requestExactAlarmPermission() async {
+    await init();
+    if (!Platform.isAndroid) return true;
+    final android = _plugin
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
+    if (android == null) return true;
+    if (await android.canScheduleExactNotifications() ?? true) return true;
+    return await android.requestExactAlarmsPermission() ?? false;
+  }
 
-    // Request ignoring battery optimizations to prevent the OS from killing alarms
-    if (await Permission.ignoreBatteryOptimizations.isDenied) {
-      await Permission.ignoreBatteryOptimizations.request();
+  Future<ReminderPermissionState> readPermissionState() async {
+    await init();
+    if (!Platform.isAndroid) {
+      return const ReminderPermissionState(
+        notificationsAllowed: true,
+        exactAlarmsAllowed: true,
+      );
     }
-
-    return notifGranted && exactGranted;
+    final android = _plugin
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
+    if (android == null) {
+      return const ReminderPermissionState(
+        notificationsAllowed: true,
+        exactAlarmsAllowed: true,
+      );
+    }
+    return ReminderPermissionState(
+      notificationsAllowed: await android.areNotificationsEnabled() ?? true,
+      exactAlarmsAllowed: await android.canScheduleExactNotifications() ?? true,
+    );
   }
 
   NotificationDetails _details({required NotificationVisibility visibility}) =>
@@ -316,15 +369,12 @@ class NotificationService {
           reminderChannelId,
           reminderChannelName,
           channelDescription: reminderChannelDescription,
-          importance: Importance.max,
+          importance: Importance.high,
           priority: Priority.high,
-          category: AndroidNotificationCategory.alarm,
+          category: AndroidNotificationCategory.reminder,
           playSound: true,
           enableVibration: true,
-          fullScreenIntent: true,
-          audioAttributesUsage: AudioAttributesUsage.alarm,
           visibility: visibility,
-          additionalFlags: Int32List.fromList(<int>[_flagInsistent]),
           actions: [
             AndroidNotificationAction(
               actionTaken,
@@ -333,7 +383,7 @@ class NotificationService {
             ),
             AndroidNotificationAction(
               actionSnooze,
-              'Snooze 10m',
+              'Snooze ${AppSettings.instance.snoozeMinutes}m',
               showsUserInterface: true,
             ),
           ],
@@ -342,7 +392,7 @@ class NotificationService {
           presentAlert: true,
           presentBadge: true,
           presentSound: true,
-          interruptionLevel: InterruptionLevel.critical,
+          interruptionLevel: InterruptionLevel.timeSensitive,
         ),
       );
 
@@ -422,11 +472,12 @@ class NotificationService {
   /// `pendingNotificationRequests()` round-trip over the platform channel,
   /// which returns *every* armed alarm in the app, so repeating it per
   /// schedule is the difference between one such call and N+1 of them.
-  Future<void> scheduleForScheduleWithMedicine(
+  Future<ScheduleArmResult> scheduleForScheduleWithMedicine(
     ScheduleWithMedicine sm, {
     bool skipCancel = false,
   }) async {
     await init();
+    await _requireTimezone();
     final schedule = sm.schedule;
     final medicine = sm.medicine;
 
@@ -450,11 +501,21 @@ class NotificationService {
 
     if (!skipCancel) await cancelForSchedule(schedule);
 
-    if (!schedule.active || frequency == FrequencyType.asNeeded) return;
+    if (!reminderIsActive(schedule) || frequency == FrequencyType.asNeeded) {
+      return ScheduleArmResult.notRequired(schedule.id);
+    }
 
     final times = schedulableTimes(schedule.times);
     final copy = await _copyFor(medicine);
     final details = _details(visibility: copy.visibility);
+    final scheduleMode = await _scheduleMode();
+    var armedCount = 0;
+    tz.TZDateTime? nextAlarm;
+
+    void recordArmed(tz.TZDateTime when) {
+      armedCount++;
+      if (nextAlarm == null || when.isBefore(nextAlarm!)) nextAlarm = when;
+    }
 
     switch (frequency) {
       case FrequencyType.daily:
@@ -467,10 +528,11 @@ class NotificationService {
             body: copy.body,
             scheduledDate: when,
             notificationDetails: details,
-            androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+            androidScheduleMode: scheduleMode,
             matchDateTimeComponents: DateTimeComponents.time,
             payload: _payload(schedule.id, time.label, when),
           );
+          recordArmed(when);
         }
         break;
 
@@ -485,10 +547,11 @@ class NotificationService {
               body: copy.body,
               scheduledDate: when,
               notificationDetails: details,
-              androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+              androidScheduleMode: scheduleMode,
               matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
               payload: _payload(schedule.id, time.label, when),
             );
+            recordArmed(when);
           }
         }
         break;
@@ -545,30 +608,38 @@ class NotificationService {
 
         for (var index = 0; index < sequence.length; index++) {
           final when = sequence[index];
+          final scheduledAt = tz.TZDateTime(
+            tz.local,
+            when.year,
+            when.month,
+            when.day,
+            when.hour,
+            when.minute,
+            when.second,
+            when.millisecond,
+          );
           await _plugin.zonedSchedule(
             id: notificationIdFor(schedule.id, 'slot-$index'),
             title: copy.title,
             body: copy.body,
-            scheduledDate: tz.TZDateTime(
-              tz.local,
-              when.year,
-              when.month,
-              when.day,
-              when.hour,
-              when.minute,
-              when.second,
-              when.millisecond,
-            ),
+            scheduledDate: scheduledAt,
             notificationDetails: details,
-            androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+            androidScheduleMode: scheduleMode,
             payload: _payload(schedule.id, anchor.label, when),
           );
+          recordArmed(scheduledAt);
         }
         break;
 
       case FrequencyType.asNeeded:
         break;
     }
+    return ScheduleArmResult(
+      scheduleId: schedule.id,
+      armedCount: armedCount,
+      nextAlarmExpectedAt: nextAlarm?.toLocal(),
+      mode: scheduleMode,
+    );
   }
 
   /// Cancels every currently-armed alarm belonging to [schedule] — not just
@@ -610,6 +681,69 @@ class NotificationService {
     }
   }
 
+  /// Removes snooze alarms that no longer represent an active dose occurrence.
+  ///
+  /// Ordinary reconciliation deliberately preserves snoozes because they are
+  /// one-off alarms that are not regenerated from a schedule. That exception
+  /// must not preserve an alarm after a schedule edit/deactivation, or after
+  /// the dose was marked Taken through Home: those paths otherwise leave a
+  /// false re-reminder behind. This also covers edits arriving through the
+  /// caregiver sync path, where [cancelForSchedule] is not called locally.
+  Future<void> _cancelInvalidSnoozes(
+    AppDatabase db,
+    List<ScheduleWithMedicine> active,
+  ) async {
+    final activeById = {
+      for (final item in active) item.schedule.id: item.schedule,
+    };
+    final pending = await _plugin.pendingNotificationRequests();
+    for (final request in pending) {
+      final payloadRaw = request.payload;
+      if (payloadRaw == null || payloadRaw.isEmpty) continue;
+      final Map<String, dynamic> payload;
+      try {
+        payload = jsonDecode(payloadRaw) as Map<String, dynamic>;
+      } catch (_) {
+        continue;
+      }
+      if (payload['timeLabel'] != snoozeTimeLabel) continue;
+      final scheduleId = payload['scheduleId'] as String?;
+      if (scheduleId == null || scheduleId.isEmpty) continue;
+
+      var invalid = !activeById.containsKey(scheduleId);
+      final rawScheduledAt = payload['scheduledAt'] as String?;
+      final scheduledAt = rawScheduledAt == null
+          ? null
+          : DateTime.tryParse(rawScheduledAt)?.toLocal();
+      // Every snooze armed by this build carries the exact occurrence. A
+      // malformed/legacy payload cannot be matched safely, so discard it
+      // instead of allowing an untraceable re-reminder to survive a sweep.
+      if (scheduledAt == null) invalid = true;
+      final schedule = activeById[scheduleId];
+
+      if (!invalid) {
+        // A schedule may have several daily occurrences, each with its own
+        // valid snooze. Looking only at the schedule's latest log would
+        // incorrectly cancel every older occurrence when a later one was
+        // snoozed, so resolve the deterministic log for this exact slot.
+        final log = await db.doseLogById(
+          doseLogIdFor(scheduleId, scheduledAt!, DoseAction.snoozed),
+        );
+        invalid = log == null || log.action != DoseAction.snoozed.name;
+        if (!invalid) {
+          // Compare the response time, not only the dose's due time. A
+          // future dose can be snoozed before a reminder edit; its due time
+          // is still after updatedAt, but the snooze itself is stale and must
+          // not mask the newly edited reminder.
+          invalid =
+              log.loggedAt.isBefore(schedule!.updatedAt) ||
+              !log.scheduledAt.isAtSameMomentAs(scheduledAt);
+        }
+      }
+      if (invalid) await _plugin.cancel(id: request.id);
+    }
+  }
+
   /// Arms the one re-reminder for [scheduledAt]'s dose, [delay] from now.
   ///
   /// The id is derived from the dose, not from the moment of the tap. It used
@@ -625,16 +759,37 @@ class NotificationService {
     required DateTime scheduledAt,
   }) async {
     await init();
+    await _requireTimezone();
     final copy = await _copyFor(medicine);
+    // Snoozes must use the same exact/inexact permission fallback as normal
+    // reminders. Requesting exactAllowWhileIdle unconditionally could record
+    // the snooze but fail to arm its re-reminder when special access is off.
+    final scheduleMode = await _scheduleMode();
     await _plugin.zonedSchedule(
       id: snoozeNotificationId(scheduleId, scheduledAt),
       title: copy.title,
       body: copy.body,
       scheduledDate: tz.TZDateTime.now(tz.local).add(delay),
       notificationDetails: _details(visibility: copy.visibility),
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      androidScheduleMode: scheduleMode,
       payload: _payload(scheduleId, snoozeTimeLabel, scheduledAt),
     );
+  }
+
+  /// Cancels the one-off re-reminder for a dose that was answered by another
+  /// path (for example Mark as Taken from Home while it is snoozed).
+  /// Missing-plugin hosts and an already-fired notification are harmless.
+  Future<void> cancelSnooze({
+    required String scheduleId,
+    required DateTime scheduledAt,
+  }) async {
+    try {
+      await init();
+      await _plugin.cancel(id: snoozeNotificationId(scheduleId, scheduledAt));
+    } catch (_) {
+      // The dose action is already persisted; reconcile will clean up any
+      // stale platform alarm on the next foreground if cancellation failed.
+    }
   }
 
   /// Shows a care alert this device received while in the foreground.
@@ -692,6 +847,19 @@ class NotificationService {
     );
   }
 
+  /// Sends a redacted one-shot notification so a user can verify Android
+  /// channel and lock-screen behavior without waiting for a real dose.
+  Future<void> showTestReminder() async {
+    await init();
+    await _plugin.show(
+      id: 990001,
+      title: _redactedReminderTitle,
+      body: 'This is a test reminder',
+      notificationDetails: _details(visibility: NotificationVisibility.private),
+      payload: jsonEncode({'testReminder': true}),
+    );
+  }
+
   /// What this phone currently reports about whether reminders can fire.
   ///
   /// Null when the platform cannot say — writing a guessed `false` would
@@ -719,12 +887,15 @@ class NotificationService {
       if (android == null) return null;
       final notifications = await android.areNotificationsEnabled() ?? true;
       final exact = await android.canScheduleExactNotifications() ?? true;
-      final battery = await Permission.ignoreBatteryOptimizations.isGranted;
       final pending = await _plugin.pendingNotificationRequests();
       return DeviceHealthSnapshot(
         notificationsAllowed: notifications,
         exactAlarmsAllowed: exact,
-        batteryExemption: battery,
+        // Dosely no longer requests the broad battery-exemption permission.
+        // Android's normal alarm delivery and the inexact fallback are the
+        // supported path, so do not report an unrequested exemption as a
+        // reminder failure to the patient or caregiver.
+        batteryExemption: true,
         armedAlarmCount: pending.length,
         checkedAt: DateTime.now().toUtc(),
       );
@@ -755,9 +926,8 @@ class NotificationService {
     // opening the app meant the reminder never came back. A snooze for a
     // schedule that is genuinely going away is still cancelled, by
     // [cancelForSchedule] on the stop/delete path.
-    await _cancelWhere(
-      (_, payload) => payload['timeLabel'] != snoozeTimeLabel,
-    );
+    await _cancelInvalidSnoozes(db, active);
+    await _cancelWhere((_, payload) => payload['timeLabel'] != snoozeTimeLabel);
 
     // Every schedule gets its own try/catch, because the sweep above has
     // already happened: without this, the first schedule that cannot be
@@ -765,11 +935,23 @@ class NotificationService {
     // is the failure this method exists to prevent, so it must not be able
     // to cause it.
     final failures = <String, Object>{};
+    final results = <String, ScheduleArmResult>{};
     for (final sm in active) {
       try {
-        await scheduleForScheduleWithMedicine(sm, skipCancel: true);
+        final result = await scheduleForScheduleWithMedicine(
+          sm,
+          skipCancel: true,
+        );
+        results[sm.schedule.id] = result;
       } catch (error) {
         failures[sm.schedule.id] = error;
+        await DoselyTelemetry.instance.recordError(
+          error is TimezoneUnavailableException
+              ? 'timezone_unavailable'
+              : error is UnschedulableSchedule
+              ? 'invalid_schedule'
+              : 'platform_schedule_failed',
+        );
       }
     }
     if (failures.isNotEmpty) {
@@ -777,11 +959,14 @@ class NotificationService {
       // was previously the only trace a failed-to-arm schedule left anywhere
       // — logged here once, centrally, rather than asking every call site to
       // remember to check `allArmed` itself.
-      debugPrint('[dosely] reconcile: ${failures.length} schedule(s) failed to arm: $failures');
+      debugPrint(
+        '[dosely] reconcile: ${failures.length} schedule(s) failed to arm: $failures',
+      );
     }
     return ReconcileReport(
       armed: active.length - failures.length,
       failures: failures,
+      results: results,
     );
   }
 
@@ -817,6 +1002,7 @@ class NotificationService {
     required DateTime scheduledAt,
   }) async {
     await init();
+    await _requireTimezone();
     final copy = await _copyFor(medicine);
     final local = scheduledAt.toLocal();
     final timeLabel =
@@ -850,7 +1036,11 @@ class NotificationService {
 /// caller can eventually tell the user that a specific reminder is not
 /// running — that part of the design is unbuilt, not the reason this exists.
 class ReconcileReport {
-  const ReconcileReport({required this.armed, required this.failures});
+  const ReconcileReport({
+    required this.armed,
+    required this.failures,
+    this.results = const {},
+  });
 
   /// Schedules whose alarms were armed without error.
   final int armed;
@@ -858,5 +1048,53 @@ class ReconcileReport {
   /// Schedule id to the error that stopped it, for those that failed.
   final Map<String, Object> failures;
 
+  /// Successful per-schedule delivery results for the reliability center.
+  final Map<String, ScheduleArmResult> results;
+
   bool get allArmed => failures.isEmpty;
+}
+
+/// Permission state used by the reminder-health UI. Exact access is a
+/// reliability enhancement, not a prerequisite for saving: Android can use
+/// inexact-while-idle alarms when exact access is unavailable.
+class ReminderPermissionState {
+  const ReminderPermissionState({
+    required this.notificationsAllowed,
+    required this.exactAlarmsAllowed,
+  });
+
+  final bool notificationsAllowed;
+  final bool exactAlarmsAllowed;
+}
+
+class TimezoneUnavailableException implements Exception {
+  const TimezoneUnavailableException(this.cause);
+  final Object? cause;
+
+  @override
+  String toString() => 'Device timezone is unavailable';
+}
+
+/// Result of one schedule's arm attempt. It carries only delivery state, not
+/// medicine content, so it is safe to persist for the reliability center.
+class ScheduleArmResult {
+  const ScheduleArmResult({
+    required this.scheduleId,
+    required this.armedCount,
+    required this.nextAlarmExpectedAt,
+    required this.mode,
+  });
+
+  const ScheduleArmResult.notRequired(this.scheduleId)
+    : armedCount = 0,
+      nextAlarmExpectedAt = null,
+      mode = null;
+
+  final String scheduleId;
+  final int armedCount;
+  final DateTime? nextAlarmExpectedAt;
+  final AndroidScheduleMode? mode;
+
+  bool get isRequired => mode != null;
+  bool get isArmed => !isRequired || armedCount > 0;
 }

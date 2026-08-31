@@ -1,9 +1,9 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Play-required web URL for requesting account deletion without the app.
-/// Rendered from `docs/play-store/delete-account.md` on GitHub.
+/// Rendered from `docs/play-store/delete-account.md` by the public Pages site.
 const deleteAccountWebUrl =
-    'https://github.com/sagnikdas/dosely/blob/main/docs/play-store/delete-account.md';
+    'https://sagnikdas.github.io/dosely/delete-account/';
 
 class AccountDeletionException implements Exception {
   const AccountDeletionException(this.message);
@@ -25,7 +25,9 @@ Future<void> requestServerAccountDeletion() async {
         .invoke('delete_account', body: const <String, dynamic>{})
         .timeout(const Duration(seconds: 20));
   } on FunctionException catch (e) {
-    throw AccountDeletionException(messageForAccountDeletionError(e.details, status: e.status));
+    throw AccountDeletionException(
+      messageForAccountDeletionError(e.details, status: e.status),
+    );
   } catch (_) {
     throw const AccountDeletionException(
       'Could not reach the server. Check your connection and try again. Your account was not deleted.',
@@ -34,7 +36,9 @@ Future<void> requestServerAccountDeletion() async {
 
   final data = response.data;
   if (data is! Map || data['ok'] != true) {
-    throw AccountDeletionException(messageForAccountDeletionError(data, status: response.status));
+    throw AccountDeletionException(
+      messageForAccountDeletionError(data, status: response.status),
+    );
   }
 }
 

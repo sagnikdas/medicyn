@@ -27,15 +27,18 @@ void main() {
       expect(AppSettings.instance.consentCareShare, isFalse);
     });
 
-    test('an existing install that skipped onboarding still has no recorded consents', () async {
-      SharedPreferences.setMockInitialValues({'has_seen_onboarding': true});
-      AppSettings.instance.resetForTest();
-      await AppSettings.instance.init();
+    test(
+      'an existing install that skipped onboarding still has no recorded consents',
+      () async {
+        SharedPreferences.setMockInitialValues({'has_seen_onboarding': true});
+        AppSettings.instance.resetForTest();
+        await AppSettings.instance.init();
 
-      expect(AppSettings.instance.hasSeenOnboarding, isTrue);
-      expect(AppSettings.instance.hasRecordedConsents, isFalse);
-      expect(AppSettings.instance.consentCloudBackup, isFalse);
-    });
+        expect(AppSettings.instance.hasSeenOnboarding, isTrue);
+        expect(AppSettings.instance.hasRecordedConsents, isFalse);
+        expect(AppSettings.instance.consentCloudBackup, isFalse);
+      },
+    );
   });
 
   group('prefs', () {
@@ -66,6 +69,76 @@ void main() {
       AppSettings.instance.resetForTest();
       await AppSettings.instance.init();
       expect(AppSettings.instance.hasRecordedConsents, isTrue);
+    });
+
+    test('processing choices are isolated by account owner', () async {
+      const accountA = 'user-a';
+      const accountB = 'user-b';
+
+      await AppSettings.instance.activateConsentOwner(accountA);
+      await AppSettings.instance.setConsentCloudBackup(true);
+      await AppSettings.instance.setConsentAnthropicParse(true);
+      await AppSettings.instance.setConsentGoogleSpeech(true);
+      await AppSettings.instance.setConsentCareShare(true);
+      await AppSettings.instance.setHasRecordedConsents();
+
+      await AppSettings.instance.activateConsentOwner(accountB);
+      expect(AppSettings.instance.consentOwnerId, accountB);
+      expect(AppSettings.instance.hasRecordedConsents, isFalse);
+      expect(AppSettings.instance.consentCloudBackup, isFalse);
+      expect(AppSettings.instance.consentAnthropicParse, isFalse);
+      expect(AppSettings.instance.consentGoogleSpeech, isFalse);
+      expect(AppSettings.instance.consentCareShare, isFalse);
+
+      await AppSettings.instance.activateConsentOwner(accountA);
+      expect(AppSettings.instance.hasRecordedConsents, isTrue);
+      expect(AppSettings.instance.consentCloudBackup, isTrue);
+      expect(AppSettings.instance.consentAnthropicParse, isTrue);
+      expect(AppSettings.instance.consentGoogleSpeech, isTrue);
+      expect(AppSettings.instance.consentCareShare, isTrue);
+    });
+
+    test(
+      'first-run choices follow the first Google account once, then stay isolated',
+      () async {
+        await AppSettings.instance.setConsentCloudBackup(true);
+        await AppSettings.instance.setConsentGoogleSpeech(true);
+        await AppSettings.instance.setHasRecordedConsents();
+
+        await AppSettings.instance.activateConsentOwnerAfterSignIn(
+          'first-account',
+        );
+        expect(AppSettings.instance.hasRecordedConsents, isTrue);
+        expect(AppSettings.instance.consentCloudBackup, isTrue);
+        expect(AppSettings.instance.consentGoogleSpeech, isTrue);
+
+        await AppSettings.instance.activateConsentOwner('second-account');
+        expect(AppSettings.instance.hasRecordedConsents, isFalse);
+        expect(AppSettings.instance.consentCloudBackup, isFalse);
+        expect(AppSettings.instance.consentGoogleSpeech, isFalse);
+      },
+    );
+
+    test('legacy device-wide choices migrate only to local owner', () async {
+      SharedPreferences.setMockInitialValues({
+        'has_recorded_consents': true,
+        'consent_cloud_backup': true,
+      });
+      AppSettings.instance.resetForTest();
+
+      await AppSettings.instance.init(consentOwnerId: 'signed-in-user');
+      expect(AppSettings.instance.hasRecordedConsents, isFalse);
+      expect(AppSettings.instance.consentCloudBackup, isFalse);
+
+      await AppSettings.instance.activateConsentOwner(
+        AppSettings.localConsentOwnerId,
+      );
+      expect(AppSettings.instance.hasRecordedConsents, isTrue);
+      expect(AppSettings.instance.consentCloudBackup, isTrue);
+
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.containsKey('has_recorded_consents'), isFalse);
+      expect(prefs.containsKey('consent_cloud_backup'), isFalse);
     });
   });
 
@@ -98,7 +171,10 @@ void main() {
     });
 
     test('first screen does not include care-share', () {
-      expect(ConsentPurpose.firstScreen, isNot(contains(ConsentPurpose.careShare)));
+      expect(
+        ConsentPurpose.firstScreen,
+        isNot(contains(ConsentPurpose.careShare)),
+      );
       expect(ConsentPurpose.firstScreen, hasLength(3));
     });
   });
@@ -117,25 +193,39 @@ void main() {
 
     test('skips when there is nothing to parse, even if granted', () {
       expect(
-        shouldParseMedicine(anthropicGranted: true, ocrText: '', transcript: ''),
+        shouldParseMedicine(
+          anthropicGranted: true,
+          ocrText: '',
+          transcript: '',
+        ),
         isFalse,
       );
     });
 
     test('parses when granted and there is label or speech text', () {
       expect(
-        shouldParseMedicine(anthropicGranted: true, ocrText: 'Aspirin', transcript: ''),
+        shouldParseMedicine(
+          anthropicGranted: true,
+          ocrText: 'Aspirin',
+          transcript: '',
+        ),
         isTrue,
       );
       expect(
-        shouldParseMedicine(anthropicGranted: true, ocrText: '', transcript: 'one at night'),
+        shouldParseMedicine(
+          anthropicGranted: true,
+          ocrText: '',
+          transcript: 'one at night',
+        ),
         isTrue,
       );
     });
   });
 
   group('ConsentScreen', () {
-    testWidgets('shows three unticked purposes and Continue is enabled', (tester) async {
+    testWidgets('shows three unticked purposes and Continue is enabled', (
+      tester,
+    ) async {
       await tester.pumpWidget(const MaterialApp(home: ConsentScreen()));
 
       final switches = tester.widgetList<Switch>(find.byType(Switch)).toList();
@@ -154,7 +244,9 @@ void main() {
       expect(continueButton.onPressed, isNotNull);
     });
 
-    testWidgets('Continue records consents even when everything stays off', (tester) async {
+    testWidgets('Continue records consents even when everything stays off', (
+      tester,
+    ) async {
       await tester.pumpWidget(const MaterialApp(home: ConsentScreen()));
 
       await tester.tap(find.text('Continue'));

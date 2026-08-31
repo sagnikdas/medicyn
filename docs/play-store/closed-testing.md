@@ -30,21 +30,16 @@ rule in Console; Google has changed it before.
 
 4. Keep one or two of your own phones ready for the first Play install.
 
-5. Host the legal pages on a **public** https site. The copies in this
-   private repo 404 for Play. Do **not** use a private GitHub blob URL.
+5. Host the legal pages on a **public** https site. This repository includes
+   a GitHub Pages workflow that publishes the current policy and deletion
+   source files. Enable Pages for the repository, wait for the workflow, and
+   verify these URLs in a private browser window before continuing:
 
-   1. Create a **public** GitHub repo (for example `dosely-legal`) or a
-      public gist.
-   2. Copy [`PRIVACY.md`](../compliance/PRIVACY.md) into it unchanged. That
-      URL is the Play privacy-policy field.
-   3. Copy [`docs/play-store/delete-account.md`](delete-account.md) into it
-      unchanged. That URL is the Play account-deletion field.
-   4. Optionally copy [`docs/compliance/MHMD.md`](../compliance/MHMD.md) if
-      you also want a public Washington consumer-health URL.
-   5. Open each URL in a private browser window. If GitHub asks you to log
-      in, Play cannot read it either — fix hosting before continuing.
-   6. Write down the two (or three) public URLs. You paste them in steps 26
-      and 33. Contact on the pages is already **sagnikd91@gmail.com**.
+   - `https://sagnikdas.github.io/dosely/privacy/`
+   - `https://sagnikdas.github.io/dosely/delete-account/`
+   - `https://sagnikdas.github.io/dosely/support/`
+
+   If any URL asks for a GitHub login or does not load, Play cannot read it.
 
 6. Understand the `.jks`: Play does **not** give you this file. You create
    it on this Mac with Java `keytool`. Play only receives the AAB you sign
@@ -253,15 +248,11 @@ rule in Console; Google has changed it before.
 35. Restricted permissions — declare each of these, using the same
     justifications as `PLAY-DATA-SAFETY.md`:
 
-    1. `SCHEDULE_EXACT_ALARM` / `USE_EXACT_ALARM` — alarm at the wall-clock
-       time, screen locked, no live process.
-    2. `USE_FULL_SCREEN_INTENT` — patient reminder is an alarm. Care alerts
-       must **not** use this.
-    3. `POST_NOTIFICATIONS` — reminders and care alerts.
-    4. `CAMERA` — label OCR; photo not kept.
-    5. `RECORD_AUDIO` — voice input, only if that consent is on.
-    6. `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` — OEMs otherwise kill exact
-       alarms; the user can refuse.
+    1. `SCHEDULE_EXACT_ALARM` — requested when a saved reminder needs exact
+       timing; inexact-while-idle fallback is shown when unavailable.
+    2. `POST_NOTIFICATIONS` — reminders and care alerts.
+    3. `CAMERA` — label OCR; photo not kept.
+    4. `RECORD_AUDIO` — voice input, only if that consent is on.
 
 36. App access / login: state that local reminders work without an account,
     backup and family sharing use Google Sign-In, and you are not providing

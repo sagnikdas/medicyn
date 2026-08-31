@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../core/account_deletion.dart';
@@ -9,12 +11,15 @@ import '../../core/widgets/dosely_motion.dart';
 import '../../data/export/data_export_service.dart';
 import '../../data/local/database.dart';
 import '../../data/local/encrypted_database.dart';
+import '../../data/remote/sync_service.dart';
+import '../../data/remote/sync_status.dart';
 import '../auth/auth_service.dart';
 import '../care/care_screen.dart';
 import '../care/care_service.dart';
 import '../consent/consent_purpose.dart';
 import '../consent/consent_service.dart';
 import '../notification_engine/notification_service.dart';
+import '../notification_engine/reminder_reliability_screen.dart';
 
 /// Deliberately sparse — there's almost nothing to configure by design.
 /// Notification sound/vibration follow the OS channel settings (opened via
@@ -26,13 +31,22 @@ import '../notification_engine/notification_service.dart';
 /// unless the user overrides it here, and whether a locked phone may show
 /// which medicine is due.
 class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({super.key, required this.db, this.embedded = false});
+  const SettingsScreen({
+    super.key,
+    required this.db,
+    this.embedded = false,
+    this.active = true,
+  });
 
   final AppDatabase db;
 
   /// True when this screen is the Profile tab, so it draws the Stitch
   /// header instead of a "Settings" app bar.
   final bool embedded;
+
+  /// The shell keeps Profile mounted in an IndexedStack. Reset the settings
+  /// list when the tab becomes active so it always opens at the beginning.
+  final bool active;
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -42,6 +56,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _signingIn = false;
   String? _signInError;
   bool _exporting = false;
+  late final ScrollController _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_refreshSyncStatus());
+  }
+
+  @override
+  void didUpdateWidget(covariant SettingsScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!oldWidget.active && widget.active) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_scrollController.hasClients) return;
+        _scrollController.jumpTo(0);
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
 
   bool get _signedIn => AuthService.instance.isSignedIn;
 
@@ -62,11 +100,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget build(BuildContext context) {
     final email = AuthService.instance.currentUser?.email ?? '';
     final name = email.contains('@') ? email.split('@').first : email;
+    final avatarUrl = AuthService.instance.currentUserAvatarUrl;
     return Scaffold(
       appBar: widget.embedded ? null : AppBar(title: const Text('Settings')),
       body: SafeArea(
         child: DoselyContent(
           child: ListView(
+            controller: _scrollController,
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
             children: [
               if (widget.embedded) ...[
@@ -83,6 +123,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           foregroundColor: Theme.of(
                             context,
                           ).colorScheme.onSecondaryContainer,
+                          foregroundImage: avatarUrl == null
+                              ? null
+                              : NetworkImage(avatarUrl),
                           child: Text(
                             (name.isEmpty ? 'D' : name.substring(0, 1))
                                 .toUpperCase(),
@@ -223,6 +266,63 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                     ),
                     const SizedBox(height: 24),
+                    ListenableBuilder(
+                      listenable: SyncStatusStore.instance,
+                      builder: (context, _) => _BackupStatusCard(
+                        signedIn: _signedIn,
+                        onRetry: _retrySync,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Text(
+                      'Reminder reliability',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    ProfileMenuRow(
+                      icon: Icons.notifications_active_outlined,
+                      title: 'Check reminder access',
+                      subtitle:
+                          'See whether notifications and timing are ready, then send a test reminder.',
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              ReminderReliabilityScreen(db: widget.db),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Text(
+                      'Dose responses',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    ListenableBuilder(
+                      listenable: AppSettings.instance,
+                      builder: (context, _) => DropdownButtonFormField<int>(
+                        initialValue: AppSettings.instance.snoozeMinutes,
+                        decoration: const InputDecoration(
+                          labelText: 'Snooze duration',
+                        ),
+                        items: [
+                          for (final minutes in AppSettings.snoozeOptions)
+                            DropdownMenuItem(
+                              value: minutes,
+                              child: Text('$minutes minutes'),
+                            ),
+                        ],
+                        onChanged: (value) {
+                          if (value != null) {
+                            unawaited(_setSnoozeMinutes(value));
+                          }
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 24),
                     Text(
                       'Appearance',
                       style: Theme.of(context).textTheme.titleSmall?.copyWith(
@@ -294,10 +394,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           onSelectionChanged: (s) =>
                               AppSettings.instance.setThemeMode(s.first),
                           showSelectedIcon: false,
-                          style: const ButtonStyle(
-                            visualDensity: VisualDensity.compact,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          ),
                         ),
                       ),
                     ),
@@ -434,7 +530,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         context: context,
         builder: (dialogContext) => AlertDialog(
           title: const Text('Could not export'),
-          content: Text('$e'),
+          content: const Text(
+            'Your data could not be prepared right now. Check your storage and try again.',
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(),
@@ -448,6 +546,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  Future<void> _refreshSyncStatus() async {
+    final ownerId = AppSettings.instance.consentOwnerId;
+    if (ownerId == null) return;
+    await SyncStatusStore.instance.refresh(ownerId: ownerId, db: widget.db);
+  }
+
+  Future<void> _retrySync() async {
+    final ownerId = AppSettings.instance.consentOwnerId;
+    if (!_signedIn || ownerId == null) return;
+    await SyncStatusStore.instance.markSyncing(ownerId);
+    try {
+      await SyncService(widget.db).syncAll();
+      await SyncStatusStore.instance.refresh(
+        ownerId: ownerId,
+        db: widget.db,
+        successful: AppSettings.instance.consentCloudBackup,
+      );
+    } catch (_) {
+      await SyncStatusStore.instance.refresh(
+        ownerId: ownerId,
+        db: widget.db,
+        errorCode: 'sync_failed',
+      );
+    }
+  }
+
   /// Already-armed alarms still carry the old title and visibility, so a
   /// toggle that only wrote the pref would not take effect until the next
   /// app foreground. Re-arm here so the lock screen matches the switch.
@@ -457,6 +581,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
       await NotificationService.instance.reconcileFromDisk();
     } catch (_) {
       // Next foreground re-arms; the pref is already stored.
+    }
+  }
+
+  Future<void> _setSnoozeMinutes(int minutes) async {
+    await AppSettings.instance.setSnoozeMinutes(minutes);
+    // Notification action labels and payload details are stored when the
+    // alarm is armed. Reconcile so an already-armed notification does not
+    // continue offering the previous duration.
+    try {
+      await NotificationService.instance.reconcileFromDisk();
+    } catch (_) {
+      // The preference is already saved; the next foreground reconcile will
+      // update any existing alarms.
     }
   }
 
@@ -485,7 +622,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       // failed — fail open rather than block turning consent off.
     }
     final linkedAsPatient =
-        link != null && link.status == CareLinkStatus.active && link.patientId == me;
+        link != null &&
+        link.status == CareLinkStatus.active &&
+        link.patientId == me;
     if (!linkedAsPatient) {
       await ConsentService.instance.setGranted(purpose, value);
       return;
@@ -687,5 +826,65 @@ class _SettingsScreenState extends State<SettingsScreen> {
     await AuthService.instance.signOut();
     await wipeEncryptedDatabaseForUser(userId);
     navigator.popUntil((r) => r.isFirst);
+  }
+}
+
+class _BackupStatusCard extends StatelessWidget {
+  const _BackupStatusCard({required this.signedIn, required this.onRetry});
+
+  final bool signedIn;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final status = SyncStatusStore.instance;
+    final scheme = Theme.of(context).colorScheme;
+    final enabled = status.backupEnabled;
+    final waiting = status.pendingWork > 0;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  enabled
+                      ? (waiting
+                            ? Icons.cloud_upload_outlined
+                            : Icons.cloud_done_outlined)
+                      : Icons.cloud_off_outlined,
+                  color: enabled ? scheme.primary : scheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Backup',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+                if (signedIn && enabled)
+                  TextButton(
+                    onPressed: status.syncing ? null : onRetry,
+                    child: const Text('Retry'),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(status.summary, style: Theme.of(context).textTheme.bodyMedium),
+            const SizedBox(height: 4),
+            Text(
+              enabled
+                  ? 'Your local reminders keep working even while backup is waiting.'
+                  : signedIn
+                  ? 'Turn on Cloud backup below when you want another device to restore this data.'
+                  : 'Sign in when you want to enable backup on another device.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

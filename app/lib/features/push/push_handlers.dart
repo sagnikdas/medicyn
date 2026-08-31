@@ -39,7 +39,9 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     // foreground. reconcile would then re-arm from an unchanged database,
     // so an edit made on the other phone never reached this one until
     // someone happened to open the app.
-    await AppSettings.instance.init();
+    final ownerId = Supabase.instance.client.auth.currentUser?.id;
+    if (ownerId == null) return;
+    await AppSettings.instance.init(consentOwnerId: ownerId);
   } catch (_) {
     // Already initialized (Android sometimes reuses a warm isolate), or
     // genuinely unavailable. Either way the pull below will tell us.

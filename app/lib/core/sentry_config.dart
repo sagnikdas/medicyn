@@ -8,5 +8,5 @@
 /// one in via a build-time define) before shipping a release build that
 /// should actually report crashes.
 class SentryConfig {
-  static const dsn = '';
+  static const dsn = String.fromEnvironment('SENTRY_DSN');
 }

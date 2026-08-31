@@ -2,6 +2,7 @@ import 'package:timezone/timezone.dart' as tz;
 
 import '../../data/local/database.dart';
 import '../../data/local/tables.dart';
+import '../../data/local/lifecycle.dart';
 import '../notification_engine/expected_doses.dart';
 import '../notification_engine/missed_doses.dart';
 
@@ -192,7 +193,10 @@ List<DayOccurrence> occurrencesOnDay({
     // or missed log from a reminder that was later turned off. History has
     // to stay visible; we just must not invent pending/notRecorded for a
     // schedule that is no longer firing.
-    final live = schedule.active && !schedule.deleted && !item.medicine.deleted;
+    final live =
+        reminderIsActive(schedule, at: now) &&
+        !schedule.deleted &&
+        !item.medicine.deleted;
     if (!live) {
       out.addAll(
         _occurrencesFromLogsOnly(
@@ -215,13 +219,24 @@ List<DayOccurrence> occurrencesOnDay({
               ),
             )
             .toList();
+    // A snooze belongs to the reminder definition that was active when the
+    // user pressed it. If the schedule was edited afterwards, ignore that
+    // old snooze so it cannot hide the newly edited occurrence (the immutable
+    // log remains available in History).
+    final currentScheduleLogs = scheduleLogs
+        .where(
+          (log) =>
+              log.action != DoseAction.snoozed ||
+              !log.loggedAt.isBefore(schedule.updatedAt),
+        )
+        .toList();
     for (var i = 0; i < dues.length; i++) {
       final due = dues[i];
       final nextDue = i + 1 < dues.length ? dues[i + 1] : dayEnd;
       final record = _winningLog(
         due: due,
         nextDue: nextDue,
-        logs: scheduleLogs,
+        logs: currentScheduleLogs,
         now: now,
         snoozeWindow: snoozeWindow,
       );
@@ -398,14 +413,6 @@ List<DayOccurrence> attentionDoses({
     }
   }
   return out;
-}
-
-/// Upcoming later today — not already on the attention list.
-DayOccurrence? nextUpcomingDose(List<DayOccurrence> todayOccs) {
-  final upcoming =
-      todayOccs.where((o) => o.status == DayDoseStatus.upcoming).toList()
-        ..sort((a, b) => a.scheduledAt.compareTo(b.scheduledAt));
-  return upcoming.isEmpty ? null : upcoming.first;
 }
 
 bool doseCanSnooze(DayDoseStatus status) {

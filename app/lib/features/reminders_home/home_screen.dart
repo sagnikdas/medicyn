@@ -6,18 +6,21 @@ import '../../core/app_settings.dart';
 import '../../core/motion.dart';
 import '../../core/widgets/dosely_chrome.dart';
 import '../../core/widgets/dosely_motion.dart';
+import '../../core/telemetry.dart';
 import '../../data/local/database.dart';
+import '../../data/local/tables.dart';
 import '../../data/remote/care_notifier.dart';
 import '../../data/remote/sync_service.dart';
+import '../../data/remote/sync_status.dart';
 import '../auth/auth_service.dart';
 import '../capture_ocr/ocr_capture_screen.dart';
 import '../care/care_service.dart';
-import '../consent/consent_purpose.dart';
-import '../consent/consent_service.dart';
 import '../history/dose_history_screen.dart';
 import '../notification_engine/missed_doses.dart';
 import '../notification_engine/notification_actions.dart';
+import '../notification_engine/reminder_health.dart';
 import '../notification_engine/notification_service.dart';
+import '../notification_engine/reminder_reliability_screen.dart';
 import '../push/push_service.dart';
 import '../review_edit/review_edit_screen.dart';
 import '../voice_capture/voice_capture_screen.dart';
@@ -30,18 +33,17 @@ import 'refill.dart';
 
 enum _ReminderDisposition { stop, deleteHistory }
 
+enum _CaptureMethod { scan, speak, manual }
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
     super.key,
     required this.db,
-    this.onAvatarTap,
     this.onNames,
     this.onNeedsAttention,
+    this.active = true,
   });
   final AppDatabase db;
-
-  /// Opens the Profile tab when this screen is hosted in [AppShell].
-  final VoidCallback? onAvatarTap;
 
   /// Lets the Plan tab show the same edit-attribution names Home loaded.
   final ValueChanged<Map<String, String>>? onNames;
@@ -49,6 +51,10 @@ class HomeScreen extends StatefulWidget {
   /// Switch to the Today tab when a dose needs answering, so opening the
   /// app from Plan or Insights still lands on Taken / Snooze.
   final VoidCallback? onNeedsAttention;
+
+  /// The shell keeps Today mounted in an IndexedStack. Reset its calendar
+  /// list when the user enters the tab so it always opens at the beginning.
+  final bool active;
 
   @override
   HomeScreenState createState() => HomeScreenState();
@@ -66,18 +72,22 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   // every calendar day tap. Over a full 24 months of retained history that
   // measured 24ms of query and subscription churn per rebuild against
   // 2.5ms for a stream opened once.
-  late final Stream<List<ScheduleWithMedicine>> _schedulesStream =
-      widget.db.watchSchedulesWithMedicines();
+  late final Stream<List<ScheduleWithMedicine>> _schedulesStream = widget.db
+      .watchSchedulesWithMedicines();
   late final Stream<List<DoseLog>> _doseLogsStream = widget.db.watchDoseLogs();
   final _scroll = ScrollController();
   bool _calendarMonth = false;
   List<DayOccurrence> _ringIfLeft = const [];
+  final _dismissedAttentionUntil = <String, DateTime>{};
+  final _attentionScheduleVersions = <String, DateTime>{};
+  var _attentionWasPresent = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _bootstrap(requestPermissions: true);
+    doseResponseEvents.addListener(_onDoseResponse);
+    _bootstrap(firstLoad: true);
     // Upcoming → pending has to flip when the clock time passes, not only
     // when the user comes back from another screen. Fifteen seconds is
     // short enough to notice an alarm that fired while the app is open.
@@ -94,8 +104,36 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void dispose() {
     _clock?.cancel();
     _scroll.dispose();
+    doseResponseEvents.removeListener(_onDoseResponse);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant HomeScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!oldWidget.active && widget.active) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_scroll.hasClients) return;
+        _scroll.jumpTo(0);
+      });
+    }
+  }
+
+  void _onDoseResponse() {
+    final event = doseResponseEvents.value;
+    if (!mounted || event == null || event.action != DoseAction.snoozed) {
+      return;
+    }
+    final delay = Duration(minutes: AppSettings.instance.snoozeMinutes);
+    setState(() {
+      _dismissedAttentionUntil[_attentionKeyForValues(
+        event.scheduleId,
+        event.scheduledAt,
+      )] = DateTime.now().add(
+        delay,
+      );
+    });
   }
 
   @override
@@ -107,11 +145,8 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (state == AppLifecycleState.paused) unawaited(_reRingUnanswered());
   }
 
-  /// [requestPermissions] only on the first run, from `initState`. Asking on
-  /// every resume meant that anyone who declined the battery-optimisation
-  /// exemption got the system dialog thrown at them again every single time
-  /// they returned to the app — the permission requests are one-time asks,
-  /// while the re-arming below is what actually needs to happen on resume.
+  /// Permission prompts belong to reminder Save, where the user understands
+  /// why Android is asking. Home only reads and surfaces the resulting state.
   ///
   /// The same flag gates the *full* Supabase pull, for the same reason:
   /// restoring dose-log history wholesale matters on a fresh install or a new
@@ -120,34 +155,36 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   /// schedules, and contest notes are cheap, and skipping them would let the
   /// push that follows blind-overwrite an edit made elsewhere while this
   /// device was away.
-  Future<void> _bootstrap({bool requestPermissions = false}) async {
+  Future<void> _bootstrap({bool firstLoad = false}) async {
     await NotificationService.instance.init();
-    if (requestPermissions) {
-      await NotificationService.instance.requestPermissions();
-    }
     final signedIn = AuthService.instance.currentUser != null;
-    if (signedIn && requestPermissions) {
+    if (signedIn && firstLoad) {
       // Also backfills a profile for anyone who signed in before profiles
       // existed — without it their name never appears on the other side of a
       // link, and nothing would ever create the row.
       unawaited(CareService.instance.upsertOwnProfile());
-      // Only needs the navigator, which exists by now. Not in `main`, where
-      // PushService.init runs: a tapped alert has nowhere to open a feed
-      // before runApp.
-      unawaited(PushService.instance.attachForegroundListeners(db: widget.db));
     }
     // Local-only has no JWT, so Care Link RPCs and FCM registration stay
     // off until the user signs in from Settings.
-    if (signedIn) {
+    if (signedIn && AppSettings.instance.consentCareShare) {
+      // Only needs the navigator, which exists by now. It is deliberately
+      // account/consent gated rather than attached globally at startup.
+      unawaited(PushService.instance.attachForegroundListeners(db: widget.db));
       unawaited(PushService.instance.registerToken());
     }
     final sync = signedIn ? SyncService(widget.db) : null;
+    final syncOwner = AppSettings.instance.consentOwnerId;
+    if (sync != null &&
+        syncOwner != null &&
+        AppSettings.instance.consentCloudBackup) {
+      await SyncStatusStore.instance.markSyncing(syncOwner);
+    }
     // Pull before reconcile: a fresh install/new device has no local
     // schedules yet, so restoring them from Supabase first means reconcile
     // arms their alarms in this same pass instead of waiting for the next
     // resume.
     if (sync != null) {
-      if (requestPermissions) {
+      if (firstLoad) {
         await sync.pullAll();
       } else {
         await sync.pullEditableTables();
@@ -158,7 +195,28 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     // Reconcile afterwards puts the repeating series back (cancel of a
     // fired daily id also drops AlarmManager for that id).
     await NotificationService.instance.dismissActiveReminderNotifications();
-    await NotificationService.instance.reconcile(widget.db);
+    final reconcile = await NotificationService.instance.reconcile(widget.db);
+    final ownerId = AppSettings.instance.consentOwnerId;
+    if (ownerId != null) {
+      final permissions = await NotificationService.instance
+          .readPermissionState();
+      await ReminderHealthStore.instance.updateFromReconcile(
+        ownerId: ownerId,
+        report: reconcile,
+        permissions: permissions,
+        timezoneReady: NotificationService.instance.timezoneReady,
+      );
+      await DoselyTelemetry.instance.record(
+        DoselyEvent.reminderArmResult,
+        properties: {
+          'result': reconcile.allArmed ? 'all_armed' : 'degraded',
+          'count_bucket': DoselyTelemetry.countBucket(reconcile.armed),
+          'error_code': reconcile.failures.isEmpty
+              ? null
+              : 'platform_schedule_failed',
+        },
+      );
+    }
     if (signedIn) {
       unawaited(_reportHealth());
       unawaited(_refreshNames());
@@ -171,9 +229,19 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
     // Before the push, so a dose recorded as missed goes up in the same pass
     // and reaches the other side without waiting for another foreground.
-    await const MissedDoseDetector().sweep(widget.db);
+    await const MissedDoseDetector().sweep(
+      widget.db,
+      snoozeWindow: Duration(minutes: AppSettings.instance.snoozeMinutes),
+    );
     if (sync == null) return;
     await sync.syncAll();
+    if (syncOwner != null) {
+      await SyncStatusStore.instance.refresh(
+        ownerId: syncOwner,
+        db: widget.db,
+        successful: AppSettings.instance.consentCloudBackup,
+      );
+    }
 
     // Care alerts name dose-log ids the server reads back. Without cloud
     // backup there is no push, so there is nothing to announce.
@@ -258,29 +326,90 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Future<void> delete(ScheduleWithMedicine item) => _delete(item);
 
   Future<void> _startCapture() async {
-    final ocrText = await Navigator.of(
-      context,
-    ).push<String>(MaterialPageRoute(builder: (_) => const OcrCaptureScreen()));
-    if (ocrText == null || !mounted) return;
-
-    var transcript = '';
-    if (ConsentService.instance.isGranted(ConsentPurpose.googleSpeech)) {
-      final spoken = await Navigator.of(context).push<String>(
-        MaterialPageRoute(builder: (_) => const VoiceCaptureScreen()),
-      );
-      if (spoken == null || !mounted) return;
-      transcript = spoken;
-    }
-
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => ReviewEditScreen(
-          ocrText: ocrText,
-          transcript: transcript,
-          db: widget.db,
+    // Selecting a method is intentionally separate from opening the capture
+    // screen: camera and microphone permissions are requested only after the
+    // user has made that choice.
+    final method = await showModalBottomSheet<_CaptureMethod>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'How do you want to add it?',
+                style: Theme.of(sheetContext).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Choose one. You can check every detail before saving.',
+                style: Theme.of(sheetContext).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 12),
+              ListTile(
+                minTileHeight: 56,
+                leading: const Icon(Icons.document_scanner_outlined),
+                title: const Text('Scan label'),
+                subtitle: const Text('Use your camera to read the label'),
+                onTap: () => Navigator.pop(sheetContext, _CaptureMethod.scan),
+              ),
+              ListTile(
+                minTileHeight: 56,
+                leading: const Icon(Icons.mic_outlined),
+                title: const Text('Speak details'),
+                subtitle: const Text('Say the medicine and schedule'),
+                onTap: () => Navigator.pop(sheetContext, _CaptureMethod.speak),
+              ),
+              ListTile(
+                minTileHeight: 56,
+                leading: const Icon(Icons.edit_outlined),
+                title: const Text('Enter manually'),
+                subtitle: const Text('Type the details yourself'),
+                onTap: () => Navigator.pop(sheetContext, _CaptureMethod.manual),
+              ),
+            ],
+          ),
         ),
       ),
     );
+    if (!mounted || method == null) return;
+
+    await DoselyTelemetry.instance.record(
+      DoselyEvent.addStarted,
+      properties: {'method': method.name},
+    );
+    if (!mounted) return;
+    final navigator = Navigator.of(context);
+    switch (method) {
+      case _CaptureMethod.scan:
+        final ocrText = await navigator.push<String>(
+          MaterialPageRoute(builder: (_) => const OcrCaptureScreen()),
+        );
+        if (ocrText == null || !mounted) return;
+        await navigator.push(
+          MaterialPageRoute(
+            builder: (_) => ReviewEditScreen(ocrText: ocrText, db: widget.db),
+          ),
+        );
+      case _CaptureMethod.speak:
+        final transcript = await navigator.push<String>(
+          MaterialPageRoute(builder: (_) => const VoiceCaptureScreen()),
+        );
+        if (transcript == null || !mounted) return;
+        await navigator.push(
+          MaterialPageRoute(
+            builder: (_) =>
+                ReviewEditScreen(transcript: transcript, db: widget.db),
+          ),
+        );
+      case _CaptureMethod.manual:
+        await navigator.push(
+          MaterialPageRoute(builder: (_) => ReviewEditScreen(db: widget.db)),
+        );
+    }
   }
 
   Future<void> _edit(ScheduleWithMedicine item) => Navigator.of(context).push(
@@ -360,24 +489,29 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: DoselyTopBar(
-        onAvatarTap: widget.onAvatarTap,
-        avatarLabel: AuthService.instance.currentUser?.email,
-      ),
-      body: StreamBuilder<List<ScheduleWithMedicine>>(
-        stream: _schedulesStream,
-        builder: (context, scheduleSnap) {
-          return StreamBuilder<List<DoseLog>>(
-            stream: _doseLogsStream,
-            builder: (context, logSnap) {
-              return _calendarBody(
-                schedules: scheduleSnap.data ?? const [],
-                logs: logSnap.data ?? const [],
-              );
-            },
-          );
-        },
+    return ListenableBuilder(
+      listenable: ReminderHealthStore.instance,
+      builder: (context, _) => Scaffold(
+        appBar: AppBar(
+          automaticallyImplyLeading: false,
+          toolbarHeight: 64,
+          titleSpacing: 20,
+          title: const DoselyBrandMark(compact: true),
+        ),
+        body: StreamBuilder<List<ScheduleWithMedicine>>(
+          stream: _schedulesStream,
+          builder: (context, scheduleSnap) {
+            return StreamBuilder<List<DoseLog>>(
+              stream: _doseLogsStream,
+              builder: (context, logSnap) {
+                return _calendarBody(
+                  schedules: scheduleSnap.data ?? const [],
+                  logs: logSnap.data ?? const [],
+                );
+              },
+            );
+          },
+        ),
       ),
     );
   }
@@ -386,7 +520,30 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     required List<ScheduleWithMedicine> schedules,
     required List<DoseLog> logs,
   }) {
+    // A snooze dismissal is tied to the reminder version the user answered.
+    // If that reminder is edited while the same occurrence is still visible,
+    // clear the old attention suppression so the new definition can surface
+    // immediately instead of waiting for the old snooze timeout.
+    final scheduleVersions = {
+      for (final item in schedules) item.schedule.id: item.schedule.updatedAt,
+    };
+    final editedScheduleIds = <String>{};
+    for (final entry in scheduleVersions.entries) {
+      final previous = _attentionScheduleVersions[entry.key];
+      if (previous != null && previous != entry.value) {
+        editedScheduleIds.add(entry.key);
+      }
+    }
+    if (editedScheduleIds.isNotEmpty) {
+      _dismissedAttentionUntil.removeWhere(
+        (key, _) => editedScheduleIds.contains(key.split('|').first),
+      );
+    }
+    _attentionScheduleVersions
+      ..clear()
+      ..addAll(scheduleVersions);
     final now = DateTime.now();
+    final snoozeWindow = Duration(minutes: AppSettings.instance.snoozeMinutes);
     final records = <DoseRecord>[
       for (final log in logs) ?DoseRecord.tryFromLog(log),
     ];
@@ -399,6 +556,7 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       rangeStart: rangeStart,
       rangeEnd: rangeEnd,
       now: now,
+      snoozeWindow: snoozeWindow,
     );
     final calendarMarks = {
       for (final e in cellMarks.entries)
@@ -415,6 +573,7 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       index: logIndex,
       day: _selectedDay,
       now: now,
+      snoozeWindow: snoozeWindow,
     );
     final today = calendarDay(now);
     final todayOccs = isSameCalendarDay(_selectedDay, now)
@@ -424,30 +583,52 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             logs: records,
             day: today,
             now: now,
+            snoozeWindow: snoozeWindow,
           );
     final yesterdayOccs = occurrencesOnDay(
       items: schedules,
       logs: records,
       day: addCalendarDays(today, -1),
       now: now,
+      snoozeWindow: snoozeWindow,
     );
-    final attention = attentionDoses(
+    final allAttention = attentionDoses(
       today: todayOccs,
       yesterday: yesterdayOccs,
     );
+    final nowForAttention = DateTime.now();
+    _dismissedAttentionUntil.removeWhere(
+      (_, until) => !until.isAfter(nowForAttention),
+    );
+    final attention = [
+      for (final occurrence in allAttention)
+        if (occurrence.status != DayDoseStatus.snoozed &&
+            !(_dismissedAttentionUntil[_attentionKey(occurrence)]?.isAfter(
+                  nowForAttention,
+                ) ??
+                false))
+          occurrence,
+    ];
     _ringIfLeft = [
       for (final o in attention)
         if (doseStillRings(o.status)) o,
     ];
-    if (attention.isNotEmpty) {
+    // Focus Today once when an unanswered dose first appears. The panel stays
+    // available there, but repeatedly requesting the shell to jump back on
+    // every rebuild would trap the user on Today and make the other tabs
+    // impossible to use until they answered the dose.
+    if (attention.isEmpty) {
+      _attentionWasPresent = false;
+    } else if (attentionNeedsInitialFocus(
+      wasPresent: _attentionWasPresent,
+      isPresent: true,
+    )) {
+      _attentionWasPresent = true;
       final jump = widget.onNeedsAttention;
       if (jump != null) {
         WidgetsBinding.instance.addPostFrameCallback((_) => jump());
       }
     }
-    final next = isSameCalendarDay(_selectedDay, now)
-        ? nextUpcomingDose(todayOccs)
-        : null;
     final takenCount = occurrences
         .where((o) => o.status == DayDoseStatus.taken)
         .length;
@@ -499,6 +680,19 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               ),
             ),
           ),
+        if (ReminderHealthStore.instance.hasIssues)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+              child: _ReminderHealthCard(
+                onFix: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => ReminderReliabilityScreen(db: widget.db),
+                  ),
+                ),
+              ),
+            ),
+          ),
         HomeCalendarSliver(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
@@ -510,24 +704,6 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               onMonthExpandedChanged: _onMonthExpandedChanged,
               onSelectDay: (day) => setState(() => _selectedDay = day),
             ),
-          ),
-        ),
-        SliverToBoxAdapter(
-          child: AnimatedSize(
-            duration: DoselyMotion.duration(context, DoselyMotion.medium),
-            curve: DoselyMotion.decelerate,
-            alignment: Alignment.topCenter,
-            child: next == null
-                ? const SizedBox.shrink()
-                : Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-                    child: DoselyFadeIn(
-                      child: _NextDoseCard(
-                        occurrence: next,
-                        onMarkTaken: () => _markTaken(next),
-                      ),
-                    ),
-                  ),
           ),
         ),
         if (expectedCount > 0)
@@ -584,11 +760,33 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _snooze(DayOccurrence occurrence) async {
-    await recordDoseSnoozed(
-      widget.db,
-      scheduleId: occurrence.item.schedule.id,
-      scheduledAt: occurrence.scheduledAt,
-    );
+    final delay = Duration(minutes: AppSettings.instance.snoozeMinutes);
+    // Remove the card before waiting on SQLite or the notification plugin.
+    // The scheduled one-off reminder remains the way this dose returns to the
+    // user's attention after the snooze window.
+    if (mounted) {
+      setState(() {
+        _dismissedAttentionUntil[_attentionKey(occurrence)] = DateTime.now()
+            .add(delay);
+      });
+    }
+    try {
+      await recordDoseSnoozed(
+        widget.db,
+        scheduleId: occurrence.item.schedule.id,
+        scheduledAt: occurrence.scheduledAt,
+        delay: delay,
+      );
+    } catch (_) {
+      // If saving the snooze failed, restore the card so the dose is still
+      // actionable instead of silently hiding it.
+      if (mounted) {
+        setState(
+          () => _dismissedAttentionUntil.remove(_attentionKey(occurrence)),
+        );
+      }
+      rethrow;
+    }
     if (AuthService.instance.currentUser == null) return;
     unawaited(SyncService(widget.db).syncAll());
   }
@@ -605,124 +803,74 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 }
 
-class _NextDoseCard extends StatefulWidget {
-  const _NextDoseCard({required this.occurrence, required this.onMarkTaken});
+class _ReminderHealthCard extends StatelessWidget {
+  const _ReminderHealthCard({required this.onFix});
 
-  final DayOccurrence occurrence;
-  final Future<void> Function() onMarkTaken;
-
-  @override
-  State<_NextDoseCard> createState() => _NextDoseCardState();
-}
-
-class _NextDoseCardState extends State<_NextDoseCard> {
-  bool _busy = false;
+  final VoidCallback onFix;
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final medicine = widget.occurrence.item.medicine;
-    final local = widget.occurrence.scheduledAt.toLocal();
-    final time =
-        '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
-    final subtitle = [
-      if (medicine.strength.isNotEmpty) medicine.strength,
-      if (medicine.notes.isNotEmpty) medicine.notes,
-    ].join(' • ');
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: scheme.primary,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x3300685F),
-            blurRadius: 16,
-            offset: Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Flexible(
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: scheme.primaryContainer,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      'NEXT DOSE',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: scheme.onPrimaryContainer,
-                        letterSpacing: 1,
-                      ),
+    final issues = ReminderHealthStore.instance.issues.length;
+    return Card(
+      color: Theme.of(context).colorScheme.errorContainer,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              Icons.notifications_off_outlined,
+              color: Theme.of(context).colorScheme.onErrorContainer,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '$issues reminder${issues == 1 ? '' : 's'} need setup',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onErrorContainer,
                     ),
                   ),
-                ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Your medicine is saved. Check reminder access so the next dose is not missed.',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onErrorContainer,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton(
+                      onPressed: onFix,
+                      child: const Text('Fix reminders'),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 8),
-              Text(
-                time,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(color: scheme.onPrimary),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            medicine.drugName,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(
-              context,
-            ).textTheme.headlineSmall?.copyWith(color: scheme.onPrimary),
-          ),
-          if (subtitle.isNotEmpty) ...[
-            const SizedBox(height: 4),
-            Text(
-              subtitle,
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(color: scheme.inversePrimary),
             ),
           ],
-          const SizedBox(height: 16),
-          FilledButton(
-            onPressed: _busy
-                ? null
-                : () async {
-                    setState(() => _busy = true);
-                    try {
-                      await widget.onMarkTaken();
-                    } finally {
-                      if (mounted) setState(() => _busy = false);
-                    }
-                  },
-            style: FilledButton.styleFrom(
-              backgroundColor: scheme.onPrimary,
-              foregroundColor: scheme.primary,
-            ),
-            child: const Text('Mark as Taken'),
-          ),
-        ],
+        ),
       ),
     );
   }
 }
+
+String _attentionKey(DayOccurrence occurrence) =>
+    _attentionKeyForValues(occurrence.item.schedule.id, occurrence.scheduledAt);
+
+String _attentionKeyForValues(String scheduleId, DateTime scheduledAt) =>
+    '$scheduleId|${scheduledAt.toUtc().toIso8601String()}';
+
+/// Returns true only when an unanswered dose first appears. Rebuilds while it
+/// remains unanswered must not steal focus from another tab the user chose.
+@visibleForTesting
+bool attentionNeedsInitialFocus({
+  required bool wasPresent,
+  required bool isPresent,
+}) => isPresent && !wasPresent;
 
 class _EmptyState extends StatelessWidget {
   const _EmptyState({required this.onAdd});
