@@ -1,3 +1,4 @@
+import 'dart:async' show TimeoutException;
 import 'dart:convert';
 import 'dart:io' show Platform;
 
@@ -327,6 +328,18 @@ class NotificationService {
     return await android.requestNotificationsPermission() ?? false;
   }
 
+  /// `requestExactAlarmsPermission()` opens Android's Settings screen via
+  /// `startActivityForResult` and only completes when the OS calls back
+  /// `onActivityResult` — and on some devices (seen on a Samsung OneUI
+  /// phone with predictive back gesture enabled) that callback simply never
+  /// fires, so the plugin's Future never resolves. Since this is awaited
+  /// directly from the save flow, an unbounded await here freezes the app
+  /// permanently with no exception and no network activity to point at —
+  /// confirmed live via the Dart VM service (idle isolate, no open sockets)
+  /// while reproducing it. The timeout is the safety net: Android's own
+  /// guidance for this permission is to re-check the real state rather than
+  /// trust the callback, so on timeout we do exactly that instead of
+  /// guessing true/false.
   Future<bool> requestExactAlarmPermission() async {
     await init();
     if (!Platform.isAndroid) return true;
@@ -336,7 +349,14 @@ class NotificationService {
         >();
     if (android == null) return true;
     if (await android.canScheduleExactNotifications() ?? true) return true;
-    return await android.requestExactAlarmsPermission() ?? false;
+    try {
+      return await android.requestExactAlarmsPermission().timeout(
+            const Duration(seconds: 45),
+          ) ??
+          false;
+    } on TimeoutException {
+      return await android.canScheduleExactNotifications() ?? false;
+    }
   }
 
   Future<ReminderPermissionState> readPermissionState() async {
@@ -1016,9 +1036,9 @@ class NotificationService {
     );
   }
 
-  /// Re-arms from a short-lived database connection — for callers that do
-  /// not already hold one, such as Settings when the lock-screen toggle
-  /// changes. Matches the isolate pattern in push_handlers: open, use, close.
+  /// Re-arms from a short-lived database connection for background callers
+  /// that do not already hold one. Foreground screens should call [reconcile]
+  /// with their existing database connection instead.
   Future<ReconcileReport> reconcileFromDisk() async {
     final db = AppDatabase();
     try {

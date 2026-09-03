@@ -2,10 +2,16 @@ import 'package:flutter/material.dart';
 
 import 'widgets/medicyn_motion.dart';
 
-/// Clinical Calm — the Stitch design system for Medicyn.
+/// The Bedside Chart — Medicyn's design system, evolved from the original
+/// "Clinical Calm" Stitch tokens (primary teal `#00685f`, Public Sans, 8px
+/// rhythm, 12px cards) into a warmer material world: a chart clipped at
+/// someone's bedside, not a hospital monitor. Teal stays the one brand/
+/// confirming color; the ground shifts from clinical white to a warm
+/// linen/kraft paper, cards read as pages sitting on that ground, and every
+/// dose status carries a persistent glyph alongside its color (see
+/// `DayDoseStyle` in `features/reminders_home/day_dose_style.dart`) so
+/// state never depends on hue alone.
 ///
-/// Tokens come from the "Medicyn App Redesign" project (primary teal
-/// `#00685f`, Public Sans, 8px rhythm, 12px cards, ambient teal shadows).
 /// Dark mode keeps the same seed so Settings → Theme still works; the
 /// light scheme is the designed one.
 class MedicynTheme {
@@ -19,17 +25,39 @@ class MedicynTheme {
   static const secondaryContainer = Color(0xFFD8E5E2);
   static const onSecondaryContainer = Color(0xFF5B6765);
   static const tertiary = Color(0xFF4648D4);
-  static const surface = Color(0xFFF8F9FA);
-  static const onSurface = Color(0xFF191C1D);
-  static const onSurfaceVariant = Color(0xFF3D4947);
-  static const outline = Color(0xFF6D7A77);
-  static const outlineVariant = Color(0xFFBCC9C6);
+
+  /// Warm linen/kraft ground — the "chart backing" the app sits on. Darker
+  /// and warmer than the paper cards float above it, so a page always
+  /// reads as clipped onto the surface rather than painted the same as it.
+  static const surface = Color(0xFFF3ECDB);
+  static const onSurface = Color(0xFF2B2318);
+  static const onSurfaceVariant = Color(0xFF5C4F3B);
+  static const outline = Color(0xFF8A7A5E);
+  static const outlineVariant = Color(0xFFD9CBAA);
   static const error = Color(0xFFBA1A1A);
   static const fontFamily = 'Public Sans';
 
-  /// Soft teal-tinted drop shadow used on schedule cards.
+  /// Chart-grid rule color — the faint ruled lines behind Today's list.
+  /// Ink at low alpha rather than a separate hue, so it always reads as
+  /// "the same ink, fainter" instead of a competing color.
+  static const chartGridLine = Color(0x142B2318);
+
+  /// The warm paper fleck used by [ChartPaperTexture]'s grain.
+  static const paperGrain = Color(0xFFE6D9B8);
+
+  /// Soft warm-ink drop shadow used on schedule cards — the system's one
+  /// recurring shadow (The One Shadow Rule), retuned from the original
+  /// teal-tinted version to sit against the warm ground and read with a
+  /// bit more presence at rest.
   static List<BoxShadow> get ambientShadow => const [
-    BoxShadow(color: Color(0x0A00685F), blurRadius: 12, offset: Offset(0, 4)),
+    BoxShadow(color: Color(0x1A2B2318), blurRadius: 16, offset: Offset(0, 6)),
+  ];
+
+  /// The same shadow, deepened — used transiently while a card is actively
+  /// pressed, so touch reads as physically lifting the page before the tap
+  /// registers. See `AmbientCard`.
+  static List<BoxShadow> get liftedShadow => const [
+    BoxShadow(color: Color(0x262B2318), blurRadius: 24, offset: Offset(0, 10)),
   ];
 
   static const _lightScheme = ColorScheme(
@@ -55,13 +83,15 @@ class MedicynTheme {
     onSurfaceVariant: onSurfaceVariant,
     outline: outline,
     outlineVariant: outlineVariant,
-    surfaceContainerLowest: Color(0xFFFFFFFF),
-    surfaceContainerLow: Color(0xFFF3F4F5),
-    surfaceContainer: Color(0xFFEDEEEF),
-    surfaceContainerHigh: Color(0xFFE7E8E9),
-    surfaceContainerHighest: Color(0xFFE1E3E4),
-    inverseSurface: Color(0xFF2E3132),
-    onInverseSurface: Color(0xFFF0F1F2),
+    // Lighter and warmer than [surface] on purpose: cards are pages sitting
+    // on the linen ground, not the same material as it.
+    surfaceContainerLowest: Color(0xFFFBF7EC),
+    surfaceContainerLow: Color(0xFFF6F0E1),
+    surfaceContainer: Color(0xFFEDE4CE),
+    surfaceContainerHigh: Color(0xFFE6DBC1),
+    surfaceContainerHighest: Color(0xFFDED1B0),
+    inverseSurface: Color(0xFF332B1D),
+    onInverseSurface: Color(0xFFF4EFE3),
     inversePrimary: primaryFixedDim,
     surfaceTint: Color(0xFF006A61),
   );
@@ -115,7 +145,7 @@ class MedicynTheme {
         color: scheme.surfaceContainerLowest,
         shape: const RoundedRectangleBorder(borderRadius: radius12),
         margin: EdgeInsets.zero,
-        shadowColor: const Color(0x0A00685F),
+        shadowColor: const Color(0x1A2B2318),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(

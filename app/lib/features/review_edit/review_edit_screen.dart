@@ -400,6 +400,19 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
     return true;
   }
 
+  /// The lifecycle value must follow a frequency change. In particular, an
+  /// as-needed reminder edited into a scheduled reminder must become active;
+  /// carrying `asNeeded` into the saved schedule makes the scheduler ignore
+  /// every time slot.
+  ReminderStatus get _effectiveStatus {
+    if (_frequency == FrequencyType.asNeeded) {
+      return ReminderStatus.asNeeded;
+    }
+    if (!_isEditing) return ReminderStatus.active;
+    final current = reminderStatus(widget.existing!.schedule);
+    return current == ReminderStatus.asNeeded ? ReminderStatus.active : current;
+  }
+
   Future<void> _save() async {
     if (!_forSomeoneElse && _frequency != FrequencyType.asNeeded) {
       await _prepareReminderAccess();
@@ -504,9 +517,7 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
       intervalHours: _frequency == FrequencyType.everyXHours
           ? _enteredIntervalHours
           : null,
-      status: _frequency == FrequencyType.asNeeded
-          ? ReminderStatus.asNeeded.name
-          : (widget.existing?.schedule.status ?? ReminderStatus.active.name),
+      status: _effectiveStatus.name,
       startDate: widget.existing?.schedule.startDate,
       endDate: widget.existing?.schedule.endDate,
       pauseUntil: widget.existing?.schedule.pauseUntil,
@@ -567,9 +578,7 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
       intervalHours: _frequency == FrequencyType.everyXHours
           ? _enteredIntervalHours
           : null,
-      status: _frequency == FrequencyType.asNeeded
-          ? ReminderStatus.asNeeded.name
-          : (widget.existing?.schedule.status ?? ReminderStatus.active.name),
+      status: _effectiveStatus.name,
       startDate: widget.existing?.schedule.startDate,
       endDate: widget.existing?.schedule.endDate,
       pauseUntil: widget.existing?.schedule.pauseUntil,
@@ -945,7 +954,7 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
   }
 
   Widget _lifecycleActions() {
-    final status = reminderStatus(widget.existing!.schedule);
+    final status = _effectiveStatus;
     final label = switch (status) {
       ReminderStatus.active => 'Active',
       ReminderStatus.paused => 'Paused',

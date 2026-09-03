@@ -394,18 +394,22 @@ class _DoseEventCard extends StatelessWidget {
     switch (event.action) {
       case 'taken':
         return (
-          icon: Icons.check_circle,
-          color: Colors.green.shade600,
+          icon: Icons.check_rounded,
+          color: scheme.primary,
           label: 'Taken',
         );
       case 'snoozed':
         return (
-          icon: Icons.snooze,
-          color: Colors.orange.shade700,
+          icon: Icons.panorama_fish_eye_rounded,
+          color: scheme.tertiary,
           label: 'Snoozed',
         );
       case 'missed':
-        return (icon: Icons.cancel, color: scheme.error, label: 'Missed');
+        return (
+          icon: Icons.change_history_rounded,
+          color: scheme.error,
+          label: 'Missed',
+        );
       default:
         return (
           icon: Icons.help_outline,

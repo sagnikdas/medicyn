@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/app_settings.dart';
 import '../../core/motion.dart';
+import '../../core/widgets/chart_grid.dart';
 import '../../core/widgets/medicyn_chrome.dart';
 import '../../core/widgets/medicyn_motion.dart';
 import '../../core/telemetry.dart';
@@ -75,7 +76,11 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   late final Stream<List<ScheduleWithMedicine>> _schedulesStream = widget.db
       .watchSchedulesWithMedicines();
   late final Stream<List<DoseLog>> _doseLogsStream = widget.db.watchDoseLogs();
-  final _scroll = ScrollController();
+  // Today is a live timeline whose sliver geometry changes while the app
+  // bootstraps (and when a reminder is answered). Restoring a stale offset
+  // from an earlier geometry can leave every sliver above the viewport while
+  // the paper background and shell remain visible.
+  final _scroll = ScrollController(keepScrollOffset: false);
   bool _calendarMonth = false;
   List<DayOccurrence> _ringIfLeft = const [];
   final _dismissedAttentionUntil = <String, DateTime>{};
@@ -87,6 +92,10 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     doseResponseEvents.addListener(_onDoseResponse);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scroll.hasClients) return;
+      _scroll.jumpTo(0);
+    });
     _bootstrap(firstLoad: true);
     // Upcoming → pending has to flip when the clock time passes, not only
     // when the user comes back from another screen. Fifteen seconds is
@@ -498,19 +507,23 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           titleSpacing: 20,
           title: const MedicynBrandMark(compact: true),
         ),
-        body: StreamBuilder<List<ScheduleWithMedicine>>(
-          stream: _schedulesStream,
-          builder: (context, scheduleSnap) {
-            return StreamBuilder<List<DoseLog>>(
-              stream: _doseLogsStream,
-              builder: (context, logSnap) {
-                return _calendarBody(
-                  schedules: scheduleSnap.data ?? const [],
-                  logs: logSnap.data ?? const [],
+        body: ChartPaperTexture(
+          child: ChartRuleLines(
+            child: StreamBuilder<List<ScheduleWithMedicine>>(
+              stream: _schedulesStream,
+              builder: (context, scheduleSnap) {
+                return StreamBuilder<List<DoseLog>>(
+                  stream: _doseLogsStream,
+                  builder: (context, logSnap) {
+                    return _calendarBody(
+                      schedules: scheduleSnap.data ?? const [],
+                      logs: logSnap.data ?? const [],
+                    );
+                  },
                 );
               },
-            );
-          },
+            ),
+          ),
         ),
       ),
     );
@@ -810,49 +823,52 @@ class _ReminderHealthCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final issues = ReminderHealthStore.instance.issues.length;
-    return Card(
-      color: Theme.of(context).colorScheme.errorContainer,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(
-              Icons.notifications_off_outlined,
-              color: Theme.of(context).colorScheme.onErrorContainer,
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      decoration: BoxDecoration(
+        color: scheme.errorContainer,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.notifications_off_outlined,
+            color: scheme.onErrorContainer,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${ReminderHealthStore.instance.issues.length} reminder'
+                  '${ReminderHealthStore.instance.issues.length == 1 ? '' : 's'} '
+                  'need setup',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: scheme.onErrorContainer,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Your medicine is saved. Check reminder access so the next dose is not missed.',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: scheme.onErrorContainer,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                // Keep the action directly in the column. Wrapping this
+                // button in Align makes the sliver fail to paint on Android
+                // when the reminder-health banner is present.
+                TextButton(
+                  onPressed: onFix,
+                  child: const Text('Fix reminders'),
+                ),
+              ],
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '$issues reminder${issues == 1 ? '' : 's'} need setup',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.onErrorContainer,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Your medicine is saved. Check reminder access so the next dose is not missed.',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.onErrorContainer,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: TextButton(
-                      onPressed: onFix,
-                      child: const Text('Fix reminders'),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

@@ -30,8 +30,11 @@ void main() {
           ),
           SliverList(
             delegate: SliverChildBuilderDelegate(
-              (context, index) =>
-                  SizedBox(height: 72, child: Text('dose $index')),
+              (context, index) => SizedBox(
+                key: ValueKey('dose-$index'),
+                height: 72,
+                child: Text('dose $index'),
+              ),
               childCount: 20,
             ),
           ),
@@ -74,6 +77,25 @@ void main() {
       expect(find.text('dose 0'), findsOneWidget);
     },
   );
+
+  testWidgets('calendar snap keeps the first dose below the header', (
+    tester,
+  ) async {
+    await tester.pumpWidget(calendar());
+
+    final scroll = find.byType(CustomScrollView);
+    final header = find.byKey(const ValueKey('collapsing-calendar-header'));
+    final firstDose = find.byKey(const ValueKey('dose-0'));
+
+    await tester.drag(scroll, const Offset(0, -180));
+    await tester.pumpAndSettle();
+    await tester.drag(scroll, const Offset(0, 72));
+    await tester.pumpAndSettle();
+
+    final headerRect = tester.getRect(header);
+    final doseRect = tester.getRect(firstDose);
+    expect(headerRect.bottom, lessThanOrEqualTo(doseRect.top + 0.5));
+  });
 
   testWidgets('week calendar does not overflow at 150% text', (tester) async {
     tester.view.physicalSize = const Size(320, 568);

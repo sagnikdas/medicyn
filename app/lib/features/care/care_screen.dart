@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/motion.dart';
+import '../../core/widgets/chart_grid.dart';
 import '../../core/widgets/medicyn_layout.dart';
 import '../../core/widgets/medicyn_motion.dart';
 import '../../data/local/database.dart';
@@ -212,36 +213,44 @@ class _CareScreenState extends State<CareScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Family')),
-      body: SafeArea(
-        child: MedicynContent(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                MedicynSwitcher(
-                  alignment: Alignment.topCenter,
-                  duration: MedicynMotion.medium,
-                  child: KeyedSubtree(
-                    key: ValueKey(_loading ? 'loading' : _link?.status),
-                    child: _loading
-                        ? const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 48),
-                            child: Center(child: CircularProgressIndicator()),
-                          )
-                        : _body(),
-                  ),
-                ),
-                if (_error != null) ...[
-                  const SizedBox(height: 20),
-                  Text(
-                    _error!,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
+      body: ChartPaperTexture(
+        child: ChartRuleLines(
+          child: SafeArea(
+            child: MedicynContent(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const MedicynFadeIn(child: Center(child: MedicynClip())),
+                    const SizedBox(height: 8),
+                    MedicynSwitcher(
+                      alignment: Alignment.topCenter,
+                      duration: MedicynMotion.medium,
+                      child: KeyedSubtree(
+                        key: ValueKey(_loading ? 'loading' : _link?.status),
+                        child: _loading
+                            ? const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 48),
+                                child: Center(
+                                  child: CircularProgressIndicator(),
+                                ),
+                              )
+                            : _body(),
+                      ),
                     ),
-                  ),
-                ],
-              ],
+                    if (_error != null) ...[
+                      const SizedBox(height: 20),
+                      Text(
+                        _error!,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
             ),
           ),
         ),
