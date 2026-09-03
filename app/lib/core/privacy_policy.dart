@@ -9,7 +9,7 @@ const privacyPolicyAsset = 'assets/PRIVACY.md';
 
 /// Public policy endpoint used for Play Console. The bundled asset remains
 /// the offline source of truth for users who have no network.
-const privacyPolicyWebUrl = 'https://sagnikdas.github.io/dosely/privacy/';
+const privacyPolicyWebUrl = 'https://sagnikdas.github.io/medicyn/privacy/';
 
 /// Opens the in-app policy so the user can actually read it, even offline.
 void openPrivacyPolicy(BuildContext context) {

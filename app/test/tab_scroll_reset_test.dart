@@ -1,7 +1,7 @@
-import 'package:dosely/core/theme.dart';
-import 'package:dosely/data/local/database.dart';
-import 'package:dosely/features/insights/insights_screen.dart';
-import 'package:dosely/features/settings/settings_screen.dart';
+import 'package:medicyn/core/theme.dart';
+import 'package:medicyn/data/local/database.dart';
+import 'package:medicyn/features/insights/insights_screen.dart';
+import 'package:medicyn/features/settings/settings_screen.dart';
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -27,7 +27,7 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(
-      MaterialApp(theme: DoselyTheme.light(), home: child),
+      MaterialApp(theme: MedicynTheme.light(), home: child),
     );
     await tester.pump(const Duration(milliseconds: 500));
   }

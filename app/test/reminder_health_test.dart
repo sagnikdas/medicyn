@@ -1,9 +1,9 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:dosely/core/telemetry.dart';
-import 'package:dosely/features/notification_engine/reminder_health.dart';
-import 'package:dosely/features/notification_engine/notification_service.dart';
+import 'package:medicyn/core/telemetry.dart';
+import 'package:medicyn/features/notification_engine/reminder_health.dart';
+import 'package:medicyn/features/notification_engine/notification_service.dart';
 
 void main() {
   test('health snapshot round-trips without medicine or dosage data', () {
@@ -47,9 +47,9 @@ void main() {
   });
 
   test('telemetry count buckets never expose exact totals', () {
-    expect(DoselyTelemetry.countBucket(0), 'none');
-    expect(DoselyTelemetry.countBucket(1), 'one');
-    expect(DoselyTelemetry.countBucket(3), '2-5');
-    expect(DoselyTelemetry.countBucket(99), '6+');
+    expect(MedicynTelemetry.countBucket(0), 'none');
+    expect(MedicynTelemetry.countBucket(1), 'one');
+    expect(MedicynTelemetry.countBucket(3), '2-5');
+    expect(MedicynTelemetry.countBucket(99), '6+');
   });
 }

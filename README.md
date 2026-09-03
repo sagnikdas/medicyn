@@ -1,4 +1,4 @@
-# Dosely
+# Medicyn
 
 A minimalist Android medicine reminder app. Photograph the label, say the
 dosage out loud, review what the AI understood, confirm — done. Reminders
@@ -25,7 +25,7 @@ fire from the device itself, so they work even with no network.
 ## Project layout
 
 ```
-dosely/
+medicyn/
   app/                  Flutter Android app
     lib/
       core/             theme, ids, Supabase config
@@ -48,9 +48,10 @@ dosely/
     tests/              adversarial SQL assertions against the RLS policies
 ```
 
-Backend: Supabase project `dosely` (ref `twybepxnqayypzljhcnx`, org
+Backend: the existing Supabase project (ref `twybepxnqayypzljhcnx`, org
 `kgeamhakgmnfhsythhrx` — same org as your other project, separate project so
-nothing shares data/schema with it).
+nothing shares data/schema with it). Its CLI slug remains unchanged while the
+app branding is Medicyn.
 
 ## One-time setup
 
@@ -59,7 +60,7 @@ secret, never on-device — run this yourself so the key never lands in any
 chat/session log:
 
 ```
-cd ~/research/dosely
+cd ~/research/medicyn
 supabase secrets set ANTHROPIC_API_KEY=sk-ant-...your-key...
 ```
 
@@ -70,7 +71,7 @@ this is set, the review screen's "Try again" will fail — everything else
 **2. Install Flutter dependencies:**
 
 ```
-cd ~/research/dosely/app
+cd ~/research/medicyn/app
 flutter pub get
 ```
 
@@ -87,7 +88,7 @@ missing.
 ## Running it
 
 ```
-cd ~/research/dosely/app
+cd ~/research/medicyn/app
 flutter run                 # debug, attaches for hot reload
 flutter build apk --release # ships a standalone APK
 ```
@@ -100,7 +101,7 @@ reminder, and for camera/microphone permission when you use those steps.
 
 **Google Sign-In is the only sign-in method.** The previous email
 one-time-code flow, its custom SMTP sender, its email templates, and the
-`dosely://login-callback` deep link have all been removed — from the repo
+`medicyn://login-callback` deep link have all been removed — from the repo
 and from the hosted Supabase project alike.
 
 The flow is native, not web-based: `AuthService.signInWithGoogle()`
@@ -131,7 +132,7 @@ Values you'll need throughout:
 
 | Thing | Value |
 |---|---|
-| Android package name | `com.sagnikdas.dosely` |
+| Android package name | `com.sagnikdas.medicyn` |
 | Debug signing SHA-1 | see step 1b |
 | Supabase project ref | `twybepxnqayypzljhcnx` |
 
@@ -171,7 +172,7 @@ Copy the `SHA1:` line — the colon-separated hex, e.g.
 **1c. Create the Android OAuth client.** **Credentials → Create
 Credentials → OAuth client ID → Application type: Android.** Enter the
 package name and the SHA-1 from above. Give it a name you'll recognise
-("Dosely Android debug"). Save, and copy the **Android client ID** it
+("Medicyn Android debug"). Save, and copy the **Android client ID** it
 issues — you'll need it in step 3, and Google won't prominently show it
 again.
 
@@ -273,7 +274,7 @@ never appear in this repo or in the app.
 #### 4. Test it
 
 ```
-cd ~/research/dosely/app
+cd ~/research/medicyn/app
 flutter run
 ```
 
@@ -293,7 +294,7 @@ prompts for passwords) and keep the file outside the repo:
 
 ```
 keytool -genkeypair -v \
-  -keystore ~/dosely-upload-keystore.jks \
+  -keystore ~/medicyn-upload-keystore.jks \
   -keyalg RSA -keysize 2048 -validity 10000 \
   -alias upload
 ```
@@ -317,7 +318,7 @@ that is depends on how you distribute.
 *Direct APK.* It's your upload keystore's:
 
 ```
-keytool -list -v -keystore ~/dosely-upload-keystore.jks -alias upload
+keytool -list -v -keystore ~/medicyn-upload-keystore.jks -alias upload
 ```
 
 *Google Play.* It is **not** your keystore's. Play App Signing re-signs
@@ -342,10 +343,10 @@ installs.
 
 **4. Register one Android OAuth client per SHA-1.** Google Cloud Console →
 **Credentials → Create Credentials → OAuth client ID → Android**, package
-name `com.sagnikdas.dosely`, one client per certificate. A client holds
+name `com.sagnikdas.medicyn`, one client per certificate. A client holds
 exactly one package + SHA-1 pair, so they can't be combined into one. Name
-them so they're tellable apart — "Dosely Android — Play app signing",
-"Dosely Android — upload key".
+them so they're tellable apart — "Medicyn Android — Play app signing",
+"Medicyn Android — upload key".
 
 **5. Append each new client ID** to Supabase's *Client IDs* list (step 2
 above), Web first:
@@ -425,7 +426,7 @@ an existing Google Cloud project"), so there's one project to reason about
 rather than two.
 
 **2. Register the Android app** in it with package name
-`com.sagnikdas.dosely`, download `google-services.json`, and put it at:
+`com.sagnikdas.medicyn`, download `google-services.json`, and put it at:
 
 ```
 app/android/app/google-services.json
@@ -443,8 +444,8 @@ authorised by a service-account JWT, not an API key. In the Firebase console:
 this yourself, so the key never lands in any chat or session log:
 
 ```
-cd ~/research/dosely
-supabase secrets set FCM_SERVICE_ACCOUNT="$(cat ~/Downloads/dosely-firebase-adminsdk-xxxxx.json)"
+cd ~/research/medicyn
+supabase secrets set FCM_SERVICE_ACCOUNT="$(cat ~/Downloads/medicyn-firebase-adminsdk-xxxxx.json)"
 ```
 
 The function reads `project_id`, `client_email` and `private_key` out of it and
@@ -531,9 +532,9 @@ dose. `notify-care` should delete the token when FCM answers 404 /
 UNREGISTERED, not retry it forever. `delivered_count` may be 0 on that
 send; the next send must not keep targeting the dead token.
 
-**Cold-start tap.** Force-stop Dosely on the caregiver phone. Raise a
+**Cold-start tap.** Force-stop Medicyn on the caregiver phone. Raise a
 missed dose, tap the notification on the lock screen (unlock the *phone*
-first if asked). Dosely may then ask for the device PIN — that cover is
+first if asked). Medicyn may then ask for the device PIN — that cover is
 deliberate and must stay; the feed opens after unlock, not on the lock
 screen. The medicine name must not appear on the lock screen (care alerts
 are `PRIVATE`).
@@ -546,7 +547,7 @@ save against an old function still drops the parent's `data_changed`. From
 the repo (or this worktree), once:
 
 ```
-cd ~/research/dosely-wt/p2   # or ~/research/dosely after this lands
+cd ~/research/medicyn-wt/p2   # or ~/research/medicyn after this lands
 supabase link --project-ref twybepxnqayypzljhcnx --yes
 supabase db push --yes
 supabase functions deploy notify-care --project-ref twybepxnqayypzljhcnx
@@ -557,15 +558,15 @@ this build on both phones (`google-services.json` is gitignored — copy it into
 `app/android/app/` if this tree does not already have it):
 
 ```
-cd ~/research/dosely-wt/p2/app
-cp ~/research/dosely/app/android/app/google-services.json android/app/
+cd ~/research/medicyn-wt/p2/app
+cp ~/research/medicyn/app/android/app/google-services.json android/app/
 flutter run
 ```
 
 Automated checks, optional but cheap:
 
 ```
-cd ~/research/dosely-wt/p2/app && flutter test
+cd ~/research/medicyn-wt/p2/app && flutter test
 deno test --config supabase/functions/notify-care/deno.json \
   supabase/functions/notify-care/
 ```
@@ -595,7 +596,7 @@ pass so an already-announced miss does not confuse the result.
 - [ ] **What changed.** Open the reminder on either phone → What changed.
       Both sides see the same history, newest first, naming who wrote it.
 - [ ] **Setup health.** On the parent phone, deny notifications (or skip
-      battery exemption). Foreground Dosely so it reports. Caregiver Care
+      battery exemption). Foreground Medicyn so it reports. Caregiver Care
       screen: the flag reads No, and the warning that reminders may not be
       firing. Parent Care screen shows the same panel.
 - [ ] **Manual form only.** The caregiver add path never opens the camera
@@ -614,7 +615,7 @@ schedule hitting `notify-care` with header `x-cron-secret`. From the repo
 (or this worktree):
 
 ```
-cd ~/research/dosely-wt/p3   # or ~/research/dosely after this lands
+cd ~/research/medicyn-wt/p3   # or ~/research/medicyn after this lands
 supabase link --project-ref twybepxnqayypzljhcnx --yes
 supabase db push --yes
 supabase secrets set CRON_SECRET=...   # once; do not rotate FCM_SERVICE_ACCOUNT

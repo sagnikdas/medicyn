@@ -77,7 +77,7 @@ class CareNotifier {
       // what *did* go out. Debugging one cost a round trip through the database,
       // the deployed function and the device's own sqlite before it could even
       // be localised to this line.
-      debugPrint('[dosely] notify-care failed: $error');
+      debugPrint('[medicyn] notify-care failed: $error');
     }
   }
 }

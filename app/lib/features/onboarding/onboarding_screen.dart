@@ -5,13 +5,13 @@ import 'package:flutter/material.dart';
 import '../../core/app_settings.dart';
 import '../../core/motion.dart';
 import '../../core/telemetry.dart';
-import '../../core/widgets/dosely_chrome.dart';
-import '../../core/widgets/dosely_layout.dart';
-import '../../core/widgets/dosely_motion.dart';
+import '../../core/widgets/medicyn_chrome.dart';
+import '../../core/widgets/medicyn_layout.dart';
+import '../../core/widgets/medicyn_motion.dart';
 
 /// Shown once, before sign-in, on first launch only (see the
 /// `_OnboardingGate` in main.dart). One concise value/privacy screen keeps
-/// the first session moving: the user sees what Dosely does and that their
+/// the first session moving: the user sees what Medicyn does and that their
 /// reminders work offline before choosing how to add a medicine.
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -47,7 +47,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   @override
   void initState() {
     super.initState();
-    unawaited(DoselyTelemetry.instance.record(DoselyEvent.onboardingViewed));
+    unawaited(MedicynTelemetry.instance.record(MedicynEvent.onboardingViewed));
   }
 
   @override
@@ -60,7 +60,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   /// and the gate in main.dart rebuilds itself off that.
   Future<void> _finish() async {
     await AppSettings.instance.setHasSeenOnboarding();
-    await DoselyTelemetry.instance.record(DoselyEvent.onboardingCompleted);
+    await MedicynTelemetry.instance.record(MedicynEvent.onboardingCompleted);
   }
 
   void _next() {
@@ -69,8 +69,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       return;
     }
     _controller.nextPage(
-      duration: DoselyMotion.duration(context, DoselyMotion.medium),
-      curve: DoselyMotion.decelerate,
+      duration: MedicynMotion.duration(context, MedicynMotion.medium),
+      curve: MedicynMotion.decelerate,
     );
   }
 
@@ -79,7 +79,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     final isLast = _page == _pages.length - 1;
     return Scaffold(
       body: SafeArea(
-        child: DoselyContent(
+        child: MedicynContent(
           child: Column(
             children: [
               Align(
@@ -94,7 +94,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               ),
               const Padding(
                 padding: EdgeInsets.only(bottom: 8),
-                child: DoselyBrandMark(compact: true),
+                child: MedicynBrandMark(compact: true),
               ),
               Expanded(
                 child: PageView.builder(
@@ -112,11 +112,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   children: List.generate(
                     _pages.length,
                     (i) => AnimatedContainer(
-                      duration: DoselyMotion.duration(
+                      duration: MedicynMotion.duration(
                         context,
-                        DoselyMotion.fast,
+                        MedicynMotion.fast,
                       ),
-                      curve: DoselyMotion.decelerate,
+                      curve: MedicynMotion.decelerate,
                       margin: const EdgeInsets.symmetric(horizontal: 4),
                       width: i == _page ? 20 : 8,
                       height: 8,
@@ -166,7 +166,7 @@ class _OnboardingPageView extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                DoselyFadeIn(
+                MedicynFadeIn(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [

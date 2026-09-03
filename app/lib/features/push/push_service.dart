@@ -121,7 +121,7 @@ class PushService {
       final initial = await FirebaseMessaging.instance.getInitialMessage();
       if (initial == null) return;
       // The navigator may not be attached on this microtask — the same
-      // deferral DoselyApp makes for a local-notification cold start. The
+      // deferral MedicynApp makes for a local-notification cold start. The
       // feed is pushed onto the existing navigator, so a device-credential
       // lock (if the phone has been away) still covers it until unlock.
       WidgetsBinding.instance.addPostFrameCallback(

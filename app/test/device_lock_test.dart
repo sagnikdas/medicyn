@@ -1,4 +1,4 @@
-import 'package:dosely/core/device_lock.dart';
+import 'package:medicyn/core/device_lock.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

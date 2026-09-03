@@ -4,7 +4,7 @@ import 'package:sentry_flutter/sentry_flutter.dart';
 /// funnel. Values intentionally describe only buckets and outcomes; callers
 /// must never pass medicine names, free text, identifiers, or exact health
 /// timestamps.
-enum DoselyEvent {
+enum MedicynEvent {
   onboardingViewed,
   onboardingCompleted,
   addStarted,
@@ -27,12 +27,12 @@ enum DoselyEvent {
   purchaseState,
 }
 
-class DoselyTelemetry {
-  DoselyTelemetry._();
-  static final instance = DoselyTelemetry._();
+class MedicynTelemetry {
+  MedicynTelemetry._();
+  static final instance = MedicynTelemetry._();
 
   Future<void> record(
-    DoselyEvent event, {
+    MedicynEvent event, {
     Map<String, Object?> properties = const {},
   }) async {
     final safe = <String, Object?>{};
@@ -43,7 +43,7 @@ class DoselyTelemetry {
     }
     await Sentry.addBreadcrumb(
       Breadcrumb(
-        category: 'dosely.product',
+        category: 'medicyn.product',
         type: 'info',
         message: event.name,
         data: safe,
@@ -54,7 +54,7 @@ class DoselyTelemetry {
   Future<void> recordError(String errorCode) async {
     if (!_allowedErrorCodes.contains(errorCode)) return;
     await Sentry.captureMessage(
-      'dosely_error:$errorCode',
+      'medicyn_error:$errorCode',
       level: SentryLevel.error,
     );
   }
@@ -122,8 +122,8 @@ SentryEvent? redactSentryEvent(SentryEvent event, Hint hint) {
           data: {
             for (final entry
                 in crumb.data?.entries ?? <MapEntry<String, Object?>>[])
-              if (DoselyTelemetry._allowedKeys.contains(entry.key) &&
-                  DoselyTelemetry._isSafeValue(entry.value))
+              if (MedicynTelemetry._allowedKeys.contains(entry.key) &&
+                  MedicynTelemetry._isSafeValue(entry.value))
                 entry.key: entry.value,
           },
         ),

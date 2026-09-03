@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:dosely/core/app_settings.dart';
+import 'package:medicyn/core/app_settings.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 

@@ -1,5 +1,5 @@
-import 'package:dosely/data/local/tables.dart';
-import 'package:dosely/features/notification_engine/schedule_validation.dart';
+import 'package:medicyn/data/local/tables.dart';
+import 'package:medicyn/features/notification_engine/schedule_validation.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// These cover the values that used to make the alarm scheduler loop forever.

@@ -12,7 +12,7 @@ import 'core/sentry_config.dart';
 import 'core/supabase_init.dart';
 import 'core/theme.dart';
 import 'core/telemetry.dart';
-import 'core/widgets/dosely_motion.dart';
+import 'core/widgets/medicyn_motion.dart';
 import 'data/local/database.dart';
 import 'data/local/database_encryption.dart';
 import 'features/auth/sign_in_screen.dart';
@@ -52,23 +52,23 @@ void main() async {
       await PushService.instance.init();
       final launch = await NotificationService.instance
           .consumeLaunchNotificationResponse();
-      runApp(DoselyApp(launchNotification: launch));
+      runApp(MedicynApp(launchNotification: launch));
     },
   );
 }
 
-class DoselyApp extends StatefulWidget {
-  const DoselyApp({super.key, this.launchNotification});
+class MedicynApp extends StatefulWidget {
+  const MedicynApp({super.key, this.launchNotification});
 
   /// Set when the app was launched (cold start) by a notification tap —
   /// see [NotificationService.consumeLaunchNotificationResponse].
   final LaunchNotification? launchNotification;
 
   @override
-  State<DoselyApp> createState() => _DoselyAppState();
+  State<MedicynApp> createState() => _MedicynAppState();
 }
 
-class _DoselyAppState extends State<DoselyApp> {
+class _MedicynAppState extends State<MedicynApp> {
   @override
   void initState() {
     super.initState();
@@ -101,14 +101,14 @@ class _DoselyAppState extends State<DoselyApp> {
       builder: (context, _) => MaterialApp(
         navigatorKey: navigatorKey,
         debugShowCheckedModeBanner: false,
-        title: 'Dosely',
-        theme: DoselyTheme.light(),
-        darkTheme: DoselyTheme.dark(),
+        title: 'Medicyn',
+        theme: MedicynTheme.light(),
+        darkTheme: MedicynTheme.dark(),
         // Light/dark/system, as chosen in Settings; system by default.
         themeMode: AppSettings.instance.themeMode,
         // Applies the optional in-app multiplier on top of the device's own
         // text scaler. A system accessibility choice must never be replaced
-        // by a Dosely preference.
+        // by a Medicyn preference.
         builder: (context, child) {
           final deviceScale = MediaQuery.of(context).textScaler.scale(1);
           return MediaQuery(
@@ -141,8 +141,8 @@ class _OnboardingGate extends StatelessWidget {
         // No navigation needed here: OnboardingScreen persists the flag via
         // AppSettings, and that change alone triggers this ListenableBuilder
         // to rebuild into _ConsentGate.
-        return DoselySwitcher(
-          duration: DoselyMotion.medium,
+        return MedicynSwitcher(
+          duration: MedicynMotion.medium,
           child: AppSettings.instance.hasSeenOnboarding
               ? const _ConsentGate(key: ValueKey('consent-gate'))
               : const OnboardingScreen(key: ValueKey('onboarding')),
@@ -164,8 +164,8 @@ class _ConsentGate extends StatelessWidget {
     return ListenableBuilder(
       listenable: AppSettings.instance,
       builder: (context, _) {
-        return DoselySwitcher(
-          duration: DoselyMotion.medium,
+        return MedicynSwitcher(
+          duration: MedicynMotion.medium,
           child: AppSettings.instance.hasRecordedConsents
               ? const _AuthGate(key: ValueKey('auth-gate'))
               : const ConsentScreen(key: ValueKey('consent')),
@@ -184,7 +184,7 @@ class _ConsentGate extends StatelessWidget {
 /// The database connection is per Google account: a second person signing
 /// in on this phone must not inherit the previous person's file. The same
 /// person signing back in reopens theirs — reminders stay. Local-only uses
-/// the sentinel owner [localOwnerUserId] (`dosely-local.sqlite`); first
+/// the sentinel owner [localOwnerUserId] (`medicyn-local.sqlite`); first
 /// sign-in on this phone adopts that file when the account has none yet.
 class _AuthGate extends StatefulWidget {
   const _AuthGate({super.key});
@@ -207,7 +207,7 @@ class _AuthGateState extends State<_AuthGate> {
 
   /// Returns the open database for [userId], or null while a previous
   /// connection is still closing. First sign-in after local-only *renames*
-  /// `dosely-local.sqlite`; that cannot happen while the local file is open.
+  /// `medicyn-local.sqlite`; that cannot happen while the local file is open.
   AppDatabase? _databaseFor(String userId) {
     if (_db != null && _userId == userId) return _db!;
     if (_db != null && !_closing) {
@@ -275,7 +275,10 @@ class _AuthGateState extends State<_AuthGate> {
                 child = AppShell(db: db);
               }
             }
-            return DoselySwitcher(duration: DoselyMotion.medium, child: child);
+            return MedicynSwitcher(
+              duration: MedicynMotion.medium,
+              child: child,
+            );
           },
         );
       },

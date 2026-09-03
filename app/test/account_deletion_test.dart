@@ -1,11 +1,11 @@
-import 'package:dosely/core/account_deletion.dart';
+import 'package:medicyn/core/account_deletion.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test('the Play web URL points at the public Pages deletion page', () {
     expect(
       deleteAccountWebUrl,
-      'https://sagnikdas.github.io/dosely/delete-account/',
+      'https://sagnikdas.github.io/medicyn/delete-account/',
     );
   });
 

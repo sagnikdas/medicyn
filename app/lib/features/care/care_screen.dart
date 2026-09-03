@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/motion.dart';
-import '../../core/widgets/dosely_layout.dart';
-import '../../core/widgets/dosely_motion.dart';
+import '../../core/widgets/medicyn_layout.dart';
+import '../../core/widgets/medicyn_motion.dart';
 import '../../data/local/database.dart';
 import '../auth/auth_service.dart';
 import '../consent/consent_purpose.dart';
@@ -213,15 +213,15 @@ class _CareScreenState extends State<CareScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Family')),
       body: SafeArea(
-        child: DoselyContent(
+        child: MedicynContent(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(24),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                DoselySwitcher(
+                MedicynSwitcher(
                   alignment: Alignment.topCenter,
-                  duration: DoselyMotion.medium,
+                  duration: MedicynMotion.medium,
                   child: KeyedSubtree(
                     key: ValueKey(_loading ? 'loading' : _link?.status),
                     child: _loading
@@ -272,7 +272,7 @@ class _CareScreenState extends State<CareScreen> {
 
   Widget _chooser() {
     final text = Theme.of(context).textTheme;
-    return DoselyFadeIn(
+    return MedicynFadeIn(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -308,7 +308,7 @@ class _CareScreenState extends State<CareScreen> {
         Text('Read this number to them', style: text.headlineSmall),
         const SizedBox(height: 8),
         Text(
-          'They should open Dosely on their own phone, tap '
+          'They should open Medicyn on their own phone, tap '
           '"I\'m helping someone", and type it in.',
           style: text.bodyMedium,
         ),
@@ -610,7 +610,7 @@ class _CodeEntryDialogState extends State<_CodeEntryDialog> {
         mainAxisSize: MainAxisSize.min,
         children: [
           const Text(
-            'Ask them to open Dosely and tap "Ask someone to help me". '
+            'Ask them to open Medicyn and tap "Ask someone to help me". '
             'They will read you an eight-digit number.',
           ),
           const SizedBox(height: 20),

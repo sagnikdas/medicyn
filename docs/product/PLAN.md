@@ -1,6 +1,6 @@
-# Dosely — Care Link plan
+# Medicyn — Care Link plan
 
-The working plan for turning Dosely from a single-user pill reminder into
+The working plan for turning Medicyn from a single-user pill reminder into
 something an elderly parent and one adult child in another city use together.
 Updated as work lands; the design rationale behind these choices lives in the
 Care Link spec artifact. How the app makes money is in `MONETIZE.md`, not here.
@@ -53,7 +53,7 @@ with the Web and Android client IDs; email sign-in and the custom SMTP sender
 both disabled.
 
 **Live on Firebase** (`decent-digit-135023`, the same Google Cloud project as
-sign-in): Android app registered for `com.sagnikdas.dosely`, and the service
+sign-in): Android app registered for `com.sagnikdas.medicyn`, and the service
 account stored as the `FCM_SERVICE_ACCOUNT` secret.
 
 **Verification:** Phase 0's device testing is done — see below. Phase 1's happy

@@ -86,7 +86,7 @@ class EncryptedDatabaseOpener {
   /// a background isolate after sign-out still finds the same reminders.
   ///
   /// Local-only writes [localOwnerUserId] into the keystore on first open
-  /// so Taken/Snooze isolates can find `dosely-local.sqlite` without
+  /// so Taken/Snooze isolates can find `medicyn-local.sqlite` without
   /// reading prefs (AppSettings is not initialized there).
   Future<String> _resolveOwnerUserId() async {
     final signedIn = _lookupSignedInUserId();
@@ -127,7 +127,7 @@ bool _appSettingsLocalOnly() {
   }
 }
 
-/// What to do with `dosely-local.sqlite` when a Google session is opening
+/// What to do with `medicyn-local.sqlite` when a Google session is opening
 /// its per-account file for the first time on this phone.
 enum LocalAdoptDecision {
   /// Rename the local-only file (and sidecars) to the account name so
@@ -151,7 +151,7 @@ LocalAdoptDecision decideAdoptLocalDatabase({
 }
 
 /// If this is the first time [ownerUserId] has a file on this phone and
-/// local-only data exists, rename `dosely-local.sqlite` (including WAL/SHM
+/// local-only data exists, rename `medicyn-local.sqlite` (including WAL/SHM
 /// sidecars) to the account file. Never overwrite an existing account file.
 Future<LocalAdoptDecision> adoptLocalDatabaseIfNeeded({
   required Directory docs,
@@ -269,7 +269,7 @@ Future<void> migratePlaintextDatabase({
 
 /// Deletes [db] and the SQLite `-wal` / `-shm` / `-journal` sidecars next
 /// to it. Does not touch any other file — in particular not another
-/// account's `dosely-<id>.sqlite`, not leftover `dosely.sqlite`, and not
+/// account's `medicyn-<id>.sqlite`, not leftover `medicyn.sqlite`, and not
 /// the Keystore encryption key (another account on this phone still needs
 /// it).
 Future<void> deleteSqliteSidecars(File db) async {

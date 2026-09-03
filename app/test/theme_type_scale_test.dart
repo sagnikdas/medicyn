@@ -1,9 +1,9 @@
-import 'package:dosely/core/theme.dart';
+import 'package:medicyn/core/theme.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test('100% uses phone-sized type, not the Stitch artboard tokens', () {
-    final text = DoselyTheme.light().textTheme;
+    final text = MedicynTheme.light().textTheme;
     expect(text.bodyMedium?.fontSize, 14);
     expect(text.bodyLarge?.fontSize, 16);
     expect(text.titleMedium?.fontSize, 16);

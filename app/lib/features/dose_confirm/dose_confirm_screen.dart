@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../core/app_settings.dart';
 import '../../core/motion.dart';
-import '../../core/widgets/dosely_layout.dart';
-import '../../core/widgets/dosely_motion.dart';
+import '../../core/widgets/medicyn_layout.dart';
+import '../../core/widgets/medicyn_motion.dart';
 import '../../data/local/database.dart';
 import '../notification_engine/notification_actions.dart';
 
@@ -119,9 +119,9 @@ class _DoseConfirmScreenState extends State<DoseConfirmScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
-        child: DoselyContent(
+        child: MedicynContent(
           child: Center(
-            child: DoselySwitcher(
+            child: MedicynSwitcher(
               child: _loading
                   ? const CircularProgressIndicator(key: ValueKey('loading'))
                   : (_notFound
@@ -129,7 +129,7 @@ class _DoseConfirmScreenState extends State<DoseConfirmScreen> {
                             key: const ValueKey('not-found'),
                             child: _notFoundView(),
                           )
-                        : DoselyFadeIn(
+                        : MedicynFadeIn(
                             key: const ValueKey('body'),
                             child: _body(),
                           )),
@@ -213,7 +213,7 @@ class _DoseConfirmScreenState extends State<DoseConfirmScreen> {
             onPressed: _submitting
                 ? null
                 : () {
-                    DoselyMotion.confirm(context);
+                    MedicynMotion.confirm(context);
                     _respond(true);
                   },
             child: const Text('Mark as Taken'),

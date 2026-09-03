@@ -1,5 +1,5 @@
-import 'package:dosely/data/local/tables.dart';
-import 'package:dosely/features/review_edit/parsed_medicine.dart';
+import 'package:medicyn/data/local/tables.dart';
+import 'package:medicyn/features/review_edit/parsed_medicine.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// The model's tool output reaches the review form through here, and from

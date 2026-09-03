@@ -327,7 +327,7 @@ class _AttentionCard extends StatelessWidget {
         color: scheme.surfaceContainerLowest,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: scheme.primary.withValues(alpha: 0.28)),
-        boxShadow: DoselyTheme.ambientShadow,
+        boxShadow: MedicynTheme.ambientShadow,
       ),
       child: IntrinsicHeight(
         child: Row(

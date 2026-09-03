@@ -5,9 +5,9 @@ import 'package:flutter/material.dart';
 import '../../core/account_deletion.dart';
 import '../../core/app_settings.dart';
 import '../../core/privacy_policy.dart';
-import '../../core/widgets/dosely_chrome.dart';
-import '../../core/widgets/dosely_layout.dart';
-import '../../core/widgets/dosely_motion.dart';
+import '../../core/widgets/medicyn_chrome.dart';
+import '../../core/widgets/medicyn_layout.dart';
+import '../../core/widgets/medicyn_motion.dart';
 import '../../data/export/data_export_service.dart';
 import '../../data/local/database.dart';
 import '../../data/local/encrypted_database.dart';
@@ -104,14 +104,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Scaffold(
       appBar: widget.embedded ? null : AppBar(title: const Text('Settings')),
       body: SafeArea(
-        child: DoselyContent(
+        child: MedicynContent(
           child: ListView(
             controller: _scrollController,
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
             children: [
               if (widget.embedded) ...[
                 const SizedBox(height: 8),
-                DoselyFadeIn(
+                MedicynFadeIn(
                   child: Center(
                     child: Column(
                       children: [
@@ -161,7 +161,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 const SizedBox(height: 28),
               ] else if (_signedIn) ...[
-                DoselyFadeIn(
+                MedicynFadeIn(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -183,7 +183,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ] else ...[
                 OutlinedButton(
                   onPressed: _signingIn ? null : _signInWithGoogle,
-                  child: DoselySwitcher(
+                  child: MedicynSwitcher(
                     child: _signingIn
                         ? const SizedBox(
                             key: ValueKey(true),
@@ -211,7 +211,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               if (widget.embedded && !_signedIn) ...[
                 OutlinedButton(
                   onPressed: _signingIn ? null : _signInWithGoogle,
-                  child: DoselySwitcher(
+                  child: MedicynSwitcher(
                     child: _signingIn
                         ? const SizedBox(
                             key: ValueKey(true),
@@ -236,7 +236,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ],
                 const SizedBox(height: 24),
               ],
-              DoselyFadeIn(
+              MedicynFadeIn(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -419,7 +419,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'This is a copy of the data Dosely holds about you (Art. 15/20). '
+                      'This is a copy of the data Medicyn holds about you (Art. 15/20). '
                       'Other requests are answered within one month (Art. 12(3)) by email '
                       'sagnikd91@gmail.com.',
                       style: Theme.of(context).textTheme.bodySmall,
@@ -427,7 +427,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     const SizedBox(height: 12),
                     OutlinedButton.icon(
                       onPressed: _exporting ? null : _downloadMyData,
-                      icon: DoselySwitcher(
+                      icon: MedicynSwitcher(
                         child: _exporting
                             ? const SizedBox(
                                 key: ValueKey(true),
@@ -448,7 +448,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     const SizedBox(height: 28),
                     Text(
-                      'Manage what Dosely can do',
+                      'Manage what Medicyn can do',
                       style: Theme.of(context).textTheme.titleSmall,
                     ),
                     const SizedBox(height: 4),

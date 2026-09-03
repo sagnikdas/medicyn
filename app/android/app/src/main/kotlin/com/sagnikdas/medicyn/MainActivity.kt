@@ -1,4 +1,4 @@
-package com.sagnikdas.dosely
+package com.sagnikdas.medicyn
 
 import io.flutter.embedding.android.FlutterFragmentActivity
 

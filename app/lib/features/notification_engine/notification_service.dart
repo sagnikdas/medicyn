@@ -23,7 +23,7 @@ import 'schedule_validation.dart';
 // v5 removes the old full-screen, looping, maximum-importance alarm defaults.
 // Android channel behavior is immutable, so the policy-safe behavior needs a
 // new id rather than attempting to edit v4 in place.
-const String reminderChannelId = 'dosely_reminders_v5';
+const String reminderChannelId = 'medicyn_reminders_v5';
 const String reminderChannelName = 'Medicine reminders';
 const String reminderChannelDescription =
     'High-priority reminders for your medication schedule.';
@@ -38,7 +38,7 @@ const String reminderChannelDescription =
 /// `default_notification_channel_id` meta-data in AndroidManifest.xml. Android
 /// silently drops a notification addressed to a channel that does not exist,
 /// so a mismatch here produces no error anywhere — just no alert.
-const String careAlertChannelId = 'dosely_care_alerts_v1';
+const String careAlertChannelId = 'medicyn_care_alerts_v1';
 const String careAlertChannelName = 'Care alerts';
 const String careAlertChannelDescription =
     "When someone you're helping misses a dose.";
@@ -215,7 +215,7 @@ class NotificationService {
     } catch (error) {
       _timezoneReady = false;
       _lastTimezoneError = error;
-      debugPrint('[dosely] device timezone lookup failed: $error');
+      debugPrint('[medicyn] device timezone lookup failed: $error');
       return false;
     }
   }
@@ -891,7 +891,7 @@ class NotificationService {
       return DeviceHealthSnapshot(
         notificationsAllowed: notifications,
         exactAlarmsAllowed: exact,
-        // Dosely no longer requests the broad battery-exemption permission.
+        // Medicyn no longer requests the broad battery-exemption permission.
         // Android's normal alarm delivery and the inexact fallback are the
         // supported path, so do not report an unrequested exemption as a
         // reminder failure to the patient or caregiver.
@@ -945,7 +945,7 @@ class NotificationService {
         results[sm.schedule.id] = result;
       } catch (error) {
         failures[sm.schedule.id] = error;
-        await DoselyTelemetry.instance.recordError(
+        await MedicynTelemetry.instance.recordError(
           error is TimezoneUnavailableException
               ? 'timezone_unavailable'
               : error is UnschedulableSchedule
@@ -960,7 +960,7 @@ class NotificationService {
       // — logged here once, centrally, rather than asking every call site to
       // remember to check `allArmed` itself.
       debugPrint(
-        '[dosely] reconcile: ${failures.length} schedule(s) failed to arm: $failures',
+        '[medicyn] reconcile: ${failures.length} schedule(s) failed to arm: $failures',
       );
     }
     return ReconcileReport(

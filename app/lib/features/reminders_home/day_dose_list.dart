@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/motion.dart';
 import '../../core/theme.dart';
-import '../../core/widgets/dosely_motion.dart';
+import '../../core/widgets/medicyn_motion.dart';
 import 'day_dose_style.dart';
 import 'day_occurrences.dart';
 import 'reminder_copy.dart';
@@ -48,9 +48,9 @@ class WeekAdherenceLine extends StatelessWidget {
         const SizedBox(height: 6),
         ClipRRect(
           borderRadius: BorderRadius.circular(2),
-          child: DoselyAnimatedValue(
+          child: MedicynAnimatedValue(
             value: fraction,
-            duration: DoselyMotion.medium,
+            duration: MedicynMotion.medium,
             builder: (context, value) => LinearProgressIndicator(
               value: value,
               minHeight: 4,
@@ -125,7 +125,7 @@ List<Widget> dayDoseSlivers({
     SliverPadding(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
       sliver: SliverToBoxAdapter(
-        child: DoselyFadeIn(
+        child: MedicynFadeIn(
           key: ValueKey(calendarDay(day)),
           child: _DayDoseColumn(
             day: day,
@@ -285,7 +285,7 @@ class _DayDoseRowState extends State<_DayDoseRow> {
   Future<void> _markTaken() async {
     final callback = widget.onMarkTaken;
     if (callback == null || _busy) return;
-    DoselyMotion.confirm(context);
+    MedicynMotion.confirm(context);
     setState(() => _busy = true);
     try {
       await callback(widget.occurrence);
@@ -309,11 +309,11 @@ class _DayDoseRowState extends State<_DayDoseRow> {
         status == DayDoseStatus.upcoming ||
         status == DayDoseStatus.snoozed;
 
-    return DoselyPressable(
+    return MedicynPressable(
       enabled: _canOpenHistory || _canMarkTaken,
       child: AnimatedOpacity(
-        duration: DoselyMotion.duration(context, DoselyMotion.medium),
-        curve: DoselyMotion.decelerate,
+        duration: MedicynMotion.duration(context, MedicynMotion.medium),
+        curve: MedicynMotion.decelerate,
         opacity: taken ? 0.75 : 1,
         child: Material(
           color: Colors.transparent,
@@ -326,7 +326,7 @@ class _DayDoseRowState extends State<_DayDoseRow> {
               decoration: BoxDecoration(
                 color: scheme.surfaceContainerLowest,
                 borderRadius: BorderRadius.circular(12),
-                boxShadow: DoselyTheme.ambientShadow,
+                boxShadow: MedicynTheme.ambientShadow,
                 border: highlight
                     ? Border.all(color: scheme.primary.withValues(alpha: 0.2))
                     : null,
@@ -342,11 +342,11 @@ class _DayDoseRowState extends State<_DayDoseRow> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           AnimatedDefaultTextStyle(
-                            duration: DoselyMotion.duration(
+                            duration: MedicynMotion.duration(
                               context,
-                              DoselyMotion.fast,
+                              MedicynMotion.fast,
                             ),
-                            curve: DoselyMotion.decelerate,
+                            curve: MedicynMotion.decelerate,
                             style:
                                 Theme.of(
                                   context,
@@ -411,7 +411,7 @@ class _DayDoseRowState extends State<_DayDoseRow> {
                         ],
                       ),
                     ),
-                    DoselySwitcher(
+                    MedicynSwitcher(
                       child: taken
                           ? Container(
                               key: const ValueKey('done'),
@@ -476,8 +476,8 @@ class _StatusAvatar extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final taken = status == DayDoseStatus.taken;
     return AnimatedContainer(
-      duration: DoselyMotion.duration(context, DoselyMotion.fast),
-      curve: DoselyMotion.decelerate,
+      duration: MedicynMotion.duration(context, MedicynMotion.fast),
+      curve: MedicynMotion.decelerate,
       width: 48,
       height: 48,
       decoration: BoxDecoration(

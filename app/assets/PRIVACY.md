@@ -1,44 +1,44 @@
-# Privacy Policy for Dosely
+# Privacy Policy for Medicyn
 
 **Last updated:** 20 August 2026
 **Contact:** sagnikd91@gmail.com
 
 ## Who is responsible
 
-The controller is **Sagnik Das**, the sole developer of Dosely. Correspondence
+The controller is **Sagnik Das**, the sole developer of Medicyn. Correspondence
 is by email only, at **sagnikd91@gmail.com**. There is no other contact
 address.
 
-Dosely is a medication reminder app (Android package
-`com.sagnikdas.dosely`). It records what medicines you take and when, so it
+Medicyn is a medication reminder app (Android package
+`com.sagnikdas.medicyn`). It records what medicines you take and when, so it
 can remind you and so you can look back at what you've taken. That is health
 information, and this policy explains exactly what happens to it.
 
-This policy covers the Dosely Android app and its backend.
+This policy covers the Medicyn Android app and its backend.
 
-## What Dosely collects
+## What Medicyn collects
 
 **Your medicines and schedules.** The medicine name, strength, form, dose
 amount, any notes you add, and the times and days you've set for reminders.
-Dosely cannot remind you without this.
+Medicyn cannot remind you without this.
 
-**Your dose history.** Each time you mark a dose as taken or snoozed, Dosely
+**Your dose history.** Each time you mark a dose as taken or snoozed, Medicyn
 records which reminder it was for, the time the dose was due, and the time you
-responded. If a reminder goes unanswered for more than half an hour, Dosely
+responded. If a reminder goes unanswered for more than half an hour, Medicyn
 records that too, as a missed dose.
 
-**Your account, if you sign in.** When you sign in with Google, Dosely
+**Your account, if you sign in.** When you sign in with Google, Medicyn
 receives your email address, your name, and a Google account identifier.
-Dosely never sees or stores your Google password. Signing in with Google is
+Medicyn never sees or stores your Google password. Signing in with Google is
 **not** the only way to use the app: you can choose **Use without an
 account** and keep reminders on this phone only. Backup and family sharing
 need a Google account later.
 
 **Your timezone, last-seen time, and whether reminders can fire, if you
-sign in.** On sign-in Dosely writes the phone's IANA timezone (for example
+sign in.** On sign-in Medicyn writes the phone's IANA timezone (for example
 `Asia/Kolkata`) to your profile. That is a coarse location — the region of
 the clock you use, not a GPS pin. A linked family member can see it, so
-their screens show your reminder times on your clock. Dosely also records
+their screens show your reminder times on your clock. Medicyn also records
 `last_seen_at` on the profile, which is when this signed-in app last
 updated that profile, and a snapshot of whether this phone currently
 allows notifications, exact alarms, and battery exemption, plus how many
@@ -48,16 +48,16 @@ phone cannot actually ring.
 
 **A phone number, if you choose to share one with a linked family member.**
 Each person in a Care Link can store their own number so the other can tap
-Call on a missed-dose alert. Dosely does not read your contacts. The number
+Call on a missed-dose alert. Medicyn does not read your contacts. The number
 lives only on that connection and is deleted with the account.
 
-**A record that a family alert was sent.** When Dosely notifies the person
+**A record that a family alert was sent.** When Medicyn notifies the person
 you share with — a missed dose, a running-low bottle, or that the other
 phone has not opened the app since yesterday — it records that it did so
 and when, so the same event is not sent twice. There is no in-app list of
 those alerts today.
 
-**A notification token for your phone, if you are signed in.** So that Dosely
+**A notification token for your phone, if you are signed in.** So that Medicyn
 can alert the person you have chosen to share with, it stores the identifier
 Google's notification service uses to reach this install (an FCM token) and
 a `push_install_id` that ties that token to this installation of the app,
@@ -67,7 +67,7 @@ advertising identifiers. We try to delete the token when you sign out; if
 that attempt fails, it is dropped when the token goes stale or when someone
 else signs in on the same phone.
 
-Dosely does **not** collect advertising identifiers, your contacts, your
+Medicyn does **not** collect advertising identifiers, your contacts, your
 browsing activity, GPS location, or any other health information beyond what
 you enter as a medicine reminder. The timezone above is the only location
 information, and it is the name of a clock zone, not a map position.
@@ -77,20 +77,20 @@ information, and it is the name of a clock zone, not a map position.
 **Label photos are never uploaded and never kept.** When you photograph a
 medicine label, the image is read on your device to extract the text, and the
 image file is deleted immediately afterwards. The photo does not leave your
-phone and is not stored by Dosely. Before any of that text is sent for AI
+phone and is not stored by Medicyn. Before any of that text is sent for AI
 fill-in, this phone removes the patient's name, address, date of birth,
 prescription number, and prescriber. What is sent is the remaining label
 text — typically the medicine name, strength, and directions.
 
 **Voice input uses your device's speech recognition.** When you describe a
-dosage out loud, Dosely uses the speech recognition service built into your
+dosage out loud, Medicyn uses the speech recognition service built into your
 phone to turn it into text. On most Android devices that service is provided
 by Google and the audio may be sent to Google's servers to be transcribed,
-under Google's own privacy policy. Dosely itself does not store the audio and
+under Google's own privacy policy. Medicyn itself does not store the audio and
 never uploads a recording. This happens only if you turn voice input on (see
-"Why Dosely uses your information" below).
+"Why Medicyn uses your information" below).
 
-## Why Dosely uses your information
+## Why Medicyn uses your information
 
 The law asks us to say the **legal basis** for each use. In plain words:
 why we are allowed to do it.
@@ -119,7 +119,7 @@ immediately: that processing stops. You can change any of them in
 **Settings**.
 
 **Your Google email, name, and account id.** If you sign in, we use these to
-run a signed-in account (Article 6(1)(b)). You can use Dosely without
+run a signed-in account (Article 6(1)(b)). You can use Medicyn without
 signing in.
 
 **The notification token.** Only if you are signed in and you use, or may
@@ -127,24 +127,24 @@ use, family alerts, so a missed-dose message can reach the other phone.
 
 ## What is sent off your device, and to whom
 
-If you use Dosely without an account, your medicines stay on this phone.
+If you use Medicyn without an account, your medicines stay on this phone.
 Nothing is backed up, and nothing is shared with family. Voice input and AI
 fill-in still leave the phone if you turn those switches on.
 
-**Supabase** hosts Dosely's database and handles sign-in. If you consent to
+**Supabase** hosts Medicyn's database and handles sign-in. If you consent to
 cloud backup, your medicines, schedules, and dose history are stored there so
 that they survive losing or replacing your phone. Access is restricted per
 account at the database level: no other account can read your data unless you
 have connected it yourself, as described in "Sharing with someone who helps
 you" below.
 
-**Google** delivers Dosely's notifications between two connected phones,
+**Google** delivers Medicyn's notifications between two connected phones,
 using Firebase Cloud Messaging. Google receives the notification token for
 the receiving device and the contents of the notification — which, for a
 missed dose, includes the name of the medicine, the time it was due, and the
 display name on your account. This is only used to deliver the message, under
 Google's own privacy policy. If you have not connected your account to
-anyone, Dosely sends no such notifications and nothing about your medicines
+anyone, Medicyn sends no such notifications and nothing about your medicines
 is sent to Google for that purpose. Google also receives your email, name,
 and account id if you sign in, and may receive the audio if you use voice
 input, as described above.
@@ -161,7 +161,7 @@ instead, nothing is sent to Anthropic at all.
 sends nothing. If it is ever enabled in a future release, this policy will be
 updated first to say what it reports.
 
-Dosely does not sell your data, does not share it with advertisers, and
+Medicyn does not sell your data, does not share it with advertisers, and
 contains no advertising or analytics SDKs.
 
 ## Where your data is sent (international transfers)
@@ -183,12 +183,12 @@ you this now rather than waiting.
 
 ## Sharing with someone who helps you
 
-Dosely can connect your account to **one** other person's — typically a
+Medicyn can connect your account to **one** other person's — typically a
 family member who wants to know that you are taking your medicines. Nothing
 is shared until you set this up, and it works in two steps that both need
 you:
 
-- You show them a short code that Dosely generates for you.
+- You show them a short code that Medicyn generates for you.
 - They enter it, and then **you** confirm, by name, that it is really them.
 
 Holding the code is not access. Until you confirm, the person who entered it
@@ -208,20 +208,20 @@ none of your business. And neither of you gains access to anybody else: an
 account can be connected to at most one other.
 
 **What they are told automatically.** If a reminder goes unanswered for more
-than half an hour, Dosely sends them a notification naming the medicine and
-the time it was due. Dosely records that it sent that alert so it is not
+than half an hour, Medicyn sends them a notification naming the medicine and
+the time it was due. Medicyn records that it sent that alert so it is not
 sent twice. There is no screen in the app today that lists those alerts.
 
 **Ending it.** Either of you can disconnect at any time, from inside the
 app, and access to your medicines, schedules, and dose history stops
-immediately. Dosely keeps a record that the connection existed and when it
+immediately. Medicyn keeps a record that the connection existed and when it
 ended, for twelve months, so the question "who could see my medicines, and
 when" has an answer. Your medicines and dose history belong to your account
 and are unaffected by disconnecting.
 
 ## Where your data lives
 
-Dosely keeps a copy of your reminders on your phone so that alarms still
+Medicyn keeps a copy of your reminders on your phone so that alarms still
 fire without an internet connection. If you have consented to cloud backup,
 a copy is also kept on Supabase. Both copies contain the same information.
 If you use the app without an account, there is only the copy on this phone.
@@ -269,7 +269,7 @@ paths where they exist.
 
 ## Do you have to give us this information?
 
-No. Using Dosely is not a legal requirement. Nobody is obliged by law to
+No. Using Medicyn is not a legal requirement. Nobody is obliged by law to
 enter their medicines here. The app simply cannot remind you unless you
 enter the medicine and the schedule.
 
@@ -290,7 +290,7 @@ accident.
 If you cannot open the app, email **sagnikd91@gmail.com** from the Google
 address you signed in with, or use this page:
 
-https://sagnikdas.github.io/dosely/delete-account/
+https://sagnikdas.github.io/medicyn/delete-account/
 
 That deletes your account, the cloud backup, any family link, and
 notification tokens. Uninstalling the app removes the copy on your phone
@@ -298,13 +298,13 @@ but does not by itself delete the backup.
 
 ## Children
 
-Dosely is not intended for children and is not directed at anyone under 13.
+Medicyn is not intended for children and is not directed at anyone under 13.
 
 ## Permissions and why they are needed
 
 - **Notifications, exact alarms** — to make a reminder fire at the right
   time. This is the core function of the app. The same notification
-  permission is what lets Dosely tell you if someone you help has missed a
+  permission is what lets Medicyn tell you if someone you help has missed a
   dose.
 - **Ignore battery optimisations** — Android power saving can silently stop
   scheduled alarms. This permission is requested so reminders are not
@@ -314,12 +314,12 @@ Dosely is not intended for children and is not directed at anyone under 13.
 
 ## Changes to this policy
 
-If what Dosely does with your data changes, this policy will be updated and
+If what Medicyn does with your data changes, this policy will be updated and
 the date at the top will change.
 
 ## Data Protection Officer
 
-Dosely has no Data Protection Officer. That role is not required at this
+Medicyn has no Data Protection Officer. That role is not required at this
 scale. Privacy questions still go to **sagnikd91@gmail.com**. There is
 not yet an EU or UK representative (GDPR / UK GDPR Article 27). If you
 are in the EEA or the UK, that gap is ours, not yours — you can still
@@ -329,7 +329,7 @@ write to the email above and to your supervisory authority.
 
 If Washington's My Health My Data Act or Nevada SB370 applies to you,
 there is a **separate** consumer health data policy in `docs/compliance/MHMD.md` in
-the Dosely source tree. Ask for it by email if you cannot open that
+the Medicyn source tree. Ask for it by email if you cannot open that
 file. It names Supabase, Anthropic, and Google, and it describes the
 second consent before family sharing.
 

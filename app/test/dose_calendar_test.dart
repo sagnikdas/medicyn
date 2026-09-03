@@ -1,5 +1,5 @@
-import 'package:dosely/core/theme.dart';
-import 'package:dosely/features/reminders_home/dose_calendar.dart';
+import 'package:medicyn/core/theme.dart';
+import 'package:medicyn/features/reminders_home/dose_calendar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -16,7 +16,7 @@ void main() {
     TextScaler textScaler = const TextScaler.linear(1.0),
   }) {
     return MaterialApp(
-      theme: DoselyTheme.light(),
+      theme: MedicynTheme.light(),
       builder: (context, child) => MediaQuery(
         data: MediaQuery.of(context).copyWith(textScaler: textScaler),
         child: child!,

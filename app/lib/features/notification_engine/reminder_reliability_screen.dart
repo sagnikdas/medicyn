@@ -84,7 +84,7 @@ class _ReminderReliabilityScreenState extends State<ReminderReliabilityScreen> {
           padding: const EdgeInsets.all(20),
           children: [
             Text(
-              'Make sure Dosely can reach you when a dose is due.',
+              'Make sure Medicyn can reach you when a dose is due.',
               style: Theme.of(context).textTheme.bodyLarge,
             ),
             const SizedBox(height: 16),
@@ -151,7 +151,7 @@ class _ReminderReliabilityScreenState extends State<ReminderReliabilityScreen> {
           contentPadding: EdgeInsets.zero,
           title: const Text('Notifications are off'),
           subtitle: const Text(
-            'Dosely cannot show a reminder until notifications are allowed.',
+            'Medicyn cannot show a reminder until notifications are allowed.',
           ),
           trailing: TextButton(
             onPressed: _working ? null : _requestNotifications,
@@ -181,7 +181,7 @@ class _ReminderReliabilityScreenState extends State<ReminderReliabilityScreen> {
           contentPadding: EdgeInsets.zero,
           title: const Text('Timezone needs setup'),
           subtitle: const Text(
-            'Dosely will not schedule a reminder until the device timezone is available.',
+            'Medicyn will not schedule a reminder until the device timezone is available.',
           ),
           trailing: TextButton(
             onPressed: _working ? null : _refresh,

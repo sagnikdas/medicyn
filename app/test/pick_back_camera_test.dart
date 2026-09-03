@@ -1,6 +1,6 @@
 import 'package:camera/camera.dart';
-import 'package:dosely/core/theme.dart';
-import 'package:dosely/features/capture_ocr/ocr_capture_screen.dart';
+import 'package:medicyn/core/theme.dart';
+import 'package:medicyn/features/capture_ocr/ocr_capture_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -52,7 +52,7 @@ void main() {
     'scan label stays on this screen instead of opening a camera app',
     (tester) async {
       await tester.pumpWidget(
-        MaterialApp(theme: DoselyTheme.light(), home: const OcrCaptureScreen()),
+        MaterialApp(theme: MedicynTheme.light(), home: const OcrCaptureScreen()),
       );
       await tester.pump();
       await tester.pump();

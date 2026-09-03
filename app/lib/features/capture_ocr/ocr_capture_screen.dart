@@ -6,9 +6,9 @@ import 'package:flutter/material.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:permission_handler/permission_handler.dart';
 
-import '../../core/widgets/dosely_chrome.dart';
-import '../../core/widgets/dosely_layout.dart';
-import '../../core/widgets/dosely_motion.dart';
+import '../../core/widgets/medicyn_chrome.dart';
+import '../../core/widgets/medicyn_layout.dart';
+import '../../core/widgets/medicyn_motion.dart';
 
 /// Step 1 of the capture flow: photograph the medicine label, run OCR
 /// on-device, then immediately delete the photo. Only the extracted text
@@ -246,18 +246,18 @@ class _OcrCaptureScreenState extends State<OcrCaptureScreen>
           tooltip: 'Close',
           onPressed: () => Navigator.of(context).maybePop(),
         ),
-        title: const DoselyBrandMark(compact: true),
+        title: const MedicynBrandMark(compact: true),
         centerTitle: true,
       ),
       body: SafeArea(
-        child: DoselyContent(
+        child: MedicynContent(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Expanded(
-                  child: DoselyFadeIn(
+                  child: MedicynFadeIn(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
@@ -355,7 +355,7 @@ class _OcrCaptureScreenState extends State<OcrCaptureScreen>
                 const SizedBox(height: 16),
                 FilledButton.icon(
                   onPressed: busy || _opening ? null : _scan,
-                  icon: DoselySwitcher(
+                  icon: MedicynSwitcher(
                     child: _status == _Status.recognizing
                         ? const SizedBox(
                             key: ValueKey('reading'),
@@ -368,7 +368,7 @@ class _OcrCaptureScreenState extends State<OcrCaptureScreen>
                             key: ValueKey('camera'),
                           ),
                   ),
-                  label: DoselySwitcher(
+                  label: MedicynSwitcher(
                     child: Text(
                       _status == _Status.recognizing
                           ? 'Reading label…'

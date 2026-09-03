@@ -6,11 +6,11 @@ import '../motion.dart';
 /// [StreamBuilder] rebuild does not replay it. Remount (new [Key]) to play
 /// again — e.g. when the selected calendar day changes.
 ///
-/// Under [DoselyMotion.reduce] the child is shown at rest immediately:
+/// Under [MedicynMotion.reduce] the child is shown at rest immediately:
 /// no [AnimationController], no delayed opacity of 0 that would eat the
 /// first tap on a slow phone.
-class DoselyFadeIn extends StatefulWidget {
-  const DoselyFadeIn({
+class MedicynFadeIn extends StatefulWidget {
+  const MedicynFadeIn({
     super.key,
     required this.child,
     this.delay = Duration.zero,
@@ -26,10 +26,10 @@ class DoselyFadeIn extends StatefulWidget {
   final double pixels;
 
   @override
-  State<DoselyFadeIn> createState() => _DoselyFadeInState();
+  State<MedicynFadeIn> createState() => _MedicynFadeInState();
 }
 
-class _DoselyFadeInState extends State<DoselyFadeIn>
+class _MedicynFadeInState extends State<MedicynFadeIn>
     with SingleTickerProviderStateMixin {
   AnimationController? _controller;
   Animation<double>? _t;
@@ -40,9 +40,9 @@ class _DoselyFadeInState extends State<DoselyFadeIn>
     super.didChangeDependencies();
     if (_started) return;
     _started = true;
-    if (DoselyMotion.reduce(context)) return;
+    if (MedicynMotion.reduce(context)) return;
     final delay = widget.delay;
-    final move = DoselyMotion.medium;
+    final move = MedicynMotion.medium;
     final total = delay + move;
     final start = total == Duration.zero
         ? 0.0
@@ -54,7 +54,7 @@ class _DoselyFadeInState extends State<DoselyFadeIn>
       curve: Interval(
         start.clamp(0.0, 0.85),
         1,
-        curve: DoselyMotion.decelerate,
+        curve: MedicynMotion.decelerate,
       ),
     );
     controller.forward();
@@ -92,8 +92,8 @@ class _DoselyFadeInState extends State<DoselyFadeIn>
 ///
 /// Skipped entirely when motion is reduced — a 2% scale is motion, and
 /// the ink splash already confirms the tap.
-class DoselyPressable extends StatefulWidget {
-  const DoselyPressable({
+class MedicynPressable extends StatefulWidget {
+  const MedicynPressable({
     super.key,
     required this.child,
     this.scale = 0.98,
@@ -105,10 +105,10 @@ class DoselyPressable extends StatefulWidget {
   final bool enabled;
 
   @override
-  State<DoselyPressable> createState() => _DoselyPressableState();
+  State<MedicynPressable> createState() => _MedicynPressableState();
 }
 
-class _DoselyPressableState extends State<DoselyPressable> {
+class _MedicynPressableState extends State<MedicynPressable> {
   var _pressed = false;
 
   void _setPressed(bool value) {
@@ -118,15 +118,15 @@ class _DoselyPressableState extends State<DoselyPressable> {
 
   @override
   Widget build(BuildContext context) {
-    final reduce = !widget.enabled || DoselyMotion.reduce(context);
+    final reduce = !widget.enabled || MedicynMotion.reduce(context);
     return Listener(
       onPointerDown: reduce ? null : (_) => _setPressed(true),
       onPointerUp: reduce ? null : (_) => _setPressed(false),
       onPointerCancel: reduce ? null : (_) => _setPressed(false),
       child: AnimatedScale(
         scale: _pressed ? widget.scale : 1,
-        duration: DoselyMotion.duration(context, DoselyMotion.fast),
-        curve: DoselyMotion.decelerate,
+        duration: MedicynMotion.duration(context, MedicynMotion.fast),
+        curve: MedicynMotion.decelerate,
         child: widget.child,
       ),
     );
@@ -139,13 +139,13 @@ class _DoselyPressableState extends State<DoselyPressable> {
 /// Holds the [Tween] in [State] so a parent rebuild with the same value
 /// does not restart the ticker (TweenAnimationBuilder compares tween
 /// identity, and `Tween(end: x)` is a new object every build).
-class DoselyAnimatedValue extends StatefulWidget {
-  const DoselyAnimatedValue({
+class MedicynAnimatedValue extends StatefulWidget {
+  const MedicynAnimatedValue({
     super.key,
     required this.value,
     required this.builder,
-    this.duration = DoselyMotion.slow,
-    this.curve = DoselyMotion.decelerate,
+    this.duration = MedicynMotion.slow,
+    this.curve = MedicynMotion.decelerate,
   });
 
   final double value;
@@ -154,10 +154,10 @@ class DoselyAnimatedValue extends StatefulWidget {
   final Widget Function(BuildContext context, double value) builder;
 
   @override
-  State<DoselyAnimatedValue> createState() => _DoselyAnimatedValueState();
+  State<MedicynAnimatedValue> createState() => _MedicynAnimatedValueState();
 }
 
-class _DoselyAnimatedValueState extends State<DoselyAnimatedValue> {
+class _MedicynAnimatedValueState extends State<MedicynAnimatedValue> {
   late Tween<double> _tween;
 
   @override
@@ -167,7 +167,7 @@ class _DoselyAnimatedValueState extends State<DoselyAnimatedValue> {
   }
 
   @override
-  void didUpdateWidget(covariant DoselyAnimatedValue oldWidget) {
+  void didUpdateWidget(covariant MedicynAnimatedValue oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.value != widget.value) {
       _tween = Tween(begin: oldWidget.value, end: widget.value);
@@ -178,7 +178,7 @@ class _DoselyAnimatedValueState extends State<DoselyAnimatedValue> {
   Widget build(BuildContext context) {
     return TweenAnimationBuilder<double>(
       tween: _tween,
-      duration: DoselyMotion.duration(context, widget.duration),
+      duration: MedicynMotion.duration(context, widget.duration),
       curve: widget.curve,
       builder: (context, value, _) => widget.builder(context, value),
     );
@@ -188,8 +188,8 @@ class _DoselyAnimatedValueState extends State<DoselyAnimatedValue> {
 /// [IndexedStack] that fades the incoming child. Off-stage children stay
 /// mounted (Home's resume observer must keep running) and sit at opacity
 /// 0 so the next visit can fade in from rest.
-class DoselyIndexedStack extends StatelessWidget {
-  const DoselyIndexedStack({
+class MedicynIndexedStack extends StatelessWidget {
+  const MedicynIndexedStack({
     super.key,
     required this.index,
     required this.children,
@@ -202,7 +202,7 @@ class DoselyIndexedStack extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final duration = DoselyMotion.duration(context, DoselyMotion.fast);
+    final duration = MedicynMotion.duration(context, MedicynMotion.fast);
     return IndexedStack(
       index: index,
       sizing: sizing,
@@ -211,7 +211,7 @@ class DoselyIndexedStack extends StatelessWidget {
           AnimatedOpacity(
             opacity: i == index ? 1 : 0,
             duration: duration,
-            curve: DoselyMotion.decelerate,
+            curve: MedicynMotion.decelerate,
             child: children[i],
           ),
       ],
@@ -221,12 +221,12 @@ class DoselyIndexedStack extends StatelessWidget {
 
 /// Fade between children. Duration collapses to zero when motion is reduced
 /// so widget tests that [WidgetTester.pump] once still see the new child.
-class DoselySwitcher extends StatelessWidget {
-  const DoselySwitcher({
+class MedicynSwitcher extends StatelessWidget {
+  const MedicynSwitcher({
     super.key,
     required this.child,
     this.alignment = Alignment.center,
-    this.duration = DoselyMotion.fast,
+    this.duration = MedicynMotion.fast,
   });
 
   final Widget child;
@@ -236,9 +236,9 @@ class DoselySwitcher extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AnimatedSwitcher(
-      duration: DoselyMotion.duration(context, duration),
-      switchInCurve: DoselyMotion.decelerate,
-      switchOutCurve: DoselyMotion.accelerate,
+      duration: MedicynMotion.duration(context, duration),
+      switchInCurve: MedicynMotion.decelerate,
+      switchOutCurve: MedicynMotion.accelerate,
       layoutBuilder: (current, previous) =>
           Stack(alignment: alignment, children: [...previous, ?current]),
       child: child,
@@ -249,8 +249,8 @@ class DoselySwitcher extends StatelessWidget {
 /// Lightweight fade + 4% horizontal slide. Cheaper than the platform zoom
 /// transition on old Mali / PowerVR GPUs, and it respects reduced motion
 /// by returning [child] with no transform.
-class DoselyPageTransitionsBuilder extends PageTransitionsBuilder {
-  const DoselyPageTransitionsBuilder();
+class MedicynPageTransitionsBuilder extends PageTransitionsBuilder {
+  const MedicynPageTransitionsBuilder();
 
   @override
   Widget buildTransitions<T>(
@@ -260,11 +260,11 @@ class DoselyPageTransitionsBuilder extends PageTransitionsBuilder {
     Animation<double> secondaryAnimation,
     Widget child,
   ) {
-    if (DoselyMotion.reduce(context)) return child;
+    if (MedicynMotion.reduce(context)) return child;
     final curved = CurvedAnimation(
       parent: animation,
-      curve: DoselyMotion.decelerate,
-      reverseCurve: DoselyMotion.accelerate,
+      curve: MedicynMotion.decelerate,
+      reverseCurve: MedicynMotion.accelerate,
     );
     return FadeTransition(
       opacity: curved,

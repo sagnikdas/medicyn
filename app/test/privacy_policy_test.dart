@@ -1,5 +1,5 @@
-import 'package:dosely/core/privacy_policy.dart';
-import 'package:dosely/features/auth/sign_in_screen.dart';
+import 'package:medicyn/core/privacy_policy.dart';
+import 'package:medicyn/features/auth/sign_in_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 

@@ -1,4 +1,4 @@
-import 'package:dosely/data/remote/medicine_parser.dart';
+import 'package:medicyn/data/remote/medicine_parser.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

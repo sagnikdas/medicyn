@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/app_settings.dart';
 import '../../core/theme.dart';
-import '../../core/widgets/dosely_motion.dart';
+import '../../core/widgets/medicyn_motion.dart';
 import '../../data/local/database.dart';
 import '../../data/local/lifecycle.dart';
 import '../../data/local/tables.dart';
@@ -30,7 +30,7 @@ class ReminderCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final medicine = item.medicine;
     final title = medicineTitle(medicine);
-    return DoselyPressable(
+    return MedicynPressable(
       child: Material(
         color: Colors.transparent,
         child: InkWell(
@@ -40,7 +40,7 @@ class ReminderCard extends StatelessWidget {
             decoration: BoxDecoration(
               color: Theme.of(context).colorScheme.surfaceContainerLowest,
               borderRadius: BorderRadius.circular(12),
-              boxShadow: DoselyTheme.ambientShadow,
+              boxShadow: MedicynTheme.ambientShadow,
             ),
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 16, 8, 16),

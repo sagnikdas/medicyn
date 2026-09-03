@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Dosely</string>
+	<string>Medicyn</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -15,7 +15,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>Dosely</string>
+	<string>Medicyn</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -49,9 +49,9 @@
 	     live here. -->
 
 	<key>NSCameraUsageDescription</key>
-	<string>Dosely uses the camera to photograph your medicine label so it can read the drug name and strength. The photo stays on your device and is discarded right after it's read.</string>
+	<string>Medicyn uses the camera to photograph your medicine label so it can read the drug name and strength. The photo stays on your device and is discarded right after it's read.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Dosely uses the microphone so you can speak your dosage and schedule instructions instead of typing them.</string>
+	<string>Medicyn uses the microphone so you can speak your dosage and schedule instructions instead of typing them.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

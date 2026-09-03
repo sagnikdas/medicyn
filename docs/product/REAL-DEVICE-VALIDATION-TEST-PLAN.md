@@ -1,4 +1,4 @@
-# Dosely real-device validation plan
+# Medicyn real-device validation plan
 
 **Status:** Canonical manual acceptance checklist  
 **Build scope:** Current Android build on codex-master  
@@ -72,7 +72,7 @@ For every case, record the test ID, result, timestamps, device, test data, and a
 
 Run from the repository before installing the candidate:
 
-    cd /Users/sagnikdas/research/dosely/app
+    cd /Users/sagnikdas/research/medicyn/app
     flutter analyze
     flutter test
 
@@ -80,14 +80,14 @@ Expected result: analyzer has no issues and all Flutter tests pass. The current 
 
 If backend behavior is in scope, run the root test command and confirm the hosted project has the migrations required by the candidate:
 
-    cd /Users/sagnikdas/research/dosely
+    cd /Users/sagnikdas/research/medicyn
     ./scripts/test_all.sh
 
 Before two-device care tests, confirm:
 
 - device_tokens, care_links, care_alerts, profiles, consent, and lifecycle migrations are applied to the test Supabase project;
 - notify-care is deployed with the matching Firebase project and service account;
-- google-services.json belongs to this Dosely Firebase project;
+- google-services.json belongs to this Medicyn Firebase project;
 - the build's Google OAuth client is registered for the signing certificate being tested;
 - test accounts are allowed by Google's OAuth consent-screen test-user configuration if the app is still in Testing mode.
 
@@ -114,7 +114,7 @@ Keep automatic date/time and the device's real timezone enabled except when deli
 ### RD-A01 — Fresh install and first launch
 
 1. Install the candidate on a clean device or clear only the test app's data.
-2. Launch Dosely and complete onboarding.
+2. Launch Medicyn and complete onboarding.
 
 Expected:
 
@@ -181,7 +181,7 @@ Expected:
 
 Run once on a device with a PIN/pattern/biometric and once on a device without a screen lock.
 
-1. Open Dosely, background it briefly, and return.
+1. Open Medicyn, background it briefly, and return.
 2. Leave it in the background beyond the configured grace period and return.
 
 Expected:
@@ -282,7 +282,7 @@ Expected: saved values match the reviewed values and the next reminder is visibl
 
 ### RD-B06 — Contextual notification permission
 
-1. Revoke Dosely notification permission in Android Settings.
+1. Revoke Medicyn notification permission in Android Settings.
 2. Open Home and browse the app.
 
 Expected: no notification prompt appears merely from opening Home.
@@ -308,7 +308,7 @@ Expected:
 - It does not substitute UTC or silently move the reminder.
 - The screen explains how to improve timing or that Android may delay delivery.
 
-4. Re-enable exact-alarm access, return to Dosely, and tap Check again.
+4. Re-enable exact-alarm access, return to Medicyn, and tap Check again.
 
 Expected: permission and schedule health update without requiring a reinstall.
 
@@ -344,7 +344,7 @@ Expected:
 ### RD-C02 — Normal background delivery
 
 1. Create a scheduled reminder.
-2. Put Dosely in the background without force-stopping it.
+2. Put Medicyn in the background without force-stopping it.
 3. Lock the phone and wait.
 
 Expected: the reminder arrives at the intended local wall-clock time, with configured sound/vibration and heads-up behavior.
@@ -364,7 +364,7 @@ Expected: only the patient's own reminder changes to named copy; the setting is 
 
 1. Trigger a reminder.
 2. Tap Taken from the notification.
-3. Open Dosely and inspect Today/History.
+3. Open Medicyn and inspect Today/History.
 
 Expected: exactly one dose is recorded for the scheduled occurrence, the attention card resolves, stock decrements once when tracking is enabled, and the alarm does not reappear for the same occurrence.
 
@@ -381,12 +381,12 @@ Expected:
 
 ### RD-C05 — Notification body tap and cold-start action
 
-1. Force-stop Dosely.
+1. Force-stop Medicyn.
 2. Trigger a reminder and tap the notification body, not an action button.
 
 Expected: the app cold-starts and opens the correct Taken/Snooze confirmation after the app is ready.
 
-3. Repeat the same tap by launching Dosely normally afterward.
+3. Repeat the same tap by launching Medicyn normally afterward.
 
 Expected: the old launch is not replayed indefinitely. A different notification opens, and the same daily slot can open again on the next civil day.
 
@@ -407,12 +407,12 @@ Expected:
 
 1. Create a reminder five minutes in the future.
 2. Reboot the device.
-3. Do not open Dosely after reboot.
+3. Do not open Medicyn after reboot.
 4. Wait for the reminder.
 
 Expected: the alarm survives reboot and fires, or the app later shows an explicit degraded/fix state. It must not silently disappear.
 
-5. Open Dosely after the test and inspect Reminder reliability.
+5. Open Medicyn after the test and inspect Reminder reliability.
 
 ### RD-C08 — App update and process death
 
@@ -433,7 +433,7 @@ Expected: T1 does not fire; T2 fires once. The old alarm is cancelled and the ne
 ### RD-C10 — Timezone and wall-clock changes
 
 1. Create a reminder in the current timezone.
-2. Change the device timezone to another valid timezone and foreground Dosely.
+2. Change the device timezone to another valid timezone and foreground Medicyn.
 3. Confirm the displayed schedule and next alarm.
 
 Expected: the app reconciles using the new local timezone and does not silently use UTC.
@@ -569,14 +569,14 @@ Expected: deletion is explicit, local history disappears as described, and later
 
 Expected: local changes succeed and the app remains usable. Pending sync is visible; the UI does not claim the change reached the server.
 
-5. Restore connectivity and foreground Dosely or tap Retry.
+5. Restore connectivity and foreground Medicyn or tap Retry.
 
 Expected: pending work clears after successful sync and the remote copy matches local state.
 
 ### RD-E02 — Fresh-device restore
 
 1. Create and sync a medicine/schedule on Device P.
-2. Install Dosely on clean Device P2 and sign in as the same account.
+2. Install Medicyn on clean Device P2 and sign in as the same account.
 3. Grant cloud-backup consent.
 
 Expected: the first pull restores data before reconciliation, and P2 arms the restored active schedule during the same foreground pass.
@@ -682,7 +682,7 @@ Expected: caregiver receives one alert, not one per patient device, and care_ale
 ### RD-F06 — Silent-device alert
 
 1. Configure the test account/link for silent-device detection.
-2. Leave the patient device without opening Dosely for the required threshold.
+2. Leave the patient device without opening Medicyn for the required threshold.
 3. Observe the caregiver device and test project logs.
 
 Expected: a silent-device alert is distinguishable from a missed-dose alert, does not expose medicine details, and is not sent when the patient device has recently checked in.
@@ -700,11 +700,11 @@ Expected: dialer opens with a sanitized dialable number; letters and unusably sh
 
 ### RD-F08 — Care alert tap while alive and cold-started
 
-1. With Device C unlocked and Dosely alive/backgrounded, tap a care alert.
+1. With Device C unlocked and Medicyn alive/backgrounded, tap a care alert.
 
 Expected: linked patient's feed opens after the app is ready.
 
-2. Force-stop Dosely on C, lock the phone, deliver another care alert, and tap it.
+2. Force-stop Medicyn on C, lock the phone, deliver another care alert, and tap it.
 
 Expected:
 
@@ -749,14 +749,14 @@ Expected: bundled policy opens without requiring a private repository, and claim
 
 ### RD-G02 — Public privacy, deletion and support pages
 
-From a browser where Dosely is not installed or signed in, open the configured HTTPS Privacy, Delete account, and Support URLs.
+From a browser where Medicyn is not installed or signed in, open the configured HTTPS Privacy, Delete account, and Support URLs.
 
 Expected: each route is public, loads without repository access, explains the action and support path, and matches the URLs in app and Play materials.
 
 ### RD-G03 — Export completeness and temporary-file cleanup
 
 1. Create synthetic medicine, schedule, stock, dose, consent, sync, and care records.
-2. Export Dosely data and inspect the shared JSON in a safe location.
+2. Export Medicyn data and inspect the shared JSON in a safe location.
 
 Expected:
 
@@ -807,7 +807,7 @@ Run on a small phone, a normal phone, and a tablet/foldable if available. Repeat
 ### RD-H01 — Text scaling
 
 1. Set Android system font/display size to the largest available value and at least 200% where supported.
-2. Set Dosely text scale to 100%, then 150%.
+2. Set Medicyn text scale to 100%, then 150%.
 3. Exercise onboarding, add/review/save, Today, Plan, Insights, Settings, Reminder reliability, care, history, and deletion.
 
 Expected: text reflows without clipped critical content, horizontal overflow, inaccessible buttons, or hidden confirmation actions. The app setting does not silently defeat Android system scale.

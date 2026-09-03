@@ -14,8 +14,8 @@ class DatabaseKeyStore {
   DatabaseKeyStore({SecureKeyValueStore? store})
       : _store = store ?? FlutterSecureKeyValueStore();
 
-  static const encryptionKeyName = 'dosely.db.encryption_key';
-  static const ownerUserIdName = 'dosely.db.owner_user_id';
+  static const encryptionKeyName = 'medicyn.db.encryption_key';
+  static const ownerUserIdName = 'medicyn.db.owner_user_id';
 
   final SecureKeyValueStore _store;
   static final _rand = Random.secure();

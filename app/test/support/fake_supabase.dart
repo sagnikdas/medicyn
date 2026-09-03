@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import 'package:dosely/core/supabase_init.dart' as init;
+import 'package:medicyn/core/supabase_init.dart' as init;
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';

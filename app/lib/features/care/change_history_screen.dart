@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../core/widgets/dosely_layout.dart';
-import '../../core/widgets/dosely_motion.dart';
+import '../../core/widgets/medicyn_layout.dart';
+import '../../core/widgets/medicyn_motion.dart';
 import '../auth/auth_service.dart';
 import 'care_service.dart';
 import 'edit_attribution.dart';
@@ -60,7 +60,7 @@ class _ChangeHistoryScreenState extends State<ChangeHistoryScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('What changed')),
       body: SafeArea(
-        child: DoselyContent(
+        child: MedicynContent(
           child: RefreshIndicator(onRefresh: _load, child: _body()),
         ),
       ),
@@ -80,7 +80,7 @@ class _ChangeHistoryScreenState extends State<ChangeHistoryScreen> {
       return const Center(child: CircularProgressIndicator());
     }
     if (edits.isEmpty) {
-      return DoselyFadeIn(
+      return MedicynFadeIn(
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.all(28),
@@ -93,7 +93,7 @@ class _ChangeHistoryScreenState extends State<ChangeHistoryScreen> {
         ),
       );
     }
-    return DoselyFadeIn(
+    return MedicynFadeIn(
       child: ListView.separated(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
         itemCount: edits.length,

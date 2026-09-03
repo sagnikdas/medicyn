@@ -2,8 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../../core/widgets/dosely_layout.dart';
-import '../../core/widgets/dosely_motion.dart';
+import '../../core/widgets/medicyn_layout.dart';
+import '../../core/widgets/medicyn_motion.dart';
 import '../../data/local/database.dart';
 import '../../data/local/tables.dart';
 import '../../data/remote/sync_service.dart';
@@ -29,7 +29,7 @@ class DoseHistoryScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Dose history')),
       body: SafeArea(
-        child: DoselyContent(
+        child: MedicynContent(
           child: StreamBuilder<List<DoseLogWithContest>>(
             stream: db.watchDoseLogsWithContests(scheduleId),
             builder: (context, snapshot) {
@@ -40,9 +40,9 @@ class DoseHistoryScreen extends StatelessWidget {
                 snapshot.data!,
               )..sort((a, b) => b.log.scheduledAt.compareTo(a.log.scheduledAt));
               if (rows.isEmpty) {
-                return DoselyFadeIn(child: _EmptyState());
+                return MedicynFadeIn(child: _EmptyState());
               }
-              return DoselyFadeIn(
+              return MedicynFadeIn(
                 child: ListView.separated(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
                   itemCount: rows.length,

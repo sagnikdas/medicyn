@@ -51,6 +51,6 @@ jobs:
           flutter build appbundle --release --dart-define=SENTRY_DSN="$SENTRY_DSN"
       - uses: actions/upload-artifact@v4
         with:
-          name: dosely-release-aab
+          name: medicyn-release-aab
           path: app/build/app/outputs/bundle/release/app-release.aab
           if-no-files-found: error

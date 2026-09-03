@@ -1,4 +1,4 @@
-import 'package:dosely/features/notification_engine/notification_service.dart';
+import 'package:medicyn/features/notification_engine/notification_service.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_test/flutter_test.dart';
 

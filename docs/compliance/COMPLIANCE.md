@@ -1,6 +1,6 @@
-# Dosely — HIPAA and GDPR compliance plan
+# Medicyn — HIPAA and GDPR compliance plan
 
-A phased plan to close the gap between what Dosely does today and what the law
+A phased plan to close the gap between what Medicyn does today and what the law
 requires of it. Audited against `main` @ `006489f`, 2026-08-19.
 
 Read the threshold finding first. It changes what the rest of this document is
@@ -10,10 +10,10 @@ for.
 
 ## Threshold finding: HIPAA does not currently apply. GDPR does.
 
-**Dosely is neither a Covered Entity nor a Business Associate.** HIPAA reaches
+**Medicyn is neither a Covered Entity nor a Business Associate.** HIPAA reaches
 health plans, clearinghouses, and providers who transmit health information in
 connection with a covered transaction (45 CFR 160.103) — plus Business
-Associates acting on their behalf. Dosely is none of these:
+Associates acting on their behalf. Medicyn is none of these:
 
 | Test | Finding |
 |---|---|
@@ -22,12 +22,12 @@ Associates acting on their behalf. Dosely is none of these:
 | Does health data originate from a covered entity? | No. Every field is user-entered — a photo the user takes, a sentence they speak, a form they edit before saving. |
 | B2B contract with a plan, clinic, or provider? | None. No tenancy or org concept; distribution is consumer Google Play. |
 
-Dosely holds **consumer-generated health information outside the HIPAA-regulated
+Medicyn holds **consumer-generated health information outside the HIPAA-regulated
 flow** — the same legal posture as a fitness tracker or a paper pill diary.
 Building "HIPAA compliance" as the primary goal would be spending real effort
 against the wrong statute.
 
-### What *does* bind Dosely today
+### What *does* bind Medicyn today
 
 - **GDPR / UK GDPR** — squarely, for any EU or UK user. Medication and adherence
   data is Article 9 special-category health data. This is the real obligation
@@ -44,10 +44,10 @@ against the wrong statute.
 - **Google Play** — Health apps policy, the Data Safety form, and the mandatory
   account-deletion path (in-app *and* a web URL). This blocks release.
 
-### What would pull Dosely into HIPAA
+### What would pull Medicyn into HIPAA
 
 Any of: an EHR or provider integration; a B2B deal selling into a clinic,
-health system, home-health agency or payer (Dosely becomes a Business
+health system, home-health agency or payer (Medicyn becomes a Business
 Associate); reimbursement for remote monitoring; or employing a clinician.
 
 **So this plan is structured as: fix what binds you now (Phases 1–3), then
@@ -99,7 +99,7 @@ platform default is `true`.
 
 Verified live on a physical Samsung SM-M336BU (Android 15): Backup Manager is
 enabled, the active transport is `com.google.android.gms/.backup.BackupTransportService`,
-and `com.sagnikdas.dosely` is a registered backup participant. The unencrypted
+and `com.sagnikdas.medicyn` is a registered backup participant. The unencrypted
 medicine database and the plaintext Supabase refresh token are both eligible for
 upload and for device-to-device transfer.
 
@@ -158,7 +158,7 @@ unlawful for EU/UK data subjects.**
 
 Persist a `consents(user_id, purpose, granted_at, withdrawn_at, policy_version,
 consent_text_hash, app_version)` table written through a security-definer RPC,
-in the same shape as `register_device_token`. Add a "Manage what Dosely can do"
+in the same shape as `register_device_token`. Add a "Manage what Medicyn can do"
 section in Settings where each toggle is as easy to withdraw as it was to give
 (Art. 7(3)).
 
@@ -261,7 +261,7 @@ users reasonably assume otherwise about an "AI" step.
 
 ### 2.2 Correct two claims the code does not implement
 
-- *"Both of you can see that record"* / *"you can see every alert Dosely has
+- *"Both of you can see that record"* / *"you can see every alert Medicyn has
   sent them"* (`PRIVACY.md:37-39`, `:103`). No screen queries `care_alerts` —
   the RLS permits the read but no UI exercises it. `PLAN.md` confirms: "The
   parent is told nothing when an alert fires." Either build the screen (a
@@ -272,7 +272,7 @@ users reasonably assume otherwise about an "AI" step.
 
 ### 2.3 Disclose what is actually collected
 
-`PRIVACY.md:40-42` says Dosely collects no location or device identifiers.
+`PRIVACY.md:40-42` says Medicyn collects no location or device identifiers.
 Undisclosed: the IANA **timezone** written to `profiles` on every sign-in
 (coarse location, and shared with the caregiver), **`last_seen_at`**, and the
 **Firebase Installation ID**. Qualify the sentence to "advertising identifiers"
@@ -339,7 +339,7 @@ No code. All of it is mandatory, and none of it exists.
 
 ### 3.1 Data Protection Impact Assessment — mandatory
 
-Under EDPB WP248, two criteria trigger a DPIA. Dosely hits five: special
+Under EDPB WP248, two criteria trigger a DPIA. Medicyn hits five: special
 category data; vulnerable data subjects (the design target is explicitly elderly
 parents); disclosure to a third party with write access; innovative technology
 (an LLM structuring health data); and risk of physical harm.
@@ -419,7 +419,7 @@ Must agree with a policy that is currently incomplete, so do it *after* 2.1.
 Declare Health info as collected **and shared**; name, email, user IDs; device
 identifiers including the FCM token and Firebase installation ID; and **Audio —
 voice recordings**, because the mic path sends audio to Google even though
-Dosely never stores it. Complete the Health apps declaration. Add
+Medicyn never stores it. Complete the Health apps declaration. Add
 the contextual `SCHEDULE_EXACT_ALARM` permission to the restricted-permission
 declarations tracked in `PLAN.md`. Full-screen intent and direct battery
 exemption are not requested by the current build.
@@ -456,7 +456,7 @@ plan or above** with the HIPAA add-on — not available on Free or Pro. Anthropi
 offers one under commercial terms.
 
 **One is unobtainable at any price:** the Android platform speech recogniser is a
-consumer Google service with no BAA. If Dosely ever becomes a Business
+consumer Google service with no BAA. If Medicyn ever becomes a Business
 Associate, voice capture must set `onDevice: true` with a hard fallback to typed
 entry, or be removed.
 
@@ -531,9 +531,9 @@ technical leftovers (4.3c–e) live on this branch until it is merged to `main`.
 | # | Change the application needs | Kind | Status | Notes |
 |---|---|---|---|---|
 | 1.1 | `allowBackup="false"` + backup / D2D exclude XML | App | **Done** — #22 | Verified on the Galaxy M33. |
-| 1.2 | Wipe local DB on sign-out so a second Google account cannot see the previous person's medicines | App | **Done differently** — #33 | Not a wipe: encrypted `dosely-<userId>.sqlite` per Google account. Same account keeps reminders; a different account opens a different file. Dialog copy was updated. |
+| 1.2 | Wipe local DB on sign-out so a second Google account cannot see the previous person's medicines | App | **Done differently** — #33 | Not a wipe: encrypted `medicyn-<userId>.sqlite` per Google account. Same account keeps reminders; a different account opens a different file. Dialog copy was updated. |
 | 1.3 | Consent screen (unticked purposes) + `consents` table + Settings toggles | App + DB | **Done** — #40 | Onboarding → consent → auth. Unticked purposes: `cloud_backup`, `anthropic_parse`, `google_speech`. Care-share at Care Link. Settings withdraw. Hosted `consents` migration applied. |
-| 1.4 | Local-only mode so reminders work without signing in / cloud | App | **Done** — #38 | “Use without an account” writes `dosely-local.sqlite`. Sync / push / Care Link stay off until Google sign-in; first sign-in can adopt the local file. |
+| 1.4 | Local-only mode so reminders work without signing in / cloud | App | **Done** — #38 | “Use without an account” writes `medicyn-local.sqlite`. Sync / push / Care Link stay off until Google sign-in; first sign-in can adopt the local file. |
 | 1.5 | In-app account deletion + `delete_account` function + wipe local DB + web URL | App + backend | **Partial** — Phase 1 | In-app two-step delete, hosted `delete_account` function, local sqlite wipe, and a public Pages workflow. The operator must enable Pages and verify the published URL before Play submission. |
 | 1.6 | Name the Care Link claimant (name + email); fail closed; longer code; claim throttle | App + DB | **Done** — #34 | 8-digit codes; 10 claims / 15 min; hosted migration applied. |
 | 1.7 | Fill `PRIVACY.md` placeholders and link the policy in-app | Docs + app | **Partial** — Phase 1 | The app opens a bundled `PRIVACY.md` offline and the Pages workflow publishes the same source. The operator must enable Pages and verify the public policy URL. |

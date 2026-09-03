@@ -13,7 +13,7 @@ schedules, your dose history (taken, snoozed, missed), any correction
 note you attach to a dose, and the fact that a missed-dose alert was
 sent.
 
-Dosely is the Android app `com.sagnikdas.dosely`. The controller is
+Medicyn is the Android app `com.sagnikdas.medicyn`. The controller is
 Sagnik Das.
 
 ## What we collect, and from where

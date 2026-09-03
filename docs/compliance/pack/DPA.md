@@ -4,7 +4,7 @@
 **Status:** Tracker only. No DPA has been accepted in a vendor console from
 this pack. Do not tick these rows until you have done it.
 
-Google's speech recogniser is **not** a processor of Dosely. It is a
+Google's speech recogniser is **not** a processor of Medicyn. It is a
 controller. There is no DPA to sign for it. Consent (`google_speech`) or
 `onDevice: true` are the only tools.
 
@@ -22,7 +22,7 @@ controller. There is no DPA to sign for it. Consent (`google_speech`) or
 ## Operator steps (do in this order)
 
 1. **Supabase.** Sign in as the org owner (`kgeamhakgmnfhsythhrx`). Execute
-   the DPA. Confirm the named controller is Sagnik Das / Dosely, not a
+   the DPA. Confirm the named controller is Sagnik Das / Medicyn, not a
    placeholder company. Keep a PDF of the executed copy next to this file
    (do not commit it if it contains signatures you do not want in git).
 2. **Google Cloud / Firebase** for project `twybepxnqayypzljhcnx`. Accept

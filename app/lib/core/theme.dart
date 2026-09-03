@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 
-import 'widgets/dosely_motion.dart';
+import 'widgets/medicyn_motion.dart';
 
-/// Clinical Calm — the Stitch design system for Dosely.
+/// Clinical Calm — the Stitch design system for Medicyn.
 ///
-/// Tokens come from the "Dosely App Redesign" project (primary teal
+/// Tokens come from the "Medicyn App Redesign" project (primary teal
 /// `#00685f`, Public Sans, 8px rhythm, 12px cards, ambient teal shadows).
 /// Dark mode keeps the same seed so Settings → Theme still works; the
 /// light scheme is the designed one.
-class DoselyTheme {
-  DoselyTheme._();
+class MedicynTheme {
+  MedicynTheme._();
 
   static const primary = Color(0xFF00685F);
   static const primaryContainer = Color(0xFF008378);
@@ -91,12 +91,12 @@ class DoselyTheme {
       splashFactory: InkRipple.splashFactory,
       pageTransitionsTheme: const PageTransitionsTheme(
         builders: {
-          TargetPlatform.android: DoselyPageTransitionsBuilder(),
+          TargetPlatform.android: MedicynPageTransitionsBuilder(),
           TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
           TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
-          TargetPlatform.linux: DoselyPageTransitionsBuilder(),
-          TargetPlatform.windows: DoselyPageTransitionsBuilder(),
-          TargetPlatform.fuchsia: DoselyPageTransitionsBuilder(),
+          TargetPlatform.linux: MedicynPageTransitionsBuilder(),
+          TargetPlatform.windows: MedicynPageTransitionsBuilder(),
+          TargetPlatform.fuchsia: MedicynPageTransitionsBuilder(),
         },
       ),
       appBarTheme: AppBarTheme(

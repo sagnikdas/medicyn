@@ -1,6 +1,6 @@
-import 'package:dosely/core/app_settings.dart';
-import 'package:dosely/features/consent/consent_purpose.dart';
-import 'package:dosely/features/consent/consent_screen.dart';
+import 'package:medicyn/core/app_settings.dart';
+import 'package:medicyn/features/consent/consent_purpose.dart';
+import 'package:medicyn/features/consent/consent_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';

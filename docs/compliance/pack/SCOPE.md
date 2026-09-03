@@ -5,7 +5,7 @@
 
 ## Target markets
 
-Dosely is a consumer Android app. Phases 1 and 2 were built on the assumption
+Medicyn is a consumer Android app. Phases 1 and 2 were built on the assumption
 that an EU or UK person might install it. That assumption stands:
 
 - **Intended:** anyone who can use an Android phone, including people in the
@@ -36,7 +36,7 @@ in the UK and the controller has no UK establishment — same gap.
 
 ## Data Protection Officer
 
-A DPO is **not** required. Dosely is not a public authority. Its core
+A DPO is **not** required. Medicyn is not a public authority. Its core
 activity is not regular and systematic monitoring of people on a large
 scale, and it is not a processor whose core activity is large-scale
 special-category processing. It is a solo consumer reminder app.

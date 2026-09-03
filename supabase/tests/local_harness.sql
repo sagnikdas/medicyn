@@ -1,8 +1,8 @@
 -- Enough of Supabase's own plumbing to run the RLS test on a plain Postgres,
 -- for when Docker (and so `supabase start`) isn't available.
 --
---   createdb dosely_rls_test
---   psql -d dosely_rls_test -v ON_ERROR_STOP=1 \
+--   createdb medicyn_rls_test
+--   psql -d medicyn_rls_test -v ON_ERROR_STOP=1 \
 --     -f supabase/tests/local_harness.sql \
 --     -f supabase/migrations/20260812121223_init.sql \
 --     -f supabase/migrations/20260812122500_schedule_interval_hours.sql \
@@ -31,32 +31,32 @@
 -- and the push tables' own assertions, which need a fresh database because
 -- both tests set up the same three users:
 --
---   dropdb --if-exists dosely_rls_test && createdb dosely_rls_test
---   psql -d dosely_rls_test -v ON_ERROR_STOP=1 \
+--   dropdb --if-exists medicyn_rls_test && createdb medicyn_rls_test
+--   psql -d medicyn_rls_test -v ON_ERROR_STOP=1 \
 --     -f supabase/tests/local_harness.sql \
 --     -f supabase/migrations/*.sql (in the order above) \
 --     -f supabase/tests/push_rls_test.sql
 --
 -- and the schedule constraint assertions, which also want a fresh database:
 --
---   dropdb --if-exists dosely_rls_test && createdb dosely_rls_test
---   psql -d dosely_rls_test -v ON_ERROR_STOP=1 \
+--   dropdb --if-exists medicyn_rls_test && createdb medicyn_rls_test
+--   psql -d medicyn_rls_test -v ON_ERROR_STOP=1 \
 --     -f supabase/tests/local_harness.sql \
 --     -f supabase/migrations/*.sql (in the order above) \
 --     -f supabase/tests/schedule_constraints_test.sql
 --
 -- and the dose-log contest assertions:
 --
---   dropdb --if-exists dosely_rls_test && createdb dosely_rls_test
---   psql -d dosely_rls_test -v ON_ERROR_STOP=1 \
+--   dropdb --if-exists medicyn_rls_test && createdb medicyn_rls_test
+--   psql -d medicyn_rls_test -v ON_ERROR_STOP=1 \
 --     -f supabase/tests/local_harness.sql \
 --     -f supabase/migrations/*.sql (in the order above) \
 --     -f supabase/tests/dose_log_contests_test.sql
 --
 -- and the retention prune assertions, which also want a fresh database:
 --
---   dropdb --if-exists dosely_rls_test && createdb dosely_rls_test
---   psql -d dosely_rls_test -v ON_ERROR_STOP=1 \
+--   dropdb --if-exists medicyn_rls_test && createdb medicyn_rls_test
+--   psql -d medicyn_rls_test -v ON_ERROR_STOP=1 \
 --     -f supabase/tests/local_harness.sql \
 --     -f supabase/migrations/*.sql (in the order above) \
 --     -f supabase/tests/retention_prune_test.sql

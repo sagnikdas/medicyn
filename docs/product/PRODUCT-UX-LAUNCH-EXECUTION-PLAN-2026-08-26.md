@@ -1,4 +1,4 @@
-# Dosely product and UX launch execution plan
+# Medicyn product and UX launch execution plan
 
 **Plan date:** 26 August 2026
 
@@ -14,7 +14,7 @@ The delivery order is:
 
 > **Account privacy → scheduling correctness → visible reliability → release observability → activation → lifecycle completeness → family validation → closed beta → staged production → monetization**
 
-This sequence deliberately puts user harm, privacy exposure, Play policy, and the ability to diagnose failures ahead of growth or feature breadth. Dosely's positioning should remain:
+This sequence deliberately puts user harm, privacy exposure, Play policy, and the ability to diagnose failures ahead of growth or feature breadth. Medicyn's positioning should remain:
 
 > **A private medication routine that works offline, with calm family backup when you want it.**
 
@@ -278,7 +278,7 @@ Build only after retention and reliability demonstrate demand:
 - Escalation ladders with rate limits, quiet hours, and patient control.
 - Home-screen widget or Android quick actions.
 - One additional language selected from observed cohort demand.
-- Dosely Plus, Dosely Family, and possibly Local Pro.
+- Medicyn Plus, Medicyn Family, and possibly Local Pro.
 - Health Connect only when it removes a validated user problem.
 
 ### Monetization gates
@@ -317,7 +317,7 @@ Events may include method, duration bucket, count bucket, permission type/result
 
 ## 13. Definition of launch success
 
-Dosely is ready for broad acquisition only when users can:
+Medicyn is ready for broad acquisition only when users can:
 
 1. Create a reminder quickly by their preferred method.
 2. See that it is actually armed—or clearly understand how it is degraded.

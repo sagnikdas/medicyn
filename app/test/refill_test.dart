@@ -1,6 +1,6 @@
-import 'package:dosely/data/local/database.dart';
-import 'package:dosely/data/local/tables.dart';
-import 'package:dosely/features/reminders_home/refill.dart';
+import 'package:medicyn/data/local/database.dart';
+import 'package:medicyn/data/local/tables.dart';
+import 'package:medicyn/features/reminders_home/refill.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

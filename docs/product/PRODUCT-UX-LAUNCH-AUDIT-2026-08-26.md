@@ -1,11 +1,11 @@
-# Dosely product, UX, engineering, monetization, and launch audit
+# Medicyn product, UX, engineering, monetization, and launch audit
 
 **Audit date:** 26 August 2026  
 **Decision:** Ready for a controlled internal/closed beta after the critical items below are fixed; not ready for a public Google Play production launch in its current state.
 
 ## 1. Executive verdict
 
-Dosely already has a credible product core. It is not merely a reminder prototype: it has encrypted per-user local databases, offline scheduling, dose history, refill counts, caregiver linking, optional cloud synchronization, explicit external-processing choices, privacy-preserving lock-screen copy, and a substantial automated test suite. The four-tab information architecture is understandable, and the visual system is calmer and more senior-friendly than many utility apps.
+Medicyn already has a credible product core. It is not merely a reminder prototype: it has encrypted per-user local databases, offline scheduling, dose history, refill counts, caregiver linking, optional cloud synchronization, explicit external-processing choices, privacy-preserving lock-screen copy, and a substantial automated test suite. The four-tab information architecture is understandable, and the visual system is calmer and more senior-friendly than many utility apps.
 
 The largest risks are not cosmetic. They are:
 
@@ -22,7 +22,7 @@ The recommended positioning is:
 
 > **A private medication routine that works offline, with calm family backup when you want it.**
 
-That is more defensible than “another pill alarm.” The largest incumbents already offer reminders, refills, reports, and family support at considerable scale. Dosely should compete on trustworthy privacy, simplicity, reliable Android delivery, and an unusually good parent–adult-child experience—not on the number of health features.
+That is more defensible than “another pill alarm.” The largest incumbents already offer reminders, refills, reports, and family support at considerable scale. Medicyn should compete on trustworthy privacy, simplicity, reliable Android delivery, and an unusually good parent–adult-child experience—not on the number of health features.
 
 ## 2. Audit basis and confidence
 
@@ -60,7 +60,7 @@ This is a static/code-based product audit. It does not replace usability session
 
 ## 4. What should be preserved
 
-Do not throw away the parts that already make Dosely credible:
+Do not throw away the parts that already make Medicyn credible:
 
 - **Core works without an account or network.** This is both a product advantage and a trust advantage.
 - **Medical data is encrypted locally**, with per-account files and secure key/session storage.
@@ -114,7 +114,7 @@ On account change, load that owner's consent record before enabling any related 
 
 ### P0-3 — The off-app account-deletion route is not public
 
-**Evidence:** app/lib/core/account_deletion.dart:3-6 links to a GitHub blob in sagnikdas/dosely. app/lib/core/privacy_policy.dart:4-7 explicitly states the repository is private and its GitHub blob URLs return 404. The privacy asset repeats the deletion link.
+**Evidence:** app/lib/core/account_deletion.dart:3-6 links to a GitHub blob in sagnikdas/medicyn. app/lib/core/privacy_policy.dart:4-7 explicitly states the repository is private and its GitHub blob URLs return 404. The privacy asset repeats the deletion link.
 
 **Impact:** A user who uninstalls the app cannot use the required web route to request deletion. This is a direct Play submission blocker.
 
@@ -236,7 +236,7 @@ Do not hide material disclosures; move feature-specific choices to the moment th
 
 **Solution:** Respect the system scaler and treat the in-app setting as an optional multiplier or preset. Test at Android's maximum supported scaling and at least 200%, with reflow rather than clipping. Keep a “Use device size” default.
 
-Also increase the 32×32 avatar control in app/lib/core/widgets/dosely_chrome.dart and remove shrink-wrapped tap targets such as app/lib/features/settings/settings_screen.dart:297-300. Target at least 48dp interactive areas.
+Also increase the 32×32 avatar control in app/lib/core/widgets/medicyn_chrome.dart and remove shrink-wrapped tap targets such as app/lib/features/settings/settings_screen.dart:297-300. Target at least 48dp interactive areas.
 
 ### P1-5 — “Most consistent” always means morning
 
@@ -468,7 +468,7 @@ The status should be legible without opening each setting: Backup On · Synced 3
 
 - **Drug interaction checking:** It is attractive in store listings, but unsafe to improvise. Launch only with a licensed, maintained clinical data source, clear regional coverage, versioning, monitoring, and legal/clinical review. A disclaimer does not repair incomplete interaction data.
 - **Automatic dose changes from AI:** Never.
-- **A broad health tracker:** Weight, mood, appointments, labs, and exercise would dilute the strongest wedge before Dosely has retention.
+- **A broad health tracker:** Weight, mood, appointments, labs, and exercise would dilute the strongest wedge before Medicyn has retention.
 - **Wearable apps:** Wait for evidence that active users own and request a target platform.
 - **Pharmacy refill commerce based on medicine data:** This creates privacy, consent, targeting, and partnership complexity. Validate the reminder product first.
 
@@ -480,7 +480,7 @@ Therefore:
 
 - “Medication reminder” is the search category, not a sufficient product position.
 - Feature-count competition is unwinnable for an early launch.
-- Dosely's most credible wedge is **offline/private core + calm senior UX + transparent family backup**.
+- Medicyn's most credible wedge is **offline/private core + calm senior UX + transparent family backup**.
 - The two-person setup must be excellent. The adult child is often the discoverer/buyer; the parent is the daily user.
 - Reliability should be demonstrated in the product and store listing: test reminder, setup health, no-account mode, private lock-screen default.
 
@@ -488,7 +488,7 @@ Suggested one-line listing proposition:
 
 > Reliable medicine reminders that work offline, with optional family support and privacy you control.
 
-Do not claim that Dosely prevents missed doses, improves medical outcomes, or is clinically validated unless that is substantiated.
+Do not claim that Medicyn prevents missed doses, improves medical outcomes, or is clinically validated unless that is substantiated.
 
 ## 12. Monetization strategy
 
@@ -499,8 +499,8 @@ The core safety utility should remain free. Do not charge users to receive a due
 | Tier | Proposed contents | Price hypothesis, not a final price |
 |---|---|---|
 | **Free** | Unlimited local medicines and reminders; manual entry; on-device label OCR; Taken/Snooze/Skip; PRN log; 30-day insights; basic refill alert; one-device local storage; export/delete/privacy | Free, no ads |
-| **Dosely Plus** | Cloud backup/restore; 24-month analytics; advanced schedule phases; full refill projections; doctor PDF/CSV; custom reminder intensity/snooze; a modest monthly AI parsing allowance | India test: ₹99–149/month or ₹799–1,299/year. Global test: US$2.99–4.99/month or US$24.99–39.99/year |
-| **Dosely Family** | Plus plus multiple caregivers/patients, escalation ladder, shared management, family dashboard, alert activity | India test: ₹199–299/month or ₹1,499–2,499/year. Global test: US$5.99–8.99/month or US$49.99–79.99/year |
+| **Medicyn Plus** | Cloud backup/restore; 24-month analytics; advanced schedule phases; full refill projections; doctor PDF/CSV; custom reminder intensity/snooze; a modest monthly AI parsing allowance | India test: ₹99–149/month or ₹799–1,299/year. Global test: US$2.99–4.99/month or US$24.99–39.99/year |
+| **Medicyn Family** | Plus plus multiple caregivers/patients, escalation ladder, shared management, family dashboard, alert activity | India test: ₹199–299/month or ₹1,499–2,499/year. Global test: US$5.99–8.99/month or US$49.99–79.99/year |
 | **Local Pro one-time** | Advanced local-only schedules, reports, and themes; no ongoing cloud/AI entitlement | Optional price test for subscription-resistant users; do not include cost-bearing cloud promises |
 
 Run price discovery with beta users before locking these values. Annual should be the default value option, but monthly must remain clear. Avoid a trial that begins during onboarding; offer 7–14 days only after the user has created reminders and encounters a premium benefit.
@@ -517,7 +517,7 @@ The server currently permits up to 40 parse requests in a 24-hour window. That i
 - No sponsored “recommendations” in the adherence flow.
 - No paywall on export, deletion, privacy, or an already-created active reminder.
 
-An ad SDK in a health reminder app would weaken the exact privacy positioning that can make Dosely distinctive.
+An ad SDK in a health reminder app would weaken the exact privacy positioning that can make Medicyn distinctive.
 
 ### 12.4 Later revenue options
 
@@ -608,7 +608,7 @@ Prompt for a Play review after several successful dose responses and no recent s
 ### 13.5 Product-led loops
 
 - Caregiver invite.
-- Clinician report with a tasteful “Made with Dosely” footer and no public health data.
+- Clinician report with a tasteful “Made with Medicyn” footer and no public health data.
 - Backup/restore moment on a new phone.
 - Refill completion/share within a household.
 
@@ -799,7 +799,7 @@ Change one major variable per experiment and segment caregiver versus self-manag
 
 ## 18. Final recommendation
 
-Dosely should launch as a **trustworthy private reminder with optional family backup**, not as a medical intelligence platform. The codebase has enough depth for a serious beta, and its privacy/offline architecture is a real advantage. The immediate work is to remove contradictions:
+Medicyn should launch as a **trustworthy private reminder with optional family backup**, not as a medical intelligence platform. The codebase has enough depth for a serious beta, and its privacy/offline architecture is a real advantage. The immediate work is to remove contradictions:
 
 - consent must belong to the person, not the phone;
 - a saved reminder must be demonstrably armed;
@@ -808,4 +808,4 @@ Dosely should launch as a **trustworthy private reminder with optional family ba
 - privacy/deletion claims must work outside the app;
 - Android permissions must match Play policy and user expectations.
 
-Fix those, validate the two-person caregiver journey, and instrument the non-sensitive funnel. Only then layer subscription value around backup, reports, advanced schedules, refills, and family coordination. That sequence gives Dosely a realistic path to both trust and recurring revenue without weakening the free safety-critical core.
+Fix those, validate the two-person caregiver journey, and instrument the non-sensitive funnel. Only then layer subscription value around backup, reports, advanced schedules, refills, and family coordination. That sequence gives Medicyn a realistic path to both trust and recurring revenue without weakening the free safety-critical core.

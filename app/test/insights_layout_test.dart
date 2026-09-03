@@ -1,5 +1,5 @@
-import 'package:dosely/core/theme.dart';
-import 'package:dosely/features/insights/insights_screen.dart';
+import 'package:medicyn/core/theme.dart';
+import 'package:medicyn/features/insights/insights_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -14,7 +14,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
-        theme: DoselyTheme.light(),
+        theme: MedicynTheme.light(),
         home: Scaffold(
           body: Padding(
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),

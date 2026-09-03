@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../../core/app_settings.dart';
 import '../../core/privacy_policy.dart';
-import '../../core/widgets/dosely_chrome.dart';
-import '../../core/widgets/dosely_layout.dart';
-import '../../core/widgets/dosely_motion.dart';
+import '../../core/widgets/medicyn_chrome.dart';
+import '../../core/widgets/medicyn_layout.dart';
+import '../../core/widgets/medicyn_motion.dart';
 import 'auth_service.dart';
 
 /// Google sign-in, or local-only so reminders work without an account.
@@ -46,20 +46,20 @@ class _SignInScreenState extends State<SignInScreen> {
         // Scrollable rather than a plain Center+Column: at the largest text
         // size setting this content can outgrow a short screen, and the
         // fixed version clipped instead of scrolling.
-        child: DoselyContent(
+        child: MedicynContent(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(28),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                DoselyFadeIn(
+                MedicynFadeIn(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       const SizedBox(height: 24),
-                      const DoselyBrandMark(),
+                      const MedicynBrandMark(),
                       const SizedBox(height: 32),
                       Text(
                         'Sign in with Google to keep your reminders backed up and on '
@@ -71,7 +71,7 @@ class _SignInScreenState extends State<SignInScreen> {
                       const SizedBox(height: 28),
                       FilledButton(
                         onPressed: _busy ? null : _signInWithGoogle,
-                        child: DoselySwitcher(
+                        child: MedicynSwitcher(
                           child: _busy
                               ? const SizedBox(
                                   key: ValueKey('busy'),

@@ -8,8 +8,8 @@ import 'package:flutter/material.dart';
 /// the body stays a readable 640px column instead of stretching cards
 /// across the full iPad width. [Expanded] children still work because
 /// the frame keeps a bounded height when the parent has one.
-class DoselyContent extends StatelessWidget {
-  const DoselyContent({super.key, required this.child});
+class MedicynContent extends StatelessWidget {
+  const MedicynContent({super.key, required this.child});
 
   static const maxWidth = 640.0;
 
