@@ -515,6 +515,21 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 return StreamBuilder<List<DoseLog>>(
                   stream: _doseLogsStream,
                   builder: (context, logSnap) {
+                    // Neither stream emits until the encrypted database has
+                    // actually opened (Keystore reads, background-isolate
+                    // spawn — not instant). Falling straight into
+                    // _calendarBody with `?? const []` before that first
+                    // emission drew the real "No reminders yet" empty state
+                    // for a user who already has medicines, which then
+                    // flashed to the true list the moment it arrived. See
+                    // the matching guard in MedicinesListScreen.
+                    if ((scheduleSnap.connectionState ==
+                                ConnectionState.waiting &&
+                            !scheduleSnap.hasData) ||
+                        (logSnap.connectionState == ConnectionState.waiting &&
+                            !logSnap.hasData)) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
                     return _calendarBody(
                       schedules: scheduleSnap.data ?? const [],
                       logs: logSnap.data ?? const [],

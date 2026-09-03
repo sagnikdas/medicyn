@@ -27,9 +27,7 @@ import 'features/shell/app_shell.dart';
 void main() async {
   // With SentryConfig.dsn empty (the default), SentryFlutter.init disables
   // the SDK entirely — no crash capture, no network calls — so this is a
-  // no-op wrapper until a real DSN is configured. The existing init order
-  // (Supabase, then AppSettings, then runApp) is preserved unchanged inside
-  // the `appRunner`.
+  // no-op wrapper until a real DSN is configured.
   await SentryFlutter.init(
     (options) {
       options.dsn = SentryConfig.dsn;
@@ -37,23 +35,34 @@ void main() async {
     },
     appRunner: () async {
       WidgetsFlutterBinding.ensureInitialized();
-      await initializeSupabase();
-      await AppSettings.instance.init(
-        consentOwnerId:
-            Supabase.instance.client.auth.currentUser?.id ?? localOwnerUserId,
-      );
-      // Must happen before checking the launch response below — the plugin
-      // has to be initialized first to answer getNotificationAppLaunchDetails.
-      await NotificationService.instance.init();
-      // Before runApp, and that matters: PushService.init registers the
-      // background message handler, which has to be in place while the main
-      // isolate starts up or a message arriving with the app dead has nowhere
-      // to go. It no-ops when Firebase isn't configured in this build.
-      await PushService.instance.init();
+      // Supabase→AppSettings is a real dependency (AppSettings.init reads
+      // the signed-in user id), but nothing ties that pair to
+      // NotificationService.init (timezone data + local-notifications
+      // plugin) or PushService.init (Firebase) — each was already
+      // independently required to finish before runApp, just not before
+      // *each other*. Running the three chains concurrently instead of one
+      // after another cuts real wall-clock time off the blank screen before
+      // the first frame.
+      await Future.wait([
+        _initSupabaseAndSettings(),
+        NotificationService.instance.init(),
+        PushService.instance.init(),
+      ]);
+      // Must happen after NotificationService.init above — the plugin has
+      // to be initialized first to answer getNotificationAppLaunchDetails —
+      // and before runApp.
       final launch = await NotificationService.instance
           .consumeLaunchNotificationResponse();
       runApp(MedicynApp(launchNotification: launch));
     },
+  );
+}
+
+Future<void> _initSupabaseAndSettings() async {
+  await initializeSupabase();
+  await AppSettings.instance.init(
+    consentOwnerId:
+        Supabase.instance.client.auth.currentUser?.id ?? localOwnerUserId,
   );
 }
 
