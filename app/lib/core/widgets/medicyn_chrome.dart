@@ -74,7 +74,12 @@ class MedicynTopBar extends StatelessWidget implements PreferredSizeWidget {
   }
 }
 
-class AmbientCard extends StatelessWidget {
+/// The system's signature container — a "page" resting on the chart's
+/// linen ground. When tappable, it visibly lifts (a deeper, wider shadow)
+/// the instant a finger touches it, on top of the existing 2% press-scale,
+/// so touch reads as physically picking the page up before the tap
+/// registers — not just a color/ripple response.
+class AmbientCard extends StatefulWidget {
   const AmbientCard({
     super.key,
     required this.child,
@@ -91,25 +96,49 @@ class AmbientCard extends StatelessWidget {
   final Color? color;
 
   @override
+  State<AmbientCard> createState() => _AmbientCardState();
+}
+
+class _AmbientCardState extends State<AmbientCard> {
+  var _lifted = false;
+
+  void _setLifted(bool value) {
+    if (_lifted == value) return;
+    setState(() => _lifted = value);
+  }
+
+  @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final card = Container(
+    final reduceMotion = MedicynMotion.reduce(context);
+    final card = AnimatedContainer(
+      duration: MedicynMotion.duration(context, MedicynMotion.fast),
+      curve: MedicynMotion.decelerate,
       decoration: BoxDecoration(
-        color: color ?? scheme.surfaceContainerLowest,
+        color: widget.color ?? scheme.surfaceContainerLowest,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: MedicynTheme.ambientShadow,
-        border: borderColor == null ? null : Border.all(color: borderColor!),
+        boxShadow: _lifted
+            ? MedicynTheme.liftedShadow
+            : MedicynTheme.ambientShadow,
+        border: widget.borderColor == null
+            ? null
+            : Border.all(color: widget.borderColor!),
       ),
-      child: Padding(padding: padding, child: child),
+      child: Padding(padding: widget.padding, child: widget.child),
     );
-    if (onTap == null) return card;
-    return MedicynPressable(
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
-          child: card,
+    if (widget.onTap == null) return card;
+    return Listener(
+      onPointerDown: reduceMotion ? null : (_) => _setLifted(true),
+      onPointerUp: reduceMotion ? null : (_) => _setLifted(false),
+      onPointerCancel: reduceMotion ? null : (_) => _setLifted(false),
+      child: MedicynPressable(
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: widget.onTap,
+            borderRadius: BorderRadius.circular(12),
+            child: card,
+          ),
         ),
       ),
     );
@@ -292,9 +321,9 @@ class MedicynBottomNav extends StatelessWidget {
           borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
           boxShadow: const [
             BoxShadow(
-              color: Color(0x0A00685F),
-              blurRadius: 12,
-              offset: Offset(0, -4),
+              color: Color(0x1A2B2318),
+              blurRadius: 16,
+              offset: Offset(0, -6),
             ),
           ],
         ),

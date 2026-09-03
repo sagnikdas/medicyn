@@ -578,7 +578,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _setShowMedicineOnLockScreen(bool value) async {
     await AppSettings.instance.setShowMedicineOnLockScreen(value);
     try {
-      await NotificationService.instance.reconcileFromDisk();
+      await NotificationService.instance.reconcile(widget.db);
     } catch (_) {
       // Next foreground re-arms; the pref is already stored.
     }
@@ -590,7 +590,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     // alarm is armed. Reconcile so an already-armed notification does not
     // continue offering the previous duration.
     try {
-      await NotificationService.instance.reconcileFromDisk();
+      await NotificationService.instance.reconcile(widget.db);
     } catch (_) {
       // The preference is already saved; the next foreground reconcile will
       // update any existing alarms.

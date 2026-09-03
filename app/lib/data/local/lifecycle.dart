@@ -15,6 +15,15 @@ ReminderStatus? reminderStatusFromName(String? value) {
 ReminderStatus reminderStatus(Schedule schedule, {DateTime? now}) {
   final stored = reminderStatusFromName(schedule.status);
   if (stored != null) {
+    // `asNeeded` is also the lifecycle value used by older rows to represent
+    // the as-needed frequency. It is not a valid lifecycle state for a
+    // scheduled frequency. Repair the interpretation here so a malformed
+    // row cannot silently disappear from the calendar after an edit or an
+    // interrupted migration.
+    if (stored == ReminderStatus.asNeeded &&
+        schedule.frequencyType != FrequencyType.asNeeded.name) {
+      return schedule.active ? ReminderStatus.active : ReminderStatus.completed;
+    }
     if (stored == ReminderStatus.paused &&
         schedule.pauseUntil != null &&
         !(schedule.pauseUntil!.isAfter(now ?? DateTime.now()))) {

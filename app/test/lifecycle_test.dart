@@ -85,4 +85,23 @@ void main() {
     );
     expect(reminderStatus(legacy), ReminderStatus.completed);
   });
+
+  test('as-needed status cannot suppress a scheduled frequency', () {
+    final malformed = Schedule(
+      id: 'schedule-1',
+      medicineId: 'medicine-1',
+      frequencyType: FrequencyType.daily.name,
+      times: const ['08:00'],
+      daysOfWeek: const [],
+      status: ReminderStatus.asNeeded.name,
+      active: true,
+      createdAt: DateTime(2026, 8, 1),
+      updatedAt: DateTime(2026, 8, 1),
+      pendingSync: false,
+      deleted: false,
+    );
+
+    expect(reminderStatus(malformed), ReminderStatus.active);
+    expect(reminderIsActive(malformed), isTrue);
+  });
 }

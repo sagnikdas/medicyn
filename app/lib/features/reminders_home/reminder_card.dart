@@ -123,15 +123,20 @@ class _LifecycleStatus extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final status = reminderStatus(schedule);
-    if (status == ReminderStatus.active) return const SizedBox.shrink();
+    // `describeSchedule` already communicates an as-needed frequency. It is
+    // not a second lifecycle line, and repeating it here made every PRN
+    // reminder read "As needed" twice in Plan.
+    if (status == ReminderStatus.active || status == ReminderStatus.asNeeded) {
+      return const SizedBox.shrink();
+    }
     final label = switch (status) {
       ReminderStatus.paused =>
         schedule.pauseUntil == null
             ? 'Paused'
             : 'Paused until ${_format(schedule.pauseUntil!)}',
       ReminderStatus.completed => 'Completed',
-      ReminderStatus.asNeeded => 'As needed',
       ReminderStatus.active => '',
+      ReminderStatus.asNeeded => '',
     };
     return Padding(
       padding: const EdgeInsets.only(top: 4),

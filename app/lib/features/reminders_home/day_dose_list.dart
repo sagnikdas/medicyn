@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/motion.dart';
 import '../../core/theme.dart';
+import '../../core/widgets/chart_grid.dart';
 import '../../core/widgets/medicyn_motion.dart';
 import 'day_dose_style.dart';
 import 'day_occurrences.dart';
@@ -165,7 +166,7 @@ class _DayDoseColumn extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (showHeading) ...[
-          Text(
+          ChartHandLetteredText(
             _dayHeading(day, now),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
@@ -308,6 +309,7 @@ class _DayDoseRowState extends State<_DayDoseRow> {
         status == DayDoseStatus.pending ||
         status == DayDoseStatus.upcoming ||
         status == DayDoseStatus.snoozed;
+    final statusColor = DayDoseStyle.color(context, status);
 
     return MedicynPressable(
       enabled: _canOpenHistory || _canMarkTaken,
@@ -327,134 +329,171 @@ class _DayDoseRowState extends State<_DayDoseRow> {
                 color: scheme.surfaceContainerLowest,
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: MedicynTheme.ambientShadow,
+                // A soft full outline while the row still needs a response.
+                // Deliberately a uniform Border.all: a BoxDecoration border
+                // with per-side widths (e.g. a thicker left edge) combined
+                // with borderRadius hits Flutter's non-uniform-border paint
+                // path and silently drops the rest of the card's content —
+                // see the leading colored tab below for how that accent is
+                // done safely instead.
                 border: highlight
-                    ? Border.all(color: scheme.primary.withValues(alpha: 0.2))
+                    ? Border.all(
+                        color: statusColor.withValues(alpha: 0.25),
+                        width: 1.5,
+                      )
                     : null,
               ),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Row(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Stack(
                   children: [
-                    _StatusAvatar(status: status),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                    // The content determines the card's height. The accent
+                    // is positioned after that height is known, rather than
+                    // using a stretched Row child while the sliver is still
+                    // being laid out with an unbounded height.
+                    Positioned(
+                      left: 0,
+                      top: 0,
+                      bottom: 0,
+                      width: 4,
+                      child: ColoredBox(color: statusColor),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 16, 16, 16),
+                      child: Row(
                         children: [
-                          AnimatedDefaultTextStyle(
-                            duration: MedicynMotion.duration(
-                              context,
-                              MedicynMotion.fast,
-                            ),
-                            curve: MedicynMotion.decelerate,
-                            style:
-                                Theme.of(
-                                  context,
-                                ).textTheme.titleMedium?.copyWith(
-                                  decoration: taken
-                                      ? TextDecoration.lineThrough
-                                      : TextDecoration.none,
-                                  color: taken
-                                      ? scheme.onSurfaceVariant
-                                      : scheme.onSurface,
-                                ) ??
-                                const TextStyle(),
-                            child: Text(
-                              title,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            subtitle,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.bodyMedium
-                                ?.copyWith(color: scheme.onSurfaceVariant),
-                          ),
-                          if (notes.isNotEmpty && highlight) ...[
-                            const SizedBox(height: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: scheme.secondaryContainer,
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Text(
-                                notes,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: Theme.of(context).textTheme.labelSmall
-                                    ?.copyWith(
-                                      color: scheme.onSecondaryContainer,
-                                    ),
-                              ),
-                            ),
-                          ],
-                          if (status == DayDoseStatus.missed ||
-                              status == DayDoseStatus.snoozed ||
-                              status == DayDoseStatus.notRecorded) ...[
-                            const SizedBox(height: 4),
-                            Text(
-                              DayDoseStyle.label(status),
-                              style: Theme.of(context).textTheme.bodySmall
-                                  ?.copyWith(
-                                    color: DayDoseStyle.color(context, status),
-                                    fontWeight: FontWeight.w600,
+                          _StatusAvatar(status: status),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                AnimatedDefaultTextStyle(
+                                  duration: MedicynMotion.duration(
+                                    context,
+                                    MedicynMotion.fast,
                                   ),
+                                  curve: MedicynMotion.decelerate,
+                                  style:
+                                      Theme.of(
+                                        context,
+                                      ).textTheme.titleMedium?.copyWith(
+                                        decoration: taken
+                                            ? TextDecoration.lineThrough
+                                            : TextDecoration.none,
+                                        color: taken
+                                            ? scheme.onSurfaceVariant
+                                            : scheme.onSurface,
+                                      ) ??
+                                      const TextStyle(),
+                                  child: Text(
+                                    title,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  subtitle,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context).textTheme.bodyMedium
+                                      ?.copyWith(
+                                        color: scheme.onSurfaceVariant,
+                                      ),
+                                ),
+                                if (notes.isNotEmpty && highlight) ...[
+                                  const SizedBox(height: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: scheme.secondaryContainer,
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Text(
+                                      notes,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .labelSmall
+                                          ?.copyWith(
+                                            color: scheme.onSecondaryContainer,
+                                          ),
+                                    ),
+                                  ),
+                                ],
+                                if (status == DayDoseStatus.missed ||
+                                    status == DayDoseStatus.snoozed ||
+                                    status == DayDoseStatus.notRecorded) ...[
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    DayDoseStyle.label(status),
+                                    style: Theme.of(context).textTheme.bodySmall
+                                        ?.copyWith(
+                                          color: DayDoseStyle.color(
+                                            context,
+                                            status,
+                                          ),
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                  ),
+                                ],
+                              ],
                             ),
-                          ],
+                          ),
+                          MedicynSwitcher(
+                            child: taken
+                                ? Container(
+                                    key: const ValueKey('done'),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: scheme.surfaceContainer,
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      'Done',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .labelLarge
+                                          ?.copyWith(color: scheme.secondary),
+                                    ),
+                                  )
+                                : _canMarkTaken
+                                ? IconButton(
+                                    key: const ValueKey('mark'),
+                                    tooltip: 'Mark taken',
+                                    onPressed: _busy ? null : _markTaken,
+                                    icon: Icon(
+                                      Icons.check,
+                                      color: highlight
+                                          ? scheme.primary
+                                          : scheme.outline,
+                                    ),
+                                    style: IconButton.styleFrom(
+                                      side: BorderSide(
+                                        color: highlight
+                                            ? scheme.primary
+                                            : scheme.outlineVariant,
+                                        width: 2,
+                                      ),
+                                      minimumSize: const Size(48, 48),
+                                    ),
+                                  )
+                                : const SizedBox(
+                                    key: ValueKey('none'),
+                                    width: 0,
+                                    height: 48,
+                                  ),
+                          ),
                         ],
                       ),
-                    ),
-                    MedicynSwitcher(
-                      child: taken
-                          ? Container(
-                              key: const ValueKey('done'),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: scheme.surfaceContainer,
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                'Done',
-                                style: Theme.of(context).textTheme.labelLarge
-                                    ?.copyWith(color: scheme.secondary),
-                              ),
-                            )
-                          : _canMarkTaken
-                          ? IconButton(
-                              key: const ValueKey('mark'),
-                              tooltip: 'Mark taken',
-                              onPressed: _busy ? null : _markTaken,
-                              icon: Icon(
-                                Icons.check,
-                                color: highlight
-                                    ? scheme.primary
-                                    : scheme.outline,
-                              ),
-                              style: IconButton.styleFrom(
-                                side: BorderSide(
-                                  color: highlight
-                                      ? scheme.primary
-                                      : scheme.outlineVariant,
-                                  width: 2,
-                                ),
-                                minimumSize: const Size(48, 48),
-                              ),
-                            )
-                          : const SizedBox(
-                              key: ValueKey('none'),
-                              width: 0,
-                              height: 48,
-                            ),
                     ),
                   ],
                 ),
@@ -467,14 +506,29 @@ class _DayDoseRowState extends State<_DayDoseRow> {
   }
 }
 
+/// The chart's per-row status mark: a ring in the status color holding its
+/// glyph (see [DayDoseStyle.glyph]) — a miniature of the same color+mark
+/// pairing used everywhere else a status appears.
+///
+/// Implicitly animated (`AnimatedContainer`, same element identity across a
+/// status change) rather than keyed to the status and rebuilt from scratch:
+/// a `KeyedSubtree(key: ValueKey(status))` here — tearing the element down
+/// and remounting a new one every time a dose transitions status — hit a
+/// live Flutter framework assertion ('really is our descendant') on real
+/// hardware once several rows were cycling status around the same time.
+/// Keeping one long-lived element and animating its properties avoids that
+/// whole class of element-lifecycle risk.
 class _StatusAvatar extends StatelessWidget {
   const _StatusAvatar({required this.status});
   final DayDoseStatus status;
 
   @override
   Widget build(BuildContext context) {
+    final color = DayDoseStyle.color(context, status);
     final scheme = Theme.of(context).colorScheme;
-    final taken = status == DayDoseStatus.taken;
+    final due =
+        status == DayDoseStatus.pending || status == DayDoseStatus.upcoming;
+    final filled = status == DayDoseStatus.taken;
     return AnimatedContainer(
       duration: MedicynMotion.duration(context, MedicynMotion.fast),
       curve: MedicynMotion.decelerate,
@@ -482,21 +536,19 @@ class _StatusAvatar extends StatelessWidget {
       height: 48,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: taken
-            ? scheme.secondaryContainer
-            : status == DayDoseStatus.pending ||
-                  status == DayDoseStatus.upcoming
-            ? scheme.primary.withValues(alpha: 0.1)
+        color: filled
+            ? color
+            : due
+            ? color.withValues(alpha: 0.12)
             : scheme.surfaceContainerHigh,
+        border: filled
+            ? null
+            : Border.all(color: color.withValues(alpha: 0.6), width: 2),
       ),
       child: Icon(
-        taken ? Icons.check : Icons.medication,
-        color:
-            taken ||
-                status == DayDoseStatus.pending ||
-                status == DayDoseStatus.upcoming
-            ? scheme.primary
-            : scheme.onSurfaceVariant,
+        DayDoseStyle.glyph(status),
+        size: 22,
+        color: filled ? scheme.onPrimary : color,
       ),
     );
   }
