@@ -40,10 +40,19 @@ class EncryptedDatabaseOpener {
   final Future<Directory> Function() _temporaryDirectory;
 
   Future<QueryExecutor> open() async {
-    final hexKey = await _keyStore.getOrCreateKeyHex();
-    final userId = await _resolveOwnerUserId();
-    final docs = await _documentsDirectory();
-    final cache = await _temporaryDirectory();
+    // Independent of each other — key/owner resolution reads Keystore, the
+    // two directories go through path_provider — so starting all four
+    // before awaiting any of them turns four sequential platform-channel
+    // round trips into the cost of the slowest one. This runs on the UI
+    // isolate on every cold start, before the first medicine can appear.
+    final hexKeyFuture = _keyStore.getOrCreateKeyHex();
+    final userIdFuture = _resolveOwnerUserId();
+    final docsFuture = _documentsDirectory();
+    final cacheFuture = _temporaryDirectory();
+    final hexKey = await hexKeyFuture;
+    final userId = await userIdFuture;
+    final docs = await docsFuture;
+    final cache = await cacheFuture;
     sqlite3.tempDirectory = cache.path;
 
     ensureSqlite3MultipleCiphers();
@@ -52,13 +61,22 @@ class EncryptedDatabaseOpener {
 
     final plaintext = File(p.join(docs.path, plaintextDatabaseFileName));
     final encrypted = File(p.join(docs.path, encryptedDatabaseFileName(userId)));
-    final anyPerUser = await _anyPerUserDatabaseExists(docs);
 
+    // decidePlaintextMigration() falls straight through to leaveAlone
+    // whenever there's no plaintext file to migrate — true of effectively
+    // every open past the one-time F-4 migration. destExists and
+    // anyPerUserDatabaseExists only ever feed that decision, so skip them
+    // (and, for anyPerUserDatabaseExists, the full documents-directory
+    // listing) rather than paying for them on every single cold start.
+    final plaintextExists = await plaintext.exists();
+    final plaintextIsSqlite =
+        plaintextExists && await _fileIsPlaintextSqlite(plaintext);
     final decision = decidePlaintextMigration(
-      plaintextExists: await plaintext.exists(),
-      plaintextIsSqlite: await _fileIsPlaintextSqlite(plaintext),
-      destExists: await encrypted.exists(),
-      anyPerUserDatabaseExists: anyPerUser,
+      plaintextExists: plaintextExists,
+      plaintextIsSqlite: plaintextIsSqlite,
+      destExists: plaintextIsSqlite ? await encrypted.exists() : false,
+      anyPerUserDatabaseExists:
+          plaintextIsSqlite ? await _anyPerUserDatabaseExists(docs) : false,
     );
     switch (decision) {
       case PlaintextMigrationDecision.migrate:

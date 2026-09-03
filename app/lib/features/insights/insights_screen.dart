@@ -72,6 +72,16 @@ class _InsightsScreenState extends State<InsightsScreen> {
           return StreamBuilder<List<DoseLog>>(
             stream: _doseLogsStream,
             builder: (context, logSnap) {
+              // See the matching guard in HomeScreen: without it this tab
+              // shows "Nothing due this week yet" / all-zero stats for the
+              // moment before the database's first watch() emission, then
+              // jumps to the real numbers.
+              if ((scheduleSnap.connectionState == ConnectionState.waiting &&
+                      !scheduleSnap.hasData) ||
+                  (logSnap.connectionState == ConnectionState.waiting &&
+                      !logSnap.hasData)) {
+                return const Center(child: CircularProgressIndicator());
+              }
               return _InsightsBody(
                 db: widget.db,
                 schedules: scheduleSnap.data ?? const [],
