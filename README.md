@@ -386,11 +386,32 @@ third:
 | "access blocked" / "app not verified" from Google itself | Consent screen is in Testing and your account isn't a test user (step 1a). |
 | A message naming the **audience** or "could not complete sign-in" | The Android client ID is missing from Supabase's Client IDs list (step 2). |
 | A message naming the **signing certificate** | SHA-1 mismatch — wrong keystore registered, or a release build against a debug-only client (step 1c). |
+| "not registered to use OAuth2.0" (visible with `adb logcat`, tag `Auth`) | The Android OAuth client's **package name** doesn't match, even if the SHA-1 is right — see the renamed-package trap below. |
 | "Sign-in isn't configured in this build" | `serverClientId` is still empty (step 3). |
 | "Check your connection and try again" | Genuinely transient. Retry. |
 
 None of the configuration cases resolve by retrying, and none of them mean
 the account or the code is wrong.
+
+> **The renamed-package trap.** An Android OAuth client is registered
+> against the **pair** package name + SHA-1, not the SHA-1 alone. Renaming
+> the app's `applicationId` (as this project did, `com.sagnikdas.dosely` →
+> `com.sagnikdas.medicyn`, September 2026) silently orphans it: the
+> debug keystore never changed, so every symptom points at "SHA-1
+> mismatch" while the SHA-1 is actually fine. The real Google-side error —
+> "This android application is not registered to use OAuth2.0, please
+> confirm the package name and SHA-1 certificate fingerprint" — only
+> surfaces in `adb logcat` (tag `Auth`, from `com.google.android.gms`); the
+> in-app failure just reads as the generic `[16] Account reauth failed`,
+> identical to a transient network hiccup and a genuinely stale cached
+> account (see [`auth_service.dart`](app/lib/features/auth/auth_service.dart)'s
+> notes on `googleSignInCanceledIsStaleAccount`) — so this cause is easy to
+> chase as "the account" or "the network" and never as "the package name."
+> Fix: repeat step 1c (**Create Credentials → OAuth client ID → Android**)
+> for the *new* package name with the *same* SHA-1, then append the newly
+> issued client ID to Supabase's Client IDs list (step 2). Do this again
+> for every release SHA-1 (upload key, Play App Signing) the next time a
+> release build is cut — those clients are just as orphaned by a rename.
 
 ## Push
 
