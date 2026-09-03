@@ -23,10 +23,26 @@ class GoogleSignInFailure implements Exception {
   String toString() => message;
 }
 
-/// Credential Manager reports a stale on-device Google account as `canceled`
-/// with `[16] Account reauth failed`, not as a configuration error. Treating
-/// that as a user backing out of the picker hides the only device-specific
-/// SSO failure we have seen (moto g22).
+/// Credential Manager reports a failed silent reauth as `canceled` with
+/// `[16] Account reauth failed`, not as a configuration error. Treating that
+/// as a user backing out of the picker hides a real, recurring SSO failure
+/// (first seen on a moto g22).
+///
+/// `[16]` is not specific to a broken/stale cached account, though: on-device
+/// logcat tracing (Auth.Api.Credentials, 2026-09-03) shows the *identical*
+/// `cpwk: [16] Account reauth failed` surfacing from a plain transient
+/// network failure too — GMS's internal `AccountReauth_flowRunner` fails
+/// with `[7] Network error` / `dhpg: Connectivity error` (a DNS timeout in
+/// this trace), and `GetCredentialManager` wraps that as a
+/// `GetCredentialCancellationException` regardless of cause: the Android
+/// Credential Manager API classifies purely by exception *class*
+/// (`GoogleSignInPlugin.onError`), never by the wrapped reason, and the
+/// message text it hands back to Dart is only the outer "[16]" line — the
+/// inner "[7] Network error" never crosses the platform channel. So `[16]`
+/// means "the device's silent reauth failed," which a stale cached account
+/// and a network hiccup both produce identically; there is no reliable way
+/// to tell them apart from here. Message copy for this case must not assert
+/// either cause with confidence — see [AuthService._describe].
 bool googleSignInCanceledIsStaleAccount(GoogleSignInException e) {
   if (e.code != GoogleSignInExceptionCode.canceled) return false;
   final haystack = '${e.description ?? ''} ${e.details ?? ''}'.toLowerCase();
@@ -196,9 +212,17 @@ class AuthService {
     switch (e.code) {
       case GoogleSignInExceptionCode.canceled:
         if (googleSignInCanceledIsStaleAccount(e)) {
-          return 'Google could not refresh the account saved on this phone. '
-              'Open Settings → Passwords & accounts, tap the Google account, '
-              'sign in again, then retry here.';
+          // Deliberately doesn't name a single cause: `[16]` covers both a
+          // genuinely stale cached account and a plain network failure
+          // during the device's silent reauth check indistinguishably (see
+          // the doc comment on [googleSignInCanceledIsStaleAccount]) — and
+          // this message already fires after one internal retry, so a third
+          // attempt costs nothing.
+          return "Google couldn't finish signing you in. This is often a "
+              'temporary connection problem — check your signal or Wi-Fi and '
+              'try again. If it keeps happening, open Settings → Passwords & '
+              'accounts, tap the Google account, sign in again, then retry '
+              'here.';
         }
         return 'Sign-in cancelled.';
       case GoogleSignInExceptionCode.interrupted:
