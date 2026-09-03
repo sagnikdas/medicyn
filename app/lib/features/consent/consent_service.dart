@@ -33,8 +33,8 @@ class ConsentService {
     }
     await _persistLocal(purpose, granted);
     await _recordOnServer(purpose, granted);
-    await DoselyTelemetry.instance.record(
-      DoselyEvent.permissionResult,
+    await MedicynTelemetry.instance.record(
+      MedicynEvent.permissionResult,
       properties: {
         'permission_type': 'consent_${purpose.id}',
         'result': granted ? 'granted' : 'withheld',

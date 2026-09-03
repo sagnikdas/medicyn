@@ -1,4 +1,4 @@
-import 'package:dosely/features/notification_engine/interval_dose_sequence.dart';
+import 'package:medicyn/features/notification_engine/interval_dose_sequence.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

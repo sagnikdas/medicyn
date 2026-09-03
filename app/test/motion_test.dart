@@ -1,7 +1,7 @@
-import 'package:dosely/core/motion.dart';
-import 'package:dosely/core/theme.dart';
-import 'package:dosely/core/widgets/dosely_chrome.dart';
-import 'package:dosely/core/widgets/dosely_motion.dart';
+import 'package:medicyn/core/motion.dart';
+import 'package:medicyn/core/theme.dart';
+import 'package:medicyn/core/widgets/medicyn_chrome.dart';
+import 'package:medicyn/core/widgets/medicyn_motion.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -11,12 +11,12 @@ void main() {
   ) async {
     await tester.pumpWidget(
       MaterialApp(
-        theme: DoselyTheme.light(),
+        theme: MedicynTheme.light(),
         builder: (context, child) => MediaQuery(
           data: MediaQuery.of(context).copyWith(disableAnimations: true),
           child: child!,
         ),
-        home: const Scaffold(body: DoselyFadeIn(child: Text('Hello'))),
+        home: const Scaffold(body: MedicynFadeIn(child: Text('Hello'))),
       ),
     );
 
@@ -30,7 +30,7 @@ void main() {
   ) async {
     await tester.pumpWidget(
       MaterialApp(
-        theme: DoselyTheme.light(),
+        theme: MedicynTheme.light(),
         home: const Scaffold(body: ProgressRing(fraction: 1)),
       ),
     );
@@ -45,7 +45,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
-        theme: DoselyTheme.light(),
+        theme: MedicynTheme.light(),
         home: Scaffold(
           body: StatefulBuilder(
             builder: (context, set) {
@@ -72,7 +72,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
-        theme: DoselyTheme.light(),
+        theme: MedicynTheme.light(),
         builder: (context, child) => MediaQuery(
           data: MediaQuery.of(context).copyWith(disableAnimations: true),
           child: child!,
@@ -96,9 +96,9 @@ void main() {
   testWidgets('indexed stack keeps every child mounted', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
-        theme: DoselyTheme.light(),
+        theme: MedicynTheme.light(),
         home: const Scaffold(
-          body: DoselyIndexedStack(
+          body: MedicynIndexedStack(
             index: 0,
             children: [Text('today'), Text('plan')],
           ),
@@ -111,8 +111,8 @@ void main() {
   });
 
   test('motion tokens stay short enough for a medicine reminder', () {
-    expect(DoselyMotion.fast.inMilliseconds, lessThanOrEqualTo(200));
-    expect(DoselyMotion.medium.inMilliseconds, lessThanOrEqualTo(300));
-    expect(DoselyMotion.slow.inMilliseconds, lessThanOrEqualTo(400));
+    expect(MedicynMotion.fast.inMilliseconds, lessThanOrEqualTo(200));
+    expect(MedicynMotion.medium.inMilliseconds, lessThanOrEqualTo(300));
+    expect(MedicynMotion.slow.inMilliseconds, lessThanOrEqualTo(400));
   });
 }

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../core/privacy_policy.dart';
-import '../../core/widgets/dosely_layout.dart';
-import '../../core/widgets/dosely_motion.dart';
+import '../../core/widgets/medicyn_layout.dart';
+import '../../core/widgets/medicyn_motion.dart';
 import 'consent_purpose.dart';
 import 'consent_service.dart';
 
@@ -38,16 +38,16 @@ class _ConsentScreenState extends State<ConsentScreen> {
     final text = Theme.of(context).textTheme;
     return Scaffold(
       body: SafeArea(
-        child: DoselyContent(
+        child: MedicynContent(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Expanded(
-                child: DoselyFadeIn(
+                child: MedicynFadeIn(
                   child: ListView(
                     padding: const EdgeInsets.fromLTRB(24, 28, 24, 12),
                     children: [
-                      Text('What Dosely may do', style: text.headlineSmall),
+                      Text('What Medicyn may do', style: text.headlineSmall),
                       const SizedBox(height: 12),
                       Text(
                         'These are off unless you turn them on. You can change '
@@ -92,7 +92,7 @@ class _ConsentScreenState extends State<ConsentScreen> {
                 padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
                 child: FilledButton(
                   onPressed: _saving ? null : _continue,
-                  child: DoselySwitcher(
+                  child: MedicynSwitcher(
                     child: _saving
                         ? const SizedBox(
                             key: ValueKey('busy'),

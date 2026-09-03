@@ -1,6 +1,6 @@
-# Dosely — penetration test findings
+# Medicyn — penetration test findings
 
-Authorised white-box security assessment of the Dosely Android client, its
+Authorised white-box security assessment of the Medicyn Android client, its
 local storage, and its Supabase backend. Static review plus dynamic testing on a
 physical device.
 
@@ -128,7 +128,7 @@ migrations and redeployed `parse-medicine` (quota) and `notify-care`
 **#22 — F-5 fixed.** `allowBackup` is false, with backup and D2D exclusion XML
 and `networkSecurityConfig` refusing cleartext. Verified on the same handset:
 `ALLOW_BACKUP` gone from the package flags; Backup Manager no longer lists
-Dosely.
+Medicyn.
 
 **#29 — F-3 fixed.** Session lives in `flutter_secure_storage` (Android
 EncryptedSharedPreferences). Shared leftover plaintext is migrated then
@@ -175,8 +175,8 @@ depend on unused EOL `sqlcipher_flutter_libs`.
 **#33 — F-4 fixed.** On-device medical file is SQLite3MultipleCiphers via
 sqlite3 native-assets hooks, keyed from Keystore / Keychain, isolated per
 Google account. Verified on the same handset after overlay install: leftover
-`dosely.sqlite` (`SQLite format 3`, drug names readable) replaced by
-`dosely-<userId>.sqlite` whose header is not SQLite and which does not
+`medicyn.sqlite` (`SQLite format 3`, drug names readable) replaced by
+`medicyn-<userId>.sqlite` whose header is not SQLite and which does not
 contain those names as plaintext.
 
 **#34 — F-6 fixed.** Confirmation loads the claimant through
@@ -400,13 +400,13 @@ isolate will not see the session.
 
 > **Status: fixed in #33.** SQLite3MultipleCiphers via sqlite3 hooks, not the
 > EOL `sqlcipher_flutter_libs` package. Verified on the handset after overlay
-> install: the plaintext `dosely.sqlite` is gone; the per-account file does
+> install: the plaintext `medicyn.sqlite` is gone; the per-account file does
 > not start with `SQLite format 3`.
 
 Confirmed on the device by reading the file header through `run-as`:
 
 ```
-$ head -c 16 .../app_flutter/dosely.sqlite | xxd
+$ head -c 16 .../app_flutter/medicyn.sqlite | xxd
 00000000: 5351 4c69 7465 2066 6f72 6d61 7420 3300  SQLite format 3.
 ```
 
@@ -416,7 +416,7 @@ dose logs, with word-like strings recoverable via `strings(1)`. Contents are
 complete adherence history (`app/lib/data/local/tables.dart:12-68`).
 
 Root cause: `app/lib/data/local/database.dart:20` —
-`super(driftDatabase(name: 'dosely'))` with no native options.
+`super(driftDatabase(name: 'medicyn'))` with no native options.
 
 Worth knowing: `sqlcipher_flutter_libs` is **already** in `app/pubspec.lock` as a
 transitive dependency, so the encryption native libraries ship in the APK today
@@ -451,7 +451,7 @@ sensitive, has no equivalent protection.
 **Severity: High (amplifier)**
 
 > **Status: fixed in #22.** Verified on the handset: Backup Manager no longer
-> lists Dosely.
+> lists Medicyn.
 
 `app/android/app/src/main/AndroidManifest.xml:17-21` — the `<application>`
 element declares `label`, `name`, `icon`, `roundIcon` and nothing else. No
@@ -463,11 +463,11 @@ element declares `label`, `name`, `icon`, `roundIcon` and nothing else. No
 Backup Manager currently enabled
 * com.google.android.gms/.backup.BackupTransportService   (active transport)
   com.google.android.gms/.backup.migrate.service.D2dTransport
-Participants: 1787136121879 : com.sagnikdas.dosely
+Participants: 1787136121879 : com.sagnikdas.medicyn
 ```
 
-Dosely is a registered backup participant with the Google cloud transport active,
-so both `app_flutter/dosely.sqlite` and `shared_prefs/*.xml` are in scope for
+Medicyn is a registered backup participant with the Google cloud transport active,
+so both `app_flutter/medicyn.sqlite` and `shared_prefs/*.xml` are in scope for
 auto-backup and device-to-device transfer.
 
 **Stated precisely:** since Android 9, Google cloud backup is client-side
@@ -477,7 +477,7 @@ new phone, a restored refresh token yields a live session, and under GDPR this i
 an undisclosed disclosure and international transfer.
 
 **Remediation:** `android:allowBackup="false"`, or `dataExtractionRules` with
-explicit excludes for `sharedpref` and `dosely.sqlite`. Add
+explicit excludes for `sharedpref` and `medicyn.sqlite`. Add
 `networkSecurityConfig` with `cleartextTrafficPermitted="false"` rather than
 relying on the platform default.
 
@@ -603,8 +603,8 @@ Confirmed on the device that this governs: both channels report
 per-notification setting decides.
 
 ```
-NotificationChannel{mId='dosely_reminders_v4',   mName=Medicine Alarms, mImportance=5, mLockscreenVisibility=-1000, ...}
-NotificationChannel{mId='dosely_care_alerts_v1', mName=Care alerts,     mImportance=4, mLockscreenVisibility=-1000, ...}
+NotificationChannel{mId='medicyn_reminders_v4',   mName=Medicine Alarms, mImportance=5, mLockscreenVisibility=-1000, ...}
+NotificationChannel{mId='medicyn_care_alerts_v1', mName=Care alerts,     mImportance=4, mLockscreenVisibility=-1000, ...}
 ```
 
 So on a locked phone the full text renders — *"Sertraline 100mg / Take 1

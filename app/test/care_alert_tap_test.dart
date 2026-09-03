@@ -1,5 +1,5 @@
-import 'package:dosely/features/push/push_events.dart';
-import 'package:dosely/features/push/push_handlers.dart';
+import 'package:medicyn/features/push/push_events.dart';
+import 'package:medicyn/features/push/push_handlers.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

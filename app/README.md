@@ -1,4 +1,4 @@
-# dosely
+# medicyn
 
 A new Flutter project.
 

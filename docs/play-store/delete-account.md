@@ -1,11 +1,11 @@
-# Delete your Dosely account
+# Delete your Medicyn account
 
 This is the web page Google Play requires for account deletion. You do not
 need it if you can open the app.
 
 ## From the app (preferred)
 
-1. Open Dosely and sign in with the Google account you used before.
+1. Open Medicyn and sign in with the Google account you used before.
 2. Go to **Settings**.
 3. Tap **Delete account**.
 4. Read the warning, then tap **Continue**.
@@ -22,7 +22,7 @@ tell the request is yours.
 
 ## What is deleted
 
-- Your Dosely account
+- Your Medicyn account
 - The cloud backup of your medicines, schedules, and dose history
 - Any family (care) link you were part of
 - Notification tokens used to reach your phone

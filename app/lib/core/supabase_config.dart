@@ -1,4 +1,4 @@
-/// Project-level Supabase config for the "dosely" project — safe to embed
+/// Project-level Supabase config for the "medicyn" project — safe to embed
 /// (the publishable/anon key is meant to be public; every access rule lives
 /// in Postgres Row Level Security, see supabase/migrations/*.sql). No
 /// service-role key or database password ever belongs in this app.

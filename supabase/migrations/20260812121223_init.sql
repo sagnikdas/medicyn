@@ -1,4 +1,4 @@
--- Dosely core schema: medicines, schedules, dose_logs.
+-- Medicyn core schema: medicines, schedules, dose_logs.
 -- Local Drift DB on-device is the source of truth for scheduling/firing
 -- reminders; these tables are sync/backup only, scoped per user via RLS.
 

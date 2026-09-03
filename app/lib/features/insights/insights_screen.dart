@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import '../../core/app_settings.dart';
 import '../../core/motion.dart';
 import '../../core/theme.dart';
-import '../../core/widgets/dosely_chrome.dart';
-import '../../core/widgets/dosely_motion.dart';
+import '../../core/widgets/medicyn_chrome.dart';
+import '../../core/widgets/medicyn_motion.dart';
 import '../../data/local/database.dart';
 import '../auth/auth_service.dart';
 import '../care/care_service.dart';
@@ -64,7 +64,7 @@ class _InsightsScreenState extends State<InsightsScreen> {
         automaticallyImplyLeading: false,
         toolbarHeight: 64,
         titleSpacing: 20,
-        title: const DoselyBrandMark(compact: true),
+        title: const MedicynBrandMark(compact: true),
       ),
       body: StreamBuilder<List<ScheduleWithMedicine>>(
         stream: _schedulesStream,
@@ -160,7 +160,7 @@ class _InsightsBody extends StatelessWidget {
       controller: scrollController,
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
       children: [
-        DoselyFadeIn(
+        MedicynFadeIn(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -240,7 +240,7 @@ class _InsightsBody extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 24),
-              DoselyFadeIn(
+              MedicynFadeIn(
                 child: _WeekBars(days: days, now: now),
               ),
             ],
@@ -280,14 +280,14 @@ class _InsightsBody extends StatelessWidget {
                       Expanded(child: consistentCard),
                     ],
                   );
-            return DoselyFadeIn(
+            return MedicynFadeIn(
               delay: const Duration(milliseconds: 40),
               child: pair,
             );
           },
         ),
         const SizedBox(height: 16),
-        DoselyFadeIn(
+        MedicynFadeIn(
           delay: const Duration(milliseconds: 80),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -544,8 +544,8 @@ class _Bar extends StatelessWidget {
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 40),
               child: AnimatedContainer(
-                duration: DoselyMotion.duration(context, DoselyMotion.slow),
-                curve: DoselyMotion.decelerate,
+                duration: MedicynMotion.duration(context, MedicynMotion.slow),
+                curve: MedicynMotion.decelerate,
                 width: double.infinity,
                 height: h,
                 decoration: BoxDecoration(
@@ -624,7 +624,7 @@ class InsightsMostConsistentCard extends StatelessWidget {
             const SizedBox(height: 12),
             ClipRRect(
               borderRadius: BorderRadius.circular(4),
-              child: DoselyAnimatedValue(
+              child: MedicynAnimatedValue(
                 value: rate,
                 builder: (context, value) => LinearProgressIndicator(
                   value: value,
@@ -678,7 +678,7 @@ class _StatHero extends StatelessWidget {
       decoration: BoxDecoration(
         color: scheme.primary,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: DoselyTheme.ambientShadow,
+        boxShadow: MedicynTheme.ambientShadow,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

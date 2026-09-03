@@ -57,7 +57,7 @@ class DoseCalendarMetrics {
   static const _weekdayFont = 12.0;
   static const _weekdayHeight = 16 / 12;
 
-  /// Comfortable density, matching [DoselyTheme]. Callers with another
+  /// Comfortable density, matching [MedicynTheme]. Callers with another
   /// density should pass [densityDy] from `visualDensity.baseSizeAdjustment`.
   static const _comfortableDensityDy = -4.0;
 
@@ -291,8 +291,8 @@ class _DoseCalendarState extends State<DoseCalendar> {
         ),
         const SizedBox(height: 4),
         AnimatedSize(
-          duration: DoselyMotion.duration(context, DoselyMotion.medium),
-          curve: DoselyMotion.decelerate,
+          duration: MedicynMotion.duration(context, MedicynMotion.medium),
+          curve: MedicynMotion.decelerate,
           alignment: Alignment.topCenter,
           clipBehavior: Clip.hardEdge,
           child: _WeekGrid(
@@ -518,8 +518,8 @@ class _DayCell extends StatelessWidget {
                 SizedBox.square(
                   dimension: circle,
                   child: AnimatedContainer(
-                    duration: DoselyMotion.duration(context, DoselyMotion.fast),
-                    curve: DoselyMotion.decelerate,
+                    duration: MedicynMotion.duration(context, MedicynMotion.fast),
+                    curve: MedicynMotion.decelerate,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: selected ? scheme.primary : Colors.transparent,
@@ -531,11 +531,11 @@ class _DayCell extends StatelessWidget {
                       child: FittedBox(
                         fit: BoxFit.scaleDown,
                         child: AnimatedDefaultTextStyle(
-                          duration: DoselyMotion.duration(
+                          duration: MedicynMotion.duration(
                             context,
-                            DoselyMotion.fast,
+                            MedicynMotion.fast,
                           ),
-                          curve: DoselyMotion.decelerate,
+                          curve: MedicynMotion.decelerate,
                           style:
                               text.bodyMedium?.copyWith(color: numberColor) ??
                               TextStyle(color: numberColor),

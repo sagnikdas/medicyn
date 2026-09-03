@@ -3,8 +3,8 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
 import '../../core/motion.dart';
-import '../../core/widgets/dosely_layout.dart';
-import '../../core/widgets/dosely_motion.dart';
+import '../../core/widgets/medicyn_layout.dart';
+import '../../core/widgets/medicyn_motion.dart';
 import '../consent/consent_purpose.dart';
 import '../consent/consent_service.dart';
 
@@ -14,7 +14,7 @@ import '../consent/consent_service.dart';
 /// Transcription goes through the *platform's* speech recogniser, not an
 /// on-device one: `SpeechListenOptions.onDevice` is left at its default of
 /// false, so on most Android devices the audio is handled by Google's speech
-/// service. Dosely neither stores nor uploads the audio itself, but "nothing
+/// service. Medicyn neither stores nor uploads the audio itself, but "nothing
 /// leaves the phone" would be untrue — see docs/compliance/PRIVACY.md, which says so plainly.
 /// Only the resulting text is sent onward, and only at the AI structuring
 /// step the review screen triggers explicitly.
@@ -110,14 +110,14 @@ class _VoiceCaptureScreenState extends State<VoiceCaptureScreen> {
         ),
       ),
       body: SafeArea(
-        child: DoselyContent(
+        child: MedicynContent(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const SizedBox(height: 16),
-                DoselyFadeIn(
+                MedicynFadeIn(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -163,11 +163,11 @@ class _VoiceCaptureScreenState extends State<VoiceCaptureScreen> {
                       GestureDetector(
                         onTap: listening ? _stopListening : _startListening,
                         child: AnimatedContainer(
-                          duration: DoselyMotion.duration(
+                          duration: MedicynMotion.duration(
                             context,
-                            DoselyMotion.fast,
+                            MedicynMotion.fast,
                           ),
-                          curve: DoselyMotion.decelerate,
+                          curve: MedicynMotion.decelerate,
                           width: 128,
                           height: 128,
                           decoration: BoxDecoration(

@@ -1,7 +1,7 @@
-import 'package:dosely/core/theme.dart';
-import 'package:dosely/features/reminders_home/calendar_collapse_sliver.dart';
-import 'package:dosely/features/reminders_home/day_dose_list.dart';
-import 'package:dosely/features/reminders_home/dose_calendar.dart';
+import 'package:medicyn/core/theme.dart';
+import 'package:medicyn/features/reminders_home/calendar_collapse_sliver.dart';
+import 'package:medicyn/features/reminders_home/day_dose_list.dart';
+import 'package:medicyn/features/reminders_home/dose_calendar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -39,7 +39,7 @@ void main() {
       ),
     );
     return MaterialApp(
-      theme: DoselyTheme.light(),
+      theme: MedicynTheme.light(),
       builder: textScaler == null
           ? null
           : (context, child) => MediaQuery(
@@ -115,7 +115,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
-        theme: DoselyTheme.light(),
+        theme: MedicynTheme.light(),
         builder: (context, child) => MediaQuery(
           data: MediaQuery.of(
             context,
@@ -127,7 +127,7 @@ void main() {
             return Scaffold(
               appBar: AppBar(
                 title: const Text(
-                  'Dosely',
+                  'Medicyn',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -194,7 +194,7 @@ void main() {
       ),
     );
 
-    expect(find.text('Dosely'), findsOneWidget);
+    expect(find.text('Medicyn'), findsOneWidget);
     expect(find.byIcon(Icons.medication_outlined), findsOneWidget);
     expect(find.byType(DoseCalendar), findsOneWidget);
     expect(find.textContaining('taken this week'), findsOneWidget);

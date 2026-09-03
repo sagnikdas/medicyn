@@ -17,10 +17,10 @@ class HomeCalendarSliver extends StatelessWidget {
     return SliverFloatingHeader(
       snapMode: FloatingHeaderSnapMode.overlay,
       animationStyle: AnimationStyle(
-        duration: DoselyMotion.medium,
-        curve: DoselyMotion.standard,
-        reverseDuration: DoselyMotion.medium,
-        reverseCurve: DoselyMotion.standard,
+        duration: MedicynMotion.medium,
+        curve: MedicynMotion.standard,
+        reverseDuration: MedicynMotion.medium,
+        reverseCurve: MedicynMotion.standard,
       ),
       child: Material(
         key: const ValueKey('collapsing-calendar-header'),

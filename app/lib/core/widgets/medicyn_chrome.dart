@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../motion.dart';
 import '../theme.dart';
-import 'dosely_motion.dart';
+import 'medicyn_motion.dart';
 
 /// Greeting copy from the Stitch Today screen, keyed off the local hour.
 String greetingFor(DateTime now) {
@@ -12,8 +12,8 @@ String greetingFor(DateTime now) {
   return 'Good evening,';
 }
 
-class DoselyBrandMark extends StatelessWidget {
-  const DoselyBrandMark({super.key, this.compact = false});
+class MedicynBrandMark extends StatelessWidget {
+  const MedicynBrandMark({super.key, this.compact = false});
 
   final bool compact;
 
@@ -35,7 +35,7 @@ class DoselyBrandMark extends StatelessWidget {
         ),
         const SizedBox(width: 8),
         Text(
-          'Dosely',
+          'Medicyn',
           style: Theme.of(context).textTheme.headlineSmall?.copyWith(
             color: color,
             fontWeight: FontWeight.w700,
@@ -47,8 +47,8 @@ class DoselyBrandMark extends StatelessWidget {
   }
 }
 
-class DoselyTopBar extends StatelessWidget implements PreferredSizeWidget {
-  const DoselyTopBar({super.key, this.trailing});
+class MedicynTopBar extends StatelessWidget implements PreferredSizeWidget {
+  const MedicynTopBar({super.key, this.trailing});
 
   final Widget? trailing;
 
@@ -65,7 +65,7 @@ class DoselyTopBar extends StatelessWidget implements PreferredSizeWidget {
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         child: Row(
           children: [
-            const DoselyBrandMark(compact: true),
+            const MedicynBrandMark(compact: true),
             if (trailing != null) ...[const Spacer(), trailing!],
           ],
         ),
@@ -97,13 +97,13 @@ class AmbientCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: color ?? scheme.surfaceContainerLowest,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: DoselyTheme.ambientShadow,
+        boxShadow: MedicynTheme.ambientShadow,
         border: borderColor == null ? null : Border.all(color: borderColor!),
       ),
       child: Padding(padding: padding, child: child),
     );
     if (onTap == null) return card;
-    return DoselyPressable(
+    return MedicynPressable(
       child: Material(
         color: Colors.transparent,
         child: InkWell(
@@ -135,7 +135,7 @@ class ProgressRing extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final clamped = fraction.clamp(0.0, 1.0);
-    return DoselyAnimatedValue(
+    return MedicynAnimatedValue(
       value: clamped,
       builder: (context, animated) => _paint(context, animated),
     );
@@ -249,8 +249,8 @@ class ProfileMenuRow extends StatelessWidget {
   }
 }
 
-class DoselyBottomNav extends StatelessWidget {
-  const DoselyBottomNav({
+class MedicynBottomNav extends StatelessWidget {
+  const MedicynBottomNav({
     super.key,
     required this.index,
     required this.onChanged,
@@ -349,8 +349,8 @@ class _NavItem extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         AnimatedSwitcher(
-          duration: DoselyMotion.duration(context, DoselyMotion.fast),
-          switchInCurve: DoselyMotion.decelerate,
+          duration: MedicynMotion.duration(context, MedicynMotion.fast),
+          switchInCurve: MedicynMotion.decelerate,
           child: profileImageUrl == null
               ? Icon(
                   selected ? item.selected : item.icon,
@@ -378,8 +378,8 @@ class _NavItem extends StatelessWidget {
         FittedBox(
           fit: BoxFit.scaleDown,
           child: AnimatedDefaultTextStyle(
-            duration: DoselyMotion.duration(context, DoselyMotion.fast),
-            curve: DoselyMotion.decelerate,
+            duration: MedicynMotion.duration(context, MedicynMotion.fast),
+            curve: MedicynMotion.decelerate,
             style:
                 Theme.of(
                   context,
@@ -401,8 +401,8 @@ class _NavItem extends StatelessWidget {
           // height Scaffold offers the bottom bar — the full screen.
           heightFactor: 1,
           child: AnimatedContainer(
-            duration: DoselyMotion.duration(context, DoselyMotion.fast),
-            curve: DoselyMotion.decelerate,
+            duration: MedicynMotion.duration(context, MedicynMotion.fast),
+            curve: MedicynMotion.decelerate,
             padding: selected
                 ? const EdgeInsets.symmetric(horizontal: 12, vertical: 6)
                 : const EdgeInsets.symmetric(horizontal: 6, vertical: 6),

@@ -1,10 +1,10 @@
-import 'package:dosely/core/theme.dart';
-import 'package:dosely/core/widgets/dosely_chrome.dart';
-import 'package:dosely/core/widgets/dosely_layout.dart';
-import 'package:dosely/features/consent/consent_screen.dart';
-import 'package:dosely/features/insights/insights_screen.dart';
-import 'package:dosely/features/onboarding/onboarding_screen.dart';
-import 'package:dosely/features/reminders_home/dose_calendar.dart';
+import 'package:medicyn/core/theme.dart';
+import 'package:medicyn/core/widgets/medicyn_chrome.dart';
+import 'package:medicyn/core/widgets/medicyn_layout.dart';
+import 'package:medicyn/features/consent/consent_screen.dart';
+import 'package:medicyn/features/insights/insights_screen.dart';
+import 'package:medicyn/features/onboarding/onboarding_screen.dart';
+import 'package:medicyn/features/reminders_home/dose_calendar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -25,7 +25,7 @@ Future<void> _pump(
 
   await tester.pumpWidget(
     MaterialApp(
-      theme: DoselyTheme.light(),
+      theme: MedicynTheme.light(),
       builder: (context, child) => MediaQuery(
         data: MediaQuery.of(
           context,
@@ -40,7 +40,7 @@ Future<void> _pump(
 }
 
 void main() {
-  testWidgets('DoselyContent caps tablet width and fills a phone', (
+  testWidgets('MedicynContent caps tablet width and fills a phone', (
     tester,
   ) async {
     const panel = Key('panel');
@@ -48,18 +48,18 @@ void main() {
       tester,
       size: const Size(1024, 768),
       home: const Scaffold(
-        body: DoselyContent(
+        body: MedicynContent(
           child: ColoredBox(key: panel, color: Colors.red),
         ),
       ),
     );
-    expect(tester.getSize(find.byKey(panel)).width, DoselyContent.maxWidth);
+    expect(tester.getSize(find.byKey(panel)).width, MedicynContent.maxWidth);
 
     await _pump(
       tester,
       size: const Size(360, 800),
       home: const Scaffold(
-        body: DoselyContent(
+        body: MedicynContent(
           child: ColoredBox(key: panel, color: Colors.red),
         ),
       ),
@@ -74,11 +74,11 @@ void main() {
         size: size,
         home: Scaffold(
           body: const SizedBox.expand(),
-          bottomNavigationBar: DoselyBottomNav(index: 2, onChanged: (_) {}),
+          bottomNavigationBar: MedicynBottomNav(index: 2, onChanged: (_) {}),
         ),
       );
       expect(find.text('Insights'), findsOneWidget);
-      final nav = tester.getRect(find.byType(DoselyBottomNav));
+      final nav = tester.getRect(find.byType(MedicynBottomNav));
       expect(nav.width, size.width);
       expect(nav.right, lessThanOrEqualTo(size.width + 0.5));
     });
@@ -163,7 +163,7 @@ void main() {
       textScale: 1.5,
       home: const ConsentScreen(),
     );
-    expect(find.text('What Dosely may do'), findsOneWidget);
+    expect(find.text('What Medicyn may do'), findsOneWidget);
   });
 
   testWidgets('profile row wraps a long subtitle', (tester) async {

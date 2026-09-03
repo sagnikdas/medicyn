@@ -1,4 +1,4 @@
-import 'package:dosely/data/remote/sync_service.dart';
+import 'package:medicyn/data/remote/sync_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// The rule that decides which copy of a reminder survives when two devices

@@ -2,8 +2,8 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 /// The unencrypted file from before F-4, under the app documents directory
-/// (`app_flutter/dosely.sqlite` on Android).
-const plaintextDatabaseFileName = 'dosely.sqlite';
+/// (`app_flutter/medicyn.sqlite` on Android).
+const plaintextDatabaseFileName = 'medicyn.sqlite';
 
 /// First 16 bytes of an unencrypted SQLite database: `SQLite format 3\0`.
 /// Encrypted sqlite3mc/SQLCipher files do not start with this.
@@ -12,7 +12,7 @@ final Uint8List sqlitePlaintextHeader = Uint8List.fromList(
 );
 
 /// Owner id used when the user runs without a Google account. Names the
-/// file `dosely-local.sqlite` via [encryptedDatabaseFileName].
+/// file `medicyn-local.sqlite` via [encryptedDatabaseFileName].
 const localOwnerUserId = 'local';
 
 /// Encrypted, per-account file name. [userId] is the Supabase auth subject
@@ -20,7 +20,7 @@ const localOwnerUserId = 'local';
 /// conservative filesystem set are replaced so a surprising id cannot escape
 /// the documents directory by name.
 String encryptedDatabaseFileName(String userId) =>
-    'dosely-${sanitizeDatabaseUserId(userId)}.sqlite';
+    'medicyn-${sanitizeDatabaseUserId(userId)}.sqlite';
 
 String sanitizeDatabaseUserId(String userId) {
   final safe = userId.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
@@ -31,9 +31,9 @@ String sanitizeDatabaseUserId(String userId) {
 }
 
 /// True for the per-account files this opener creates, and false for the
-/// legacy `dosely.sqlite` name (no hyphenated suffix).
+/// legacy `medicyn.sqlite` name (no hyphenated suffix).
 bool isPerUserDatabaseFileName(String name) =>
-    RegExp(r'^dosely-[A-Za-z0-9._-]+\.sqlite$').hasMatch(name);
+    RegExp(r'^medicyn-[A-Za-z0-9._-]+\.sqlite$').hasMatch(name);
 
 /// Whether [bytes] (at least the first 16, if present) are a plaintext
 /// SQLite database header. Shorter blobs and encrypted files return false.
@@ -45,7 +45,7 @@ bool isPlaintextSqliteHeader(List<int> bytes) {
   return true;
 }
 
-/// What to do with a leftover `dosely.sqlite` when opening [dest]'s
+/// What to do with a leftover `medicyn.sqlite` when opening [dest]'s
 /// per-user encrypted file.
 enum PlaintextMigrationDecision {
   /// Copy into the encrypted dest, then delete the plaintext on success.

@@ -1,9 +1,9 @@
-import 'package:dosely/core/theme.dart';
-import 'package:dosely/data/local/database.dart';
-import 'package:dosely/data/local/tables.dart';
-import 'package:dosely/features/reminders_home/day_occurrences.dart';
-import 'package:dosely/features/reminders_home/dose_attention_panel.dart';
-import 'package:dosely/features/reminders_home/home_screen.dart';
+import 'package:medicyn/core/theme.dart';
+import 'package:medicyn/data/local/database.dart';
+import 'package:medicyn/data/local/tables.dart';
+import 'package:medicyn/features/reminders_home/day_occurrences.dart';
+import 'package:medicyn/features/reminders_home/dose_attention_panel.dart';
+import 'package:medicyn/features/reminders_home/home_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -60,7 +60,7 @@ void main() {
   }) {
     return tester.pumpWidget(
       MaterialApp(
-        theme: DoselyTheme.light(),
+        theme: MedicynTheme.light(),
         home: Scaffold(
           body: SingleChildScrollView(
             child: DoseAttentionPanel(

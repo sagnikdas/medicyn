@@ -8,7 +8,7 @@ The Art. 30(5) small-organisation exemption does **not** apply. Processing
 includes special categories of data (Art. 9 health). This record is
 mandatory regardless of headcount.
 
-Dosely is not a processor for anyone else. There is no Art. 30(2) section.
+Medicyn is not a processor for anyone else. There is no Art. 30(2) section.
 
 ## A. Identity
 
@@ -67,7 +67,7 @@ Dosely is not a processor for anyone else. There is no Art. 30(2) section.
 - **Special categories:** Health, and possibly other identifiers in the blob.
 - **Recipients:** Anthropic (intended processor).
 - **Transfers:** United States.
-- **Retention:** Anthropic's side is a single request. Dosely does not keep
+- **Retention:** Anthropic's side is a single request. Medicyn does not keep
   the photo. Request zero-retention in writing — see [DPA.md](DPA.md).
 - **Legal basis:** Art. 6(1)(a) + 9(2)(a). Consent `anthropic_parse`, off by
   default.
@@ -79,9 +79,9 @@ Dosely is not a processor for anyone else. There is no Art. 30(2) section.
   the device.
 - **Special categories:** Health (content of the utterance).
 - **Recipients:** Google as **controller** of the platform speech service on
-  most Android devices. Dosely does not upload a recording.
+  most Android devices. Medicyn does not upload a recording.
 - **Transfers:** United States (typical).
-- **Retention:** Dosely does not store the audio.
+- **Retention:** Medicyn does not store the audio.
 - **Legal basis:** Art. 6(1)(a) + 9(2)(a). Consent `google_speech`, off by
   default.
 

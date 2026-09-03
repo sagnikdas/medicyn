@@ -3,9 +3,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../core/motion.dart';
-import '../../core/widgets/dosely_chrome.dart';
-import '../../core/widgets/dosely_layout.dart';
-import '../../core/widgets/dosely_motion.dart';
+import '../../core/widgets/medicyn_chrome.dart';
+import '../../core/widgets/medicyn_layout.dart';
+import '../../core/widgets/medicyn_motion.dart';
 import '../../data/local/database.dart';
 import '../auth/auth_service.dart';
 import '../insights/insights_screen.dart';
@@ -35,8 +35,8 @@ class _AppShellState extends State<AppShell> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: DoselyContent(
-        child: DoselyIndexedStack(
+      body: MedicynContent(
+        child: MedicynIndexedStack(
           index: _index,
           sizing: StackFit.expand,
           children: [
@@ -75,12 +75,12 @@ class _AppShellState extends State<AppShell> {
           ],
         ),
       ),
-      bottomNavigationBar: DoselyBottomNav(
+      bottomNavigationBar: MedicynBottomNav(
         index: _index,
         profileImageUrl: AuthService.instance.currentUserAvatarUrl,
         onChanged: (i) {
           if (i == _index) return;
-          DoselyMotion.selection(context);
+          MedicynMotion.selection(context);
           setState(() => _index = i);
         },
       ),

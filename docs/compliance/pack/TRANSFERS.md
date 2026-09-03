@@ -76,7 +76,7 @@ is still tiny.
 ### Decision
 
 Until Option A is done or Option B's DPAs are executed, **do not market
-Dosely as having "GDPR-compliant transfers."** Tell the truth that
+Medicyn as having "GDPR-compliant transfers."** Tell the truth that
 `PRIVACY.md` already tells. The residual risk is accepted in
 [DPIA.md](DPIA.md) R7 for pre-launch work; it is not accepted as a
 finished Art. 46 story.

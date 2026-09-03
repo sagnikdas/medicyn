@@ -12,7 +12,7 @@ import '../../features/consent/consent_purpose.dart';
 import '../../features/consent/consent_service.dart';
 import '../local/database.dart';
 
-/// Builds the Art. 15/20 JSON copy of what Dosely holds about this person.
+/// Builds the Art. 15/20 JSON copy of what Medicyn holds about this person.
 ///
 /// Local Drift is the source of truth for medicines, schedules, dose logs
 /// and contest notes. Profile, care links and care alerts are fetched from
@@ -80,13 +80,13 @@ class DataExportService {
         .toIso8601String()
         .replaceAll(':', '')
         .replaceAll('.', '');
-    final file = File(p.join(dir.path, 'dosely-data-$stamp.json'));
+    final file = File(p.join(dir.path, 'medicyn-data-$stamp.json'));
     await file.writeAsString(json);
     try {
       await SharePlus.instance.share(
         ShareParams(
           files: [XFile(file.path, mimeType: 'application/json')],
-          subject: 'My Dosely data',
+          subject: 'My Medicyn data',
           sharePositionOrigin: sharePositionOrigin,
         ),
       );

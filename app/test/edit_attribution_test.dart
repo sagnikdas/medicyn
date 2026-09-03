@@ -1,6 +1,6 @@
-import 'package:dosely/features/care/care_service.dart';
-import 'package:dosely/features/care/edit_attribution.dart';
-import 'package:dosely/features/notification_engine/device_health.dart';
+import 'package:medicyn/features/care/care_service.dart';
+import 'package:medicyn/features/care/edit_attribution.dart';
+import 'package:medicyn/features/notification_engine/device_health.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

@@ -1,4 +1,4 @@
-import 'package:dosely/data/remote/label_redactor.dart';
+import 'package:medicyn/data/remote/label_redactor.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

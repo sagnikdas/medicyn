@@ -6,7 +6,11 @@ import 'edit_attribution.dart';
 /// Whether the patient's phone can actually ring. Shown to both sides of a
 /// link so the parent sees the same panel the caregiver is judging them by.
 class SetupHealthPanel extends StatelessWidget {
-  const SetupHealthPanel({super.key, required this.profile, required this.viewingOwnData});
+  const SetupHealthPanel({
+    super.key,
+    required this.profile,
+    required this.viewingOwnData,
+  });
 
   final CareProfile? profile;
   final bool viewingOwnData;
@@ -15,7 +19,9 @@ class SetupHealthPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
     final scheme = Theme.of(context).colorScheme;
-    final who = viewingOwnData ? 'this phone' : (profile?.displayName ?? 'their phone');
+    final who = viewingOwnData
+        ? 'this phone'
+        : (profile?.displayName ?? 'their phone');
     final warn = profile?.remindersMayNotFire == true;
     final silent = _looksSilent(profile?.lastSeenAt);
     return Column(
@@ -27,7 +33,7 @@ class SetupHealthPanel extends StatelessWidget {
           viewingOwnData
               ? 'What your family member sees about whether alarms can ring on $who.'
               : 'If any of these is off, reminders on $who may never fire — '
-                  'and you would not hear about missed doses either.',
+                    'and you would not hear about missed doses either.',
           style: text.bodySmall,
         ),
         const SizedBox(height: 12),
@@ -44,9 +50,11 @@ class SetupHealthPanel extends StatelessWidget {
                 child: Text(
                   viewingOwnData
                       ? 'Reminders may not fire until notifications, exact alarms, '
-                          'and battery exemption are allowed, and at least one alarm is armed.'
+                            'and battery exemption are allowed, and at least one alarm is armed.'
                       : 'Reminders may not be firing on their phone.',
-                  style: text.bodySmall?.copyWith(color: scheme.onErrorContainer),
+                  style: text.bodySmall?.copyWith(
+                    color: scheme.onErrorContainer,
+                  ),
                 ),
               ),
             ),
@@ -63,20 +71,36 @@ class SetupHealthPanel extends StatelessWidget {
                 padding: const EdgeInsets.all(14),
                 child: Text(
                   viewingOwnData
-                      ? 'This phone has not checked in for a day. Open Dosely so your family knows it is still on.'
+                      ? 'This phone has not checked in for a day. Open Medicyn so your family knows it is still on.'
                       : 'Their phone has not checked in since yesterday. That is not a missed dose — the app did not run.',
-                  style: text.bodySmall?.copyWith(color: scheme.onErrorContainer),
+                  style: text.bodySmall?.copyWith(
+                    color: scheme.onErrorContainer,
+                  ),
                 ),
               ),
             ),
           ),
-        _row(context, 'Notifications allowed', describeHealthFlag(profile?.notificationsAllowed)),
-        _row(context, 'Exact alarms allowed', describeHealthFlag(profile?.exactAlarmsAllowed)),
-        _row(context, 'Battery exemption', describeHealthFlag(profile?.batteryExemption)),
+        _row(
+          context,
+          'Notifications allowed',
+          describeHealthFlag(profile?.notificationsAllowed),
+        ),
+        _row(
+          context,
+          'Exact alarms allowed',
+          describeHealthFlag(profile?.exactAlarmsAllowed),
+        ),
+        _row(
+          context,
+          'Battery exemption',
+          describeHealthFlag(profile?.batteryExemption),
+        ),
         _row(
           context,
           'Alarms armed',
-          profile?.armedAlarmCount == null ? 'Not reported yet' : '${profile!.armedAlarmCount}',
+          profile?.armedAlarmCount == null
+              ? 'Not reported yet'
+              : '${profile!.armedAlarmCount}',
         ),
         _row(context, 'Last check-in', describeLastSeen(profile?.lastSeenAt)),
       ],
@@ -88,7 +112,9 @@ class SetupHealthPanel extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         children: [
-          Expanded(child: Text(label, style: Theme.of(context).textTheme.bodyMedium)),
+          Expanded(
+            child: Text(label, style: Theme.of(context).textTheme.bodyMedium),
+          ),
           Text(value, style: Theme.of(context).textTheme.bodyMedium),
         ],
       ),
@@ -98,5 +124,6 @@ class SetupHealthPanel extends StatelessWidget {
 
 bool _looksSilent(DateTime? lastSeenAt, {DateTime? now}) {
   if (lastSeenAt == null) return false;
-  return (now ?? DateTime.now()).difference(lastSeenAt) >= const Duration(hours: 24);
+  return (now ?? DateTime.now()).difference(lastSeenAt) >=
+      const Duration(hours: 24);
 }

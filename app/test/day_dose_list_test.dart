@@ -1,4 +1,4 @@
-import 'package:dosely/features/reminders_home/day_dose_list.dart';
+import 'package:medicyn/features/reminders_home/day_dose_list.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 

@@ -1,7 +1,7 @@
 import 'dart:io';
 
-import 'package:dosely/features/care/care_service.dart';
-import 'package:dosely/data/local/tables.dart';
+import 'package:medicyn/features/care/care_service.dart';
+import 'package:medicyn/data/local/tables.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// Everything here parses a row written by *another* device, or by Postgres,

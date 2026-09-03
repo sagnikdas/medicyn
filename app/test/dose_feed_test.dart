@@ -1,4 +1,4 @@
-import 'package:dosely/features/care/care_service.dart';
+import 'package:medicyn/features/care/care_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// The feed is what a worried person in another city reads instead of

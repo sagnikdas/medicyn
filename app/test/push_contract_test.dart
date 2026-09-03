@@ -1,7 +1,7 @@
 import 'dart:io';
 
-import 'package:dosely/features/notification_engine/notification_service.dart';
-import 'package:dosely/features/push/push_events.dart';
+import 'package:medicyn/features/notification_engine/notification_service.dart';
+import 'package:medicyn/features/push/push_events.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// Push depends on four files agreeing on some string literals, and every one

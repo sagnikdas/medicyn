@@ -1,6 +1,6 @@
-import 'package:dosely/core/theme.dart';
-import 'package:dosely/core/widgets/dosely_chrome.dart';
-import 'package:dosely/features/reminders_home/home_screen.dart';
+import 'package:medicyn/core/theme.dart';
+import 'package:medicyn/core/widgets/medicyn_chrome.dart';
+import 'package:medicyn/features/reminders_home/home_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -71,7 +71,7 @@ Future<void> _pumpCard(
 
   await tester.pumpWidget(
     MaterialApp(
-      theme: DoselyTheme.light(),
+      theme: MedicynTheme.light(),
       builder: (context, child) => MediaQuery(
         data: MediaQuery.of(
           context,

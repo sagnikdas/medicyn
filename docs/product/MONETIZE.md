@@ -1,4 +1,4 @@
-# Dosely — Monetization plan
+# Medicyn — Monetization plan
 
 How this app makes money, and in what order. Written for a product with
 **zero customers and zero awareness**. That fact is the plan: pricing is
@@ -31,7 +31,7 @@ the tempting alternatives are traps.
 | What is free forever | **Local reminders.** Scan, speak, save, alarm. Offline. No account required. | This is how the parent keeps the app. If the reminder is the paid bit, they uninstall, and the care link has nothing to attach to. |
 | What is paid | **The care pair** — missed-dose alerts, setup health, remote edit, call-from-alert. | That is the product a working adult will open their wallet for. Scanning a label is a five-minute convenience; knowing Amma missed her 9am pill is the ongoing job. |
 | Ads / data | **Never.** No ad SDK, no sale of health data, no "sponsored" pharmacy. | `../compliance/PRIVACY.md` already promises this, Play Health and GDPR punish it, and one leak ends the trust the care link is made of. |
-| Clinics / payers | **Not now.** Consumer families only. | A B2B deal with a clinic, home-health agency, or insurer makes Dosely a HIPAA Business Associate (`../compliance/COMPLIANCE.md`). That is a different company. |
+| Clinics / payers | **Not now.** Consumer families only. | A B2B deal with a clinic, home-health agency, or insurer makes Medicyn a HIPAA Business Associate (`../compliance/COMPLIANCE.md`). That is a different company. |
 | When to charge | **After evidence, not at launch.** First public version is free. | There is no one to convert. A price on day one is a hypothesis you cannot test, and it will suppress the only signal that matters: do pairs form and stay. |
 | Currency of the first paid plan | **Annual, caregiver-paid, one pair.** | Monthly is churn theatre for a product used in the background. Annual matches "I am responsible for my parent this year." |
 | Early users | **Grandfathered free for at least a year** after paid launches. | The first fifty families are the sales force. Taxing them for the privilege is how word of mouth dies. |
@@ -190,7 +190,7 @@ Costs that actually move, at today's architecture:
 A Care+ pair at ₹999 or $49 / year is wildly positive on infrastructure
 as long as you do not: (a) let the parse quota become a botnet, which
 you already prevented, or (b) put a human in the loop for every
-missed dose. Dosely is a signal, not a call centre. The moment you
+missed dose. Medicyn is a signal, not a call centre. The moment you
 offer "we will phone your mother for you," the unit economics die
 and you have become a home-health agency.
 
@@ -246,7 +246,7 @@ specific situation the Care Link was designed for:
 - Adult child in Bengaluru / Mumbai / Delhi, parent in a smaller
   city.
 - Adult child in the US / UK / UAE, parent in India. WhatsApp is
-  how they already care; Dosely is the one thing WhatsApp cannot
+  how they already care; Medicyn is the one thing WhatsApp cannot
   do — a missed 9am tablet at 9:31.
 
 Channels that match that, in order of cost (all near-zero at first):

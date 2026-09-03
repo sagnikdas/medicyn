@@ -1,10 +1,10 @@
 import 'dart:io';
 
-import 'package:dosely/core/supabase_init.dart';
-import 'package:dosely/data/local/database.dart';
-import 'package:dosely/data/local/database_encryption.dart';
-import 'package:dosely/data/local/database_key_store.dart';
-import 'package:dosely/data/local/encrypted_database.dart';
+import 'package:medicyn/core/supabase_init.dart';
+import 'package:medicyn/data/local/database.dart';
+import 'package:medicyn/data/local/database_encryption.dart';
+import 'package:medicyn/data/local/database_key_store.dart';
+import 'package:medicyn/data/local/encrypted_database.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart';
 
@@ -27,26 +27,26 @@ void main() {
   group('per-account file names', () {
     test('keeps the legacy name distinct from per-user files', () {
       expect(isPerUserDatabaseFileName(plaintextDatabaseFileName), isFalse);
-      expect(isPerUserDatabaseFileName('dosely.sqlite'), isFalse);
+      expect(isPerUserDatabaseFileName('medicyn.sqlite'), isFalse);
     });
 
     test('gives different users different files', () {
       const a = '11111111-1111-1111-1111-111111111111';
       const b = '22222222-2222-2222-2222-222222222222';
-      expect(encryptedDatabaseFileName(a), 'dosely-$a.sqlite');
-      expect(encryptedDatabaseFileName(b), 'dosely-$b.sqlite');
+      expect(encryptedDatabaseFileName(a), 'medicyn-$a.sqlite');
+      expect(encryptedDatabaseFileName(b), 'medicyn-$b.sqlite');
       expect(encryptedDatabaseFileName(a), isNot(encryptedDatabaseFileName(b)));
       expect(isPerUserDatabaseFileName(encryptedDatabaseFileName(a)), isTrue);
     });
 
-    test('local-only sentinel names dosely-local.sqlite', () {
+    test('local-only sentinel names medicyn-local.sqlite', () {
       expect(localOwnerUserId, 'local');
-      expect(encryptedDatabaseFileName(localOwnerUserId), 'dosely-local.sqlite');
+      expect(encryptedDatabaseFileName(localOwnerUserId), 'medicyn-local.sqlite');
       expect(isPerUserDatabaseFileName(encryptedDatabaseFileName(localOwnerUserId)), isTrue);
     });
 
     test('sanitises surprising characters in the user id', () {
-      expect(encryptedDatabaseFileName('alice/../bob'), 'dosely-alice_.._bob.sqlite');
+      expect(encryptedDatabaseFileName('alice/../bob'), 'medicyn-alice_.._bob.sqlite');
     });
   });
 
@@ -126,8 +126,8 @@ void main() {
         return;
       }
 
-      final docs = await Directory.systemTemp.createTemp('dosely-docs');
-      final tmp = await Directory.systemTemp.createTemp('dosely-tmp');
+      final docs = await Directory.systemTemp.createTemp('medicyn-docs');
+      final tmp = await Directory.systemTemp.createTemp('medicyn-tmp');
       addTearDown(() async {
         await docs.delete(recursive: true);
         await tmp.delete(recursive: true);
@@ -194,14 +194,14 @@ void main() {
       stillA.close();
     });
 
-    test('local-only with no session opens dosely-local.sqlite and does not throw', () async {
+    test('local-only with no session opens medicyn-local.sqlite and does not throw', () async {
       if (!_sqlite3HasCipher()) {
         markTestSkipped('sqlite3mc native assets are not linked in this test run');
         return;
       }
 
-      final docs = await Directory.systemTemp.createTemp('dosely-docs');
-      final tmp = await Directory.systemTemp.createTemp('dosely-tmp');
+      final docs = await Directory.systemTemp.createTemp('medicyn-docs');
+      final tmp = await Directory.systemTemp.createTemp('medicyn-tmp');
       addTearDown(() async {
         await docs.delete(recursive: true);
         await tmp.delete(recursive: true);
@@ -232,8 +232,8 @@ void main() {
         return;
       }
 
-      final docs = await Directory.systemTemp.createTemp('dosely-docs');
-      final tmp = await Directory.systemTemp.createTemp('dosely-tmp');
+      final docs = await Directory.systemTemp.createTemp('medicyn-docs');
+      final tmp = await Directory.systemTemp.createTemp('medicyn-tmp');
       addTearDown(() async {
         await docs.delete(recursive: true);
         await tmp.delete(recursive: true);
@@ -269,13 +269,13 @@ void main() {
   });
 
   group('adopt local-only on first sign-in', () {
-    test('renames dosely-local.sqlite and sidecars onto a new account file', () async {
+    test('renames medicyn-local.sqlite and sidecars onto a new account file', () async {
       expect(
         decideAdoptLocalDatabase(accountFileExists: false, localFileExists: true),
         LocalAdoptDecision.adopt,
       );
 
-      final docs = await Directory.systemTemp.createTemp('dosely-adopt');
+      final docs = await Directory.systemTemp.createTemp('medicyn-adopt');
       addTearDown(() async {
         await docs.delete(recursive: true);
       });
@@ -299,7 +299,7 @@ void main() {
       expect(await File('${local.path}-shm').exists(), isFalse);
     });
 
-    test('leaves dosely-local.sqlite in place when the account already has a file', () async {
+    test('leaves medicyn-local.sqlite in place when the account already has a file', () async {
       expect(
         decideAdoptLocalDatabase(accountFileExists: true, localFileExists: true),
         LocalAdoptDecision.leaveLocalInPlace,
@@ -309,7 +309,7 @@ void main() {
         LocalAdoptDecision.nothingToAdopt,
       );
 
-      final docs = await Directory.systemTemp.createTemp('dosely-adopt');
+      final docs = await Directory.systemTemp.createTemp('medicyn-adopt');
       addTearDown(() async {
         await docs.delete(recursive: true);
       });
@@ -332,8 +332,8 @@ void main() {
         return;
       }
 
-      final docs = await Directory.systemTemp.createTemp('dosely-docs');
-      final tmp = await Directory.systemTemp.createTemp('dosely-tmp');
+      final docs = await Directory.systemTemp.createTemp('medicyn-docs');
+      final tmp = await Directory.systemTemp.createTemp('medicyn-tmp');
       addTearDown(() async {
         await docs.delete(recursive: true);
         await tmp.delete(recursive: true);
@@ -373,7 +373,7 @@ void main() {
 
   group('wipeEncryptedDatabaseForUser', () {
     test('deletes this account file and sidecars, and leaves others alone', () async {
-      final docs = await Directory.systemTemp.createTemp('dosely-wipe');
+      final docs = await Directory.systemTemp.createTemp('medicyn-wipe');
       addTearDown(() async {
         await docs.delete(recursive: true);
       });
@@ -410,7 +410,7 @@ void main() {
     });
 
     test('does not throw when the file is already gone', () async {
-      final docs = await Directory.systemTemp.createTemp('dosely-wipe-missing');
+      final docs = await Directory.systemTemp.createTemp('medicyn-wipe-missing');
       addTearDown(() async {
         await docs.delete(recursive: true);
       });

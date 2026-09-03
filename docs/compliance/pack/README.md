@@ -1,4 +1,4 @@
-# Dosely — Phase 3 governance pack
+# Medicyn — Phase 3 governance pack
 
 Paper that GDPR, UK GDPR, the FTC Health Breach Notification Rule, Washington
 MHMD, and Google Play require, and that did not exist before this directory.

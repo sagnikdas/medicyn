@@ -1,6 +1,6 @@
-import 'package:dosely/core/app_settings.dart';
-import 'package:dosely/core/theme.dart';
-import 'package:dosely/features/onboarding/onboarding_screen.dart';
+import 'package:medicyn/core/app_settings.dart';
+import 'package:medicyn/core/theme.dart';
+import 'package:medicyn/features/onboarding/onboarding_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -36,7 +36,7 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      MaterialApp(theme: DoselyTheme.light(), home: const OnboardingScreen()),
+      MaterialApp(theme: MedicynTheme.light(), home: const OnboardingScreen()),
     );
     await tester.pump();
 

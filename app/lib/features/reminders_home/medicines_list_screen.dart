@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../../core/widgets/dosely_chrome.dart';
-import '../../core/widgets/dosely_layout.dart';
-import '../../core/widgets/dosely_motion.dart';
+import '../../core/widgets/medicyn_chrome.dart';
+import '../../core/widgets/medicyn_layout.dart';
+import '../../core/widgets/medicyn_motion.dart';
 import '../../data/local/database.dart';
 import '../auth/auth_service.dart';
 import '../care/edit_attribution.dart';
@@ -62,7 +62,7 @@ class _MedicinesListScreenState extends State<MedicinesListScreen> {
               automaticallyImplyLeading: false,
               toolbarHeight: 64,
               titleSpacing: 20,
-              title: const DoselyBrandMark(compact: true),
+              title: const MedicynBrandMark(compact: true),
             )
           : AppBar(title: const Text('My medicines')),
       floatingActionButton: FloatingActionButton.extended(
@@ -70,7 +70,7 @@ class _MedicinesListScreenState extends State<MedicinesListScreen> {
         icon: const Icon(Icons.add),
         label: const Text('Add medicine'),
       ),
-      body: DoselyContent(
+      body: MedicynContent(
         child: StreamBuilder<List<ScheduleWithMedicine>>(
           // Lifecycle states are intentionally shown here too: a paused or
           // completed course must remain reachable so the user can review
@@ -101,11 +101,11 @@ class _MedicinesListScreenState extends State<MedicinesListScreen> {
             }
             final items = snapshot.data ?? const <ScheduleWithMedicine>[];
             if (items.isEmpty) {
-              return DoselyFadeIn(
+              return MedicynFadeIn(
                 child: _EmptyState(embedded: widget.embedded),
               );
             }
-            return DoselyFadeIn(
+            return MedicynFadeIn(
               child: ListView.separated(
                 controller: _scrollController,
                 padding: const EdgeInsets.fromLTRB(20, 16, 20, 96),

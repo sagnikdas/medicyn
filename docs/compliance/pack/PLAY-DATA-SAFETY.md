@@ -18,10 +18,10 @@ Declare **collected** for:
 | Health | Health info | Medicines, schedules, dose history, contest notes |
 | Personal info | Name | Google Sign-In, if used |
 | Personal info | Email | Google Sign-In, if used |
-| Personal info | User IDs | Google account id; Dosely `user_id` |
+| Personal info | User IDs | Google account id; Medicyn `user_id` |
 | Device or other IDs | Device or other IDs | FCM token; `push_install_id` (not an advertising ID) |
 | Location | Approximate location | IANA timezone on the profile if signed in. Not GPS. |
-| Audio | Voice or sound recordings | Microphone path. Dosely does not store the recording. On most devices Google's speech service receives the audio. |
+| Audio | Voice or sound recordings | Microphone path. Medicyn does not store the recording. On most devices Google's speech service receives the audio. |
 
 Do **not** declare: contacts, browsing history, advertising ID, precise
 location, photos **as stored** (the label image is OCR'd and deleted; only
@@ -41,7 +41,7 @@ Declare **shared** for:
 
 Encrypted in transit: **Yes** (TLS; cleartext disallowed).
 Users can request deletion: **Yes** (Settings → Delete account and the public
-Pages URL `https://sagnikdas.github.io/dosely/delete-account/`).
+Pages URL `https://sagnikdas.github.io/medicyn/delete-account/`).
 Data collected for app functionality: **Yes**.
 Sold: **No**.
 Optional, account-creation not required: **Yes** (local-only mode).
@@ -59,7 +59,7 @@ Declare, with the same justification already used in `PLAN.md` / the
 manifest:
 
 - `SCHEDULE_EXACT_ALARM` — requested only when a saved reminder needs exact
-  timing. If it is unavailable, Dosely uses Android's inexact-while-idle
+  timing. If it is unavailable, Medicyn uses Android's inexact-while-idle
   fallback and tells the user that timing may be delayed.
 - `POST_NOTIFICATIONS`
 - `CAMERA` — label OCR only; photo deleted.

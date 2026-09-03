@@ -1,6 +1,6 @@
 # Closed testing — sequential steps
 
-Google Play closed testing for Dosely (`com.sagnikdas.dosely`). This is the
+Google Play closed testing for Medicyn (`com.sagnikdas.medicyn`). This is the
 calendar clock in `PLAN.md` Phase 4.
 
 Do **every step in order**. Do not skip. Stop if a step fails; do not start
@@ -35,9 +35,9 @@ rule in Console; Google has changed it before.
    source files. Enable Pages for the repository, wait for the workflow, and
    verify these URLs in a private browser window before continuing:
 
-   - `https://sagnikdas.github.io/dosely/privacy/`
-   - `https://sagnikdas.github.io/dosely/delete-account/`
-   - `https://sagnikdas.github.io/dosely/support/`
+   - `https://sagnikdas.github.io/medicyn/privacy/`
+   - `https://sagnikdas.github.io/medicyn/delete-account/`
+   - `https://sagnikdas.github.io/medicyn/support/`
 
    If any URL asks for a GitHub login or does not load, Play cannot read it.
 
@@ -74,12 +74,12 @@ rule in Console; Google has changed it before.
       steps 9 and 11.
 
 9. Generate the keystore. This creates **one new file** at
-   `$HOME/dosely-upload-keystore.jks`. It does not exist until the command
+   `$HOME/medicyn-upload-keystore.jks`. It does not exist until the command
    finishes.
 
    ```sh
    keytool -genkeypair -v \
-     -keystore "$HOME/dosely-upload-keystore.jks" \
+     -keystore "$HOME/medicyn-upload-keystore.jks" \
      -storetype JKS \
      -keyalg RSA -keysize 2048 -validity 10000 \
      -alias upload
@@ -91,8 +91,8 @@ rule in Console; Google has changed it before.
        This is `storePassword`.
     2. **Re-enter password** — the same password again.
     3. **First and last name** — your name, e.g. `Sagnik Das`.
-    4. **Organizational unit** — `Dosely`, or Return to leave blank.
-    5. **Organization** — `Dosely` or your name.
+    4. **Organizational unit** — `Medicyn`, or Return to leave blank.
+    5. **Organization** — `Medicyn` or your name.
     6. **City / locality** — your city.
     7. **State / province** — your state.
     8. **Country code** — two letters, e.g. `IN`.
@@ -105,9 +105,9 @@ rule in Console; Google has changed it before.
     and `[Storing …jks]`. Then run:
 
     ```sh
-    ls -l "$HOME/dosely-upload-keystore.jks"
+    ls -l "$HOME/medicyn-upload-keystore.jks"
     keytool -list -v \
-      -keystore "$HOME/dosely-upload-keystore.jks" \
+      -keystore "$HOME/medicyn-upload-keystore.jks" \
       -alias upload
     ```
 
@@ -126,7 +126,7 @@ rule in Console; Google has changed it before.
     path with no `~`. On this Mac:
 
     ```properties
-    storeFile=/Users/sagnikdas/dosely-upload-keystore.jks
+    storeFile=/Users/sagnikdas/medicyn-upload-keystore.jks
     storePassword=the-password-you-typed
     keyAlias=upload
     keyPassword=the-same-password-unless-you-set-another
@@ -151,7 +151,7 @@ rule in Console; Google has changed it before.
 15. Open [Play Console](https://play.google.com/console) and choose
     **Create app**.
 
-16. Set the name to **Dosely**. Pick the default language your testers
+16. Set the name to **Medicyn**. Pick the default language your testers
     actually read.
 
 17. Choose **App**, **Free**, and accept that you meet Play policies and
@@ -168,7 +168,7 @@ rule in Console; Google has changed it before.
     Write copy for the adult child who sets the app up, not the parent.
     The first line is the job.
 
-20. Set **App name** to `Dosely`.
+20. Set **App name** to `Medicyn`.
 
 21. Paste this **short description** (80 characters max):
 
@@ -179,7 +179,7 @@ rule in Console; Google has changed it before.
 22. Paste this **full description**:
 
     ```
-    Dosely is a medicine reminder for one parent and one adult child.
+    Medicyn is a medicine reminder for one parent and one adult child.
 
     The parent gets alarms on their phone. The child sees whether a dose was
     taken, snoozed, or missed — including when they are in another city.
@@ -234,7 +234,7 @@ rule in Console; Google has changed it before.
     2. Name, email, user IDs (if they sign in with Google).
     3. Device IDs (FCM token, install id — not an advertising ID).
     4. Approximate location (IANA timezone, not GPS).
-    5. Audio (voice path; Dosely does not keep the recording).
+    5. Audio (voice path; Medicyn does not keep the recording).
     6. Encrypted in transit: **Yes**. Deletion: **Yes**. Sold: **No**.
        Account not required: **Yes** (Use without an account).
     7. Paste the **public account-deletion URL** from step 5.
@@ -303,13 +303,13 @@ rule in Console; Google has changed it before.
 
 47. Create the first Android client:
 
-    1. Package name: `com.sagnikdas.dosely`.
+    1. Package name: `com.sagnikdas.medicyn`.
     2. SHA-1: the **app signing** fingerprint from step 44.
-    3. Name: `Dosely Android — Play app signing`.
+    3. Name: `Medicyn Android — Play app signing`.
     4. Save and copy the Android client ID.
 
 48. Create the second Android client the same way, using the **upload**
-    SHA-1 from step 45, named `Dosely Android — upload key`. Copy that
+    SHA-1 from step 45, named `Medicyn Android — upload key`. Copy that
     client ID.
 
 49. If the OAuth consent screen is still **Testing**, either add every
@@ -345,17 +345,17 @@ rule in Console; Google has changed it before.
 56. Save and **Start rollout to Closed testing**.
 
 57. Copy the opt-in URL. It looks like
-    `https://play.google.com/apps/testing/com.sagnikdas.dosely`.
+    `https://play.google.com/apps/testing/com.sagnikdas.medicyn`.
 
 58. Send testers this, with the real URL:
 
     ```
-    Please help test Dosely on Google Play for 14 days.
+    Please help test Medicyn on Google Play for 14 days.
 
     1. Open this link while signed into the Google account I listed:
        <OPT-IN URL>
     2. Tap Become a tester.
-    3. Install Dosely from the Play Store button on that page
+    3. Install Medicyn from the Play Store button on that page
        (not an APK I send you).
     4. Open the app at least once. You can use “Use without an account”
        or Google Sign-In.

@@ -1,6 +1,6 @@
-# Dosely — F5: Drug-drug interaction warnings
+# Medicyn — F5: Drug-drug interaction warnings
 
-The plan for turning F5 in `dosely-features-summary.md` ("Not built — no
+The plan for turning F5 in `medicyn-features-summary.md` ("Not built — no
 interaction-checking code anywhere in the repo") into a shipped feature.
 Written after a feasibility pass that changed the design from what the
 features summary originally assumed — see the Appendix for what was tested
@@ -17,7 +17,7 @@ such as DrugBank." That path is closed: NIH discontinued its own free
 interaction API in January 2024, DrugBank/Micromedex/Lexicomp are
 enterprise-priced ($10K–$250K+/year, sales-quote-only), and the one credible
 free option — DDInter 2.0, a peer-reviewed, self-hostable database — is
-licensed **CC BY-NC-SA 4.0, NonCommercial**. Dosely is a commercial product
+licensed **CC BY-NC-SA 4.0, NonCommercial**. Medicyn is a commercial product
 even on its free tier, so shipping DDInter's data in the app isn't licensed
 as-is (see Appendix for the actual terms text and what was tested against it).
 

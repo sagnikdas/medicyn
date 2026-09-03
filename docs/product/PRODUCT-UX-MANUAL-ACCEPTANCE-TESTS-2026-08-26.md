@@ -1,4 +1,4 @@
-# Dosely codex-master manual acceptance tests
+# Medicyn codex-master manual acceptance tests
 
 **Build scope:** Phase 1, Phase 2, and the implemented Phase 3 lifecycle foundation on `codex-master`  
 **Test date:** 26 August 2026  
@@ -20,7 +20,7 @@
 From the repository:
 
 ```bash
-cd /Users/sagnikdas/research/dosely/app
+cd /Users/sagnikdas/research/medicyn/app
 flutter analyze
 flutter test
 ```
@@ -80,8 +80,8 @@ Expected result: no notification callback, navigation, token, or data from Accou
 
 ### P1-03 — Contextual notification permission
 
-1. Clear Dosely notification permission in Android Settings.
-2. Open Dosely Home.
+1. Clear Medicyn notification permission in Android Settings.
+2. Open Medicyn Home.
 
 Expected result: no notification permission prompt appears merely on Home load.
 
@@ -97,12 +97,12 @@ Expected result: the reminder is still saved and the app shows a clear degraded/
 
 1. Reopen the reminder reliability screen.
 2. Deny exact-alarm access when prompted, or disable it in Android Settings.
-3. Return to Dosely.
+3. Return to Medicyn.
 
 Expected result: the app does not claim exact scheduling is active. It explains the fallback or fix path and does not silently substitute UTC.
 
 4. Re-enable exact-alarm access.
-5. Return to Dosely and refresh/reopen reliability.
+5. Return to Medicyn and refresh/reopen reliability.
 
 Expected result: the permission state and armed reminder state update.
 
@@ -111,7 +111,7 @@ Expected result: the permission state and armed reminder state update.
 1. Open **Settings → Reminder reliability**.
 2. Inspect notification permission, exact-alarm state, battery state, armed count, and last reconciliation.
 3. Disable one relevant Android permission.
-4. Return to Dosely.
+4. Return to Medicyn.
 
 Expected result: the affected reminder says **Not active—fix** or equivalent, not **Reminder active**.
 
@@ -135,12 +135,12 @@ Expected result:
 
 1. Create a reminder five minutes ahead.
 2. Reboot the Samsung phone.
-3. Do not open Dosely after reboot.
+3. Do not open Medicyn after reboot.
 4. Wait for the reminder.
 
 Expected result: the reminder still fires, or the app clearly reports why it could not be armed.
 
-5. Force-stop Dosely, reopen it, and check Reminder reliability.
+5. Force-stop Medicyn, reopen it, and check Reminder reliability.
 
 Expected result: reconciliation runs and the armed state is accurate.
 
@@ -154,7 +154,7 @@ Expected result: the old alarm does not fire; only the new schedule is active.
 
 ### P1-09 — Public privacy, deletion, and support routes
 
-From a browser where Dosely is not installed, open the configured public HTTPS links:
+From a browser where Medicyn is not installed, open the configured public HTTPS links:
 
 1. Privacy page.
 2. Account deletion page.
@@ -175,7 +175,7 @@ Expected result: diagnostics contain app/device/version/permission/arming/sync i
 ### P2-01 — First-session method chooser
 
 1. Clear app data or use a fresh install.
-2. Open Dosely.
+2. Open Medicyn.
 
 Expected result: the Add flow offers **Scan label**, **Speak details**, and **Enter manually**.
 
@@ -338,7 +338,7 @@ Expected result: Device B shows it as active and re-arms the reminder.
 
 ### P3-08 — Complete export
 
-1. Open Settings and export Dosely data.
+1. Open Settings and export Medicyn data.
 2. Inspect the JSON in the share preview or after saving a copy.
 
 Expected result:

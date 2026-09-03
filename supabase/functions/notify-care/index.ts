@@ -40,7 +40,7 @@ import { FcmConfigError, FcmMessage, sendToToken } from "./fcm.ts";
 // app/lib/features/notification_engine/notification_service.dart. The client
 // creates the channel; Android silently drops a notification addressed to a
 // channel id that does not exist.
-const CARE_ALERT_CHANNEL_ID = "dosely_care_alerts_v1";
+const CARE_ALERT_CHANNEL_ID = "medicyn_care_alerts_v1";
 
 // Bound on one call, matched to `MissedDoseDetector._maxPerSweep` on the client
 // — the most a single device-side sweep can produce. Deliberately not a smaller
@@ -391,7 +391,7 @@ async function announceRefillLow(
     delivered = await deliver(admin, tokens, {
       notification: {
         title: `${who}'s medicine is running low`,
-        body: "Open Dosely to see which one. About five days of tablets left.",
+        body: "Open Medicyn to see which one. About five days of tablets left.",
       },
       androidChannelId: CARE_ALERT_CHANNEL_ID,
       data: {
@@ -490,7 +490,7 @@ async function announceSilentDevices(admin: SupabaseClient): Promise<Response> {
       delivered = await deliver(admin, tokens, {
         notification: {
           title: `${who}'s phone hasn't checked in`,
-          body: "It hasn't opened Dosely since yesterday. This is not a missed dose — their app did not run.",
+          body: "It hasn't opened Medicyn since yesterday. This is not a missed dose — their app did not run.",
         },
         androidChannelId: CARE_ALERT_CHANNEL_ID,
         data: {

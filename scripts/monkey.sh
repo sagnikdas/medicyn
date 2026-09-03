@@ -19,7 +19,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 APP_DIR="$ROOT/app"
-PACKAGE="com.sagnikdas.dosely"
+PACKAGE="com.sagnikdas.medicyn"
 APK="$APP_DIR/build/app/outputs/flutter-apk/app-debug.apk"
 SESSIONS="${SESSIONS:-3}"
 EVENTS="${EVENTS:-2000}"
@@ -129,11 +129,11 @@ launch_and_wait() {
   return 1
 }
 
-OUT="$(mktemp -d "${TMPDIR:-/tmp}/dosely-monkey.XXXXXX")"
+OUT="$(mktemp -d "${TMPDIR:-/tmp}/medicyn-monkey.XXXXXX")"
 echo "logs: $OUT"
 echo "warning: keep the phone unlocked. Monkey stays in $PACKAGE (no Home/Power)."
 
-# Do not send Power / Home / app-switch events — those leave Dosely or
+# Do not send Power / Home / app-switch events — those leave Medicyn or
 # lock the device and the rest of the session is noise.
 monkey_args=(
   -p "$PACKAGE"

@@ -1,5 +1,5 @@
-import 'package:dosely/core/supabase_config.dart';
-import 'package:dosely/core/supabase_init.dart';
+import 'package:medicyn/core/supabase_config.dart';
+import 'package:medicyn/core/supabase_init.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 

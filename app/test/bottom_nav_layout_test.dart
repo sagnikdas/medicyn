@@ -1,5 +1,5 @@
-import 'package:dosely/core/theme.dart';
-import 'package:dosely/core/widgets/dosely_chrome.dart';
+import 'package:medicyn/core/theme.dart';
+import 'package:medicyn/core/widgets/medicyn_chrome.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -14,12 +14,12 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
-          theme: DoselyTheme.light(),
-          darkTheme: DoselyTheme.dark(),
+          theme: MedicynTheme.light(),
+          darkTheme: MedicynTheme.dark(),
           themeMode: ThemeMode.dark,
           home: Scaffold(
             body: const SizedBox.expand(child: ColoredBox(color: Colors.red)),
-            bottomNavigationBar: DoselyBottomNav(
+            bottomNavigationBar: MedicynBottomNav(
               index: 0,
               onChanged: (_) {},
             ),
@@ -27,7 +27,7 @@ void main() {
         ),
       );
 
-      final nav = tester.getRect(find.byType(DoselyBottomNav));
+      final nav = tester.getRect(find.byType(MedicynBottomNav));
       expect(
         nav.height,
         lessThan(160),

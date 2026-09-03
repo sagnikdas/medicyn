@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:timezone/timezone.dart' as tz;
 
 import '../../core/app_navigation.dart';
-import '../../core/widgets/dosely_layout.dart';
-import '../../core/widgets/dosely_motion.dart';
+import '../../core/widgets/medicyn_layout.dart';
+import '../../core/widgets/medicyn_motion.dart';
 import '../../data/local/database.dart';
 import '../../data/local/tables.dart';
 import '../auth/auth_service.dart';
@@ -179,7 +179,7 @@ class _DoseFeedScreenState extends State<DoseFeedScreen> {
         ],
       ),
       body: SafeArea(
-        child: DoselyContent(
+        child: MedicynContent(
           child: RefreshIndicator(onRefresh: _load, child: _body()),
         ),
       ),
@@ -244,7 +244,7 @@ class _DoseFeedScreenState extends State<DoseFeedScreen> {
       wallClock: clock,
     );
 
-    return DoselyFadeIn(
+    return MedicynFadeIn(
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(8, 4, 8, 32),

@@ -1,7 +1,7 @@
 # 3.1 — Data Protection Impact Assessment
 
 **Controller:** Sagnik Das.
-**Processing:** Dosely Android app (`com.sagnikdas.dosely`) and its backend.
+**Processing:** Medicyn Android app (`com.sagnikdas.medicyn`) and its backend.
 **Date:** 20 August 2026.
 **Version:** 1. Against `main` @ `f73aed5`.
 **Next review:** before Play release, and whenever a data flow is added.
@@ -13,7 +13,7 @@ risks are generic.
 ## 1. Why a DPIA is mandatory
 
 WP248: a DPIA is required when processing is likely high risk, especially
-when two or more of its nine criteria apply. Dosely hits **five**:
+when two or more of its nine criteria apply. Medicyn hits **five**:
 
 1. **Special category data** — medicines, schedules, dose history (Art. 9 health).
 2. **Vulnerable data subjects** — the design target is elderly parents.
@@ -28,7 +28,7 @@ A DPIA would be required on (1) and (5) alone. The others make it heavier.
 
 ## 2. Description of processing
 
-### What Dosely is
+### What Medicyn is
 
 A medication reminder. The person who takes the medicine is the data
 subject. One other person may be linked, with that subject's confirmation,

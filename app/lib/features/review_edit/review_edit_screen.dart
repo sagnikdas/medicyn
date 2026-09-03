@@ -7,8 +7,8 @@ import 'package:flutter/services.dart';
 import '../../core/ids.dart';
 import '../../core/motion.dart';
 import '../../core/telemetry.dart';
-import '../../core/widgets/dosely_layout.dart';
-import '../../core/widgets/dosely_motion.dart';
+import '../../core/widgets/medicyn_layout.dart';
+import '../../core/widgets/medicyn_motion.dart';
 import '../../data/local/database.dart';
 import '../../data/local/lifecycle.dart';
 import '../../data/local/tables.dart';
@@ -436,8 +436,8 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
     if (permission.notificationsAllowed && permission.exactAlarmsAllowed) {
       return;
     }
-    await DoselyTelemetry.instance.record(
-      DoselyEvent.permissionPrompted,
+    await MedicynTelemetry.instance.record(
+      MedicynEvent.permissionPrompted,
       properties: {'permission_type': 'reminder_access'},
     );
     if (!mounted) return;
@@ -446,7 +446,7 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
       builder: (dialogContext) => AlertDialog(
         title: const Text('Enable this reminder'),
         content: const Text(
-          'Dosely needs notification access to alert you. Exact timing is '
+          'Medicyn needs notification access to alert you. Exact timing is '
           'optional; if you skip it, Android may deliver the reminder a little later.',
         ),
         actions: [
@@ -469,8 +469,8 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
       await NotificationService.instance.requestExactAlarmPermission();
     }
     final after = await NotificationService.instance.readPermissionState();
-    await DoselyTelemetry.instance.record(
-      DoselyEvent.permissionResult,
+    await MedicynTelemetry.instance.record(
+      MedicynEvent.permissionResult,
       properties: {
         'permission_type': 'reminder_access',
         'result': after.notificationsAllowed
@@ -661,14 +661,14 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
               : 'Review reminder',
         ),
       ),
-      body: SafeArea(child: DoselyContent(child: _body())),
+      body: SafeArea(child: MedicynContent(child: _body())),
     );
   }
 
   Widget _body() {
-    return DoselySwitcher(
+    return MedicynSwitcher(
       alignment: Alignment.topCenter,
-      duration: DoselyMotion.medium,
+      duration: MedicynMotion.medium,
       child: switch (_loadState) {
         _LoadState.loading => const Center(
           key: ValueKey(_LoadState.loading),
@@ -700,7 +700,7 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
             ),
           ),
         ),
-        _LoadState.ready => DoselyFadeIn(
+        _LoadState.ready => MedicynFadeIn(
           key: const ValueKey(_LoadState.ready),
           child: Column(
             children: [
@@ -712,7 +712,7 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
                   padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
                   child: FilledButton(
                     onPressed: _canSave && !_saving ? _save : null,
-                    child: DoselySwitcher(
+                    child: MedicynSwitcher(
                       child: _saving
                           ? const SizedBox(
                               key: ValueKey(true),

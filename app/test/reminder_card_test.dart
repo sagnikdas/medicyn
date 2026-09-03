@@ -1,4 +1,4 @@
-import 'package:dosely/features/reminders_home/reminder_card.dart';
+import 'package:medicyn/features/reminders_home/reminder_card.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

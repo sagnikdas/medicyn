@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 
 import '../../core/app_settings.dart';
 import '../../core/motion.dart';
-import '../../core/widgets/dosely_chrome.dart';
-import '../../core/widgets/dosely_motion.dart';
+import '../../core/widgets/medicyn_chrome.dart';
+import '../../core/widgets/medicyn_motion.dart';
 import '../../core/telemetry.dart';
 import '../../data/local/database.dart';
 import '../../data/local/tables.dart';
@@ -206,11 +206,11 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         permissions: permissions,
         timezoneReady: NotificationService.instance.timezoneReady,
       );
-      await DoselyTelemetry.instance.record(
-        DoselyEvent.reminderArmResult,
+      await MedicynTelemetry.instance.record(
+        MedicynEvent.reminderArmResult,
         properties: {
           'result': reconcile.allArmed ? 'all_armed' : 'degraded',
-          'count_bucket': DoselyTelemetry.countBucket(reconcile.armed),
+          'count_bucket': MedicynTelemetry.countBucket(reconcile.armed),
           'error_code': reconcile.failures.isEmpty
               ? null
               : 'platform_schedule_failed',
@@ -377,8 +377,8 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
     if (!mounted || method == null) return;
 
-    await DoselyTelemetry.instance.record(
-      DoselyEvent.addStarted,
+    await MedicynTelemetry.instance.record(
+      MedicynEvent.addStarted,
       properties: {'method': method.name},
     );
     if (!mounted) return;
@@ -496,7 +496,7 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           automaticallyImplyLeading: false,
           toolbarHeight: 64,
           titleSpacing: 20,
-          title: const DoselyBrandMark(compact: true),
+          title: const MedicynBrandMark(compact: true),
         ),
         body: StreamBuilder<List<ScheduleWithMedicine>>(
           stream: _schedulesStream,
@@ -644,7 +644,7 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-            child: DoselyFadeIn(
+            child: MedicynFadeIn(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -670,7 +670,7 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-              child: DoselyFadeIn(
+              child: MedicynFadeIn(
                 child: DoseAttentionPanel(
                   occurrences: attention,
                   now: now,
@@ -710,7 +710,7 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-              child: DoselyFadeIn(
+              child: MedicynFadeIn(
                 delay: const Duration(milliseconds: 40),
                 child: DailyProgressCard(
                   taken: takenCount,
@@ -721,7 +721,7 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ),
         if (schedules.isEmpty)
           SliverToBoxAdapter(
-            child: DoselyFadeIn(child: _EmptyState(onAdd: _startCapture)),
+            child: MedicynFadeIn(child: _EmptyState(onAdd: _startCapture)),
           )
         else
           ...dayDoseSlivers(
@@ -741,14 +741,14 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     unawaited(
       _scroll.animateTo(
         0,
-        duration: DoselyMotion.duration(context, DoselyMotion.medium),
-        curve: DoselyMotion.standard,
+        duration: MedicynMotion.duration(context, MedicynMotion.medium),
+        curve: MedicynMotion.standard,
       ),
     );
   }
 
   Future<void> _markTaken(DayOccurrence occurrence) async {
-    DoselyMotion.confirm(context);
+    MedicynMotion.confirm(context);
     await recordDoseTaken(
       widget.db,
       scheduleId: occurrence.item.schedule.id,

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../core/widgets/dosely_layout.dart';
-import '../../core/widgets/dosely_motion.dart';
+import '../../core/widgets/medicyn_layout.dart';
+import '../../core/widgets/medicyn_motion.dart';
 import '../../data/local/database.dart';
 import '../auth/auth_service.dart';
 import '../reminders_home/reminder_copy.dart';
@@ -109,7 +109,7 @@ class _PatientRemindersScreenState extends State<PatientRemindersScreen> {
         label: const Text('Add reminder'),
       ),
       body: SafeArea(
-        child: DoselyContent(
+        child: MedicynContent(
           child: RefreshIndicator(onRefresh: _load, child: _body()),
         ),
       ),
@@ -129,7 +129,7 @@ class _PatientRemindersScreenState extends State<PatientRemindersScreen> {
       return const Center(child: CircularProgressIndicator());
     }
     if (items.isEmpty) {
-      return DoselyFadeIn(
+      return MedicynFadeIn(
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(28, 48, 28, 96),
@@ -144,7 +144,7 @@ class _PatientRemindersScreenState extends State<PatientRemindersScreen> {
         ),
       );
     }
-    return DoselyFadeIn(
+    return MedicynFadeIn(
       child: ListView.separated(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
         itemCount: items.length,

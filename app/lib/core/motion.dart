@@ -11,9 +11,9 @@ import 'package:flutter/services.dart';
 ///  * Curves are Material 3 emphasized: incoming work settles, outgoing
 ///    work gets out of the way. Implicit widgets (AnimatedContainer,
 ///    AnimatedOpacity, TweenAnimationBuilder) over hand-rolled controllers
-///    except where a one-shot entrance needs [DoselyFadeIn].
-class DoselyMotion {
-  DoselyMotion._();
+///    except where a one-shot entrance needs [MedicynFadeIn].
+class MedicynMotion {
+  MedicynMotion._();
 
   /// Micro-interactions: press scale, nav pill, icon swap.
   static const Duration fast = Duration(milliseconds: 150);
@@ -33,7 +33,7 @@ class DoselyMotion {
   /// Shared with the collapsing calendar sliver.
   static const Curve standard = Curves.easeOutCubic;
 
-  /// Paint-only slide for [DoselyFadeIn]. Small enough that a dropped
+  /// Paint-only slide for [MedicynFadeIn]. Small enough that a dropped
   /// frame on a Mali-400 still reads as a fade, not a stutter.
   static const Offset enterOffset = Offset(0, 10);
 

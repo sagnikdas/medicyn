@@ -1,4 +1,4 @@
-import 'package:dosely/features/care/phone_dial.dart';
+import 'package:medicyn/features/care/phone_dial.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

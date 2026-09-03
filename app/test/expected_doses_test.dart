@@ -1,7 +1,7 @@
-import 'package:dosely/data/local/database.dart';
-import 'package:dosely/data/local/tables.dart';
-import 'package:dosely/features/notification_engine/expected_doses.dart';
-import 'package:dosely/features/notification_engine/missed_doses.dart';
+import 'package:medicyn/data/local/database.dart';
+import 'package:medicyn/data/local/tables.dart';
+import 'package:medicyn/features/notification_engine/expected_doses.dart';
+import 'package:medicyn/features/notification_engine/missed_doses.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// A wrong answer here marks a dose missed that never was, and tells a family

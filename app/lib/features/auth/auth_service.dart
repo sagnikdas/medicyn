@@ -49,7 +49,7 @@ bool googleSignInIsUserCancellation(GoogleSignInException e) {
 /// session via `GoTrueClient.signInWithIdToken` (gotrue 2.27.1, as pulled
 /// in by supabase_flutter 2.17.1). Nothing opens a browser and no
 /// deep-link/redirect URL is involved, which is why the app no longer
-/// registers a `dosely://` scheme.
+/// registers a `medicyn://` scheme.
 class AuthService {
   AuthService._();
   static final AuthService instance = AuthService._();

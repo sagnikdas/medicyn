@@ -117,8 +117,8 @@ class _DeviceLockGateState extends State<DeviceLockGate>
             excluding: !_locked,
             child: AnimatedOpacity(
               opacity: _locked ? 1 : 0,
-              duration: DoselyMotion.duration(context, DoselyMotion.fast),
-              curve: DoselyMotion.decelerate,
+              duration: MedicynMotion.duration(context, MedicynMotion.fast),
+              curve: MedicynMotion.decelerate,
               child: ColoredBox(
                 color: scheme.surface,
                 child: SafeArea(
@@ -134,7 +134,7 @@ class _DeviceLockGateState extends State<DeviceLockGate>
                         ),
                         const SizedBox(height: 20),
                         Text(
-                          'Unlock Dosely',
+                          'Unlock Medicyn',
                           style: Theme.of(context).textTheme.headlineSmall,
                           textAlign: TextAlign.center,
                         ),

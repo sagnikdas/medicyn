@@ -1,5 +1,5 @@
-import 'package:dosely/data/local/database.dart';
-import 'package:dosely/data/local/tables.dart';
+import 'package:medicyn/data/local/database.dart';
+import 'package:medicyn/data/local/tables.dart';
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
