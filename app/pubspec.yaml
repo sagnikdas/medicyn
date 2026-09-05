@@ -1,5 +1,5 @@
 name: medicyn
-description: "A minimalist Android medicine reminder."
+description: "Private medicine reminders that work offline, with optional family support."
 publish_to: 'none'
 version: 0.1.0+1
 

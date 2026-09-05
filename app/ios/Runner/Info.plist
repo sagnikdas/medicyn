@@ -52,6 +52,10 @@
 	<string>Medicyn uses the camera to photograph your medicine label so it can read the drug name and strength. The photo stays on your device and is discarded right after it's read.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Medicyn uses the microphone so you can speak your dosage and schedule instructions instead of typing them.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Medicyn uses Face ID or your device passcode to protect your medicine information when you return to the app.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Medicyn uses speech recognition to turn the dosage and schedule you speak into text for you to review.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

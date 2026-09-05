@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/app_settings.dart';
@@ -7,6 +8,7 @@ import '../../core/motion.dart';
 import '../../core/widgets/chart_grid.dart';
 import '../../core/widgets/medicyn_chrome.dart';
 import '../../core/widgets/medicyn_motion.dart';
+import '../../core/widgets/medicyn_platform.dart';
 import '../../core/telemetry.dart';
 import '../../data/local/database.dart';
 import '../../data/local/tables.dart';
@@ -338,52 +340,93 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     // Selecting a method is intentionally separate from opening the capture
     // screen: camera and microphone permissions are requested only after the
     // user has made that choice.
-    final method = await showModalBottomSheet<_CaptureMethod>(
-      context: context,
-      showDragHandle: true,
-      builder: (sheetContext) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                'How do you want to add it?',
-                style: Theme.of(sheetContext).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 8),
-              Text(
+    final applePlatform = isApplePlatform(context);
+    final method = applePlatform
+        ? await showCupertinoModalPopup<_CaptureMethod>(
+            // The context is consumed synchronously to create the route; the
+            // Future returned by the route is what this method awaits.
+            // ignore: use_build_context_synchronously
+            context: context,
+            builder: (sheetContext) => CupertinoActionSheet(
+              title: const Text('How do you want to add it?'),
+              message: const Text(
                 'Choose one. You can check every detail before saving.',
-                style: Theme.of(sheetContext).textTheme.bodyMedium,
               ),
-              const SizedBox(height: 12),
-              ListTile(
-                minTileHeight: 56,
-                leading: const Icon(Icons.document_scanner_outlined),
-                title: const Text('Scan label'),
-                subtitle: const Text('Use your camera to read the label'),
-                onTap: () => Navigator.pop(sheetContext, _CaptureMethod.scan),
+              actions: [
+                CupertinoActionSheetAction(
+                  onPressed: () =>
+                      Navigator.pop(sheetContext, _CaptureMethod.scan),
+                  child: const Text('Scan label'),
+                ),
+                CupertinoActionSheetAction(
+                  onPressed: () =>
+                      Navigator.pop(sheetContext, _CaptureMethod.speak),
+                  child: const Text('Speak details'),
+                ),
+                CupertinoActionSheetAction(
+                  onPressed: () =>
+                      Navigator.pop(sheetContext, _CaptureMethod.manual),
+                  child: const Text('Enter manually'),
+                ),
+              ],
+              cancelButton: CupertinoActionSheetAction(
+                onPressed: () => Navigator.pop(sheetContext),
+                child: const Text('Cancel'),
               ),
-              ListTile(
-                minTileHeight: 56,
-                leading: const Icon(Icons.mic_outlined),
-                title: const Text('Speak details'),
-                subtitle: const Text('Say the medicine and schedule'),
-                onTap: () => Navigator.pop(sheetContext, _CaptureMethod.speak),
+            ),
+          )
+        : await showModalBottomSheet<_CaptureMethod>(
+            // The context is consumed synchronously to create the route; the
+            // Future returned by the route is what this method awaits.
+            // ignore: use_build_context_synchronously
+            context: context,
+            showDragHandle: true,
+            builder: (sheetContext) => SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'How do you want to add it?',
+                      style: Theme.of(sheetContext).textTheme.titleLarge,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Choose one. You can check every detail before saving.',
+                      style: Theme.of(sheetContext).textTheme.bodyMedium,
+                    ),
+                    const SizedBox(height: 12),
+                    ListTile(
+                      minTileHeight: 56,
+                      leading: const Icon(Icons.document_scanner_outlined),
+                      title: const Text('Scan label'),
+                      subtitle: const Text('Use your camera to read the label'),
+                      onTap: () =>
+                          Navigator.pop(sheetContext, _CaptureMethod.scan),
+                    ),
+                    ListTile(
+                      minTileHeight: 56,
+                      leading: const Icon(Icons.mic_outlined),
+                      title: const Text('Speak details'),
+                      subtitle: const Text('Say the medicine and schedule'),
+                      onTap: () =>
+                          Navigator.pop(sheetContext, _CaptureMethod.speak),
+                    ),
+                    ListTile(
+                      minTileHeight: 56,
+                      leading: const Icon(Icons.edit_outlined),
+                      title: const Text('Enter manually'),
+                      subtitle: const Text('Type the details yourself'),
+                      onTap: () =>
+                          Navigator.pop(sheetContext, _CaptureMethod.manual),
+                    ),
+                  ],
+                ),
               ),
-              ListTile(
-                minTileHeight: 56,
-                leading: const Icon(Icons.edit_outlined),
-                title: const Text('Enter manually'),
-                subtitle: const Text('Type the details yourself'),
-                onTap: () => Navigator.pop(sheetContext, _CaptureMethod.manual),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+            ),
+          );
     if (!mounted || method == null) return;
 
     await MedicynTelemetry.instance.record(
@@ -428,9 +471,9 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   );
 
   Future<void> _delete(ScheduleWithMedicine item) async {
-    final choice = await showDialog<_ReminderDisposition>(
+    final choice = await showAdaptiveDialog<_ReminderDisposition>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
+      builder: (dialogContext) => AlertDialog.adaptive(
         title: const Text('Stop reminding, or delete?'),
         content: const SingleChildScrollView(
           child: Column(

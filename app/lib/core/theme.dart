@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'widgets/medicyn_motion.dart';
@@ -133,7 +134,11 @@ class MedicynTheme {
         backgroundColor: scheme.surface,
         foregroundColor: scheme.onSurface,
         elevation: 0,
-        centerTitle: false,
+        // iOS conventionally centers navigation-bar titles; Android keeps
+        // the existing leading-title treatment.
+        centerTitle:
+            defaultTargetPlatform == TargetPlatform.iOS ||
+            defaultTargetPlatform == TargetPlatform.macOS,
         scrolledUnderElevation: 0,
         titleTextStyle: text.titleLarge?.copyWith(
           color: scheme.primary,

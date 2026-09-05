@@ -140,9 +140,9 @@ class _AttentionDeckState extends State<_AttentionDeck> {
 
   Future<bool> _confirmTaken(DayOccurrence occurrence) async {
     final medicine = medicineTitle(occurrence.item.medicine);
-    return await showDialog<bool>(
+    return await showAdaptiveDialog<bool>(
           context: context,
-          builder: (dialogContext) => AlertDialog(
+          builder: (dialogContext) => AlertDialog.adaptive(
             title: Text(
               'Confirm dose',
               style: Theme.of(dialogContext).textTheme.headlineSmall,

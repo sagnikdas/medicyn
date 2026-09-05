@@ -9,6 +9,7 @@ import 'package:permission_handler/permission_handler.dart';
 import '../../core/widgets/medicyn_chrome.dart';
 import '../../core/widgets/medicyn_layout.dart';
 import '../../core/widgets/medicyn_motion.dart';
+import '../../core/widgets/medicyn_platform.dart';
 
 /// Step 1 of the capture flow: photograph the medicine label, run OCR
 /// on-device, then immediately delete the photo. Only the extracted text
@@ -241,8 +242,7 @@ class _OcrCaptureScreenState extends State<OcrCaptureScreen>
     final ready = camera != null && camera.value.isInitialized;
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.close),
+        leading: MedicynAdaptiveBackButton(
           tooltip: 'Close',
           onPressed: () => Navigator.of(context).maybePop(),
         ),

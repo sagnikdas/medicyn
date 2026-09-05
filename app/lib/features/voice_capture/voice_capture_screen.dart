@@ -5,6 +5,7 @@ import 'package:speech_to_text/speech_to_text.dart';
 import '../../core/motion.dart';
 import '../../core/widgets/medicyn_layout.dart';
 import '../../core/widgets/medicyn_motion.dart';
+import '../../core/widgets/medicyn_platform.dart';
 import '../consent/consent_purpose.dart';
 import '../consent/consent_service.dart';
 
@@ -103,12 +104,7 @@ class _VoiceCaptureScreenState extends State<VoiceCaptureScreen> {
     final listening = _status == _Status.listening;
     final scheme = Theme.of(context).colorScheme;
     return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.of(context).maybePop(),
-        ),
-      ),
+      appBar: AppBar(leading: const MedicynAdaptiveBackButton()),
       body: SafeArea(
         child: MedicynContent(
           child: Padding(

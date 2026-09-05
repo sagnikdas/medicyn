@@ -1,8 +1,10 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../motion.dart';
 import '../theme.dart';
 import 'medicyn_motion.dart';
+import 'medicyn_platform.dart';
 
 /// Greeting copy from the Stitch Today screen, keyed off the local hour.
 String greetingFor(DateTime now) {
@@ -312,6 +314,27 @@ class MedicynBottomNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    if (isApplePlatform(context)) {
+      return CupertinoTabBar(
+        currentIndex: index,
+        onTap: onChanged,
+        activeColor: scheme.primary,
+        inactiveColor: scheme.onSurfaceVariant,
+        backgroundColor: scheme.surfaceContainer,
+        border: Border(
+          top: BorderSide(color: scheme.outlineVariant, width: 0.5),
+        ),
+        items: [
+          for (var i = 0; i < items.length; i++)
+            BottomNavigationBarItem(
+              icon: _iconForItem(context, i, selected: false),
+              activeIcon: _iconForItem(context, i, selected: true),
+              label: items[i].label,
+            ),
+        ],
+      );
+    }
+
     return Material(
       color: scheme.surfaceContainer,
       elevation: 0,
@@ -352,6 +375,29 @@ class MedicynBottomNav extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _iconForItem(
+    BuildContext context,
+    int index, {
+    required bool selected,
+  }) {
+    final item = items[index];
+    final imageUrl = index == 3 ? profileImageUrl : null;
+    if (imageUrl == null) {
+      return Icon(selected ? item.selected : item.icon);
+    }
+    return ClipOval(
+      child: Image.network(
+        imageUrl,
+        width: 22,
+        height: 22,
+        fit: BoxFit.cover,
+        excludeFromSemantics: true,
+        errorBuilder: (context, error, stackTrace) =>
+            Icon(selected ? item.selected : item.icon),
       ),
     );
   }

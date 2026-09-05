@@ -141,7 +141,7 @@ class _CareScreenState extends State<CareScreen> {
     if (ConsentService.instance.isGranted(ConsentPurpose.careShare)) {
       return true;
     }
-    final granted = await showDialog<bool>(
+    final granted = await showAdaptiveDialog<bool>(
       context: context,
       builder: (_) => const CareShareConsentDialog(),
     );
@@ -162,7 +162,7 @@ class _CareScreenState extends State<CareScreen> {
   Future<void> _enterCode() async {
     if (!await _ensureCareShareConsent()) return;
     if (!mounted) return;
-    final code = await showDialog<String>(
+    final code = await showAdaptiveDialog<String>(
       context: context,
       builder: (_) => const _CodeEntryDialog(),
     );
@@ -180,9 +180,9 @@ class _CareScreenState extends State<CareScreen> {
     final link = _link;
     if (link == null) return;
     final who = _otherName ?? 'this person';
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showAdaptiveDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
+      builder: (dialogContext) => AlertDialog.adaptive(
         title: const Text('Disconnect?'),
         content: Text(
           link.status == CareLinkStatus.active
@@ -483,7 +483,7 @@ class _CareScreenState extends State<CareScreen> {
 
   Future<void> _editOwnPhone() async {
     final current = _link?.ownPhone(_myId) ?? '';
-    final next = await showDialog<String>(
+    final next = await showAdaptiveDialog<String>(
       context: context,
       builder: (_) => _PhoneEntryDialog(initial: current),
     );
@@ -613,7 +613,7 @@ class _CodeEntryDialogState extends State<_CodeEntryDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
+    return AlertDialog.adaptive(
       title: const Text('Enter their number'),
       content: Column(
         mainAxisSize: MainAxisSize.min,
@@ -684,7 +684,7 @@ class _PhoneEntryDialogState extends State<_PhoneEntryDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
+    return AlertDialog.adaptive(
       title: const Text('Your number'),
       content: Column(
         mainAxisSize: MainAxisSize.min,

@@ -1,6 +1,6 @@
 # Medicyn
 
-A minimalist Android medicine reminder app. Photograph the label, say the
+A minimalist mobile medicine reminder app. Photograph the label, say the
 dosage out loud, review what the AI understood, confirm — done. Reminders
 fire from the device itself, so they work even with no network.
 
@@ -26,7 +26,7 @@ fire from the device itself, so they work even with no network.
 
 ```
 medicyn/
-  app/                  Flutter Android app
+  app/                  Flutter mobile app
     lib/
       core/             theme, ids, Supabase config
       data/local/       Drift (SQLite) — source of truth for scheduling

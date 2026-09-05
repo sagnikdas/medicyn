@@ -142,7 +142,7 @@ class _DoseLogCard extends StatelessWidget {
   }
 
   Future<void> _editNote(BuildContext context) async {
-    final saved = await showDialog<String>(
+    final saved = await showAdaptiveDialog<String>(
       context: context,
       builder: (dialogContext) =>
           _ContestNoteDialog(initial: contest?.note ?? ''),
@@ -233,7 +233,7 @@ class _ContestNoteDialogState extends State<_ContestNoteDialog> {
   @override
   Widget build(BuildContext context) {
     final editing = widget.initial.trim().isNotEmpty;
-    return AlertDialog(
+    return AlertDialog.adaptive(
       title: Text(editing ? 'Edit note' : 'Add a note'),
       content: TextField(
         controller: _controller,

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:drift/drift.dart' hide Column;
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -9,6 +10,7 @@ import '../../core/motion.dart';
 import '../../core/telemetry.dart';
 import '../../core/widgets/medicyn_layout.dart';
 import '../../core/widgets/medicyn_motion.dart';
+import '../../core/widgets/medicyn_platform.dart';
 import '../../data/local/database.dart';
 import '../../data/local/lifecycle.dart';
 import '../../data/local/tables.dart';
@@ -296,35 +298,68 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
   }
 
   Future<void> _pauseWithChoice() async {
-    final choice = await showModalBottomSheet<String>(
-      context: context,
-      builder: (sheetContext) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const ListTile(
-              title: Text('Pause reminder'),
-              subtitle: Text('You can resume it any time.'),
+    final applePlatform = isApplePlatform(context);
+    final choice = applePlatform
+        ? await showCupertinoModalPopup<String>(
+            // The context is consumed synchronously to create the route; the
+            // Future returned by the route is what this method awaits.
+            // ignore: use_build_context_synchronously
+            context: context,
+            builder: (sheetContext) => CupertinoActionSheet(
+              title: const Text('Pause reminder'),
+              message: const Text('You can resume it any time.'),
+              actions: [
+                CupertinoActionSheetAction(
+                  onPressed: () => Navigator.pop(sheetContext, 'tomorrow'),
+                  child: const Text('Until tomorrow'),
+                ),
+                CupertinoActionSheetAction(
+                  onPressed: () => Navigator.pop(sheetContext, 'week'),
+                  child: const Text('For one week'),
+                ),
+                CupertinoActionSheetAction(
+                  onPressed: () => Navigator.pop(sheetContext, 'forever'),
+                  child: const Text('Indefinitely'),
+                ),
+              ],
+              cancelButton: CupertinoActionSheetAction(
+                onPressed: () => Navigator.pop(sheetContext),
+                child: const Text('Cancel'),
+              ),
             ),
-            ListTile(
-              leading: const Icon(Icons.today_outlined),
-              title: const Text('Until tomorrow'),
-              onTap: () => Navigator.pop(sheetContext, 'tomorrow'),
+          )
+        : await showModalBottomSheet<String>(
+            // The context is consumed synchronously to create the route; the
+            // Future returned by the route is what this method awaits.
+            // ignore: use_build_context_synchronously
+            context: context,
+            builder: (sheetContext) => SafeArea(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const ListTile(
+                    title: Text('Pause reminder'),
+                    subtitle: Text('You can resume it any time.'),
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.today_outlined),
+                    title: const Text('Until tomorrow'),
+                    onTap: () => Navigator.pop(sheetContext, 'tomorrow'),
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.date_range_outlined),
+                    title: const Text('For one week'),
+                    onTap: () => Navigator.pop(sheetContext, 'week'),
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.pause_circle_outline),
+                    title: const Text('Indefinitely'),
+                    onTap: () => Navigator.pop(sheetContext, 'forever'),
+                  ),
+                ],
+              ),
             ),
-            ListTile(
-              leading: const Icon(Icons.date_range_outlined),
-              title: const Text('For one week'),
-              onTap: () => Navigator.pop(sheetContext, 'week'),
-            ),
-            ListTile(
-              leading: const Icon(Icons.pause_circle_outline),
-              title: const Text('Indefinitely'),
-              onTap: () => Navigator.pop(sheetContext, 'forever'),
-            ),
-          ],
-        ),
-      ),
-    );
+          );
     if (!mounted || choice == null) return;
     final now = DateTime.now();
     final until = switch (choice) {
@@ -336,8 +371,8 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
   }
 
   Future<void> _addTime() async {
-    final picked = await showTimePicker(
-      context: context,
+    final picked = await showMedicynTimePicker(
+      context,
       initialTime: TimeOfDay.now(),
     );
     if (picked == null) return;
@@ -454,9 +489,9 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
       properties: {'permission_type': 'reminder_access'},
     );
     if (!mounted) return;
-    final proceed = await showDialog<bool>(
+    final proceed = await showAdaptiveDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
+      builder: (dialogContext) => AlertDialog.adaptive(
         title: const Text('Enable this reminder'),
         content: const Text(
           'Medicyn needs notification access to alert you. Exact timing is '

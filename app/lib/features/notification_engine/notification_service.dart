@@ -47,6 +47,17 @@ const String careAlertChannelDescription =
 const String actionTaken = 'taken';
 const String actionSnooze = 'snooze';
 const String actionCareCall = 'care_call';
+const String _iosReminderCategoryId = 'medicyn_reminder';
+
+final List<DarwinNotificationCategory> _iosNotificationCategories = [
+  DarwinNotificationCategory(
+    _iosReminderCategoryId,
+    actions: [
+      DarwinNotificationAction.plain(actionTaken, 'Taken'),
+      DarwinNotificationAction.plain(actionSnooze, 'Snooze'),
+    ],
+  ),
+];
 
 const String _redactedReminderTitle = 'Medicine reminder';
 const String _redactedReminderBody = 'Time to take your dose';
@@ -167,9 +178,15 @@ class NotificationService {
   bool _timezoneReady = false;
   Object? _lastTimezoneError;
 
-  /// Every-X-hours schedules keep this many upcoming doses armed at once.
-  static const int _everyXHoursWindowDays = 14;
-  static const int _everyXHoursMaxOccurrences = 120;
+  /// iOS silently drops local notifications beyond 64 pending requests. Keep
+  /// a small reserve for a snooze or another app-owned reminder.
+  static const int _iosReminderSlotBudget = 60;
+
+  /// Every-X-hours schedules are replenished on foreground/reconcile. A
+  /// two-day rolling window keeps the schedule useful without consuming the
+  /// whole device-wide pending-notification budget.
+  static const int _everyXHoursWindowHours = 48;
+  static const int _everyXHoursMaxOccurrences = 64;
 
   /// Seven would do — the eighth step is slack so a schedule whose weekday
   /// is valid but whose time has already passed today still resolves.
@@ -182,13 +199,14 @@ class NotificationService {
     const androidSettings = AndroidInitializationSettings(
       '@mipmap/ic_launcher',
     );
-    const iosSettings = DarwinInitializationSettings(
+    final iosSettings = DarwinInitializationSettings(
       requestAlertPermission: false,
       requestBadgePermission: false,
       requestSoundPermission: false,
       requestCriticalPermission: true,
+      notificationCategories: _iosNotificationCategories,
     );
-    const settings = InitializationSettings(
+    final settings = InitializationSettings(
       android: androidSettings,
       iOS: iosSettings,
     );
@@ -361,6 +379,18 @@ class NotificationService {
 
   Future<ReminderPermissionState> readPermissionState() async {
     await init();
+    if (Platform.isIOS) {
+      final ios = _plugin
+          .resolvePlatformSpecificImplementation<
+            IOSFlutterLocalNotificationsPlugin
+          >();
+      final permissions = await ios?.checkPermissions();
+      return ReminderPermissionState(
+        notificationsAllowed: permissions?.isEnabled ?? false,
+        // iOS has no Android-style exact-alarm access gate.
+        exactAlarmsAllowed: true,
+      );
+    }
     if (!Platform.isAndroid) {
       return const ReminderPermissionState(
         notificationsAllowed: true,
@@ -413,8 +443,24 @@ class NotificationService {
           presentBadge: true,
           presentSound: true,
           interruptionLevel: InterruptionLevel.timeSensitive,
+          categoryIdentifier: _iosReminderCategoryId,
         ),
       );
+
+  /// Returns the remaining iOS reminder slots after the current schedule has
+  /// been cancelled. The platform limit is app-wide, so this count must be
+  /// shared by every schedule for the patient rather than applied per row.
+  Future<int?> _availableReminderSlots() async {
+    if (!Platform.isIOS) return null;
+    final pending = await _plugin.pendingNotificationRequests();
+    // UNUserNotificationCenter's limit is system-wide for this app, not
+    // per-payload or per-schedule. Count every pending request, including a
+    // notification from a future feature whose payload we cannot decode.
+    return (_iosReminderSlotBudget - pending.length).clamp(
+      0,
+      _iosReminderSlotBudget,
+    );
+  }
 
   /// Reads the lock-screen setting at schedule time. Android stores title,
   /// body and visibility on the alarm itself, so a later toggle only
@@ -495,6 +541,7 @@ class NotificationService {
   Future<ScheduleArmResult> scheduleForScheduleWithMedicine(
     ScheduleWithMedicine sm, {
     bool skipCancel = false,
+    int? availableSlots,
   }) async {
     await init();
     await _requireTimezone();
@@ -525,6 +572,14 @@ class NotificationService {
       return ScheduleArmResult.notRequired(schedule.id);
     }
 
+    final slotBudget = availableSlots ?? await _availableReminderSlots();
+    if (slotBudget != null && slotBudget <= 0) {
+      throw UnschedulableSchedule(
+        schedule.id,
+        'iOS pending notification budget is exhausted',
+      );
+    }
+
     final times = schedulableTimes(schedule.times);
     final copy = await _copyFor(medicine);
     final details = _details(visibility: copy.visibility);
@@ -540,6 +595,7 @@ class NotificationService {
     switch (frequency) {
       case FrequencyType.daily:
         for (final time in times) {
+          if (slotBudget != null && armedCount >= slotBudget) break;
           final when = _nextInstanceOfTime(time.clock);
           if (when == null) continue;
           await _plugin.zonedSchedule(
@@ -559,6 +615,7 @@ class NotificationService {
       case FrequencyType.specificDays:
         for (final day in schedulableDays(schedule.daysOfWeek)) {
           for (final time in times) {
+            if (slotBudget != null && armedCount >= slotBudget) break;
             final when = _nextInstanceOfTime(time.clock, weekday: day);
             if (when == null) continue;
             await _plugin.zonedSchedule(
@@ -600,7 +657,9 @@ class NotificationService {
           anchor.clock.hour,
           anchor.clock.minute,
         );
-        final windowEnd = now.add(Duration(days: _everyXHoursWindowDays));
+        final windowEnd = now.add(
+          const Duration(hours: _everyXHoursWindowHours),
+        );
         final sequence = intervalDoseSequence(
           origin: origin,
           intervalHours: interval,
@@ -622,11 +681,16 @@ class NotificationService {
             windowEnd.second,
             windowEnd.millisecond,
           ),
-          maxOccurrences: _everyXHoursMaxOccurrences,
+          maxOccurrences: slotBudget == null
+              ? _everyXHoursMaxOccurrences
+              : (slotBudget < _everyXHoursMaxOccurrences
+                    ? slotBudget
+                    : _everyXHoursMaxOccurrences),
           includeFrom: false,
         );
 
         for (var index = 0; index < sequence.length; index++) {
+          if (slotBudget != null && armedCount >= slotBudget) break;
           final when = sequence[index];
           final scheduledAt = tz.TZDateTime(
             tz.local,
@@ -889,12 +953,11 @@ class NotificationService {
     try {
       await init();
       if (!Platform.isAndroid) {
-        // iOS is not shipping; do not invent a "notifications off" for a
-        // platform we have not asked.
+        final permissions = await readPermissionState();
         final pending = await _plugin.pendingNotificationRequests();
         return DeviceHealthSnapshot(
-          notificationsAllowed: true,
-          exactAlarmsAllowed: true,
+          notificationsAllowed: permissions.notificationsAllowed,
+          exactAlarmsAllowed: permissions.exactAlarmsAllowed,
           batteryExemption: true,
           armedAlarmCount: pending.length,
           checkedAt: DateTime.now().toUtc(),
@@ -948,6 +1011,7 @@ class NotificationService {
     // [cancelForSchedule] on the stop/delete path.
     await _cancelInvalidSnoozes(db, active);
     await _cancelWhere((_, payload) => payload['timeLabel'] != snoozeTimeLabel);
+    var availableSlots = await _availableReminderSlots();
 
     // Every schedule gets its own try/catch, because the sweep above has
     // already happened: without this, the first schedule that cannot be
@@ -961,8 +1025,15 @@ class NotificationService {
         final result = await scheduleForScheduleWithMedicine(
           sm,
           skipCancel: true,
+          availableSlots: availableSlots,
         );
         results[sm.schedule.id] = result;
+        if (availableSlots != null) {
+          availableSlots = (availableSlots - result.armedCount).clamp(
+            0,
+            _iosReminderSlotBudget,
+          );
+        }
       } catch (error) {
         failures[sm.schedule.id] = error;
         await MedicynTelemetry.instance.recordError(
