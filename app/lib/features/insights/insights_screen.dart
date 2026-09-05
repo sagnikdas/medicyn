@@ -6,9 +6,6 @@ import '../../core/theme.dart';
 import '../../core/widgets/medicyn_chrome.dart';
 import '../../core/widgets/medicyn_motion.dart';
 import '../../data/local/database.dart';
-import '../auth/auth_service.dart';
-import '../care/care_service.dart';
-import '../care/dose_feed_screen.dart';
 import '../reminders_home/day_occurrences.dart';
 
 /// Adherence for the current week, drawn from the same occurrence lattice
@@ -83,7 +80,6 @@ class _InsightsScreenState extends State<InsightsScreen> {
                 return const Center(child: CircularProgressIndicator());
               }
               return _InsightsBody(
-                db: widget.db,
                 schedules: scheduleSnap.data ?? const [],
                 logs: logSnap.data ?? const [],
                 scrollController: _scrollController,
@@ -98,13 +94,11 @@ class _InsightsScreenState extends State<InsightsScreen> {
 
 class _InsightsBody extends StatelessWidget {
   const _InsightsBody({
-    required this.db,
     required this.schedules,
     required this.logs,
     required this.scrollController,
   });
 
-  final AppDatabase db;
   final List<ScheduleWithMedicine> schedules;
   final List<DoseLog> logs;
   final ScrollController scrollController;
@@ -428,8 +422,6 @@ class _InsightsBody extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(height: 16),
-        _FamilyInsightsLink(db: db),
       ],
     );
   }
@@ -737,58 +729,6 @@ class _StatHero extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _FamilyInsightsLink extends StatefulWidget {
-  const _FamilyInsightsLink({required this.db});
-  final AppDatabase db;
-
-  @override
-  State<_FamilyInsightsLink> createState() => _FamilyInsightsLinkState();
-}
-
-class _FamilyInsightsLinkState extends State<_FamilyInsightsLink> {
-  CareLink? _link;
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    if (AuthService.instance.currentUser == null) return;
-    try {
-      final link = await CareService.instance.currentLink();
-      if (!mounted) return;
-      setState(() => _link = link);
-    } catch (_) {
-      // Insights still works without a care link.
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final me = AuthService.instance.currentUser;
-    final link = _link;
-    if (me == null || link == null || link.status != CareLinkStatus.active) {
-      return const SizedBox.shrink();
-    }
-    final amPatient = link.isPatient(me.id);
-    return ProfileMenuRow(
-      icon: Icons.people_outline,
-      title: amPatient ? 'What they see' : "Their week's doses",
-      subtitle: 'The same feed both sides of a care link share.',
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => DoseFeedScreen(
-            patientId: link.patientId,
-            viewingOwnData: amPatient,
-          ),
-        ),
       ),
     );
   }

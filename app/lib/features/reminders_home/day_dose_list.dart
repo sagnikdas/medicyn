@@ -518,12 +518,61 @@ class _DayDoseRowState extends State<_DayDoseRow> {
 /// hardware once several rows were cycling status around the same time.
 /// Keeping one long-lived element and animating its properties avoids that
 /// whole class of element-lifecycle risk.
-class _StatusAvatar extends StatelessWidget {
+class _StatusAvatar extends StatefulWidget {
   const _StatusAvatar({required this.status});
   final DayDoseStatus status;
 
   @override
+  State<_StatusAvatar> createState() => _StatusAvatarState();
+}
+
+/// A [StatefulWidget] with a persistent controller, not an
+/// `AnimatedSwitcher` keyed on status: the glyph [Icon] stays the same
+/// long-lived element across a status change (see the class doc above)
+/// while [_pop] drives its scale from underneath, so DESIGN.md's promised
+/// "popping in with a slight overshoot" plays without ever remounting it.
+class _StatusAvatarState extends State<_StatusAvatar>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pop;
+  late final Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    // Built here, not as `late final` field initializers: a lazy
+    // initializer never touched by build() would only fire inside
+    // dispose(), constructing a controller against an already-deactivated
+    // element (see _AgendaAvatarState in android_today_screen.dart, which
+    // hit exactly that with its own no-status early return).
+    _pop = AnimationController(
+      vsync: this,
+      duration: MedicynMotion.medium,
+      value: 1,
+    );
+    _scale = CurvedAnimation(parent: _pop, curve: Curves.easeOutBack);
+  }
+
+  @override
+  void didUpdateWidget(covariant _StatusAvatar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.status != widget.status) {
+      if (MedicynMotion.reduce(context)) {
+        _pop.value = 1;
+      } else {
+        _pop.forward(from: 0);
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _pop.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final status = widget.status;
     final color = DayDoseStyle.color(context, status);
     final scheme = Theme.of(context).colorScheme;
     final due =
@@ -545,10 +594,15 @@ class _StatusAvatar extends StatelessWidget {
             ? null
             : Border.all(color: color.withValues(alpha: 0.6), width: 2),
       ),
-      child: Icon(
-        DayDoseStyle.glyph(status),
-        size: 22,
-        color: filled ? scheme.onPrimary : color,
+      child: AnimatedBuilder(
+        animation: _scale,
+        builder: (context, child) =>
+            Transform.scale(scale: _scale.value, child: child),
+        child: Icon(
+          DayDoseStyle.glyph(status),
+          size: 22,
+          color: filled ? scheme.onPrimary : color,
+        ),
       ),
     );
   }

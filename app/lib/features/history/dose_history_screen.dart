@@ -189,6 +189,8 @@ class _DoseLogCard extends StatelessWidget {
                     const SizedBox(height: 8),
                     Text(
                       contest!.note,
+                      maxLines: 6,
+                      overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.bodyMedium,
                     ),
                   ],

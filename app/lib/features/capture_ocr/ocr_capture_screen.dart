@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../../core/motion.dart';
 import '../../core/widgets/medicyn_chrome.dart';
 import '../../core/widgets/medicyn_layout.dart';
 import '../../core/widgets/medicyn_motion.dart';
@@ -83,7 +84,22 @@ class _OcrCaptureScreenState extends State<OcrCaptureScreen>
       if (mounted) setState(() {});
       unawaited(camera?.dispose());
     } else if (state == AppLifecycleState.resumed) {
-      unawaited(_openBackCamera());
+      // The camera permission dialog is hosted by its own translucent
+      // activity, so requesting it for the first time drives this same
+      // resumed -> inactive -> resumed cycle (see the paused comment above)
+      // without ever tearing the camera down. Calling _openBackCamera again
+      // here for that spurious resume raced a second CameraController
+      // against the one already waiting on the dialog: the camera plugin's
+      // native side rejects the second concurrent permission request, and
+      // the first controller's own successful init gets disposed anyway
+      // because a newer generation superseded it — so first-time scanning
+      // always failed and only ever worked on a retry, once permission was
+      // already granted. Only reopen when there truly is nothing already
+      // open or opening (a real background/foreground cycle, which does
+      // null out _camera via the paused branch).
+      if (_camera == null && !_opening) {
+        unawaited(_openBackCamera());
+      }
     }
   }
 
@@ -344,14 +360,24 @@ class _OcrCaptureScreenState extends State<OcrCaptureScreen>
                     ),
                   ),
                 ),
-                if (_error != null) ...[
-                  const SizedBox(height: 12),
-                  Text(
-                    _error!,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: scheme.error),
+                AnimatedSize(
+                  duration: MedicynMotion.duration(
+                    context,
+                    MedicynMotion.fast,
                   ),
-                ],
+                  curve: MedicynMotion.decelerate,
+                  alignment: Alignment.topCenter,
+                  child: _error == null
+                      ? const SizedBox(width: double.infinity)
+                      : Padding(
+                          padding: const EdgeInsets.only(top: 12),
+                          child: Text(
+                            _error!,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: scheme.error),
+                          ),
+                        ),
+                ),
                 const SizedBox(height: 16),
                 FilledButton.icon(
                   onPressed: busy || _opening ? null : _scan,

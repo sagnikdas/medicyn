@@ -239,15 +239,25 @@ class _CareScreenState extends State<CareScreen> {
                             : _body(),
                       ),
                     ),
-                    if (_error != null) ...[
-                      const SizedBox(height: 20),
-                      Text(
-                        _error!,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
-                        ),
+                    AnimatedSize(
+                      duration: MedicynMotion.duration(
+                        context,
+                        MedicynMotion.fast,
                       ),
-                    ],
+                      curve: MedicynMotion.decelerate,
+                      alignment: Alignment.topCenter,
+                      child: _error == null
+                          ? const SizedBox(width: double.infinity)
+                          : Padding(
+                              padding: const EdgeInsets.only(top: 20),
+                              child: Text(
+                                _error!,
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.error,
+                                ),
+                              ),
+                            ),
+                    ),
                   ],
                 ),
               ),
@@ -422,9 +432,19 @@ class _CareScreenState extends State<CareScreen> {
       children: [
         Icon(Icons.person_add_alt_1, size: 64, color: scheme.primary),
         const SizedBox(height: 20),
-        Text('$who typed in your number', style: text.headlineSmall),
+        Text(
+          '$who typed in your number',
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: text.headlineSmall,
+        ),
         const SizedBox(height: 8),
-        Text(claimant.email, style: text.titleMedium),
+        Text(
+          claimant.email,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: text.titleMedium,
+        ),
         const SizedBox(height: 12),
         Text(
           'If that is who you expected, connect with them. They will be able '

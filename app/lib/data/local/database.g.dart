@@ -2542,6 +2542,523 @@ class DoseLogContestsCompanion extends UpdateCompanion<DoseLogContest> {
   }
 }
 
+class $TodayCareRemindersTable extends TodayCareReminders
+    with TableInfo<$TodayCareRemindersTable, TodayCareReminder> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $TodayCareRemindersTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _titleMeta = const VerificationMeta('title');
+  @override
+  late final GeneratedColumn<String> title = GeneratedColumn<String>(
+    'title',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _kindMeta = const VerificationMeta('kind');
+  @override
+  late final GeneratedColumn<String> kind = GeneratedColumn<String>(
+    'kind',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _scheduledAtMeta = const VerificationMeta(
+    'scheduledAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> scheduledAt = GeneratedColumn<DateTime>(
+    'scheduled_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _locationMeta = const VerificationMeta(
+    'location',
+  );
+  @override
+  late final GeneratedColumn<String> location = GeneratedColumn<String>(
+    'location',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _notesMeta = const VerificationMeta('notes');
+  @override
+  late final GeneratedColumn<String> notes = GeneratedColumn<String>(
+    'notes',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _reminderMinutesMeta = const VerificationMeta(
+    'reminderMinutes',
+  );
+  @override
+  late final GeneratedColumn<int> reminderMinutes = GeneratedColumn<int>(
+    'reminder_minutes',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _completedMeta = const VerificationMeta(
+    'completed',
+  );
+  @override
+  late final GeneratedColumn<bool> completed = GeneratedColumn<bool>(
+    'completed',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("completed" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    title,
+    kind,
+    scheduledAt,
+    location,
+    notes,
+    reminderMinutes,
+    completed,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'today_care_reminders';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<TodayCareReminder> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('title')) {
+      context.handle(
+        _titleMeta,
+        title.isAcceptableOrUnknown(data['title']!, _titleMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_titleMeta);
+    }
+    if (data.containsKey('kind')) {
+      context.handle(
+        _kindMeta,
+        kind.isAcceptableOrUnknown(data['kind']!, _kindMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_kindMeta);
+    }
+    if (data.containsKey('scheduled_at')) {
+      context.handle(
+        _scheduledAtMeta,
+        scheduledAt.isAcceptableOrUnknown(
+          data['scheduled_at']!,
+          _scheduledAtMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_scheduledAtMeta);
+    }
+    if (data.containsKey('location')) {
+      context.handle(
+        _locationMeta,
+        location.isAcceptableOrUnknown(data['location']!, _locationMeta),
+      );
+    }
+    if (data.containsKey('notes')) {
+      context.handle(
+        _notesMeta,
+        notes.isAcceptableOrUnknown(data['notes']!, _notesMeta),
+      );
+    }
+    if (data.containsKey('reminder_minutes')) {
+      context.handle(
+        _reminderMinutesMeta,
+        reminderMinutes.isAcceptableOrUnknown(
+          data['reminder_minutes']!,
+          _reminderMinutesMeta,
+        ),
+      );
+    }
+    if (data.containsKey('completed')) {
+      context.handle(
+        _completedMeta,
+        completed.isAcceptableOrUnknown(data['completed']!, _completedMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  TodayCareReminder map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return TodayCareReminder(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      title: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}title'],
+      )!,
+      kind: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}kind'],
+      )!,
+      scheduledAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}scheduled_at'],
+      )!,
+      location: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}location'],
+      )!,
+      notes: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}notes'],
+      )!,
+      reminderMinutes: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}reminder_minutes'],
+      ),
+      completed: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}completed'],
+      )!,
+    );
+  }
+
+  @override
+  $TodayCareRemindersTable createAlias(String alias) {
+    return $TodayCareRemindersTable(attachedDatabase, alias);
+  }
+}
+
+class TodayCareReminder extends DataClass
+    implements Insertable<TodayCareReminder> {
+  final String id;
+  final String title;
+  final String kind;
+  final DateTime scheduledAt;
+  final String location;
+  final String notes;
+  final int? reminderMinutes;
+  final bool completed;
+  const TodayCareReminder({
+    required this.id,
+    required this.title,
+    required this.kind,
+    required this.scheduledAt,
+    required this.location,
+    required this.notes,
+    this.reminderMinutes,
+    required this.completed,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['title'] = Variable<String>(title);
+    map['kind'] = Variable<String>(kind);
+    map['scheduled_at'] = Variable<DateTime>(scheduledAt);
+    map['location'] = Variable<String>(location);
+    map['notes'] = Variable<String>(notes);
+    if (!nullToAbsent || reminderMinutes != null) {
+      map['reminder_minutes'] = Variable<int>(reminderMinutes);
+    }
+    map['completed'] = Variable<bool>(completed);
+    return map;
+  }
+
+  TodayCareRemindersCompanion toCompanion(bool nullToAbsent) {
+    return TodayCareRemindersCompanion(
+      id: Value(id),
+      title: Value(title),
+      kind: Value(kind),
+      scheduledAt: Value(scheduledAt),
+      location: Value(location),
+      notes: Value(notes),
+      reminderMinutes: reminderMinutes == null && nullToAbsent
+          ? const Value.absent()
+          : Value(reminderMinutes),
+      completed: Value(completed),
+    );
+  }
+
+  factory TodayCareReminder.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return TodayCareReminder(
+      id: serializer.fromJson<String>(json['id']),
+      title: serializer.fromJson<String>(json['title']),
+      kind: serializer.fromJson<String>(json['kind']),
+      scheduledAt: serializer.fromJson<DateTime>(json['scheduledAt']),
+      location: serializer.fromJson<String>(json['location']),
+      notes: serializer.fromJson<String>(json['notes']),
+      reminderMinutes: serializer.fromJson<int?>(json['reminderMinutes']),
+      completed: serializer.fromJson<bool>(json['completed']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'title': serializer.toJson<String>(title),
+      'kind': serializer.toJson<String>(kind),
+      'scheduledAt': serializer.toJson<DateTime>(scheduledAt),
+      'location': serializer.toJson<String>(location),
+      'notes': serializer.toJson<String>(notes),
+      'reminderMinutes': serializer.toJson<int?>(reminderMinutes),
+      'completed': serializer.toJson<bool>(completed),
+    };
+  }
+
+  TodayCareReminder copyWith({
+    String? id,
+    String? title,
+    String? kind,
+    DateTime? scheduledAt,
+    String? location,
+    String? notes,
+    Value<int?> reminderMinutes = const Value.absent(),
+    bool? completed,
+  }) => TodayCareReminder(
+    id: id ?? this.id,
+    title: title ?? this.title,
+    kind: kind ?? this.kind,
+    scheduledAt: scheduledAt ?? this.scheduledAt,
+    location: location ?? this.location,
+    notes: notes ?? this.notes,
+    reminderMinutes: reminderMinutes.present
+        ? reminderMinutes.value
+        : this.reminderMinutes,
+    completed: completed ?? this.completed,
+  );
+  TodayCareReminder copyWithCompanion(TodayCareRemindersCompanion data) {
+    return TodayCareReminder(
+      id: data.id.present ? data.id.value : this.id,
+      title: data.title.present ? data.title.value : this.title,
+      kind: data.kind.present ? data.kind.value : this.kind,
+      scheduledAt: data.scheduledAt.present
+          ? data.scheduledAt.value
+          : this.scheduledAt,
+      location: data.location.present ? data.location.value : this.location,
+      notes: data.notes.present ? data.notes.value : this.notes,
+      reminderMinutes: data.reminderMinutes.present
+          ? data.reminderMinutes.value
+          : this.reminderMinutes,
+      completed: data.completed.present ? data.completed.value : this.completed,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TodayCareReminder(')
+          ..write('id: $id, ')
+          ..write('title: $title, ')
+          ..write('kind: $kind, ')
+          ..write('scheduledAt: $scheduledAt, ')
+          ..write('location: $location, ')
+          ..write('notes: $notes, ')
+          ..write('reminderMinutes: $reminderMinutes, ')
+          ..write('completed: $completed')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    title,
+    kind,
+    scheduledAt,
+    location,
+    notes,
+    reminderMinutes,
+    completed,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is TodayCareReminder &&
+          other.id == this.id &&
+          other.title == this.title &&
+          other.kind == this.kind &&
+          other.scheduledAt == this.scheduledAt &&
+          other.location == this.location &&
+          other.notes == this.notes &&
+          other.reminderMinutes == this.reminderMinutes &&
+          other.completed == this.completed);
+}
+
+class TodayCareRemindersCompanion extends UpdateCompanion<TodayCareReminder> {
+  final Value<String> id;
+  final Value<String> title;
+  final Value<String> kind;
+  final Value<DateTime> scheduledAt;
+  final Value<String> location;
+  final Value<String> notes;
+  final Value<int?> reminderMinutes;
+  final Value<bool> completed;
+  final Value<int> rowid;
+  const TodayCareRemindersCompanion({
+    this.id = const Value.absent(),
+    this.title = const Value.absent(),
+    this.kind = const Value.absent(),
+    this.scheduledAt = const Value.absent(),
+    this.location = const Value.absent(),
+    this.notes = const Value.absent(),
+    this.reminderMinutes = const Value.absent(),
+    this.completed = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  TodayCareRemindersCompanion.insert({
+    required String id,
+    required String title,
+    required String kind,
+    required DateTime scheduledAt,
+    this.location = const Value.absent(),
+    this.notes = const Value.absent(),
+    this.reminderMinutes = const Value.absent(),
+    this.completed = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       title = Value(title),
+       kind = Value(kind),
+       scheduledAt = Value(scheduledAt);
+  static Insertable<TodayCareReminder> custom({
+    Expression<String>? id,
+    Expression<String>? title,
+    Expression<String>? kind,
+    Expression<DateTime>? scheduledAt,
+    Expression<String>? location,
+    Expression<String>? notes,
+    Expression<int>? reminderMinutes,
+    Expression<bool>? completed,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (title != null) 'title': title,
+      if (kind != null) 'kind': kind,
+      if (scheduledAt != null) 'scheduled_at': scheduledAt,
+      if (location != null) 'location': location,
+      if (notes != null) 'notes': notes,
+      if (reminderMinutes != null) 'reminder_minutes': reminderMinutes,
+      if (completed != null) 'completed': completed,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  TodayCareRemindersCompanion copyWith({
+    Value<String>? id,
+    Value<String>? title,
+    Value<String>? kind,
+    Value<DateTime>? scheduledAt,
+    Value<String>? location,
+    Value<String>? notes,
+    Value<int?>? reminderMinutes,
+    Value<bool>? completed,
+    Value<int>? rowid,
+  }) {
+    return TodayCareRemindersCompanion(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      kind: kind ?? this.kind,
+      scheduledAt: scheduledAt ?? this.scheduledAt,
+      location: location ?? this.location,
+      notes: notes ?? this.notes,
+      reminderMinutes: reminderMinutes ?? this.reminderMinutes,
+      completed: completed ?? this.completed,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (title.present) {
+      map['title'] = Variable<String>(title.value);
+    }
+    if (kind.present) {
+      map['kind'] = Variable<String>(kind.value);
+    }
+    if (scheduledAt.present) {
+      map['scheduled_at'] = Variable<DateTime>(scheduledAt.value);
+    }
+    if (location.present) {
+      map['location'] = Variable<String>(location.value);
+    }
+    if (notes.present) {
+      map['notes'] = Variable<String>(notes.value);
+    }
+    if (reminderMinutes.present) {
+      map['reminder_minutes'] = Variable<int>(reminderMinutes.value);
+    }
+    if (completed.present) {
+      map['completed'] = Variable<bool>(completed.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TodayCareRemindersCompanion(')
+          ..write('id: $id, ')
+          ..write('title: $title, ')
+          ..write('kind: $kind, ')
+          ..write('scheduledAt: $scheduledAt, ')
+          ..write('location: $location, ')
+          ..write('notes: $notes, ')
+          ..write('reminderMinutes: $reminderMinutes, ')
+          ..write('completed: $completed, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -2551,6 +3068,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $DoseLogContestsTable doseLogContests = $DoseLogContestsTable(
     this,
   );
+  late final $TodayCareRemindersTable todayCareReminders =
+      $TodayCareRemindersTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -2560,6 +3079,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     schedules,
     doseLogs,
     doseLogContests,
+    todayCareReminders,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
@@ -4461,6 +4981,280 @@ typedef $$DoseLogContestsTableProcessedTableManager =
       DoseLogContest,
       PrefetchHooks Function({bool doseLogId})
     >;
+typedef $$TodayCareRemindersTableCreateCompanionBuilder =
+    TodayCareRemindersCompanion Function({
+      required String id,
+      required String title,
+      required String kind,
+      required DateTime scheduledAt,
+      Value<String> location,
+      Value<String> notes,
+      Value<int?> reminderMinutes,
+      Value<bool> completed,
+      Value<int> rowid,
+    });
+typedef $$TodayCareRemindersTableUpdateCompanionBuilder =
+    TodayCareRemindersCompanion Function({
+      Value<String> id,
+      Value<String> title,
+      Value<String> kind,
+      Value<DateTime> scheduledAt,
+      Value<String> location,
+      Value<String> notes,
+      Value<int?> reminderMinutes,
+      Value<bool> completed,
+      Value<int> rowid,
+    });
+
+class $$TodayCareRemindersTableFilterComposer
+    extends Composer<_$AppDatabase, $TodayCareRemindersTable> {
+  $$TodayCareRemindersTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get scheduledAt => $composableBuilder(
+    column: $table.scheduledAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get location => $composableBuilder(
+    column: $table.location,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get notes => $composableBuilder(
+    column: $table.notes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get reminderMinutes => $composableBuilder(
+    column: $table.reminderMinutes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get completed => $composableBuilder(
+    column: $table.completed,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$TodayCareRemindersTableOrderingComposer
+    extends Composer<_$AppDatabase, $TodayCareRemindersTable> {
+  $$TodayCareRemindersTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get scheduledAt => $composableBuilder(
+    column: $table.scheduledAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get location => $composableBuilder(
+    column: $table.location,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get notes => $composableBuilder(
+    column: $table.notes,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get reminderMinutes => $composableBuilder(
+    column: $table.reminderMinutes,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get completed => $composableBuilder(
+    column: $table.completed,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$TodayCareRemindersTableAnnotationComposer
+    extends Composer<_$AppDatabase, $TodayCareRemindersTable> {
+  $$TodayCareRemindersTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get title =>
+      $composableBuilder(column: $table.title, builder: (column) => column);
+
+  GeneratedColumn<String> get kind =>
+      $composableBuilder(column: $table.kind, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get scheduledAt => $composableBuilder(
+    column: $table.scheduledAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get location =>
+      $composableBuilder(column: $table.location, builder: (column) => column);
+
+  GeneratedColumn<String> get notes =>
+      $composableBuilder(column: $table.notes, builder: (column) => column);
+
+  GeneratedColumn<int> get reminderMinutes => $composableBuilder(
+    column: $table.reminderMinutes,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get completed =>
+      $composableBuilder(column: $table.completed, builder: (column) => column);
+}
+
+class $$TodayCareRemindersTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $TodayCareRemindersTable,
+          TodayCareReminder,
+          $$TodayCareRemindersTableFilterComposer,
+          $$TodayCareRemindersTableOrderingComposer,
+          $$TodayCareRemindersTableAnnotationComposer,
+          $$TodayCareRemindersTableCreateCompanionBuilder,
+          $$TodayCareRemindersTableUpdateCompanionBuilder,
+          (
+            TodayCareReminder,
+            BaseReferences<
+              _$AppDatabase,
+              $TodayCareRemindersTable,
+              TodayCareReminder
+            >,
+          ),
+          TodayCareReminder,
+          PrefetchHooks Function()
+        > {
+  $$TodayCareRemindersTableTableManager(
+    _$AppDatabase db,
+    $TodayCareRemindersTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$TodayCareRemindersTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$TodayCareRemindersTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$TodayCareRemindersTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> title = const Value.absent(),
+                Value<String> kind = const Value.absent(),
+                Value<DateTime> scheduledAt = const Value.absent(),
+                Value<String> location = const Value.absent(),
+                Value<String> notes = const Value.absent(),
+                Value<int?> reminderMinutes = const Value.absent(),
+                Value<bool> completed = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => TodayCareRemindersCompanion(
+                id: id,
+                title: title,
+                kind: kind,
+                scheduledAt: scheduledAt,
+                location: location,
+                notes: notes,
+                reminderMinutes: reminderMinutes,
+                completed: completed,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String title,
+                required String kind,
+                required DateTime scheduledAt,
+                Value<String> location = const Value.absent(),
+                Value<String> notes = const Value.absent(),
+                Value<int?> reminderMinutes = const Value.absent(),
+                Value<bool> completed = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => TodayCareRemindersCompanion.insert(
+                id: id,
+                title: title,
+                kind: kind,
+                scheduledAt: scheduledAt,
+                location: location,
+                notes: notes,
+                reminderMinutes: reminderMinutes,
+                completed: completed,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$TodayCareRemindersTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $TodayCareRemindersTable,
+      TodayCareReminder,
+      $$TodayCareRemindersTableFilterComposer,
+      $$TodayCareRemindersTableOrderingComposer,
+      $$TodayCareRemindersTableAnnotationComposer,
+      $$TodayCareRemindersTableCreateCompanionBuilder,
+      $$TodayCareRemindersTableUpdateCompanionBuilder,
+      (
+        TodayCareReminder,
+        BaseReferences<
+          _$AppDatabase,
+          $TodayCareRemindersTable,
+          TodayCareReminder
+        >,
+      ),
+      TodayCareReminder,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -4473,4 +5267,6 @@ class $AppDatabaseManager {
       $$DoseLogsTableTableManager(_db, _db.doseLogs);
   $$DoseLogContestsTableTableManager get doseLogContests =>
       $$DoseLogContestsTableTableManager(_db, _db.doseLogContests);
+  $$TodayCareRemindersTableTableManager get todayCareReminders =>
+      $$TodayCareRemindersTableTableManager(_db, _db.todayCareReminders);
 }

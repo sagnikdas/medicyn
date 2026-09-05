@@ -6,7 +6,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/app_navigation.dart';
 import 'core/app_settings.dart';
-import 'core/device_lock_gate.dart';
 import 'core/motion.dart';
 import 'core/sentry_config.dart';
 import 'core/supabase_init.dart';
@@ -126,7 +125,7 @@ class _MedicynAppState extends State<MedicynApp> {
                 deviceScale * AppSettings.instance.textScale,
               ),
             ),
-            child: DeviceLockGate(child: child!),
+            child: child!,
           );
         },
         home: const _OnboardingGate(),

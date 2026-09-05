@@ -30,18 +30,49 @@ class VoiceCaptureScreen extends StatefulWidget {
 
 enum _Status { idle, initializing, listening, unavailable }
 
-class _VoiceCaptureScreenState extends State<VoiceCaptureScreen> {
+class _VoiceCaptureScreenState extends State<VoiceCaptureScreen>
+    with SingleTickerProviderStateMixin {
   SpeechToText? _speech;
   _Status _status = _Status.idle;
   String _transcript = '';
   String? _errorMessage;
 
+  // A brief, bounded pulse each time a new word is recognized — not a
+  // looping ticker (MedicynMotion's rule against those; see its class doc)
+  // but a real, event-driven "I'm hearing you" acknowledgment tied to an
+  // actual recognizer result, not a decorative always-on animation.
+  late final AnimationController _pop;
+  late final Animation<double> _pulse;
+
   bool get _speechAllowed =>
       ConsentService.instance.isGranted(ConsentPurpose.googleSpeech);
 
   @override
+  void initState() {
+    super.initState();
+    _pop = AnimationController(vsync: this, duration: MedicynMotion.fast);
+    _pulse = TweenSequence<double>([
+      TweenSequenceItem(
+        tween: Tween(
+          begin: 1.0,
+          end: 1.12,
+        ).chain(CurveTween(curve: Curves.easeOut)),
+        weight: 40,
+      ),
+      TweenSequenceItem(
+        tween: Tween(
+          begin: 1.12,
+          end: 1.0,
+        ).chain(CurveTween(curve: Curves.easeIn)),
+        weight: 60,
+      ),
+    ]).animate(_pop);
+  }
+
+  @override
   void dispose() {
     _speech?.cancel();
+    _pop.dispose();
     super.dispose();
   }
 
@@ -83,8 +114,10 @@ class _VoiceCaptureScreenState extends State<VoiceCaptureScreen> {
     }
     setState(() => _status = _Status.listening);
     await _speech!.listen(
-      onResult: (result) =>
-          setState(() => _transcript = result.recognizedWords),
+      onResult: (result) {
+        setState(() => _transcript = result.recognizedWords);
+        if (!MedicynMotion.reduce(context)) _pop.forward(from: 0);
+      },
       listenOptions: SpeechListenOptions(
         partialResults: true,
         cancelOnError: true,
@@ -179,10 +212,17 @@ class _VoiceCaptureScreenState extends State<VoiceCaptureScreen> {
                               ),
                             ],
                           ),
-                          child: Icon(
-                            listening ? Icons.stop : Icons.mic,
-                            color: scheme.onPrimary,
-                            size: 48,
+                          child: AnimatedBuilder(
+                            animation: _pulse,
+                            builder: (context, child) => Transform.scale(
+                              scale: listening ? _pulse.value : 1,
+                              child: child,
+                            ),
+                            child: Icon(
+                              listening ? Icons.stop : Icons.mic,
+                              color: scheme.onPrimary,
+                              size: 48,
+                            ),
                           ),
                         ),
                       ),

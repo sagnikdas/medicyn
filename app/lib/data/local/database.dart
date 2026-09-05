@@ -22,7 +22,9 @@ class DoseLogWithContest {
   DoseLogWithContest(this.log, this.contest);
 }
 
-@DriftDatabase(tables: [Medicines, Schedules, DoseLogs, DoseLogContests])
+@DriftDatabase(
+  tables: [Medicines, Schedules, DoseLogs, DoseLogContests, TodayCareReminders],
+)
 class AppDatabase extends _$AppDatabase {
   /// Opens the encrypted per-account file via [openEncryptedAppDatabase].
   /// Background isolates construct this the same way so Taken/Snooze and
@@ -36,7 +38,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -82,6 +84,9 @@ class AppDatabase extends _$AppDatabase {
         await customStatement(
           "UPDATE schedules SET status = CASE WHEN frequency_type = 'asNeeded' THEN 'asNeeded' WHEN active = 1 THEN 'active' ELSE 'completed' END WHERE status IS NULL",
         );
+      }
+      if (from < 7) {
+        await m.createTable(todayCareReminders);
       }
     },
   );

@@ -101,7 +101,11 @@ class _PatientRemindersScreenState extends State<PatientRemindersScreen> {
     final who = widget.patientName;
     return Scaffold(
       appBar: AppBar(
-        title: Text(who == null ? 'Their reminders' : "$who's reminders"),
+        title: Text(
+          who == null ? 'Their reminders' : "$who's reminders",
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _open(),

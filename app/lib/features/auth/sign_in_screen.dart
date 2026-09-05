@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/app_settings.dart';
+import '../../core/motion.dart';
 import '../../core/privacy_policy.dart';
 import '../../core/widgets/medicyn_chrome.dart';
 import '../../core/widgets/medicyn_layout.dart';
@@ -100,15 +101,25 @@ class _SignInScreenState extends State<SignInScreen> {
                     ],
                   ),
                 ),
-                if (_error != null) ...[
-                  const SizedBox(height: 16),
-                  Text(
-                    _error!,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
-                    ),
+                AnimatedSize(
+                  duration: MedicynMotion.duration(
+                    context,
+                    MedicynMotion.fast,
                   ),
-                ],
+                  curve: MedicynMotion.decelerate,
+                  alignment: Alignment.topCenter,
+                  child: _error == null
+                      ? const SizedBox(width: double.infinity)
+                      : Padding(
+                          padding: const EdgeInsets.only(top: 16),
+                          child: Text(
+                            _error!,
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.error,
+                            ),
+                          ),
+                        ),
+                ),
                 const SizedBox(height: 20),
                 TextButton(
                   onPressed: () => openPrivacyPolicy(context),

@@ -77,7 +77,7 @@ class _AppShellState extends State<AppShell> {
       ),
       bottomNavigationBar: MedicynBottomNav(
         index: _index,
-        profileImageUrl: AuthService.instance.currentUserAvatarUrl,
+        profileInitial: AuthService.instance.currentUserInitial,
         onChanged: (i) {
           if (i == _index) return;
           MedicynMotion.selection(context);

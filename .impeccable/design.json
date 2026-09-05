@@ -1,0 +1,215 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-03T13:20:00Z",
+  "title": "Design System: Medicyn",
+  "extensions": {
+    "colorMeta": {
+      "primary": {
+        "role": "primary",
+        "displayName": "Clinical Teal",
+        "canonical": "#00685F",
+        "tonalRamp": ["#00211E", "#00332F", "#00685F", "#1C8B80", "#4FADA1", "#7FC7BC", "#B3E0D8", "#E4F7F3"]
+      },
+      "primary-container": {
+        "role": "primary",
+        "displayName": "Deep Teal",
+        "canonical": "#008378",
+        "tonalRamp": ["#002420", "#00423B", "#00685F", "#008378", "#3AA79B", "#78C7BC", "#B3E0D8", "#E4F7F3"]
+      },
+      "primary-fixed-dim": {
+        "role": "primary",
+        "displayName": "Seafoam",
+        "canonical": "#6BD8CB",
+        "tonalRamp": ["#00332F", "#00544C", "#00685F", "#3AA79B", "#6BD8CB", "#94E3D9", "#BFEFE8", "#E9FAF7"]
+      },
+      "secondary": {
+        "role": "secondary",
+        "displayName": "Slate Sage",
+        "canonical": "#55615F",
+        "tonalRamp": ["#1A201F", "#2E3634", "#3F4A48", "#55615F", "#6D7A77", "#9BA8A5", "#C7D2CF", "#E9EEED"]
+      },
+      "secondary-container": {
+        "role": "secondary",
+        "displayName": "Pale Sage",
+        "canonical": "#D8E5E2",
+        "tonalRamp": ["#2E3634", "#55615F", "#7C8886", "#A3AFAC", "#C1CFCC", "#D8E5E2", "#EAF2F0", "#F6FAF9"]
+      },
+      "tertiary": {
+        "role": "tertiary",
+        "displayName": "Indigo Alert",
+        "canonical": "#4648D4",
+        "tonalRamp": ["#131354", "#1E1F80", "#2E30A8", "#4648D4", "#6B6DDE", "#9294E9", "#BABBF3", "#E3E4FA"]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Linen Ground",
+        "canonical": "#F3ECDB",
+        "tonalRamp": ["#2B2318", "#4A3F2A", "#6B5C3F", "#8A7A5E", "#B3A67E", "#D9CBAA", "#E9DFC6", "#F3ECDB"]
+      },
+      "surface-container-lowest": {
+        "role": "neutral",
+        "displayName": "Chart Paper",
+        "canonical": "#FBF7EC",
+        "tonalRamp": ["#2B2318", "#4A3F2A", "#6B5C3F", "#8A7A5E", "#B3A67E", "#D9CBAA", "#EDE4CE", "#FBF7EC"]
+      },
+      "surface-container": {
+        "role": "neutral",
+        "displayName": "Kraft Nav",
+        "canonical": "#EDE4CE",
+        "tonalRamp": ["#2B2318", "#4A3F2A", "#6B5C3F", "#8A7A5E", "#B3A67E", "#D0C1A0", "#DED1B0", "#EDE4CE"]
+      },
+      "on-surface": {
+        "role": "neutral",
+        "displayName": "Warm Ink",
+        "canonical": "#2B2318",
+        "tonalRamp": ["#2B2318", "#4A3F2A", "#6B5C3F", "#8A7A5E", "#B3A67E", "#D9CBAA", "#E9DFC6", "#F3ECDB"]
+      },
+      "on-surface-variant": {
+        "role": "neutral",
+        "displayName": "Muted Umber",
+        "canonical": "#5C4F3B",
+        "tonalRamp": ["#211B12", "#382F20", "#4A3F2A", "#5C4F3B", "#7A6B50", "#A09172", "#C7BB9F", "#E8E1D0"]
+      },
+      "outline": {
+        "role": "neutral",
+        "displayName": "Warm Outline",
+        "canonical": "#8A7A5E",
+        "tonalRamp": ["#382F20", "#4A3F2A", "#6B5C3F", "#8A7A5E", "#A6987A", "#C2B79E", "#DBD3BE", "#EFEADD"]
+      },
+      "outline-variant": {
+        "role": "neutral",
+        "displayName": "Pale Kraft",
+        "canonical": "#D9CBAA",
+        "tonalRamp": ["#6B5C3F", "#8A7A5E", "#A6987A", "#C2B79E", "#D9CBAA", "#E6DBC1", "#F0E9D8", "#F8F4EA"]
+      },
+      "error": {
+        "role": "error",
+        "displayName": "Clinical Red",
+        "canonical": "#BA1A1A",
+        "tonalRamp": ["#410001", "#680003", "#930006", "#BA1A1A", "#DE3730", "#FF5449", "#FF897A", "#FFDAD6"]
+      },
+      "status-pending": {
+        "role": "neutral",
+        "displayName": "Due Blue",
+        "canonical": "#3D6FA8",
+        "tonalRamp": ["#0F1E30", "#1D3A5A", "#2C5480", "#3D6FA8", "#6089BC", "#8AA9D0", "#B7CBE3", "#E2ECF6"]
+      },
+      "chart-grid-line": {
+        "role": "neutral",
+        "displayName": "Grid Ink",
+        "canonical": "rgba(43,35,24,0.08)",
+        "tonalRamp": ["#2B2318"]
+      },
+      "paper-grain": {
+        "role": "neutral",
+        "displayName": "Paper Grain",
+        "canonical": "#E6D9B8",
+        "tonalRamp": ["#8A7A5E", "#B3A67E", "#D9CBAA", "#E6D9B8", "#EDE4CE", "#F3ECDB", "#F8F4EA", "#FBF7EC"]
+      }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Hero numbers and the next-dose name — at most once per screen." },
+      "headline": { "displayName": "Headline", "purpose": "Screen and section titles; top-bar title is Clinical Teal + 700 weight." },
+      "title": { "displayName": "Title", "purpose": "Card headers and list-item titles." },
+      "body": { "displayName": "Body", "purpose": "Reading text. bodySmall (12px) shifts to Muted Umber for de-emphasis." },
+      "label": { "displayName": "Label", "purpose": "Button, chip, and nav text — always semibold with light positive tracking." },
+      "chart-heading": { "displayName": "Chart Heading", "purpose": "The one hand-marked annotation heading per screen — Today's day-chart date. Italic Public Sans + underline stroke, never body text." }
+    },
+    "shadows": [
+      { "name": "ambient-ink", "value": "0 6px 16px rgba(43, 35, 24, 0.10)", "purpose": "The system's one shadow at rest. AmbientCard, dose rows, and (inverted) the bottom nav." },
+      { "name": "lifted-ink", "value": "0 10px 24px rgba(43, 35, 24, 0.15)", "purpose": "Transient — plays only while a tappable AmbientCard is actively pressed, so touch reads as lifting the page." },
+      { "name": "top-bar-hairline", "value": "0 1px 2px rgba(0, 0, 0, 0.078)", "purpose": "Neutral, near-invisible separation under the top bar only. Structural, not brand." }
+    ],
+    "motion": [
+      { "name": "fast", "value": "150ms cubic-bezier(0.05, 0.7, 0.1, 1.0)", "purpose": "Micro-interactions: press scale, card lift, nav pill swap, status glyph pop." },
+      { "name": "medium", "value": "280ms cubic-bezier(0.05, 0.7, 0.1, 1.0)", "purpose": "Standard: page fade, calendar expand, card/row entrance." },
+      { "name": "slow", "value": "400ms cubic-bezier(0.05, 0.7, 0.1, 1.0)", "purpose": "Values the eye tracks: progress rings, week bars." },
+      { "name": "status-pop", "value": "280ms ease-out-back", "purpose": "Status avatar overshoot pop whenever a dose's status changes." },
+      { "name": "row-stagger", "value": "30ms per row, capped at 6", "purpose": "Dose rows within a day settle onto the chart a beat after the one above." }
+    ],
+    "breakpoints": [
+      { "name": "content-max", "value": "640px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The single filled call-to-action per screen — Save, Confirm, Continue.",
+      "html": "<button class=\"ds-btn-primary\">Save reminder</button>",
+      "css": ".ds-btn-primary { font-family: 'Public Sans', Roboto, sans-serif; background: #00685F; color: #FFFFFF; font-size: 14px; font-weight: 600; letter-spacing: 0.1px; padding: 16px 24px; min-height: 56px; border: none; border-radius: 999px; cursor: pointer; transition: transform 150ms cubic-bezier(0.05,0.7,0.1,1), background 150ms ease; } .ds-btn-primary:hover { background: #008378; } .ds-btn-primary:focus-visible { outline: 2px solid #6BD8CB; outline-offset: 2px; } .ds-btn-primary:active { transform: scale(0.98); }"
+    },
+    {
+      "name": "Ambient Card",
+      "kind": "card",
+      "refersTo": "card-ambient",
+      "description": "The system's signature container on the linen ground — lifts (deeper shadow) the instant it's pressed.",
+      "html": "<div class=\"ds-card-ambient\"><div class=\"ds-card-title\">Metformin 500mg</div><div class=\"ds-card-sub\">1 tablet · 8:00 AM</div></div>",
+      "css": ".ds-card-ambient { font-family: 'Public Sans', Roboto, sans-serif; background: #FBF7EC; border-radius: 12px; padding: 16px; box-shadow: 0 6px 16px rgba(43,35,24,0.10); transition: box-shadow 150ms cubic-bezier(0.05,0.7,0.1,1), transform 150ms cubic-bezier(0.05,0.7,0.1,1); } .ds-card-ambient:active { box-shadow: 0 10px 24px rgba(43,35,24,0.15); transform: translateY(-1px); } .ds-card-title { font-size: 16px; font-weight: 600; color: #2B2318; } .ds-card-sub { margin-top: 2px; font-size: 12px; color: #5C4F3B; }"
+    },
+    {
+      "name": "Dose Row",
+      "kind": "custom",
+      "description": "The flagship chart entry — a permanent colored margin tab, a status ring with its persistent glyph, sitting over the faint ruled grid.",
+      "html": "<div class=\"ds-dose-row\"><div class=\"ds-dose-avatar\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\"><path d=\"M5 13l4 4L19 7\" stroke=\"#FFFFFF\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg></div><div class=\"ds-dose-text\"><div class=\"ds-dose-title\">Metformin 500mg</div><div class=\"ds-dose-sub\">8:00 AM · 1 tablet</div></div></div>",
+      "css": ".ds-dose-row { display: flex; align-items: center; gap: 16px; font-family: 'Public Sans', Roboto, sans-serif; background: #FBF7EC; border-radius: 12px; border-left: 4px solid #00685F; padding: 16px; box-shadow: 0 6px 16px rgba(43,35,24,0.10); } .ds-dose-avatar { width: 48px; height: 48px; min-width: 48px; border-radius: 50%; background: #00685F; display: flex; align-items: center; justify-content: center; } .ds-dose-title { font-size: 16px; font-weight: 600; color: #2B2318; } .ds-dose-sub { margin-top: 4px; font-size: 14px; color: #5C4F3B; }"
+    },
+    {
+      "name": "Status Badge (glyph set)",
+      "kind": "custom",
+      "description": "The five-state, closed status set — every status is one color and one glyph, never color alone.",
+      "html": "<span class=\"ds-status ds-status--taken\">✓ Taken</span> <span class=\"ds-status ds-status--pending\">– Due</span> <span class=\"ds-status ds-status--snoozed\">○ Snoozed</span> <span class=\"ds-status ds-status--missed\">△ Missed</span>",
+      "css": ".ds-status { font-family: 'Public Sans', Roboto, sans-serif; font-size: 12px; font-weight: 600; letter-spacing: 0.2px; padding: 4px 10px; border-radius: 999px; color: #FFFFFF; margin-right: 6px; } .ds-status--taken { background: #00685F; } .ds-status--pending { background: #3D6FA8; } .ds-status--snoozed { background: #4648D4; } .ds-status--missed { background: #BA1A1A; }"
+    },
+    {
+      "name": "Chart Date Heading",
+      "kind": "custom",
+      "description": "The one hand-marked annotation heading per screen — italic Public Sans plus a short uneven underline stroke.",
+      "html": "<div class=\"ds-chart-heading\">Today, Wed 3 September<div class=\"ds-chart-heading-rule\"></div></div>",
+      "css": ".ds-chart-heading { font-family: 'Public Sans', Roboto, sans-serif; font-style: italic; font-weight: 600; font-size: 20px; letter-spacing: 0.4px; color: #2B2318; } .ds-chart-heading-rule { margin-top: 3px; height: 2px; width: 70%; background: repeating-linear-gradient(90deg, rgba(0,104,95,0.45) 0 6px, transparent 6px 9px); }"
+    },
+    {
+      "name": "Bottom Nav Item (selected)",
+      "kind": "nav",
+      "description": "One of four fixed destinations; selected state shown, on the Kraft Nav bar.",
+      "html": "<div class=\"ds-nav-item ds-nav-item--selected\"><svg width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"none\"><path d=\"M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm1 5v5.4l4 2.3-.8 1.4L11 13V7h2Z\" fill=\"#00685F\"/></svg><span>Today</span></div>",
+      "css": ".ds-nav-item { display: inline-flex; flex-direction: column; align-items: center; gap: 4px; font-family: 'Public Sans', Roboto, sans-serif; } .ds-nav-item--selected { background: #D8E5E2; border-radius: 16px; padding: 6px 12px; } .ds-nav-item span { font-size: 11px; font-weight: 600; letter-spacing: 0.2px; color: #00685F; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Bedside Chart",
+    "overview": "Medicyn reads as a chart clipped at someone's bedside — the object a competent visiting nurse leaves behind, not a monitor beeping in a hospital room. The ground shifted from the previous \"Clinical Calm\" system's clinical white to a warm linen/kraft paper; cards are pages that visibly sit above that ground, not the same material as it. Teal (#00685F) is carried over unchanged from Clinical Calm as the one brand/confirming accent — a deliberate continuity, not an oversight — but it now does its work against warmth instead of clinical neutrality.\n\nThe system's one genuinely new structural idea is that status is never color alone. Every dose status — Taken, Due, Snoozed, Missed, Not recorded — carries its own persistent glyph mark paired with its color. A faint, always-present ruled time-grid sits behind Today's list, and every dose row carries a permanent colored tab on its leading edge. A small steel clip motif sits at the top of Today and Care, holding the \"page\" in place.\n\nDepth grew more present than Clinical Calm's flat baseline: the system's one recurring shadow reads with more presence at rest, and cards visibly lift the instant a finger touches them.",
+    "keyCharacteristics": [
+      "Warm linen/kraft ground; cards are lighter \"paper\" sitting above it",
+      "Teal stays the one brand/confirming color, inherited from Clinical Calm",
+      "Every status = one color and one persistent glyph, never color alone",
+      "A faint ruled time-grid behind Today; a colored margin tab on every dose row",
+      "A steel clip motif marking the chart's \"page\" at Today and Care",
+      "One warm-ink shadow at rest, a deeper \"lift\" shadow on active press",
+      "Motion stays short (150–400ms) and fully honors reduced motion"
+    ],
+    "rules": [
+      { "name": "The Single Accent Rule", "body": "Teal is the only color allowed to mean \"brand\" or \"this succeeded.\" Taken is teal, never a stock green. Inherited unchanged from Clinical Calm.", "section": "colors" },
+      { "name": "The Status-Has-a-Shape Rule", "body": "Every dose status carries its own persistent glyph — check (Taken), dash (Due), ring (Snoozed), triangle (Missed), ellipsis (Not recorded) — paired with its color everywhere the status appears. Color alone is never the only signal.", "section": "colors" },
+      { "name": "The Phone-Size Rule", "body": "Sizes are tuned for a real handset at 100%; bigger text is the Settings Appearance slider's job, not a baseline bump. Inherited from Clinical Calm.", "section": "typography" },
+      { "name": "The One Annotation Rule", "body": "The italic hand-marked chart-heading treatment is reserved for exactly one heading per screen. It never spreads to body text, buttons, or more than one heading at a time.", "section": "typography" },
+      { "name": "The One Shadow Rule", "body": "Ambient Ink is the only shadow a component gets at rest. Lifted Ink is not a second free shadow — it exists only as the transient response to an active press.", "section": "elevation" },
+      { "name": "The Two-Radius Rule", "body": "Pill for anything tappable-as-an-action, 12–16px rounded rectangle for anything that contains content. Inherited from Clinical Calm.", "section": "shapes" }
+    ],
+    "dos": [
+      "Do keep Clinical Teal as the only \"brand/confirmed\" color.",
+      "Do give every dose/task status both a color and a glyph from the fixed five-mark set.",
+      "Do reuse MedicynTheme.ambientShadow / liftedShadow exactly as defined.",
+      "Do route new date/section annotation headings through ChartHandLetteredText, one per screen.",
+      "Do cap page content at 640px via MedicynContent."
+    ],
+    "donts": [
+      "Don't reuse Indigo Alert or Due Blue for anything other than Snoozed and Pending, and don't add a sixth status color.",
+      "Don't add a shadow anywhere beyond Ambient Ink at rest / Lifted Ink on press.",
+      "Don't apply the italic chart-heading treatment to more than one heading per screen, or to body text.",
+      "Don't override the system/app text-scale value with a fixed pixel size anywhere.",
+      "Don't port Cupertino-style components into shared code paths."
+    ]
+  }
+}

@@ -283,6 +283,7 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
         if (item.isNotEmpty) {
           await NotificationService.instance.scheduleForScheduleWithMedicine(
             item.first,
+            db: widget.db,
           );
         }
       }
@@ -656,6 +657,7 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
       try {
         await NotificationService.instance.scheduleForScheduleWithMedicine(
           ScheduleWithMedicine(schedule, medicine),
+          db: widget.db,
         );
       } catch (e) {
         // The reminder is saved either way; a scheduling failure (e.g. the

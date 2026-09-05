@@ -27,12 +27,15 @@ import '../notification_engine/reminder_reliability_screen.dart';
 import '../push/push_service.dart';
 import '../review_edit/review_edit_screen.dart';
 import '../voice_capture/voice_capture_screen.dart';
+import 'android_today_screen.dart';
 import 'calendar_collapse_sliver.dart';
 import 'day_dose_list.dart';
 import 'day_occurrences.dart';
 import 'dose_attention_panel.dart';
 import 'dose_calendar.dart';
 import 'refill.dart';
+import 'reminder_copy.dart';
+import 'today_care_events.dart';
 
 enum _ReminderDisposition { stop, deleteHistory }
 
@@ -88,12 +91,23 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   final _dismissedAttentionUntil = <String, DateTime>{};
   final _attentionScheduleVersions = <String, DateTime>{};
   var _attentionWasPresent = false;
+  // Which occurrences have already had their automatic Taken/Snooze dialog
+  // (see _autoPromptAttention) so a rebuild does not re-show it on top of
+  // itself. Pruned back to whatever is still in `attention` on every build,
+  // so a dose that genuinely returns to attention later — its own next
+  // automatic re-ring, say — gets its own fresh prompt.
+  final _autoPromptedAttentionKeys = <String>{};
+  // The one occurrence currently scheduled or showing its dialog, so a
+  // second rebuild before the first callback runs does not queue a second
+  // dialog for the same dose.
+  String? _autoPromptInFlightKey;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     doseResponseEvents.addListener(_onDoseResponse);
+    todayCareReminderTaps.addListener(_onCareReminderTap);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !_scroll.hasClients) return;
       _scroll.jumpTo(0);
@@ -116,6 +130,7 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _clock?.cancel();
     _scroll.dispose();
     doseResponseEvents.removeListener(_onDoseResponse);
+    todayCareReminderTaps.removeListener(_onCareReminderTap);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -133,6 +148,13 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   void _onDoseResponse() {
     final event = doseResponseEvents.value;
+    if (mounted &&
+        event?.action == DoseAction.taken &&
+        Theme.of(context).platform == TargetPlatform.android) {
+      // Notification actions use their own connection; refresh this stream so
+      // an answered dose also clears immediately while Today is foregrounded.
+      widget.db.markTablesUpdated({widget.db.doseLogs});
+    }
     if (!mounted || event == null || event.action != DoseAction.snoozed) {
       return;
     }
@@ -145,6 +167,13 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         delay,
       );
     });
+  }
+
+  void _onCareReminderTap() {
+    if (!mounted || todayCareReminderTaps.value == null ||
+        Theme.of(context).platform != TargetPlatform.android) return;
+    widget.onNeedsAttention?.call();
+    if (_scroll.hasClients) _scroll.jumpTo(0);
   }
 
   @override
@@ -381,8 +410,17 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             // ignore: use_build_context_synchronously
             context: context,
             showDragHandle: true,
+            // Without this, the sheet is hard-capped at 9/16 of the screen
+            // height with no scroll fallback — three ListTiles with
+            // two-line subtitles overflow that cap at a large accessibility
+            // text scale, and the overflowing content paints past the
+            // sheet's own bounds into the system nav bar. isScrollControlled
+            // plus the SingleChildScrollView below matches the working
+            // pattern already used by showTodayAddMenu in
+            // today_care_editor.dart.
+            isScrollControlled: true,
             builder: (sheetContext) => SafeArea(
-              child: Padding(
+              child: SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -541,49 +579,78 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
+    final android = Theme.of(context).platform == TargetPlatform.android;
+    Widget androidContent() => StreamBuilder<List<ScheduleWithMedicine>>(
+      stream: _schedulesStream,
+      builder: (context, scheduleSnap) => StreamBuilder<List<DoseLog>>(
+        stream: _doseLogsStream,
+        builder: (context, logSnap) {
+          if ((!scheduleSnap.hasData &&
+                  scheduleSnap.connectionState == ConnectionState.waiting) ||
+              (!logSnap.hasData &&
+                  logSnap.connectionState == ConnectionState.waiting)) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (scheduleSnap.hasError || logSnap.hasError) {
+            return const Center(
+              child: Text('Could not load your day. Please reopen Today.'),
+            );
+          }
+          return _calendarBody(
+            schedules: scheduleSnap.data ?? const [],
+            logs: logSnap.data ?? const [],
+          );
+        },
+      ),
+    );
     return ListenableBuilder(
       listenable: ReminderHealthStore.instance,
-      builder: (context, _) => Scaffold(
-        appBar: AppBar(
-          automaticallyImplyLeading: false,
-          toolbarHeight: 64,
-          titleSpacing: 20,
-          title: const MedicynBrandMark(compact: true),
-        ),
-        body: ChartPaperTexture(
-          child: ChartRuleLines(
-            child: StreamBuilder<List<ScheduleWithMedicine>>(
-              stream: _schedulesStream,
-              builder: (context, scheduleSnap) {
-                return StreamBuilder<List<DoseLog>>(
-                  stream: _doseLogsStream,
-                  builder: (context, logSnap) {
-                    // Neither stream emits until the encrypted database has
-                    // actually opened (Keystore reads, background-isolate
-                    // spawn — not instant). Falling straight into
-                    // _calendarBody with `?? const []` before that first
-                    // emission drew the real "No reminders yet" empty state
-                    // for a user who already has medicines, which then
-                    // flashed to the true list the moment it arrived. See
-                    // the matching guard in MedicinesListScreen.
-                    if ((scheduleSnap.connectionState ==
-                                ConnectionState.waiting &&
-                            !scheduleSnap.hasData) ||
-                        (logSnap.connectionState == ConnectionState.waiting &&
-                            !logSnap.hasData)) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
-                    return _calendarBody(
-                      schedules: scheduleSnap.data ?? const [],
-                      logs: logSnap.data ?? const [],
-                    );
-                  },
-                );
-              },
+      builder: (context, _) => android
+          ? androidContent()
+          : Scaffold(
+              appBar: AppBar(
+                automaticallyImplyLeading: false,
+                toolbarHeight: 64,
+                titleSpacing: 20,
+                title: const MedicynBrandMark(compact: true),
+              ),
+              body: ChartPaperTexture(
+                child: ChartRuleLines(
+                  child: StreamBuilder<List<ScheduleWithMedicine>>(
+                    stream: _schedulesStream,
+                    builder: (context, scheduleSnap) {
+                      return StreamBuilder<List<DoseLog>>(
+                        stream: _doseLogsStream,
+                        builder: (context, logSnap) {
+                          // Neither stream emits until the encrypted database has
+                          // actually opened (Keystore reads, background-isolate
+                          // spawn — not instant). Falling straight into
+                          // _calendarBody with `?? const []` before that first
+                          // emission drew the real "No reminders yet" empty state
+                          // for a user who already has medicines, which then
+                          // flashed to the true list the moment it arrived. See
+                          // the matching guard in MedicinesListScreen.
+                          if ((scheduleSnap.connectionState ==
+                                      ConnectionState.waiting &&
+                                  !scheduleSnap.hasData) ||
+                              (logSnap.connectionState ==
+                                      ConnectionState.waiting &&
+                                  !logSnap.hasData)) {
+                            return const Center(
+                              child: CircularProgressIndicator(),
+                            );
+                          }
+                          return _calendarBody(
+                            schedules: scheduleSnap.data ?? const [],
+                            logs: logSnap.data ?? const [],
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ),
             ),
-          ),
-        ),
-      ),
     );
   }
 
@@ -614,6 +681,7 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       ..clear()
       ..addAll(scheduleVersions);
     final now = DateTime.now();
+    final android = Theme.of(context).platform == TargetPlatform.android;
     final snoozeWindow = Duration(minutes: AppSettings.instance.snoozeMinutes);
     final records = <DoseRecord>[
       for (final log in logs) ?DoseRecord.tryFromLog(log),
@@ -621,14 +689,16 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final logIndex = DoseRecordIndex(records);
     final rangeStart = DateTime(now.year, now.month - 18, 1);
     final rangeEnd = DateTime(now.year, now.month + 6, 1);
-    final cellMarks = cellMarksForRange(
-      items: schedules,
-      index: logIndex,
-      rangeStart: rangeStart,
-      rangeEnd: rangeEnd,
-      now: now,
-      snoozeWindow: snoozeWindow,
-    );
+    final cellMarks = android
+        ? <DateTime, DayCellMarks>{}
+        : cellMarksForRange(
+            items: schedules,
+            index: logIndex,
+            rangeStart: rangeStart,
+            rangeEnd: rangeEnd,
+            now: now,
+            snoozeWindow: snoozeWindow,
+          );
     final calendarMarks = {
       for (final e in cellMarks.entries)
         e.key: CalendarDayMarks(
@@ -642,12 +712,12 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final occurrences = occurrencesOnDay(
       items: schedules,
       index: logIndex,
-      day: _selectedDay,
+      day: android ? calendarDay(now) : _selectedDay,
       now: now,
       snoozeWindow: snoozeWindow,
     );
     final today = calendarDay(now);
-    final todayOccs = isSameCalendarDay(_selectedDay, now)
+    final todayOccs = android || isSameCalendarDay(_selectedDay, now)
         ? occurrences
         : occurrencesOnDay(
             items: schedules,
@@ -700,11 +770,47 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         WidgetsBinding.instance.addPostFrameCallback((_) => jump());
       }
     }
+    _autoPromptedAttentionKeys.removeWhere(
+      (key) => !attention.any((o) => _attentionKey(o) == key),
+    );
+    if (attention.isNotEmpty && _autoPromptInFlightKey == null) {
+      final front = attention.first;
+      final frontKey = _attentionKey(front);
+      if (!_autoPromptedAttentionKeys.contains(frontKey)) {
+        _autoPromptInFlightKey = frontKey;
+        WidgetsBinding.instance.addPostFrameCallback(
+          (_) => _autoPromptAttention(front, frontKey),
+        );
+      }
+    }
     final takenCount = occurrences
         .where((o) => o.status == DayDoseStatus.taken)
         .length;
     final expectedCount = occurrences.length;
     final month = _calendarMonth;
+
+    if (android) {
+      return AndroidTodayScreen(
+        db: widget.db,
+        now: now,
+        occurrences: todayOccs,
+        earlier: attentionDoses(today: const [], yesterday: yesterdayOccs),
+        scrollController: _scroll,
+        onAddMedicine: _startCapture,
+        onTaken: _markTaken,
+        onSnooze: _snooze,
+        onHistory: _openHistory,
+        healthNotice: ReminderHealthStore.instance.hasIssues
+            ? _ReminderHealthCard(
+                onFix: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => ReminderReliabilityScreen(db: widget.db),
+                  ),
+                ),
+              )
+            : null,
+      );
+    }
 
     return CustomScrollView(
       controller: _scroll,
@@ -818,6 +924,153 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
+  /// Puts the same bold Taken/Snooze prompt in front of the person the
+  /// instant a dose needs attention — from any tab, not only Today — rather
+  /// than leaving it to be noticed as a card or a line item in the system
+  /// notification tray. Tapping outside the dialog (or the back gesture)
+  /// counts as Snooze, matching the ask that answering nothing must not
+  /// silently do nothing.
+  ///
+  /// [key] is the in-flight guard set by the caller before scheduling this;
+  /// clearing it here (rather than there) is what lets a route that is not
+  /// current below — an active camera scan, say — retry on the next
+  /// rebuild instead of being marked as already prompted and never asked
+  /// again.
+  Future<void> _autoPromptAttention(DayOccurrence occurrence, String key) async {
+    _autoPromptInFlightKey = null;
+    if (!mounted) return;
+    // Don't interrupt something already on top of Home — a capture flow, a
+    // pushed settings page — with a dialog fighting it for the screen. The
+    // next rebuild (the minute timer this screen already runs, or any
+    // other) retries once that route is gone.
+    final route = ModalRoute.of(context);
+    if (route != null && !route.isCurrent) return;
+
+    _autoPromptedAttentionKeys.add(key);
+    final medicine = occurrence.item.medicine;
+    final title = medicineTitle(medicine);
+    final dose = medicine.doseAmount.trim();
+    // showAdaptiveDialog + AlertDialog.adaptive matches the app's existing
+    // confirm-dose prompt (see _confirmTaken in dose_attention_panel.dart):
+    // a native Cupertino card on iOS, Material elsewhere, rather than one
+    // look forced on both.
+    final taken =
+        await showAdaptiveDialog<bool>(
+          context: context,
+          barrierDismissible: true,
+          builder: (dialogContext) {
+            final scheme = Theme.of(dialogContext).colorScheme;
+            // FittedBox rather than trusting the label is short enough on
+            // its own: at a large accessibility text-scale, "Taken" or
+            // "Snooze" plus its icon can still outgrow half the dialog's
+            // width, and an ellipsis there reads as broken rather than
+            // adaptive. This scales the label down to whatever fits.
+            Widget fitted(String text) =>
+                FittedBox(fit: BoxFit.scaleDown, child: Text(text, maxLines: 1));
+            final takenButton = FilledButton.icon(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(0, 52),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+              icon: const Icon(Icons.check, size: 18),
+              label: fitted('Taken'),
+            );
+            final snoozeButton = FilledButton.tonalIcon(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(0, 52),
+                backgroundColor: scheme.secondaryContainer,
+                foregroundColor: scheme.onSecondaryContainer,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+              icon: const Icon(Icons.snooze, size: 18),
+              label: fitted('Snooze'),
+            );
+            return ConstrainedBox(
+              // Caps how wide this gets on a tablet or a foldable's
+              // unfolded screen — an AlertDialog has no built-in ceiling,
+              // so without this a 3-4x wider screen stretched it edge to
+              // edge instead of just centering a normal-sized card.
+              constraints: const BoxConstraints(maxWidth: 420),
+              child: AlertDialog.adaptive(
+                title: Text(
+                  'Time for your medicine',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(dialogContext).textTheme.headlineSmall
+                      ?.copyWith(fontWeight: FontWeight.w700),
+                ),
+                content: Text(
+                  dose.isEmpty ? title : '$title — take $dose',
+                  // A long drug name wraps instead of overflowing the
+                  // dialog; four lines is generous before it clips.
+                  maxLines: 4,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(dialogContext).textTheme.titleMedium,
+                ),
+                actionsPadding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+                actions: [
+                  // Side-by-side and equal-width normally — proportionate
+                  // and aligned, matching Today's agenda rows — but a
+                  // LayoutBuilder rather than a fixed Row: at the narrowest
+                  // phone widths, two Expanded buttons each get too little
+                  // room for an icon and a label, so this stacks them
+                  // full-width instead of letting either clip.
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      const narrowBelow = 300.0;
+                      if (constraints.maxWidth < narrowBelow) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            takenButton,
+                            const SizedBox(height: 10),
+                            snoozeButton,
+                          ],
+                        );
+                      }
+                      return Row(
+                        children: [
+                          Expanded(child: takenButton),
+                          const SizedBox(width: 12),
+                          Expanded(child: snoozeButton),
+                        ],
+                      );
+                    },
+                  ),
+                ],
+              ),
+            );
+          },
+        ) ??
+        false; // Barrier dismiss / back gesture: treated as Snooze.
+
+    if (!mounted) return;
+    if (taken) {
+      await _markTaken(occurrence);
+    } else {
+      await _snooze(occurrence);
+      // Every path that resolves to Snooze here — the button, a
+      // barrier-dismiss, or the back gesture — needs the same visible
+      // acknowledgment: this dialog can appear from any tab, so there is no
+      // "Snoozed until" caption on screen for the person to notice instead.
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Snoozed for ${AppSettings.instance.snoozeMinutes} minutes',
+            ),
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> _markTaken(DayOccurrence occurrence) async {
     MedicynMotion.confirm(context);
     await recordDoseTaken(
@@ -882,51 +1135,57 @@ class _ReminderHealthCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return Container(
-      decoration: BoxDecoration(
-        color: scheme.errorContainer,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      padding: const EdgeInsets.all(16),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(
-            Icons.notifications_off_outlined,
-            color: scheme.onErrorContainer,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '${ReminderHealthStore.instance.issues.length} reminder'
-                  '${ReminderHealthStore.instance.issues.length == 1 ? '' : 's'} '
-                  'need setup',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: scheme.onErrorContainer,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Your medicine is saved. Check reminder access so the next dose is not missed.',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: scheme.onErrorContainer,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                // Keep the action directly in the column. Wrapping this
-                // button in Align makes the sliver fail to paint on Android
-                // when the reminder-health banner is present.
-                TextButton(
-                  onPressed: onFix,
-                  child: const Text('Fix reminders'),
-                ),
-              ],
+    // This card only exists in the tree while an issue is unresolved, so
+    // every mount is a genuine appearance — the same fade+rise DoseAttentionPanel
+    // gets right above it, so a newly-detected access problem doesn't just
+    // pop into place unannounced.
+    return MedicynFadeIn(
+      child: Container(
+        decoration: BoxDecoration(
+          color: scheme.errorContainer,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              Icons.notifications_off_outlined,
+              color: scheme.onErrorContainer,
             ),
-          ),
-        ],
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${ReminderHealthStore.instance.issues.length} reminder'
+                    '${ReminderHealthStore.instance.issues.length == 1 ? '' : 's'} '
+                    'need setup',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: scheme.onErrorContainer,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Your medicine is saved. Check reminder access so the next dose is not missed.',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: scheme.onErrorContainer,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  // Keep the action directly in the column. Wrapping this
+                  // button in Align makes the sliver fail to paint on Android
+                  // when the reminder-health banner is present.
+                  TextButton(
+                    onPressed: onFix,
+                    child: const Text('Fix reminders'),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

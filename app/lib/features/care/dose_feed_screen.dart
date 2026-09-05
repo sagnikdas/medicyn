@@ -168,6 +168,8 @@ class _DoseFeedScreenState extends State<DoseFeedScreen> {
               : who == null
               ? 'Their doses'
               : "$who's doses",
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
         actions: [
           if (_callPhone != null)

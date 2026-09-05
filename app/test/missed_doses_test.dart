@@ -140,6 +140,33 @@ void main() {
     expect(count, 1);
   });
 
+  test(
+    'grace scales with the reminder attempt interval, not a flat 30 minutes',
+    () async {
+      // Three automatic re-ring attempts, 20 minutes apart, means the last
+      // one is due at 11:40 and deserves its own 20 minutes to be answered
+      // — so this dose is not yet missed at 12:00 even though 60 minutes
+      // (twice today's default grace) have passed since it was first due.
+      await givenSchedule(times: ['11:00']);
+
+      final stillGrace = await const MissedDoseDetector().sweep(
+        db,
+        now: now,
+        lookback: const Duration(hours: 6),
+        snoozeWindow: const Duration(minutes: 20),
+      );
+      expect(stillGrace, 0);
+
+      final pastGrace = await const MissedDoseDetector().sweep(
+        db,
+        now: now.add(const Duration(minutes: 1)),
+        lookback: const Duration(hours: 6),
+        snoozeWindow: const Duration(minutes: 20),
+      );
+      expect(pastGrace, 1);
+    },
+  );
+
   test('sweeping twice does not duplicate a missed dose', () async {
     await givenSchedule(times: ['08:00']);
 

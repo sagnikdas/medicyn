@@ -101,3 +101,19 @@ class DoseLogContests extends Table {
   @override
   Set<Column> get primaryKey => {doseLogId};
 }
+
+/// Optional, device-local care agenda on Android Today. Kept in the same
+/// encrypted, per-account file as doses, but never treated as medication.
+class TodayCareReminders extends Table {
+  TextColumn get id => text()();
+  TextColumn get title => text()();
+  TextColumn get kind => text()();
+  DateTimeColumn get scheduledAt => dateTime()();
+  TextColumn get location => text().withDefault(const Constant(''))();
+  TextColumn get notes => text().withDefault(const Constant(''))();
+  IntColumn get reminderMinutes => integer().nullable()();
+  BoolColumn get completed => boolean().withDefault(const Constant(false))();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}

@@ -30,10 +30,6 @@ dependencies:
   # In-app rear preview for label scan. The system camera app (image_picker)
   # ignores facing extras and reopens the last lens — often the selfie camera.
   camera: ^0.12.0+2
-  # Device PIN / pattern / biometric re-unlock after the app has been in the
-  # background. biometricOnly is left off so a fingerprint is not required —
-  # the person this app is for already has a phone PIN.
-  local_auth: ^2.3.0
   path: ^1.9.1
   path_provider: ^2.1.6
   permission_handler: ^13.0.1
