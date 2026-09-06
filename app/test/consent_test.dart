@@ -146,7 +146,7 @@ void main() {
     test('is sha256 hex of the exact on-screen sentence', () {
       expect(
         ConsentPurpose.cloudBackup.textHash,
-        'dc0d6056f41a6620e74861be0e33d8eedbfd6c245bbf78b18c96b6e17d4e6f42',
+        '0a982adb20d6f820a2729532b54dfc299797d788b246220d2203e9050f68c515',
       );
       expect(
         ConsentPurpose.anthropicParse.textHash,

@@ -34,9 +34,11 @@ class TodayCareStore {
   const TodayCareStore(this.db);
   final AppDatabase db;
 
-  Stream<List<TodayCareReminder>> watch() => (db.select(
-    db.todayCareReminders,
-  )..orderBy([(row) => OrderingTerm.asc(row.scheduledAt)])).watch();
+  Stream<List<TodayCareReminder>> watch() =>
+      (db.select(db.todayCareReminders)
+            ..where((row) => row.deleted.equals(false))
+            ..orderBy([(row) => OrderingTerm.asc(row.scheduledAt)]))
+          .watch();
 
   Future<void> save(TodayCareReminder reminder) async {
     if (reminder.title.trim().isEmpty ||
@@ -44,12 +46,44 @@ class TodayCareStore {
         (reminder.reminderMinutes != null && reminder.reminderMinutes! < 0)) {
       throw ArgumentError('Invalid care reminder');
     }
-    await db.into(db.todayCareReminders).insertOnConflictUpdate(reminder);
+    await db.transaction(() async {
+      final previous = await (db.select(
+        db.todayCareReminders,
+      )..where((row) => row.id.equals(reminder.id))).getSingleOrNull();
+      await db
+          .into(db.todayCareReminders)
+          .insertOnConflictUpdate(
+            reminder.copyWith(
+              updatedAt: _nextVersion(previous?.updatedAt),
+              pendingSync: true,
+              deleted: false,
+            ),
+          );
+    });
   }
 
-  Future<void> remove(String id) => (db.delete(
-    db.todayCareReminders,
-  )..where((row) => row.id.equals(id))).go();
+  Future<void> remove(String id) => db.transaction(() async {
+    final previous = await (db.select(
+      db.todayCareReminders,
+    )..where((row) => row.id.equals(id))).getSingleOrNull();
+    if (previous == null) return;
+    await (db.update(
+      db.todayCareReminders,
+    )..where((row) => row.id.equals(id))).write(
+      TodayCareRemindersCompanion(
+        deleted: const Value(true),
+        pendingSync: const Value(true),
+        updatedAt: Value(_nextVersion(previous.updatedAt)),
+      ),
+    );
+  });
+
+  static DateTime _nextVersion(DateTime? previous) {
+    final now = DateTime.now().toUtc();
+    return previous != null && !now.isAfter(previous)
+        ? previous.add(const Duration(microseconds: 1))
+        : now;
+  }
 }
 
 /// Separate channel and payload namespace: medicine reconciliation and dose

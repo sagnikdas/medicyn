@@ -82,7 +82,12 @@ class SyncStatusStore extends ChangeNotifier {
     final schedules = await db.unsyncedSchedules();
     final logs = await db.unsyncedDoseLogs();
     final contests = await db.unsyncedDoseLogContests();
-    return medicines.length + schedules.length + logs.length + contests.length;
+    final care = await db.unsyncedTodayCareReminders();
+    return medicines.length +
+        schedules.length +
+        logs.length +
+        contests.length +
+        care.length;
   }
 
   static String _key(String ownerId) =>

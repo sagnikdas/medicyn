@@ -28,7 +28,7 @@ class DataExportService {
 
   /// Increment when the shape of an export changes. Consumers can migrate a
   /// saved export without guessing which optional fields were present.
-  static const exportSchemaVersion = 2;
+  static const exportSchemaVersion = 3;
   static const _networkTimeout = Duration(seconds: 8);
 
   /// JSON-encodable map. Safe to call with no network and no account.
@@ -39,6 +39,7 @@ class DataExportService {
     final schedules = await _db.select(_db.schedules).get();
     final logs = await _db.select(_db.doseLogs).get();
     final contests = await _db.select(_db.doseLogContests).get();
+    final care = await _db.select(_db.todayCareReminders).get();
 
     final export = <String, dynamic>{
       'metadata': <String, dynamic>{
@@ -51,6 +52,22 @@ class DataExportService {
       'schedules': [for (final s in schedules) _schedule(s)],
       'dose_logs': [for (final l in logs) _doseLog(l)],
       'contest_notes': [for (final c in contests) _contest(c)],
+      'today_care_reminders': [
+        for (final c in care)
+          {
+            'id': c.id,
+            'title': c.title,
+            'kind': c.kind,
+            'scheduled_at': _iso(c.scheduledAt),
+            'location': c.location,
+            'notes': c.notes,
+            'reminder_minutes': c.reminderMinutes,
+            'completed': c.completed,
+            'updated_at': _iso(c.updatedAt),
+            'pending_sync': c.pendingSync,
+            'deleted': c.deleted,
+          },
+      ],
       'consents': {
         for (final purpose in ConsentPurpose.values)
           purpose.id: ConsentService.instance.isGranted(purpose),

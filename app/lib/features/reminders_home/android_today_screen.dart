@@ -6,7 +6,10 @@ import '../../core/app_settings.dart';
 import '../../core/motion.dart';
 import '../../core/theme.dart';
 import '../../data/local/database.dart';
+import '../../data/remote/today_care_sync_service.dart';
+import '../auth/auth_service.dart';
 import '../notification_engine/notification_service.dart';
+import '../settings/settings_screen.dart';
 import 'day_dose_style.dart';
 import 'day_occurrences.dart';
 import 'reminder_copy.dart';
@@ -52,27 +55,103 @@ class _AndroidTodayScreenState extends State<AndroidTodayScreen>
   final _notifications = TodayCareNotifications();
   bool _alertIssue = false;
   bool _reconciling = false;
+  bool _reconcileAgain = false;
+  bool _syncing = false;
+  bool _syncAgain = false;
+  bool _syncFailed = false;
+  int _pendingSync = 0;
+  Timer? _syncTimer;
+  StreamSubscription<List<TodayCareReminder>>? _careChanges;
+
+  bool get _cloudReady =>
+      AuthService.instance.isSignedIn &&
+      AppSettings.instance.consentCloudBackup &&
+      AppSettings.instance.consentOwnerId ==
+          AuthService.instance.currentUser?.id;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    unawaited(_reconcile());
+    _careChanges = widget.db.select(widget.db.todayCareReminders).watch().listen((
+      rows,
+    ) {
+      if (!mounted) return;
+      setState(
+        () => _pendingSync = rows.where((row) => row.pendingSync).length,
+      );
+      // Includes server edits, completions and deletions arriving after Home's
+      // initial restore, so notifications follow the current account data.
+      unawaited(_reconcile());
+    }, onError: (Object _) {});
+    _syncTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
+        unawaited(_syncCare());
+      }
+    });
+    unawaited(_syncCare());
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _syncTimer?.cancel();
+    unawaited(_careChanges?.cancel());
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) unawaited(_reconcile());
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_reconcile());
+      unawaited(_syncCare());
+    }
+  }
+
+  Future<void> _syncCare() async {
+    if (!mounted || !_cloudReady) return;
+    if (_syncing) {
+      _syncAgain = true;
+      return;
+    }
+    setState(() => _syncing = true);
+    var success = false;
+    try {
+      success = await TodayCareSyncService(widget.db).sync();
+    } catch (_) {
+      // The local queue survives until connectivity is restored.
+    } finally {
+      if (mounted) {
+        setState(() {
+          _syncing = false;
+          _syncFailed = !success;
+        });
+        if (_syncAgain) {
+          _syncAgain = false;
+          unawaited(_syncCare());
+        }
+      }
+    }
+  }
+
+  void _openSettings() => Navigator.of(
+    context,
+  ).push(MaterialPageRoute(builder: (_) => SettingsScreen(db: widget.db)));
+
+  bool _requireCloud() {
+    if (_cloudReady) return true;
+    _message(
+      'Other care needs sign-in and cloud backup so your plans are saved to your account.',
+      action: SnackBarAction(label: 'Settings', onPressed: _openSettings),
+    );
+    return false;
   }
 
   Future<void> _reconcile() async {
-    if (_reconciling) return;
+    if (_reconciling) {
+      _reconcileAgain = true;
+      return;
+    }
     _reconciling = true;
     try {
       final reminders = await _care.first;
@@ -82,14 +161,21 @@ class _AndroidTodayScreenState extends State<AndroidTodayScreen>
       if (mounted) setState(() => _alertIssue = true);
     } finally {
       _reconciling = false;
+      if (_reconcileAgain && mounted) {
+        _reconcileAgain = false;
+        unawaited(_reconcile());
+      }
     }
   }
 
   Future<void> _retryAlerts() async {
     try {
-      final granted = await NotificationService.instance.requestNotificationPermission();
+      final granted = await NotificationService.instance
+          .requestNotificationPermission();
       if (!granted) {
-        _message('Enable notifications for Medicyn in Android Settings, then return to Today.');
+        _message(
+          'Enable notifications for Medicyn in Android Settings, then return to Today.',
+        );
       }
       await _reconcile();
     } catch (_) {
@@ -114,22 +200,26 @@ class _AndroidTodayScreenState extends State<AndroidTodayScreen>
     }
   }
 
-  Future<void> _edit({TodayCareKind? kind, TodayCareReminder? existing}) =>
-      showModalBottomSheet<void>(
-        context: context,
-        showDragHandle: true,
-        isScrollControlled: true,
-        useSafeArea: true,
-        builder: (_) => TodayCareEditor(
-          kind: kind ?? TodayCareKind.fromName(existing!.kind),
-          existing: existing,
-          onSave: _save,
-          onDelete: _remove,
-        ),
-      );
+  Future<void> _edit({TodayCareKind? kind, TodayCareReminder? existing}) async {
+    if (!_requireCloud()) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (_) => TodayCareEditor(
+        kind: kind ?? TodayCareKind.fromName(existing!.kind),
+        existing: existing,
+        onSave: _save,
+        onDelete: _remove,
+      ),
+    );
+  }
 
   Future<void> _save(TodayCareReminder reminder) async {
+    if (!_requireCloud()) throw StateError('Cloud backup is required');
     await _store.save(reminder);
+    unawaited(_syncCare());
     var armed = false;
     try {
       if (reminder.reminderMinutes != null) {
@@ -143,14 +233,20 @@ class _AndroidTodayScreenState extends State<AndroidTodayScreen>
     setState(() => _alertIssue = !armed);
     _message(
       armed
-          ? 'Reminder saved'
+          ? 'Reminder saved. Check cloud sync status in Today.'
           : 'Saved. Notifications need attention to send an alert.',
     );
   }
 
   Future<void> _remove(TodayCareReminder reminder) async {
-    await _notifications.cancel(reminder.id);
+    if (!_requireCloud()) throw StateError('Cloud backup is required');
     await _store.remove(reminder.id);
+    unawaited(_syncCare());
+    try {
+      await _notifications.cancel(reminder.id);
+    } catch (_) {
+      // Reconciliation retries notification cleanup independently of sync.
+    }
     _message(
       'Reminder removed',
       action: SnackBarAction(
@@ -169,8 +265,14 @@ class _AndroidTodayScreenState extends State<AndroidTodayScreen>
   }
 
   Future<void> _done(TodayCareReminder reminder) async {
-    await _notifications.cancel(reminder.id);
+    if (!_requireCloud()) return;
     await _store.save(reminder.copyWith(completed: true));
+    unawaited(_syncCare());
+    try {
+      await _notifications.cancel(reminder.id);
+    } catch (_) {
+      // A notification failure must not prevent persisting completion.
+    }
     _message(
       'Marked done',
       action: SnackBarAction(
@@ -201,6 +303,39 @@ class _AndroidTodayScreenState extends State<AndroidTodayScreen>
         onEditCare: (reminder) => _edit(existing: reminder),
         onCompleteCare: _done,
         healthNotice: widget.healthNotice,
+        careSyncNotice:
+            _syncing ||
+                _syncFailed ||
+                _pendingSync > 0 ||
+                (!_cloudReady && (snapshot.data?.isNotEmpty ?? false))
+            ? ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(
+                  _syncing
+                      ? Icons.cloud_sync_outlined
+                      : Icons.cloud_off_outlined,
+                ),
+                title: Text(
+                  !_cloudReady
+                      ? 'Care plans need cloud backup'
+                      : _syncing
+                      ? 'Syncing care plans…'
+                      : _pendingSync > 0
+                      ? '$_pendingSync care change${_pendingSync == 1 ? '' : 's'} waiting to sync'
+                      : 'Could not refresh care plans',
+                ),
+                subtitle: Text(
+                  !_cloudReady
+                      ? 'Sign in and enable cloud backup in Settings.'
+                      : _syncing
+                      ? 'Saving your care plans to your account.'
+                      : _pendingSync > 0
+                      ? 'These changes are only on this phone. Tap to retry.'
+                      : 'Your saved care plans are available. Tap to retry.',
+                ),
+                onTap: _cloudReady ? _syncCare : _openSettings,
+              )
+            : null,
       ),
     );
   }
@@ -225,6 +360,7 @@ class TodayAgenda extends StatelessWidget {
     this.healthNotice,
     this.careLoading = false,
     this.careError = false,
+    this.careSyncNotice,
     this.alertIssue = false,
     this.onRetryAlerts,
   });
@@ -243,6 +379,7 @@ class TodayAgenda extends StatelessWidget {
   final Widget? healthNotice;
   final bool careLoading;
   final bool careError;
+  final Widget? careSyncNotice;
   final bool alertIssue;
   final VoidCallback? onRetryAlerts;
 
@@ -417,6 +554,11 @@ class TodayAgenda extends StatelessWidget {
                       Padding(
                         padding: const EdgeInsets.only(top: 24),
                         child: healthNotice!,
+                      ),
+                    if (careSyncNotice != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 16),
+                        child: careSyncNotice!,
                       ),
                     if (alertIssue &&
                         care.any(
@@ -653,9 +795,9 @@ class _TodayDoseRow extends StatelessWidget {
     final detail = medicine.doseAmount.trim();
     final record = occurrence.record;
     final snoozedUntil = status == DayDoseStatus.snoozed && record != null
-        ? record.loggedAt
-              .toLocal()
-              .add(Duration(minutes: AppSettings.instance.snoozeMinutes))
+        ? record.loggedAt.toLocal().add(
+            Duration(minutes: AppSettings.instance.snoozeMinutes),
+          )
         : null;
     return _AgendaRow(
       at: occurrence.scheduledAt,
@@ -720,11 +862,7 @@ class _TodayCareRow extends StatelessWidget {
 /// for a status change, since this is the screen that promise is actually
 /// experienced on.
 class _AgendaAvatar extends StatefulWidget {
-  const _AgendaAvatar({
-    required this.icon,
-    required this.active,
-    this.status,
-  });
+  const _AgendaAvatar({required this.icon, required this.active, this.status});
 
   final IconData icon;
   final bool active;
@@ -852,6 +990,7 @@ class _AgendaRow extends StatefulWidget {
   final String label;
   final IconData icon;
   final bool active;
+
   /// When set, the leading avatar renders [DayDoseStyle]'s glyph+color for
   /// this status instead of a fixed icon — so Taken/Missed/Snoozed/Not
   /// recorded read by shape, not just by the caption text beside them.
@@ -861,6 +1000,7 @@ class _AgendaRow extends StatefulWidget {
   final String? secondaryLabel;
   final Future<void> Function()? onSecondary;
   final VoidCallback onOpen;
+
   /// When set, shows a "Snoozed until HH:mm" line — matching the treatment
   /// on the Plan card (see _SnoozeStatus in reminder_card.dart) — instead of
   /// leaving the person to infer it from [label] alone.
@@ -913,7 +1053,11 @@ class _AgendaRowState extends State<_AgendaRow> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _AgendaAvatar(icon: widget.icon, active: widget.active, status: widget.doseStatus),
+            _AgendaAvatar(
+              icon: widget.icon,
+              active: widget.active,
+              status: widget.doseStatus,
+            ),
             const SizedBox(width: 14),
             Expanded(
               child: Column(
@@ -976,103 +1120,102 @@ class _AgendaRowState extends State<_AgendaRow> {
                               ],
                             ),
                           ],
-                        if (widget.onAction == null) const SizedBox(height: 8),
-                      ],
+                          if (widget.onAction == null)
+                            const SizedBox(height: 8),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-                if (widget.onAction != null) ...[
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Semantics(
-                          label: '${widget.actionLabel}: ${widget.title}, $time',
-                          child: FilledButton.tonalIcon(
-                            onPressed: _busy
-                                ? null
-                                : () => _run(widget.onAction!),
-                            style: FilledButton.styleFrom(
-                              minimumSize: const Size(0, 44),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                              ),
-                              backgroundColor: scheme.primary.withValues(
-                                alpha: 0.09,
-                              ),
-                              foregroundColor: scheme.primary,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            icon: Icon(
-                              _busy ? Icons.more_horiz : Icons.check_rounded,
-                              size: 18,
-                            ),
-                            // FittedBox rather than relying on the label
-                            // being short enough: at a large system text
-                            // size (this app's accessibility text-scale
-                            // setting can push it well past 100%) even
-                            // "Taken" plus its icon can outgrow the
-                            // available half-width, and an ellipsis there
-                            // reads as broken rather than adaptive. This
-                            // scales the label down to whatever actually
-                            // fits instead of ever clipping it.
-                            label: FittedBox(
-                              fit: BoxFit.scaleDown,
-                              child: Text(
-                                widget.actionLabel!,
-                                maxLines: 1,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      if (widget.onSecondary != null) ...[
-                        const SizedBox(width: 10),
+                  if (widget.onAction != null) ...[
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
                         Expanded(
                           child: Semantics(
                             label:
-                                '${widget.secondaryLabel}: ${widget.title}, $time',
-                            // Filled (tonal), not outlined — a bare outline
-                            // on this card's warm, low-contrast background
-                            // read as "not filled in" rather than as a
-                            // deliberate secondary action.
+                                '${widget.actionLabel}: ${widget.title}, $time',
                             child: FilledButton.tonalIcon(
                               onPressed: _busy
                                   ? null
-                                  : () => _run(widget.onSecondary!),
+                                  : () => _run(widget.onAction!),
                               style: FilledButton.styleFrom(
                                 minimumSize: const Size(0, 44),
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 12,
                                 ),
-                                backgroundColor: scheme.secondaryContainer,
-                                foregroundColor: scheme.onSecondaryContainer,
+                                backgroundColor: scheme.primary.withValues(
+                                  alpha: 0.09,
+                                ),
+                                foregroundColor: scheme.primary,
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                               ),
-                              icon: const Icon(Icons.snooze, size: 18),
+                              icon: Icon(
+                                _busy ? Icons.more_horiz : Icons.check_rounded,
+                                size: 18,
+                              ),
+                              // FittedBox rather than relying on the label
+                              // being short enough: at a large system text
+                              // size (this app's accessibility text-scale
+                              // setting can push it well past 100%) even
+                              // "Taken" plus its icon can outgrow the
+                              // available half-width, and an ellipsis there
+                              // reads as broken rather than adaptive. This
+                              // scales the label down to whatever actually
+                              // fits instead of ever clipping it.
                               label: FittedBox(
                                 fit: BoxFit.scaleDown,
-                                child: Text(
-                                  widget.secondaryLabel!,
-                                  maxLines: 1,
-                                ),
+                                child: Text(widget.actionLabel!, maxLines: 1),
                               ),
                             ),
                           ),
                         ),
+                        if (widget.onSecondary != null) ...[
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Semantics(
+                              label:
+                                  '${widget.secondaryLabel}: ${widget.title}, $time',
+                              // Filled (tonal), not outlined — a bare outline
+                              // on this card's warm, low-contrast background
+                              // read as "not filled in" rather than as a
+                              // deliberate secondary action.
+                              child: FilledButton.tonalIcon(
+                                onPressed: _busy
+                                    ? null
+                                    : () => _run(widget.onSecondary!),
+                                style: FilledButton.styleFrom(
+                                  minimumSize: const Size(0, 44),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                  ),
+                                  backgroundColor: scheme.secondaryContainer,
+                                  foregroundColor: scheme.onSecondaryContainer,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                icon: const Icon(Icons.snooze, size: 18),
+                                label: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text(
+                                    widget.secondaryLabel!,
+                                    maxLines: 1,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ],
-                    ],
-                  ),
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
-          ),
-        ],
-      ),
+          ],
+        ),
       ),
     );
   }
