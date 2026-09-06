@@ -102,8 +102,8 @@ class DoseLogContests extends Table {
   Set<Column> get primaryKey => {doseLogId};
 }
 
-/// Optional, device-local care agenda on Android Today. Kept in the same
-/// encrypted, per-account file as doses, but never treated as medication.
+/// Supabase-backed care agenda, cached in the encrypted per-account file
+/// for offline access and notifications. Deleted rows remain as sync tombstones.
 class TodayCareReminders extends Table {
   TextColumn get id => text()();
   TextColumn get title => text()();
@@ -113,6 +113,9 @@ class TodayCareReminders extends Table {
   TextColumn get notes => text().withDefault(const Constant(''))();
   IntColumn get reminderMinutes => integer().nullable()();
   BoolColumn get completed => boolean().withDefault(const Constant(false))();
+  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+  BoolColumn get pendingSync => boolean().withDefault(const Constant(true))();
+  BoolColumn get deleted => boolean().withDefault(const Constant(false))();
 
   @override
   Set<Column> get primaryKey => {id};

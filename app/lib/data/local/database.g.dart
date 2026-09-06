@@ -2634,6 +2634,48 @@ class $TodayCareRemindersTable extends TodayCareReminders
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  static const VerificationMeta _pendingSyncMeta = const VerificationMeta(
+    'pendingSync',
+  );
+  @override
+  late final GeneratedColumn<bool> pendingSync = GeneratedColumn<bool>(
+    'pending_sync',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("pending_sync" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
+  static const VerificationMeta _deletedMeta = const VerificationMeta(
+    'deleted',
+  );
+  @override
+  late final GeneratedColumn<bool> deleted = GeneratedColumn<bool>(
+    'deleted',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("deleted" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -2644,6 +2686,9 @@ class $TodayCareRemindersTable extends TodayCareReminders
     notes,
     reminderMinutes,
     completed,
+    updatedAt,
+    pendingSync,
+    deleted,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -2716,6 +2761,27 @@ class $TodayCareRemindersTable extends TodayCareReminders
         completed.isAcceptableOrUnknown(data['completed']!, _completedMeta),
       );
     }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    if (data.containsKey('pending_sync')) {
+      context.handle(
+        _pendingSyncMeta,
+        pendingSync.isAcceptableOrUnknown(
+          data['pending_sync']!,
+          _pendingSyncMeta,
+        ),
+      );
+    }
+    if (data.containsKey('deleted')) {
+      context.handle(
+        _deletedMeta,
+        deleted.isAcceptableOrUnknown(data['deleted']!, _deletedMeta),
+      );
+    }
     return context;
   }
 
@@ -2757,6 +2823,18 @@ class $TodayCareRemindersTable extends TodayCareReminders
         DriftSqlType.bool,
         data['${effectivePrefix}completed'],
       )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      pendingSync: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}pending_sync'],
+      )!,
+      deleted: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}deleted'],
+      )!,
     );
   }
 
@@ -2776,6 +2854,9 @@ class TodayCareReminder extends DataClass
   final String notes;
   final int? reminderMinutes;
   final bool completed;
+  final DateTime updatedAt;
+  final bool pendingSync;
+  final bool deleted;
   const TodayCareReminder({
     required this.id,
     required this.title,
@@ -2785,6 +2866,9 @@ class TodayCareReminder extends DataClass
     required this.notes,
     this.reminderMinutes,
     required this.completed,
+    required this.updatedAt,
+    required this.pendingSync,
+    required this.deleted,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -2799,6 +2883,9 @@ class TodayCareReminder extends DataClass
       map['reminder_minutes'] = Variable<int>(reminderMinutes);
     }
     map['completed'] = Variable<bool>(completed);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    map['pending_sync'] = Variable<bool>(pendingSync);
+    map['deleted'] = Variable<bool>(deleted);
     return map;
   }
 
@@ -2814,6 +2901,9 @@ class TodayCareReminder extends DataClass
           ? const Value.absent()
           : Value(reminderMinutes),
       completed: Value(completed),
+      updatedAt: Value(updatedAt),
+      pendingSync: Value(pendingSync),
+      deleted: Value(deleted),
     );
   }
 
@@ -2831,6 +2921,9 @@ class TodayCareReminder extends DataClass
       notes: serializer.fromJson<String>(json['notes']),
       reminderMinutes: serializer.fromJson<int?>(json['reminderMinutes']),
       completed: serializer.fromJson<bool>(json['completed']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      pendingSync: serializer.fromJson<bool>(json['pendingSync']),
+      deleted: serializer.fromJson<bool>(json['deleted']),
     );
   }
   @override
@@ -2845,6 +2938,9 @@ class TodayCareReminder extends DataClass
       'notes': serializer.toJson<String>(notes),
       'reminderMinutes': serializer.toJson<int?>(reminderMinutes),
       'completed': serializer.toJson<bool>(completed),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'pendingSync': serializer.toJson<bool>(pendingSync),
+      'deleted': serializer.toJson<bool>(deleted),
     };
   }
 
@@ -2857,6 +2953,9 @@ class TodayCareReminder extends DataClass
     String? notes,
     Value<int?> reminderMinutes = const Value.absent(),
     bool? completed,
+    DateTime? updatedAt,
+    bool? pendingSync,
+    bool? deleted,
   }) => TodayCareReminder(
     id: id ?? this.id,
     title: title ?? this.title,
@@ -2868,6 +2967,9 @@ class TodayCareReminder extends DataClass
         ? reminderMinutes.value
         : this.reminderMinutes,
     completed: completed ?? this.completed,
+    updatedAt: updatedAt ?? this.updatedAt,
+    pendingSync: pendingSync ?? this.pendingSync,
+    deleted: deleted ?? this.deleted,
   );
   TodayCareReminder copyWithCompanion(TodayCareRemindersCompanion data) {
     return TodayCareReminder(
@@ -2883,6 +2985,11 @@ class TodayCareReminder extends DataClass
           ? data.reminderMinutes.value
           : this.reminderMinutes,
       completed: data.completed.present ? data.completed.value : this.completed,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      pendingSync: data.pendingSync.present
+          ? data.pendingSync.value
+          : this.pendingSync,
+      deleted: data.deleted.present ? data.deleted.value : this.deleted,
     );
   }
 
@@ -2896,7 +3003,10 @@ class TodayCareReminder extends DataClass
           ..write('location: $location, ')
           ..write('notes: $notes, ')
           ..write('reminderMinutes: $reminderMinutes, ')
-          ..write('completed: $completed')
+          ..write('completed: $completed, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('pendingSync: $pendingSync, ')
+          ..write('deleted: $deleted')
           ..write(')'))
         .toString();
   }
@@ -2911,6 +3021,9 @@ class TodayCareReminder extends DataClass
     notes,
     reminderMinutes,
     completed,
+    updatedAt,
+    pendingSync,
+    deleted,
   );
   @override
   bool operator ==(Object other) =>
@@ -2923,7 +3036,10 @@ class TodayCareReminder extends DataClass
           other.location == this.location &&
           other.notes == this.notes &&
           other.reminderMinutes == this.reminderMinutes &&
-          other.completed == this.completed);
+          other.completed == this.completed &&
+          other.updatedAt == this.updatedAt &&
+          other.pendingSync == this.pendingSync &&
+          other.deleted == this.deleted);
 }
 
 class TodayCareRemindersCompanion extends UpdateCompanion<TodayCareReminder> {
@@ -2935,6 +3051,9 @@ class TodayCareRemindersCompanion extends UpdateCompanion<TodayCareReminder> {
   final Value<String> notes;
   final Value<int?> reminderMinutes;
   final Value<bool> completed;
+  final Value<DateTime> updatedAt;
+  final Value<bool> pendingSync;
+  final Value<bool> deleted;
   final Value<int> rowid;
   const TodayCareRemindersCompanion({
     this.id = const Value.absent(),
@@ -2945,6 +3064,9 @@ class TodayCareRemindersCompanion extends UpdateCompanion<TodayCareReminder> {
     this.notes = const Value.absent(),
     this.reminderMinutes = const Value.absent(),
     this.completed = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.pendingSync = const Value.absent(),
+    this.deleted = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   TodayCareRemindersCompanion.insert({
@@ -2956,6 +3078,9 @@ class TodayCareRemindersCompanion extends UpdateCompanion<TodayCareReminder> {
     this.notes = const Value.absent(),
     this.reminderMinutes = const Value.absent(),
     this.completed = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.pendingSync = const Value.absent(),
+    this.deleted = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        title = Value(title),
@@ -2970,6 +3095,9 @@ class TodayCareRemindersCompanion extends UpdateCompanion<TodayCareReminder> {
     Expression<String>? notes,
     Expression<int>? reminderMinutes,
     Expression<bool>? completed,
+    Expression<DateTime>? updatedAt,
+    Expression<bool>? pendingSync,
+    Expression<bool>? deleted,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -2981,6 +3109,9 @@ class TodayCareRemindersCompanion extends UpdateCompanion<TodayCareReminder> {
       if (notes != null) 'notes': notes,
       if (reminderMinutes != null) 'reminder_minutes': reminderMinutes,
       if (completed != null) 'completed': completed,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (pendingSync != null) 'pending_sync': pendingSync,
+      if (deleted != null) 'deleted': deleted,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -2994,6 +3125,9 @@ class TodayCareRemindersCompanion extends UpdateCompanion<TodayCareReminder> {
     Value<String>? notes,
     Value<int?>? reminderMinutes,
     Value<bool>? completed,
+    Value<DateTime>? updatedAt,
+    Value<bool>? pendingSync,
+    Value<bool>? deleted,
     Value<int>? rowid,
   }) {
     return TodayCareRemindersCompanion(
@@ -3005,6 +3139,9 @@ class TodayCareRemindersCompanion extends UpdateCompanion<TodayCareReminder> {
       notes: notes ?? this.notes,
       reminderMinutes: reminderMinutes ?? this.reminderMinutes,
       completed: completed ?? this.completed,
+      updatedAt: updatedAt ?? this.updatedAt,
+      pendingSync: pendingSync ?? this.pendingSync,
+      deleted: deleted ?? this.deleted,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -3036,6 +3173,15 @@ class TodayCareRemindersCompanion extends UpdateCompanion<TodayCareReminder> {
     if (completed.present) {
       map['completed'] = Variable<bool>(completed.value);
     }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (pendingSync.present) {
+      map['pending_sync'] = Variable<bool>(pendingSync.value);
+    }
+    if (deleted.present) {
+      map['deleted'] = Variable<bool>(deleted.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -3053,6 +3199,9 @@ class TodayCareRemindersCompanion extends UpdateCompanion<TodayCareReminder> {
           ..write('notes: $notes, ')
           ..write('reminderMinutes: $reminderMinutes, ')
           ..write('completed: $completed, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('pendingSync: $pendingSync, ')
+          ..write('deleted: $deleted, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -4991,6 +5140,9 @@ typedef $$TodayCareRemindersTableCreateCompanionBuilder =
       Value<String> notes,
       Value<int?> reminderMinutes,
       Value<bool> completed,
+      Value<DateTime> updatedAt,
+      Value<bool> pendingSync,
+      Value<bool> deleted,
       Value<int> rowid,
     });
 typedef $$TodayCareRemindersTableUpdateCompanionBuilder =
@@ -5003,6 +5155,9 @@ typedef $$TodayCareRemindersTableUpdateCompanionBuilder =
       Value<String> notes,
       Value<int?> reminderMinutes,
       Value<bool> completed,
+      Value<DateTime> updatedAt,
+      Value<bool> pendingSync,
+      Value<bool> deleted,
       Value<int> rowid,
     });
 
@@ -5052,6 +5207,21 @@ class $$TodayCareRemindersTableFilterComposer
 
   ColumnFilters<bool> get completed => $composableBuilder(
     column: $table.completed,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get pendingSync => $composableBuilder(
+    column: $table.pendingSync,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get deleted => $composableBuilder(
+    column: $table.deleted,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -5104,6 +5274,21 @@ class $$TodayCareRemindersTableOrderingComposer
     column: $table.completed,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get pendingSync => $composableBuilder(
+    column: $table.pendingSync,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get deleted => $composableBuilder(
+    column: $table.deleted,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$TodayCareRemindersTableAnnotationComposer
@@ -5142,6 +5327,17 @@ class $$TodayCareRemindersTableAnnotationComposer
 
   GeneratedColumn<bool> get completed =>
       $composableBuilder(column: $table.completed, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<bool> get pendingSync => $composableBuilder(
+    column: $table.pendingSync,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get deleted =>
+      $composableBuilder(column: $table.deleted, builder: (column) => column);
 }
 
 class $$TodayCareRemindersTableTableManager
@@ -5192,6 +5388,9 @@ class $$TodayCareRemindersTableTableManager
                 Value<String> notes = const Value.absent(),
                 Value<int?> reminderMinutes = const Value.absent(),
                 Value<bool> completed = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<bool> pendingSync = const Value.absent(),
+                Value<bool> deleted = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => TodayCareRemindersCompanion(
                 id: id,
@@ -5202,6 +5401,9 @@ class $$TodayCareRemindersTableTableManager
                 notes: notes,
                 reminderMinutes: reminderMinutes,
                 completed: completed,
+                updatedAt: updatedAt,
+                pendingSync: pendingSync,
+                deleted: deleted,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -5214,6 +5416,9 @@ class $$TodayCareRemindersTableTableManager
                 Value<String> notes = const Value.absent(),
                 Value<int?> reminderMinutes = const Value.absent(),
                 Value<bool> completed = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<bool> pendingSync = const Value.absent(),
+                Value<bool> deleted = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => TodayCareRemindersCompanion.insert(
                 id: id,
@@ -5224,6 +5429,9 @@ class $$TodayCareRemindersTableTableManager
                 notes: notes,
                 reminderMinutes: reminderMinutes,
                 completed: completed,
+                updatedAt: updatedAt,
+                pendingSync: pendingSync,
+                deleted: deleted,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

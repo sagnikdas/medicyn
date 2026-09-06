@@ -38,7 +38,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -87,6 +87,18 @@ class AppDatabase extends _$AppDatabase {
       }
       if (from < 7) {
         await m.createTable(todayCareReminders);
+      }
+      if (from == 7) {
+        await m.alterTable(
+          TableMigration(
+            todayCareReminders,
+            newColumns: [
+              todayCareReminders.updatedAt,
+              todayCareReminders.pendingSync,
+              todayCareReminders.deleted,
+            ],
+          ),
+        );
       }
     },
   );
@@ -603,6 +615,24 @@ class AppDatabase extends _$AppDatabase {
 
   Future<List<Medicine>> unsyncedMedicines() =>
       (select(medicines)..where((t) => t.pendingSync.equals(true))).get();
+
+  Future<List<TodayCareReminder>> unsyncedTodayCareReminders() => (select(
+    todayCareReminders,
+  )..where((t) => t.pendingSync.equals(true))).get();
+
+  /// Compare inside the transaction: a local edit made while a request was
+  /// in flight must not be overwritten or marked synced by its response.
+  Future<void> applyRemoteTodayCareReminder(TodayCareReminder incoming) =>
+      transaction(() async {
+        final local = await (select(
+          todayCareReminders,
+        )..where((t) => t.id.equals(incoming.id))).getSingleOrNull();
+        if (local != null && local.updatedAt.isAfter(incoming.updatedAt))
+          return;
+        final clean = incoming.copyWith(pendingSync: false);
+        if (local == clean) return;
+        await into(todayCareReminders).insertOnConflictUpdate(clean);
+      });
 
   Future<List<Schedule>> unsyncedSchedules() =>
       (select(schedules)..where((t) => t.pendingSync.equals(true))).get();
