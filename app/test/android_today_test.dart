@@ -67,6 +67,9 @@ TodayCareReminder _care({
   notes: '',
   completed: completed,
   reminderMinutes: 30,
+  updatedAt: DateTime.utc(2026, 9, 5),
+  pendingSync: true,
+  deleted: false,
 );
 
 TodayAgenda _agenda({

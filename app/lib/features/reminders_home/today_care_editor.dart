@@ -138,6 +138,9 @@ class _TodayCareEditorState extends State<TodayCareEditor> {
           notes: _notes.text.trim(),
           reminderMinutes: _lead,
           completed: widget.existing?.completed ?? false,
+          updatedAt: DateTime.now().toUtc(),
+          pendingSync: true,
+          deleted: false,
         ),
       );
       if (mounted) Navigator.pop(context);
@@ -316,10 +319,7 @@ class _TodayCareEditorState extends State<TodayCareEditor> {
                   style: theme.textTheme.bodySmall,
                 ),
                 AnimatedSize(
-                  duration: MedicynMotion.duration(
-                    context,
-                    MedicynMotion.fast,
-                  ),
+                  duration: MedicynMotion.duration(context, MedicynMotion.fast),
                   curve: MedicynMotion.decelerate,
                   alignment: Alignment.topCenter,
                   child: _error == null

@@ -15,6 +15,9 @@ TodayCareReminder _reminder(String id, DateTime at) => TodayCareReminder(
   notes: 'Bring referral',
   reminderMinutes: 30,
   completed: false,
+  updatedAt: DateTime.utc(2026, 9, 5),
+  pendingSync: true,
+  deleted: false,
 );
 
 void main() {
@@ -31,7 +34,9 @@ void main() {
     () async {
       final reminder = _reminder('care-1', DateTime(2026, 9, 5, 10));
       await store.save(reminder);
-      expect((await store.watch().first).single, reminder);
+      final saved = (await store.watch().first).single;
+      expect(saved.title, reminder.title);
+      expect(saved.pendingSync, isTrue);
       await store.save(
         reminder.copyWith(title: 'Updated test', completed: true),
       );
@@ -120,10 +125,52 @@ void main() {
       );
       await diskDb.close();
       diskDb = AppDatabase.forTesting(NativeDatabase(file));
-      expect((await TodayCareStore(diskDb).watch().first).single, reminder);
+      final restored = (await TodayCareStore(diskDb).watch().first).single;
+      expect(restored.title, reminder.title);
+      expect(restored.scheduledAt, reminder.scheduledAt);
+      expect(restored.pendingSync, isTrue);
     } finally {
       await diskDb.close();
       await directory.delete(recursive: true);
     }
   });
+
+  test(
+    'v7 upgrade preserves existing care entries and queues them for upload',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'medicyn-care-v7-',
+      );
+      final file = File('${directory.path}/v7.sqlite');
+      var diskDb = AppDatabase.forTesting(NativeDatabase(file));
+      try {
+        await diskDb.customStatement('DROP TABLE today_care_reminders');
+        await diskDb.customStatement('''CREATE TABLE today_care_reminders (
+        id TEXT NOT NULL PRIMARY KEY, title TEXT NOT NULL, kind TEXT NOT NULL,
+        scheduled_at TEXT NOT NULL, location TEXT NOT NULL DEFAULT '',
+        notes TEXT NOT NULL DEFAULT '', reminder_minutes INTEGER,
+        completed INTEGER NOT NULL DEFAULT 0
+      )''');
+        await diskDb.customStatement('''INSERT INTO today_care_reminders
+        (id, title, kind, scheduled_at, location, notes, reminder_minutes, completed)
+        VALUES ('legacy-care', 'MRI scan', 'scan', '2026-09-10T10:00:00.000Z',
+        'Hospital', 'Bring referral', 60, 1)''');
+        await diskDb.customStatement('PRAGMA user_version = 7');
+        await diskDb.close();
+        diskDb = AppDatabase.forTesting(NativeDatabase(file));
+        final restored = (await TodayCareStore(diskDb).watch().first).single;
+        expect(restored.title, 'MRI scan');
+        expect(restored.location, 'Hospital');
+        expect(restored.notes, 'Bring referral');
+        expect(restored.reminderMinutes, 60);
+        expect(restored.completed, isTrue);
+        expect(restored.deleted, isFalse);
+        expect(restored.pendingSync, isTrue);
+        expect(await diskDb.unsyncedTodayCareReminders(), hasLength(1));
+      } finally {
+        await diskDb.close();
+        await directory.delete(recursive: true);
+      }
+    },
+  );
 }
