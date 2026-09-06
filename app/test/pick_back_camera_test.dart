@@ -59,7 +59,7 @@ void main() {
 
       expect(find.text('Scan Label'), findsOneWidget);
       expect(find.text('Take photo'), findsOneWidget);
-      expect(find.text('Skip — use voice only'), findsOneWidget);
+      expect(find.text('Skip — enter manually'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );

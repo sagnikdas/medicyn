@@ -947,6 +947,25 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (route != null && !route.isCurrent) return;
 
     _autoPromptedAttentionKeys.add(key);
+    // Only this dialog should be in front of the person for a dose that is
+    // due while the app is already open — not the dialog plus a looping
+    // system notification racing it to the same alert. Dismissing here,
+    // right as the dialog is about to show, beats waiting on the 15-second
+    // _silenceIfRinging tick for whichever notification fired first.
+    try {
+      final dismissed = await NotificationService.instance
+          .dismissActiveReminderNotifications();
+      // Cancelling a fired daily notification also drops its repeating
+      // AlarmManager entry (see dismissActiveReminderNotifications), so this
+      // puts tonight's alarm back rather than leaving it silently unarmed
+      // until the next foreground bootstrap.
+      if (dismissed > 0 && mounted) {
+        await NotificationService.instance.reconcile(widget.db);
+      }
+    } catch (_) {
+      // Tests and hosts without the plugin; the dialog still shows.
+    }
+    if (!mounted) return;
     final medicine = occurrence.item.medicine;
     final title = medicineTitle(medicine);
     final dose = medicine.doseAmount.trim();

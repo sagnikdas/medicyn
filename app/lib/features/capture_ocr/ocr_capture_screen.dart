@@ -21,9 +21,9 @@ import '../../core/widgets/medicyn_platform.dart';
 /// camera apps ignore facing extras and reopen whichever lens was last
 /// used — often the selfie camera. A medicine label is not a selfie.
 ///
-/// Pops with the recognized text (possibly empty if the user skips or OCR
-/// finds nothing) — never null, so callers don't need to special-case
-/// cancellation vs. an empty scan.
+/// Pops with the recognized text, or an empty string to enter details
+/// manually if the user skips or OCR finds nothing. Closing without
+/// continuing returns null.
 class OcrCaptureScreen extends StatefulWidget {
   const OcrCaptureScreen({super.key});
 
@@ -226,7 +226,7 @@ class _OcrCaptureScreenState extends State<OcrCaptureScreen>
         setState(() {
           _status = _Status.error;
           _error =
-              'Could not read the label. You can still continue with voice only.';
+              'Could not read the label. You can still enter the details manually.';
         });
       }
     } finally {
@@ -408,7 +408,7 @@ class _OcrCaptureScreenState extends State<OcrCaptureScreen>
                 const SizedBox(height: 12),
                 OutlinedButton(
                   onPressed: busy ? null : _skip,
-                  child: const Text('Skip — use voice only'),
+                  child: const Text('Skip — enter manually'),
                 ),
               ],
             ),
