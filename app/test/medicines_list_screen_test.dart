@@ -63,8 +63,15 @@ void main() {
   // descendant's own timer (ReminderCard's `_SnoozeStatus` poll) is still
   // pending when the framework checks for leaks at test end, failing every
   // test in this file regardless of the diff logic under test.
-  Future<void> disposeTree(WidgetTester tester) =>
-      tester.pumpWidget(const SizedBox());
+  Future<void> disposeTree(WidgetTester tester) async {
+    await tester.pumpWidget(const SizedBox());
+    // The dispose() above cancels Drift's query stream, which defers its
+    // actual close behind a zero-duration Timer. A bare pump() never calls
+    // FakeAsync.elapse and so never fires it — an explicit (even zero)
+    // duration is required to flush it before the end-of-test pending-timer
+    // check runs.
+    await tester.pump(Duration.zero);
+  }
 
   testWidgets('shows every medicine from the stream', (tester) async {
     await addMedicine('m1', 'Metformin');

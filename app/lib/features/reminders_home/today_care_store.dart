@@ -53,11 +53,17 @@ class TodayCareStore {
       await db
           .into(db.todayCareReminders)
           .insertOnConflictUpdate(
-            reminder.copyWith(
-              updatedAt: _nextVersion(previous?.updatedAt),
-              pendingSync: true,
-              deleted: false,
-            ),
+            // A plain data class's toColumns drops null fields instead of
+            // setting them, so clearing reminderMinutes would silently keep
+            // the old value on conflict — a Companion (nullToAbsent: false)
+            // sends every field explicitly, nulls included.
+            reminder
+                .copyWith(
+                  updatedAt: _nextVersion(previous?.updatedAt),
+                  pendingSync: true,
+                  deleted: false,
+                )
+                .toCompanion(false),
           );
     });
   }

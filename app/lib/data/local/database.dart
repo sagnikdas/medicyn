@@ -627,11 +627,18 @@ class AppDatabase extends _$AppDatabase {
         final local = await (select(
           todayCareReminders,
         )..where((t) => t.id.equals(incoming.id))).getSingleOrNull();
-        if (local != null && local.updatedAt.isAfter(incoming.updatedAt))
+        if (local != null && local.updatedAt.isAfter(incoming.updatedAt)) {
           return;
+        }
         final clean = incoming.copyWith(pendingSync: false);
         if (local == clean) return;
-        await into(todayCareReminders).insertOnConflictUpdate(clean);
+        // A plain data class's toColumns drops null fields instead of
+        // setting them, so a remote reminderMinutes: null would silently
+        // keep a stale local value on conflict — toCompanion sends every
+        // field explicitly, nulls included.
+        await into(
+          todayCareReminders,
+        ).insertOnConflictUpdate(clean.toCompanion(false));
       });
 
   Future<List<Schedule>> unsyncedSchedules() =>

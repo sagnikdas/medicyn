@@ -170,8 +170,11 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   void _onCareReminderTap() {
-    if (!mounted || todayCareReminderTaps.value == null ||
-        Theme.of(context).platform != TargetPlatform.android) return;
+    if (!mounted ||
+        todayCareReminderTaps.value == null ||
+        Theme.of(context).platform != TargetPlatform.android) {
+      return;
+    }
     widget.onNeedsAttention?.call();
     if (_scroll.hasClients) _scroll.jumpTo(0);
   }
