@@ -1,6 +1,6 @@
 # Privacy Policy for Medicyn
 
-**Last updated:** 20 August 2026
+**Last updated:** 6 September 2026
 **Contact:** sagnikd91@gmail.com
 
 ## Who is responsible
@@ -21,6 +21,15 @@ This policy covers the Medicyn Android app and its backend.
 **Your medicines and schedules.** The medicine name, strength, form, dose
 amount, any notes you add, and the times and days you've set for reminders.
 Medicyn cannot remind you without this.
+
+**Your other care plans.** Tests, scans, therapy, appointments and other care
+entries contain the title, category, date and time, location, notes, advance
+reminder setting and completion status you enter. This feature requires
+sign-in and cloud backup. Entries are stored for your account on Supabase,
+with an encrypted device cache for offline access and notifications. Offline
+changes wait to sync when a connection is available. Deletion versions are
+kept with the account so other devices can remove the same entry; Undo can
+restore it. These entries are not shared through family links.
 
 **Your dose history.** Each time you mark a dose as taken or snoozed, Medicyn
 records which reminder it was for, the time the dose was due, and the time you
@@ -104,7 +113,7 @@ the consent screen).
 **Cloud backup, AI fill-in, voice input, and family sharing.** Each of these
 is a separate switch, off unless you turn it on:
 
-- Cloud backup — store a copy of your medicines and dose history on
+- Cloud backup — store a copy of your medicines, dose history and other care plans on
   Supabase, so they are not only on this phone.
 - AI fill-in — send the label text (with name, address, date of birth,
   prescription number, and prescriber removed on this phone) and your spoken
@@ -132,7 +141,7 @@ Nothing is backed up, and nothing is shared with family. Voice input and AI
 fill-in still leave the phone if you turn those switches on.
 
 **Supabase** hosts Medicyn's database and handles sign-in. If you consent to
-cloud backup, your medicines, schedules, and dose history are stored there so
+cloud backup, your medicines, schedules, dose history and other care plans are stored there so
 that they survive losing or replacing your phone. Access is restricted per
 account at the database level: no other account can read your data unless you
 have connected it yourself, as described in "Sharing with someone who helps

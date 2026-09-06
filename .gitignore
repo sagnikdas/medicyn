@@ -2,4 +2,5 @@
 supabase/.temp/
 supabase/functions/*/deno.lock
 .cursor/mcp.json
+.cursor/hooks.json
 .DS_Store

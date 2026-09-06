@@ -5,6 +5,7 @@ import 'package:flutter/semantics.dart';
 
 import '../../core/app_settings.dart';
 import '../../core/theme.dart';
+import '../../core/widgets/medicyn_motion.dart';
 import 'day_occurrences.dart';
 import 'reminder_copy.dart';
 
@@ -140,15 +141,20 @@ class _AttentionDeckState extends State<_AttentionDeck> {
 
   Future<bool> _confirmTaken(DayOccurrence occurrence) async {
     final medicine = medicineTitle(occurrence.item.medicine);
-    return await showDialog<bool>(
+    return await showAdaptiveDialog<bool>(
           context: context,
-          builder: (dialogContext) => AlertDialog(
+          builder: (dialogContext) => AlertDialog.adaptive(
             title: Text(
               'Confirm dose',
               style: Theme.of(dialogContext).textTheme.headlineSmall,
             ),
             content: Text(
               'Have you taken $medicine? Confirm only after taking it.',
+              // A long real medicine name wraps instead of overflowing the
+              // dialog, matching the near-identical confirm dialog in
+              // home_screen.dart's _autoPromptAttention.
+              maxLines: 4,
+              overflow: TextOverflow.ellipsis,
               style: Theme.of(
                 dialogContext,
               ).textTheme.bodyLarge?.copyWith(height: 1.35),
@@ -249,7 +255,13 @@ class _AttentionDeckState extends State<_AttentionDeck> {
                       ): () =>
                           unawaited(_handle(visible.first, snooze: true)),
                   },
-                  child: _card(visible.first),
+                  // The Dismissible above remounts (its key follows the
+                  // front occurrence), so this mounts fresh — and replays
+                  // its one-shot fade+rise — each time swiping one dose
+                  // away surfaces the next: the same "settles onto the
+                  // page" entrance Today's own dose rows use, now carried
+                  // through the moment a card newly demands attention.
+                  child: MedicynFadeIn(child: _card(visible.first)),
                 ),
               ),
             ],

@@ -101,3 +101,22 @@ class DoseLogContests extends Table {
   @override
   Set<Column> get primaryKey => {doseLogId};
 }
+
+/// Supabase-backed care agenda, cached in the encrypted per-account file
+/// for offline access and notifications. Deleted rows remain as sync tombstones.
+class TodayCareReminders extends Table {
+  TextColumn get id => text()();
+  TextColumn get title => text()();
+  TextColumn get kind => text()();
+  DateTimeColumn get scheduledAt => dateTime()();
+  TextColumn get location => text().withDefault(const Constant(''))();
+  TextColumn get notes => text().withDefault(const Constant(''))();
+  IntColumn get reminderMinutes => integer().nullable()();
+  BoolColumn get completed => boolean().withDefault(const Constant(false))();
+  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+  BoolColumn get pendingSync => boolean().withDefault(const Constant(true))();
+  BoolColumn get deleted => boolean().withDefault(const Constant(false))();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}

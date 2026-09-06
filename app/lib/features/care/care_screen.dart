@@ -141,7 +141,7 @@ class _CareScreenState extends State<CareScreen> {
     if (ConsentService.instance.isGranted(ConsentPurpose.careShare)) {
       return true;
     }
-    final granted = await showDialog<bool>(
+    final granted = await showAdaptiveDialog<bool>(
       context: context,
       builder: (_) => const CareShareConsentDialog(),
     );
@@ -162,7 +162,7 @@ class _CareScreenState extends State<CareScreen> {
   Future<void> _enterCode() async {
     if (!await _ensureCareShareConsent()) return;
     if (!mounted) return;
-    final code = await showDialog<String>(
+    final code = await showAdaptiveDialog<String>(
       context: context,
       builder: (_) => const _CodeEntryDialog(),
     );
@@ -180,9 +180,9 @@ class _CareScreenState extends State<CareScreen> {
     final link = _link;
     if (link == null) return;
     final who = _otherName ?? 'this person';
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showAdaptiveDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
+      builder: (dialogContext) => AlertDialog.adaptive(
         title: const Text('Disconnect?'),
         content: Text(
           link.status == CareLinkStatus.active
@@ -239,15 +239,25 @@ class _CareScreenState extends State<CareScreen> {
                             : _body(),
                       ),
                     ),
-                    if (_error != null) ...[
-                      const SizedBox(height: 20),
-                      Text(
-                        _error!,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
-                        ),
+                    AnimatedSize(
+                      duration: MedicynMotion.duration(
+                        context,
+                        MedicynMotion.fast,
                       ),
-                    ],
+                      curve: MedicynMotion.decelerate,
+                      alignment: Alignment.topCenter,
+                      child: _error == null
+                          ? const SizedBox(width: double.infinity)
+                          : Padding(
+                              padding: const EdgeInsets.only(top: 20),
+                              child: Text(
+                                _error!,
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.error,
+                                ),
+                              ),
+                            ),
+                    ),
                   ],
                 ),
               ),
@@ -422,9 +432,19 @@ class _CareScreenState extends State<CareScreen> {
       children: [
         Icon(Icons.person_add_alt_1, size: 64, color: scheme.primary),
         const SizedBox(height: 20),
-        Text('$who typed in your number', style: text.headlineSmall),
+        Text(
+          '$who typed in your number',
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: text.headlineSmall,
+        ),
         const SizedBox(height: 8),
-        Text(claimant.email, style: text.titleMedium),
+        Text(
+          claimant.email,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: text.titleMedium,
+        ),
         const SizedBox(height: 12),
         Text(
           'If that is who you expected, connect with them. They will be able '
@@ -483,7 +503,7 @@ class _CareScreenState extends State<CareScreen> {
 
   Future<void> _editOwnPhone() async {
     final current = _link?.ownPhone(_myId) ?? '';
-    final next = await showDialog<String>(
+    final next = await showAdaptiveDialog<String>(
       context: context,
       builder: (_) => _PhoneEntryDialog(initial: current),
     );
@@ -613,7 +633,7 @@ class _CodeEntryDialogState extends State<_CodeEntryDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
+    return AlertDialog.adaptive(
       title: const Text('Enter their number'),
       content: Column(
         mainAxisSize: MainAxisSize.min,
@@ -684,7 +704,7 @@ class _PhoneEntryDialogState extends State<_PhoneEntryDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
+    return AlertDialog.adaptive(
       title: const Text('Your number'),
       content: Column(
         mainAxisSize: MainAxisSize.min,

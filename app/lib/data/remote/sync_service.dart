@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../features/notification_engine/schedule_validation.dart';
 import '../../core/app_settings.dart';
 import '../local/database.dart';
+import 'today_care_sync_service.dart';
 
 /// Syncs local-first Drift rows with Supabase. Never in the reminder-firing
 /// path — the device's own alarms are always the source of truth for *when*
@@ -27,6 +28,7 @@ class SyncService {
     await _syncSchedules(user.id);
     await _syncDoseLogs(user.id);
     await _syncDoseLogContests(user.id);
+    await TodayCareSyncService(_db).sync();
   }
 
   /// Best-effort `DELETE` of one medicine on the server. Postgres cascades
@@ -87,6 +89,7 @@ class SyncService {
     await _pullSchedules(user.id);
     await _pullDoseLogs(user.id);
     await _pullDoseLogContests(user.id);
+    await TodayCareSyncService(_db).pull();
   }
 
   /// The subset of [pullAll] cheap enough to run before every push, not just
@@ -108,6 +111,7 @@ class SyncService {
     await _pullMedicines(user.id);
     await _pullSchedules(user.id);
     await _pullDoseLogContests(user.id);
+    await TodayCareSyncService(_db).pull();
   }
 
   // Every network call below is bounded with a timeout. Without one, a

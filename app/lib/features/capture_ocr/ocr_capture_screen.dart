@@ -6,9 +6,11 @@ import 'package:flutter/material.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../../core/motion.dart';
 import '../../core/widgets/medicyn_chrome.dart';
 import '../../core/widgets/medicyn_layout.dart';
 import '../../core/widgets/medicyn_motion.dart';
+import '../../core/widgets/medicyn_platform.dart';
 
 /// Step 1 of the capture flow: photograph the medicine label, run OCR
 /// on-device, then immediately delete the photo. Only the extracted text
@@ -19,9 +21,9 @@ import '../../core/widgets/medicyn_motion.dart';
 /// camera apps ignore facing extras and reopen whichever lens was last
 /// used — often the selfie camera. A medicine label is not a selfie.
 ///
-/// Pops with the recognized text (possibly empty if the user skips or OCR
-/// finds nothing) — never null, so callers don't need to special-case
-/// cancellation vs. an empty scan.
+/// Pops with the recognized text, or an empty string to enter details
+/// manually if the user skips or OCR finds nothing. Closing without
+/// continuing returns null.
 class OcrCaptureScreen extends StatefulWidget {
   const OcrCaptureScreen({super.key});
 
@@ -82,7 +84,22 @@ class _OcrCaptureScreenState extends State<OcrCaptureScreen>
       if (mounted) setState(() {});
       unawaited(camera?.dispose());
     } else if (state == AppLifecycleState.resumed) {
-      unawaited(_openBackCamera());
+      // The camera permission dialog is hosted by its own translucent
+      // activity, so requesting it for the first time drives this same
+      // resumed -> inactive -> resumed cycle (see the paused comment above)
+      // without ever tearing the camera down. Calling _openBackCamera again
+      // here for that spurious resume raced a second CameraController
+      // against the one already waiting on the dialog: the camera plugin's
+      // native side rejects the second concurrent permission request, and
+      // the first controller's own successful init gets disposed anyway
+      // because a newer generation superseded it — so first-time scanning
+      // always failed and only ever worked on a retry, once permission was
+      // already granted. Only reopen when there truly is nothing already
+      // open or opening (a real background/foreground cycle, which does
+      // null out _camera via the paused branch).
+      if (_camera == null && !_opening) {
+        unawaited(_openBackCamera());
+      }
     }
   }
 
@@ -209,7 +226,7 @@ class _OcrCaptureScreenState extends State<OcrCaptureScreen>
         setState(() {
           _status = _Status.error;
           _error =
-              'Could not read the label. You can still continue with voice only.';
+              'Could not read the label. You can still enter the details manually.';
         });
       }
     } finally {
@@ -241,8 +258,7 @@ class _OcrCaptureScreenState extends State<OcrCaptureScreen>
     final ready = camera != null && camera.value.isInitialized;
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.close),
+        leading: MedicynAdaptiveBackButton(
           tooltip: 'Close',
           onPressed: () => Navigator.of(context).maybePop(),
         ),
@@ -344,14 +360,24 @@ class _OcrCaptureScreenState extends State<OcrCaptureScreen>
                     ),
                   ),
                 ),
-                if (_error != null) ...[
-                  const SizedBox(height: 12),
-                  Text(
-                    _error!,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: scheme.error),
+                AnimatedSize(
+                  duration: MedicynMotion.duration(
+                    context,
+                    MedicynMotion.fast,
                   ),
-                ],
+                  curve: MedicynMotion.decelerate,
+                  alignment: Alignment.topCenter,
+                  child: _error == null
+                      ? const SizedBox(width: double.infinity)
+                      : Padding(
+                          padding: const EdgeInsets.only(top: 12),
+                          child: Text(
+                            _error!,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: scheme.error),
+                          ),
+                        ),
+                ),
                 const SizedBox(height: 16),
                 FilledButton.icon(
                   onPressed: busy || _opening ? null : _scan,
@@ -382,7 +408,7 @@ class _OcrCaptureScreenState extends State<OcrCaptureScreen>
                 const SizedBox(height: 12),
                 OutlinedButton(
                   onPressed: busy ? null : _skip,
-                  child: const Text('Skip — use voice only'),
+                  child: const Text('Skip — enter manually'),
                 ),
               ],
             ),

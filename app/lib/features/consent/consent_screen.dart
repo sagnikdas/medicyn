@@ -57,7 +57,7 @@ class _ConsentScreenState extends State<ConsentScreen> {
                       ),
                       const SizedBox(height: 24),
                       for (final purpose in ConsentPurpose.firstScreen) ...[
-                        SwitchListTile(
+                        SwitchListTile.adaptive(
                           contentPadding: EdgeInsets.zero,
                           title: Text(purpose.title, style: text.titleMedium),
                           subtitle: Padding(
@@ -127,9 +127,9 @@ class _CareShareConsentDialogState extends State<CareShareConsentDialog> {
   @override
   Widget build(BuildContext context) {
     final purpose = ConsentPurpose.careShare;
-    return AlertDialog(
+    return AlertDialog.adaptive(
       title: Text(purpose.title),
-      content: SwitchListTile(
+      content: SwitchListTile.adaptive(
         contentPadding: EdgeInsets.zero,
         title: Text(purpose.sentence),
         value: _agreed,

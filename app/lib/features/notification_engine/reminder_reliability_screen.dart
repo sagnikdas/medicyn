@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../../core/app_settings.dart';
+import '../../core/motion.dart';
+import '../../core/widgets/medicyn_motion.dart';
 import '../../data/local/database.dart';
 import 'reminder_health.dart';
 import 'notification_service.dart';
@@ -80,63 +82,75 @@ class _ReminderReliabilityScreenState extends State<ReminderReliabilityScreen> {
       appBar: AppBar(title: const Text('Reminder reliability')),
       body: ListenableBuilder(
         listenable: ReminderHealthStore.instance,
-        builder: (context, _) => ListView(
-          padding: const EdgeInsets.all(20),
-          children: [
-            Text(
-              'Make sure Medicyn can reach you when a dose is due.',
-              style: Theme.of(context).textTheme.bodyLarge,
-            ),
-            const SizedBox(height: 16),
-            if (_error != null)
-              Card(
-                color: Theme.of(context).colorScheme.errorContainer,
-                child: ListTile(
-                  title: Text(_error!),
-                  trailing: IconButton(
-                    onPressed: _refresh,
-                    icon: const Icon(Icons.refresh),
-                    tooltip: 'Retry',
+        builder: (context, _) => MedicynFadeIn(
+          child: ListView(
+            padding: const EdgeInsets.all(20),
+            children: [
+              Text(
+                'Make sure Medicyn can reach you when a dose is due.',
+                style: Theme.of(context).textTheme.bodyLarge,
+              ),
+              const SizedBox(height: 16),
+              if (_error != null)
+                Card(
+                  color: Theme.of(context).colorScheme.errorContainer,
+                  child: ListTile(
+                    title: Text(_error!),
+                    trailing: IconButton(
+                      onPressed: _refresh,
+                      icon: const Icon(Icons.refresh),
+                      tooltip: 'Retry',
+                    ),
                   ),
                 ),
+              // AnimatedSize rather than a bare `for`: fixing a permission
+              // (Enable / Improve timing) removes its row on the next
+              // _refresh, and without this the list of what's still wrong
+              // just snaps shorter with no sense that the fix landed —
+              // the same treatment Today gives a resolved dose row.
+              AnimatedSize(
+                duration: MedicynMotion.duration(context, MedicynMotion.medium),
+                curve: MedicynMotion.standard,
+                alignment: Alignment.topCenter,
+                child: Column(children: _actions()),
               ),
-            for (final action in _actions()) action,
-            const SizedBox(height: 12),
-            Text(
-              'Schedule status',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 8),
-            if (ReminderHealthStore.instance.items.isEmpty)
-              const Text('No active scheduled reminders need checking.')
-            else
-              ...ReminderHealthStore.instance.items.asMap().entries.map(
-                (entry) => ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Icon(
-                    entry.value.needsAttention
-                        ? Icons.warning_amber_rounded
-                        : Icons.check_circle_outline,
-                    color: entry.value.needsAttention
-                        ? Theme.of(context).colorScheme.error
-                        : Theme.of(context).colorScheme.primary,
+              const SizedBox(height: 12),
+              Text(
+                'Schedule status',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 8),
+              if (ReminderHealthStore.instance.items.isEmpty)
+                const Text('No active scheduled reminders need checking.')
+              else
+                ...ReminderHealthStore.instance.items.asMap().entries.map(
+                  (entry) => ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(
+                      entry.value.needsAttention
+                          ? Icons.warning_amber_rounded
+                          : Icons.check_circle_outline,
+                      color: entry.value.needsAttention
+                          ? Theme.of(context).colorScheme.error
+                          : Theme.of(context).colorScheme.primary,
+                    ),
+                    title: Text('Reminder ${entry.key + 1}'),
+                    subtitle: Text(entry.value.shortStatus),
                   ),
-                  title: Text('Reminder ${entry.key + 1}'),
-                  subtitle: Text(entry.value.shortStatus),
                 ),
+              const SizedBox(height: 16),
+              OutlinedButton.icon(
+                onPressed: _working ? null : _testReminder,
+                icon: const Icon(Icons.notifications_active_outlined),
+                label: const Text('Send a test reminder'),
               ),
-            const SizedBox(height: 16),
-            OutlinedButton.icon(
-              onPressed: _working ? null : _testReminder,
-              icon: const Icon(Icons.notifications_active_outlined),
-              label: const Text('Send a test reminder'),
-            ),
-            const SizedBox(height: 8),
-            TextButton(
-              onPressed: _working ? null : _refresh,
-              child: Text(_working ? 'Checking…' : 'Check again'),
-            ),
-          ],
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: _working ? null : _refresh,
+                child: Text(_working ? 'Checking…' : 'Check again'),
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -22,7 +22,9 @@ class DoseLogWithContest {
   DoseLogWithContest(this.log, this.contest);
 }
 
-@DriftDatabase(tables: [Medicines, Schedules, DoseLogs, DoseLogContests])
+@DriftDatabase(
+  tables: [Medicines, Schedules, DoseLogs, DoseLogContests, TodayCareReminders],
+)
 class AppDatabase extends _$AppDatabase {
   /// Opens the encrypted per-account file via [openEncryptedAppDatabase].
   /// Background isolates construct this the same way so Taken/Snooze and
@@ -36,7 +38,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -81,6 +83,21 @@ class AppDatabase extends _$AppDatabase {
         }
         await customStatement(
           "UPDATE schedules SET status = CASE WHEN frequency_type = 'asNeeded' THEN 'asNeeded' WHEN active = 1 THEN 'active' ELSE 'completed' END WHERE status IS NULL",
+        );
+      }
+      if (from < 7) {
+        await m.createTable(todayCareReminders);
+      }
+      if (from == 7) {
+        await m.alterTable(
+          TableMigration(
+            todayCareReminders,
+            newColumns: [
+              todayCareReminders.updatedAt,
+              todayCareReminders.pendingSync,
+              todayCareReminders.deleted,
+            ],
+          ),
         );
       }
     },
@@ -598,6 +615,31 @@ class AppDatabase extends _$AppDatabase {
 
   Future<List<Medicine>> unsyncedMedicines() =>
       (select(medicines)..where((t) => t.pendingSync.equals(true))).get();
+
+  Future<List<TodayCareReminder>> unsyncedTodayCareReminders() => (select(
+    todayCareReminders,
+  )..where((t) => t.pendingSync.equals(true))).get();
+
+  /// Compare inside the transaction: a local edit made while a request was
+  /// in flight must not be overwritten or marked synced by its response.
+  Future<void> applyRemoteTodayCareReminder(TodayCareReminder incoming) =>
+      transaction(() async {
+        final local = await (select(
+          todayCareReminders,
+        )..where((t) => t.id.equals(incoming.id))).getSingleOrNull();
+        if (local != null && local.updatedAt.isAfter(incoming.updatedAt)) {
+          return;
+        }
+        final clean = incoming.copyWith(pendingSync: false);
+        if (local == clean) return;
+        // A plain data class's toColumns drops null fields instead of
+        // setting them, so a remote reminderMinutes: null would silently
+        // keep a stale local value on conflict — toCompanion sends every
+        // field explicitly, nulls included.
+        await into(
+          todayCareReminders,
+        ).insertOnConflictUpdate(clean.toCompanion(false));
+      });
 
   Future<List<Schedule>> unsyncedSchedules() =>
       (select(schedules)..where((t) => t.pendingSync.equals(true))).get();

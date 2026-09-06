@@ -47,6 +47,17 @@ const String careAlertChannelDescription =
 const String actionTaken = 'taken';
 const String actionSnooze = 'snooze';
 const String actionCareCall = 'care_call';
+const String _iosReminderCategoryId = 'medicyn_reminder';
+
+final List<DarwinNotificationCategory> _iosNotificationCategories = [
+  DarwinNotificationCategory(
+    _iosReminderCategoryId,
+    actions: [
+      DarwinNotificationAction.plain(actionTaken, 'Taken'),
+      DarwinNotificationAction.plain(actionSnooze, 'Snooze'),
+    ],
+  ),
+];
 
 const String _redactedReminderTitle = 'Medicine reminder';
 const String _redactedReminderBody = 'Time to take your dose';
@@ -167,13 +178,25 @@ class NotificationService {
   bool _timezoneReady = false;
   Object? _lastTimezoneError;
 
-  /// Every-X-hours schedules keep this many upcoming doses armed at once.
-  static const int _everyXHoursWindowDays = 14;
-  static const int _everyXHoursMaxOccurrences = 120;
+  /// iOS silently drops local notifications beyond 64 pending requests. Keep
+  /// a small reserve for a snooze or another app-owned reminder.
+  static const int _iosReminderSlotBudget = 60;
+
+  /// Every-X-hours schedules are replenished on foreground/reconcile. A
+  /// two-day rolling window keeps the schedule useful without consuming the
+  /// whole device-wide pending-notification budget.
+  static const int _everyXHoursWindowHours = 48;
+  static const int _everyXHoursMaxOccurrences = 64;
 
   /// Seven would do — the eighth step is slack so a schedule whose weekday
   /// is valid but whose time has already passed today still resolves.
   static const int _maxWeekdaySearchDays = 8;
+
+  /// How many times an unanswered reminder rings before it is left to
+  /// [MissedDoseDetector.sweep]. One alarm in a crowded notification tray is
+  /// exactly the thing someone is least likely to notice in time — three
+  /// spaced-out chances, not one, is the whole point of this feature.
+  static const int attemptsPerReminder = 3;
 
   Future<void> init() async {
     if (!_timezoneReady) await retryTimezoneInitialization();
@@ -182,13 +205,14 @@ class NotificationService {
     const androidSettings = AndroidInitializationSettings(
       '@mipmap/ic_launcher',
     );
-    const iosSettings = DarwinInitializationSettings(
+    final iosSettings = DarwinInitializationSettings(
       requestAlertPermission: false,
       requestBadgePermission: false,
       requestSoundPermission: false,
       requestCriticalPermission: true,
+      notificationCategories: _iosNotificationCategories,
     );
-    const settings = InitializationSettings(
+    final settings = InitializationSettings(
       android: androidSettings,
       iOS: iosSettings,
     );
@@ -361,6 +385,18 @@ class NotificationService {
 
   Future<ReminderPermissionState> readPermissionState() async {
     await init();
+    if (Platform.isIOS) {
+      final ios = _plugin
+          .resolvePlatformSpecificImplementation<
+            IOSFlutterLocalNotificationsPlugin
+          >();
+      final permissions = await ios?.checkPermissions();
+      return ReminderPermissionState(
+        notificationsAllowed: permissions?.isEnabled ?? false,
+        // iOS has no Android-style exact-alarm access gate.
+        exactAlarmsAllowed: true,
+      );
+    }
     if (!Platform.isAndroid) {
       return const ReminderPermissionState(
         notificationsAllowed: true,
@@ -413,8 +449,24 @@ class NotificationService {
           presentBadge: true,
           presentSound: true,
           interruptionLevel: InterruptionLevel.timeSensitive,
+          categoryIdentifier: _iosReminderCategoryId,
         ),
       );
+
+  /// Returns the remaining iOS reminder slots after the current schedule has
+  /// been cancelled. The platform limit is app-wide, so this count must be
+  /// shared by every schedule for the patient rather than applied per row.
+  Future<int?> _availableReminderSlots() async {
+    if (!Platform.isIOS) return null;
+    final pending = await _plugin.pendingNotificationRequests();
+    // UNUserNotificationCenter's limit is system-wide for this app, not
+    // per-payload or per-schedule. Count every pending request, including a
+    // notification from a future feature whose payload we cannot decode.
+    return (_iosReminderSlotBudget - pending.length).clamp(
+      0,
+      _iosReminderSlotBudget,
+    );
+  }
 
   /// Reads the lock-screen setting at schedule time. Android stores title,
   /// body and visibility on the alarm itself, so a later toggle only
@@ -433,13 +485,22 @@ class NotificationService {
   /// The next occurrence of [time], optionally on a specific [weekday]
   /// (0 = Sunday, matching the stored convention).
   ///
+  /// [pivot] stands in for "now" when given — see the retry loop in
+  /// [scheduleForScheduleWithMedicine] that skips an occurrence already
+  /// logged Taken by passing that very occurrence back in as [pivot], which
+  /// is exactly "not after this" and so resolves to the one after it.
+  ///
   /// Returns null rather than throwing or spinning when no occurrence can be
   /// found. [schedulableDays] should already have ruled that out, so a null
   /// here means something got past it — and the one thing this must never do
   /// is fail to return, because [reconcile] has already cancelled the
   /// device's alarms by the time it calls this.
-  tz.TZDateTime? _nextInstanceOfTime(ClockTime time, {int? weekday}) {
-    final now = tz.TZDateTime.now(tz.local);
+  tz.TZDateTime? _nextInstanceOfTime(
+    ClockTime time, {
+    int? weekday,
+    tz.TZDateTime? pivot,
+  }) {
+    final now = pivot ?? tz.TZDateTime.now(tz.local);
     var scheduled = tz.TZDateTime(
       tz.local,
       now.year,
@@ -487,6 +548,26 @@ class NotificationService {
         'scheduledAt': scheduledAt.toUtc().toIso8601String(),
       });
 
+  /// Whether [scheduledAt] for [scheduleId] already has a Taken log.
+  ///
+  /// Consulted before arming daily/specificDays/every-X-hours occurrences so
+  /// a dose settled ahead of its own alarm — mark-all-taken on Today, say,
+  /// answered minutes before a 15:49 reminder was due — does not get a fresh
+  /// alarm armed for the very moment already recorded as taken. Without
+  /// this, [scheduleForScheduleWithMedicine] had no idea any dose log
+  /// existed at all: it re-arms purely from the schedule's times/days, so an
+  /// early Taken never stopped that occurrence's own alarm from still
+  /// ringing.
+  Future<bool> _alreadyTaken(
+    AppDatabase db,
+    String scheduleId,
+    DateTime scheduledAt,
+  ) async =>
+      await db.doseLogById(
+        doseLogIdFor(scheduleId, scheduledAt, DoseAction.taken),
+      ) !=
+      null;
+
   /// [skipCancel] is for callers that have already cleared this schedule's
   /// alarms in a wider sweep — see [reconcile]. Cancelling costs a full
   /// `pendingNotificationRequests()` round-trip over the platform channel,
@@ -494,7 +575,9 @@ class NotificationService {
   /// schedule is the difference between one such call and N+1 of them.
   Future<ScheduleArmResult> scheduleForScheduleWithMedicine(
     ScheduleWithMedicine sm, {
+    required AppDatabase db,
     bool skipCancel = false,
+    int? availableSlots,
   }) async {
     await init();
     await _requireTimezone();
@@ -525,53 +608,92 @@ class NotificationService {
       return ScheduleArmResult.notRequired(schedule.id);
     }
 
+    final slotBudget = availableSlots ?? await _availableReminderSlots();
+    if (slotBudget != null && slotBudget <= 0) {
+      throw UnschedulableSchedule(
+        schedule.id,
+        'iOS pending notification budget is exhausted',
+      );
+    }
+
     final times = schedulableTimes(schedule.times);
     final copy = await _copyFor(medicine);
     final details = _details(visibility: copy.visibility);
     final scheduleMode = await _scheduleMode();
+    // The interval between automatic re-rings. Reuses the person's own
+    // snooze duration rather than a separate setting — see
+    // [_armReminderAttempts] and [MissedDoseDetector.sweep], which judges a
+    // dose missed once this many attempts have each had their own reply
+    // window.
+    final attemptInterval = Duration(minutes: AppSettings.instance.snoozeMinutes);
     var armedCount = 0;
     tz.TZDateTime? nextAlarm;
 
-    void recordArmed(tz.TZDateTime when) {
-      armedCount++;
+    void recordArmed(tz.TZDateTime when, int attempts) {
+      armedCount += attempts;
       if (nextAlarm == null || when.isBefore(nextAlarm!)) nextAlarm = when;
+    }
+
+    int attemptBudgetFor(int consumed) => slotBudget == null
+        ? attemptsPerReminder
+        : (slotBudget - consumed).clamp(0, attemptsPerReminder);
+
+    // Skips past any occurrence of [time] already logged Taken, so marking
+    // a dose done ahead of its own alarm (see _alreadyTaken) re-arms the day
+    // (or week) after it instead of leaving that already-settled moment
+    // armed, or silently dropping the slot until the next reconcile.
+    Future<tz.TZDateTime?> nextUnansweredInstance(
+      ClockTime time, {
+      int? weekday,
+    }) async {
+      var when = _nextInstanceOfTime(time, weekday: weekday);
+      while (when != null && await _alreadyTaken(db, schedule.id, when)) {
+        when = _nextInstanceOfTime(time, weekday: weekday, pivot: when);
+      }
+      return when;
     }
 
     switch (frequency) {
       case FrequencyType.daily:
         for (final time in times) {
-          final when = _nextInstanceOfTime(time.clock);
+          if (slotBudget != null && armedCount >= slotBudget) break;
+          final when = await nextUnansweredInstance(time.clock);
           if (when == null) continue;
-          await _plugin.zonedSchedule(
-            id: notificationIdFor(schedule.id, time.label),
-            title: copy.title,
-            body: copy.body,
-            scheduledDate: when,
-            notificationDetails: details,
-            androidScheduleMode: scheduleMode,
+          final armed = await _armReminderAttempts(
+            scheduleId: schedule.id,
+            slotKey: time.label,
+            timeLabel: time.label,
+            when: when,
+            interval: attemptInterval,
             matchDateTimeComponents: DateTimeComponents.time,
-            payload: _payload(schedule.id, time.label, when),
+            copy: copy,
+            details: details,
+            scheduleMode: scheduleMode,
+            budget: attemptBudgetFor(armedCount),
           );
-          recordArmed(when);
+          if (armed > 0) recordArmed(when, armed);
         }
         break;
 
       case FrequencyType.specificDays:
         for (final day in schedulableDays(schedule.daysOfWeek)) {
           for (final time in times) {
-            final when = _nextInstanceOfTime(time.clock, weekday: day);
+            if (slotBudget != null && armedCount >= slotBudget) break;
+            final when = await nextUnansweredInstance(time.clock, weekday: day);
             if (when == null) continue;
-            await _plugin.zonedSchedule(
-              id: notificationIdFor(schedule.id, '$day-${time.label}'),
-              title: copy.title,
-              body: copy.body,
-              scheduledDate: when,
-              notificationDetails: details,
-              androidScheduleMode: scheduleMode,
+            final armed = await _armReminderAttempts(
+              scheduleId: schedule.id,
+              slotKey: '$day-${time.label}',
+              timeLabel: time.label,
+              when: when,
+              interval: attemptInterval,
               matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
-              payload: _payload(schedule.id, time.label, when),
+              copy: copy,
+              details: details,
+              scheduleMode: scheduleMode,
+              budget: attemptBudgetFor(armedCount),
             );
-            recordArmed(when);
+            if (armed > 0) recordArmed(when, armed);
           }
         }
         break;
@@ -600,7 +722,20 @@ class NotificationService {
           anchor.clock.hour,
           anchor.clock.minute,
         );
-        final windowEnd = now.add(Duration(days: _everyXHoursWindowDays));
+        final windowEnd = now.add(
+          const Duration(hours: _everyXHoursWindowHours),
+        );
+        // Each occurrence below now costs up to attemptsPerReminder slots
+        // rather than one, so the occurrence count itself must shrink to
+        // leave room — otherwise the later occurrences in the window would
+        // silently lose their re-rings (or fail to arm at all) once the
+        // budget ran out partway through arming them.
+        final occurrenceBudget = slotBudget == null
+            ? _everyXHoursMaxOccurrences
+            : (slotBudget ~/ attemptsPerReminder).clamp(
+                0,
+                _everyXHoursMaxOccurrences,
+              );
         final sequence = intervalDoseSequence(
           origin: origin,
           intervalHours: interval,
@@ -622,11 +757,12 @@ class NotificationService {
             windowEnd.second,
             windowEnd.millisecond,
           ),
-          maxOccurrences: _everyXHoursMaxOccurrences,
+          maxOccurrences: occurrenceBudget,
           includeFrom: false,
         );
 
         for (var index = 0; index < sequence.length; index++) {
+          if (slotBudget != null && armedCount >= slotBudget) break;
           final when = sequence[index];
           final scheduledAt = tz.TZDateTime(
             tz.local,
@@ -638,16 +774,24 @@ class NotificationService {
             when.second,
             when.millisecond,
           );
-          await _plugin.zonedSchedule(
-            id: notificationIdFor(schedule.id, 'slot-$index'),
-            title: copy.title,
-            body: copy.body,
-            scheduledDate: scheduledAt,
-            notificationDetails: details,
-            androidScheduleMode: scheduleMode,
-            payload: _payload(schedule.id, anchor.label, when),
+          // Every-X-hours occurrences are independent one-offs, unlike
+          // daily/specificDays' single repeating alarm — skipping one here
+          // costs nothing else in the sequence, so no retry is needed the
+          // way nextUnansweredInstance requires.
+          if (await _alreadyTaken(db, schedule.id, scheduledAt)) continue;
+          final armed = await _armReminderAttempts(
+            scheduleId: schedule.id,
+            slotKey: 'slot-$index',
+            timeLabel: anchor.label,
+            when: scheduledAt,
+            interval: attemptInterval,
+            matchDateTimeComponents: null,
+            copy: copy,
+            details: details,
+            scheduleMode: scheduleMode,
+            budget: attemptBudgetFor(armedCount),
           );
-          recordArmed(scheduledAt);
+          if (armed > 0) recordArmed(scheduledAt, armed);
         }
         break;
 
@@ -660,6 +804,70 @@ class NotificationService {
       nextAlarmExpectedAt: nextAlarm?.toLocal(),
       mode: scheduleMode,
     );
+  }
+
+  /// Arms up to [attemptsPerReminder] copies of one dose occurrence,
+  /// [interval] apart, so a reminder nobody answers rings again instead of
+  /// going silent after just once — see [attemptsPerReminder]. All copies
+  /// share the same [when]/payload: they are one occurrence, not several.
+  /// Answering any one of them settles it for good — see
+  /// `_rescheduleAfterSettle` in notification_actions.dart, which retires
+  /// every attempt (this one and its still-pending siblings) with a full
+  /// re-arm rather than by targeting this occurrence's notifications
+  /// individually.
+  ///
+  /// [matchDateTimeComponents] lets the daily/specificDays callers arm each
+  /// attempt as a genuinely repeating alarm — the platform re-fires it every
+  /// day/week on its own, matching how attempt 1 already worked — rather
+  /// than this needing to re-arm attempts 2 and 3 itself on every foreground.
+  /// every-X-hours passes null: each occurrence there is already a one-off
+  /// instant in its own rolling window.
+  ///
+  /// A repeating attempt is matched purely by its own clock time (and, for
+  /// specificDays, weekday), so one that has drifted past midnight would
+  /// repeat on the wrong day forever. Arming stops before that happens
+  /// rather than risk it — the occurrence still gets whichever earlier
+  /// attempts fit before the boundary.
+  ///
+  /// Returns how many attempts were actually armed, which [budget] can
+  /// force below [attemptsPerReminder] on iOS, where pending requests are
+  /// capped app-wide: fewer re-rings for a dose is better than none arming.
+  Future<int> _armReminderAttempts({
+    required String scheduleId,
+    required String slotKey,
+    required String timeLabel,
+    required tz.TZDateTime when,
+    required Duration interval,
+    required DateTimeComponents? matchDateTimeComponents,
+    required ({String title, String body, NotificationVisibility visibility})
+    copy,
+    required NotificationDetails details,
+    required AndroidScheduleMode scheduleMode,
+    required int budget,
+  }) async {
+    final allowed = budget < attemptsPerReminder ? budget : attemptsPerReminder;
+    var armed = 0;
+    for (var attempt = 1; attempt <= allowed; attempt++) {
+      final fireAt = attempt == 1
+          ? when
+          : tz.TZDateTime.from(when.add(interval * (attempt - 1)), tz.local);
+      if (matchDateTimeComponents != null && fireAt.day != when.day) break;
+      await _plugin.zonedSchedule(
+        id: notificationIdFor(
+          scheduleId,
+          attempt == 1 ? slotKey : '$slotKey@$attempt',
+        ),
+        title: copy.title,
+        body: copy.body,
+        scheduledDate: fireAt,
+        notificationDetails: details,
+        androidScheduleMode: scheduleMode,
+        matchDateTimeComponents: matchDateTimeComponents,
+        payload: _payload(scheduleId, timeLabel, when.toLocal()),
+      );
+      armed++;
+    }
+    return armed;
   }
 
   /// Cancels every currently-armed alarm belonging to [schedule] — not just
@@ -889,12 +1097,11 @@ class NotificationService {
     try {
       await init();
       if (!Platform.isAndroid) {
-        // iOS is not shipping; do not invent a "notifications off" for a
-        // platform we have not asked.
+        final permissions = await readPermissionState();
         final pending = await _plugin.pendingNotificationRequests();
         return DeviceHealthSnapshot(
-          notificationsAllowed: true,
-          exactAlarmsAllowed: true,
+          notificationsAllowed: permissions.notificationsAllowed,
+          exactAlarmsAllowed: permissions.exactAlarmsAllowed,
           batteryExemption: true,
           armedAlarmCount: pending.length,
           checkedAt: DateTime.now().toUtc(),
@@ -948,6 +1155,7 @@ class NotificationService {
     // [cancelForSchedule] on the stop/delete path.
     await _cancelInvalidSnoozes(db, active);
     await _cancelWhere((_, payload) => payload['timeLabel'] != snoozeTimeLabel);
+    var availableSlots = await _availableReminderSlots();
 
     // Every schedule gets its own try/catch, because the sweep above has
     // already happened: without this, the first schedule that cannot be
@@ -960,9 +1168,17 @@ class NotificationService {
       try {
         final result = await scheduleForScheduleWithMedicine(
           sm,
+          db: db,
           skipCancel: true,
+          availableSlots: availableSlots,
         );
         results[sm.schedule.id] = result;
+        if (availableSlots != null) {
+          availableSlots = (availableSlots - result.armedCount).clamp(
+            0,
+            _iosReminderSlotBudget,
+          );
+        }
       } catch (error) {
         failures[sm.schedule.id] = error;
         await MedicynTelemetry.instance.recordError(

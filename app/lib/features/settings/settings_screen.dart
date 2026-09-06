@@ -16,6 +16,7 @@ import '../../data/remote/sync_status.dart';
 import '../auth/auth_service.dart';
 import '../care/care_screen.dart';
 import '../care/care_service.dart';
+import '../care/dose_feed_screen.dart';
 import '../consent/consent_purpose.dart';
 import '../consent/consent_service.dart';
 import '../notification_engine/notification_service.dart';
@@ -100,7 +101,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget build(BuildContext context) {
     final email = AuthService.instance.currentUser?.email ?? '';
     final name = email.contains('@') ? email.split('@').first : email;
-    final avatarUrl = AuthService.instance.currentUserAvatarUrl;
     return Scaffold(
       appBar: widget.embedded ? null : AppBar(title: const Text('Settings')),
       body: SafeArea(
@@ -123,9 +123,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           foregroundColor: Theme.of(
                             context,
                           ).colorScheme.onSecondaryContainer,
-                          foregroundImage: avatarUrl == null
-                              ? null
-                              : NetworkImage(avatarUrl),
+                          // No foregroundImage: a third-party account photo
+                          // (Google's default is a saturated, uncontrolled
+                          // color) would break the single-accent rule on the
+                          // one screen meant to be its home. The initial
+                          // below is the only avatar treatment.
                           child: Text(
                             (name.isEmpty ? 'D' : name.substring(0, 1))
                                 .toUpperCase(),
@@ -147,6 +149,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           _signedIn
                               ? email
                               : 'Reminders stay on this device until you sign in.',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                           style: Theme.of(context).textTheme.bodyMedium
                               ?.copyWith(
                                 color: Theme.of(
@@ -265,6 +269,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ),
                       ),
                     ),
+                    const _FamilyFeedLink(),
                     const SizedBox(height: 24),
                     ListenableBuilder(
                       listenable: SyncStatusStore.instance,
@@ -345,7 +350,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         return Row(
                           children: [
                             Expanded(
-                              child: Slider(
+                              child: Slider.adaptive(
                                 value: scale,
                                 min: AppSettings.minTextScale,
                                 max: AppSettings.maxTextScale,
@@ -400,7 +405,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     const SizedBox(height: 20),
                     ListenableBuilder(
                       listenable: AppSettings.instance,
-                      builder: (context, _) => SwitchListTile(
+                      builder: (context, _) => SwitchListTile.adaptive(
                         contentPadding: EdgeInsets.zero,
                         title: const Text(
                           'Show medicine names on the lock screen',
@@ -463,7 +468,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         return Column(
                           children: [
                             for (final purpose in ConsentPurpose.values)
-                              SwitchListTile(
+                              SwitchListTile.adaptive(
                                 contentPadding: EdgeInsets.zero,
                                 title: Text(purpose.title),
                                 subtitle: Text(purpose.sentence),
@@ -526,9 +531,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       );
     } catch (e) {
       if (!mounted) return;
-      await showDialog<void>(
+      await showAdaptiveDialog<void>(
         context: context,
-        builder: (dialogContext) => AlertDialog(
+        builder: (dialogContext) => AlertDialog.adaptive(
           title: const Text('Could not export'),
           content: const Text(
             'Your data could not be prepared right now. Check your storage and try again.',
@@ -630,9 +635,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       return;
     }
     if (!context.mounted) return;
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showAdaptiveDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
+      builder: (dialogContext) => AlertDialog.adaptive(
         title: const Text('Turn off cloud backup?'),
         content: const Text(
           "Your caregiver won't be told if you miss a dose while this is "
@@ -666,9 +671,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     // Captured before the await so the dialog's result doesn't have to be
     // paired with a `context.mounted` check afterwards.
     final navigator = Navigator.of(context);
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showAdaptiveDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
+      builder: (dialogContext) => AlertDialog.adaptive(
         title: const Text('Sign out?'),
         content: const Text(
           "You'll need to sign in with Google again to get back in. "
@@ -706,9 +711,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   /// hit for the people this app is for.
   Future<void> _confirmDeleteAccount(BuildContext context) async {
     final navigator = Navigator.of(context);
-    final explained = await showDialog<bool>(
+    final explained = await showAdaptiveDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
+      builder: (dialogContext) => AlertDialog.adaptive(
         title: const Text('Delete your account?'),
         content: const SingleChildScrollView(
           child: Column(
@@ -744,9 +749,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (explained != true) return;
     if (!context.mounted) return;
 
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showAdaptiveDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
+      builder: (dialogContext) => AlertDialog.adaptive(
         title: const Text('Permanently delete?'),
         content: const Text(
           'Your account and all of this data will be deleted now. This cannot '
@@ -775,12 +780,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (userId == null || userId.isEmpty) return;
 
     if (!context.mounted) return;
-    showDialog<void>(
+    showAdaptiveDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (_) => const PopScope(
         canPop: false,
-        child: AlertDialog(
+        child: AlertDialog.adaptive(
           content: Row(
             children: [
               CircularProgressIndicator(),
@@ -803,9 +808,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     if (failure != null) {
       if (!context.mounted) return;
-      await showDialog<void>(
+      await showAdaptiveDialog<void>(
         context: context,
-        builder: (dialogContext) => AlertDialog(
+        builder: (dialogContext) => AlertDialog.adaptive(
           title: const Text('Could not delete account'),
           content: Text('$failure'),
           actions: [
@@ -883,6 +888,66 @@ class _BackupStatusCard extends StatelessWidget {
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Link to the shared care-link feed, moved here from Insights: this is
+/// about the family relationship itself, not personal adherence analytics,
+/// so it belongs next to "Connect with family" rather than at the foot of
+/// a stats page. Renders nothing until signed in with an active link —
+/// including the plain not-signed-in case — so callers can place it
+/// unconditionally.
+class _FamilyFeedLink extends StatefulWidget {
+  const _FamilyFeedLink();
+
+  @override
+  State<_FamilyFeedLink> createState() => _FamilyFeedLinkState();
+}
+
+class _FamilyFeedLinkState extends State<_FamilyFeedLink> {
+  CareLink? _link;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    if (AuthService.instance.currentUser == null) return;
+    try {
+      final link = await CareService.instance.currentLink();
+      if (!mounted) return;
+      setState(() => _link = link);
+    } catch (_) {
+      // The rest of Settings still works without a care link.
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final me = AuthService.instance.currentUser;
+    final link = _link;
+    if (me == null || link == null || link.status != CareLinkStatus.active) {
+      return const SizedBox.shrink();
+    }
+    final amPatient = link.isPatient(me.id);
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: ProfileMenuRow(
+        icon: Icons.query_stats_outlined,
+        title: amPatient ? 'What they see' : "Their week's doses",
+        subtitle: 'The same feed both sides of a care link share.',
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => DoseFeedScreen(
+              patientId: link.patientId,
+              viewingOwnData: amPatient,
+            ),
+          ),
         ),
       ),
     );

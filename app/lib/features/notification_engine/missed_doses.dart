@@ -23,9 +23,11 @@ import 'expected_doses.dart';
 class MissedDoseDetector {
   const MissedDoseDetector();
 
-  /// How long after a dose is due before it counts as missed. Long enough
-  /// that a slow breakfast is not an incident; short enough that the answer
-  /// still arrives while someone could act on it.
+  /// How long after a dose is due before it counts as missed, when nothing
+  /// else says otherwise. Kept only as the shared default a few calendar
+  /// helpers in day_occurrences.dart accept for symmetry with this class —
+  /// none of them actually consult it. [sweep] itself no longer uses this
+  /// constant; see [snoozeWindow] and the computation below.
   static const grace = Duration(minutes: 30);
 
   /// How far back a single sweep will look. A phone left off over a weekend
@@ -106,8 +108,16 @@ class MissedDoseDetector {
   }) async {
     final at = now ?? DateTime.now();
     final windowStart = at.subtract(lookback ?? MissedDoseDetector.lookback);
-    // Nothing within the grace period is judged yet.
-    final windowEnd = at.subtract(grace);
+    // A reminder now automatically re-rings up to
+    // NotificationService.attemptsPerReminder times, [snoozeWindow] apart
+    // (see scheduleForScheduleWithMedicine) — the last of those attempts is
+    // due at (attemptsPerReminder - 1) * snoozeWindow after the dose, and
+    // deserves its own snoozeWindow to be answered before this sweep gives
+    // up on it. Nothing within that combined window is judged yet. Not a
+    // literal NotificationService import (this file must not depend on the
+    // plugin), so the attempt count — 3 — is inlined; the two are meant to
+    // move together.
+    final windowEnd = at.subtract(snoozeWindow * 3);
     if (!windowEnd.isAfter(windowStart)) return 0;
 
     final schedules = await db.activeSchedulesOnce();

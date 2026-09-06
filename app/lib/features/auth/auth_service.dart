@@ -75,15 +75,20 @@ class AuthService {
   User? get currentUser => _client.auth.currentUser;
   bool get isSignedIn => currentUser != null;
 
-  /// Google includes the account photo in Supabase user metadata. Keep the
-  /// UI on a safe HTTPS URL and fall back to initials when it is unavailable.
-  String? get currentUserAvatarUrl {
-    final metadata = currentUser?.userMetadata;
-    final raw = metadata?['avatar_url'] ?? metadata?['picture'];
-    if (raw is! String || raw.trim().isEmpty) return null;
-    final uri = Uri.tryParse(raw.trim());
-    if (uri == null || uri.scheme != 'https' || uri.host.isEmpty) return null;
-    return uri.toString();
+  /// A single uppercase letter for the app's own avatar treatment — derived
+  /// from the email's local part, the same stand-in display name Settings
+  /// already shows next to it. Null when signed out, so callers can fall
+  /// back to a generic icon instead of an initial that means nothing.
+  ///
+  /// Google includes the account photo in Supabase user metadata
+  /// (`avatar_url`/`picture`), but the UI never renders it: a third-party
+  /// avatar's own color (often not teal) would break the app's
+  /// single-accent rule on every screen it appears on.
+  String? get currentUserInitial {
+    final email = currentUser?.email;
+    if (email == null || email.isEmpty) return null;
+    final name = email.contains('@') ? email.split('@').first : email;
+    return (name.isEmpty ? email : name).substring(0, 1).toUpperCase();
   }
 
   Stream<AuthState> get onAuthStateChange => _client.auth.onAuthStateChange;

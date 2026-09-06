@@ -3,6 +3,8 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../core/motion.dart';
+import 'day_dose_style.dart';
+import 'day_occurrences.dart';
 
 /// Status chips for one calendar day. Booleans, not counts — the parent
 /// already rolled the day's doses up. Dots and semantics both read this.
@@ -23,9 +25,6 @@ class CalendarDayMarks {
 
   bool get isEmpty => !taken && !pending && !missed && !snoozed && !notRecorded;
 }
-
-const _takenDot = Color(0xFF00685F);
-const _pendingDot = Color(0xFF3D6FA8);
 
 const _months = [
   'January',
@@ -51,7 +50,8 @@ class DoseCalendarMetrics {
 
   static const _baseRow = 48.0;
   static const _baseCircle = 36.0;
-  static const _rowExtra = 12.0; // cell padding + dots
+  static const _dotsHeight = 10.0; // tall enough to hold a status glyph
+  static const _rowExtra = 6.0 + _dotsHeight; // cell padding + dots
   static const _actionRow = 48.0;
   static const _gaps = 12.0; // 8 above weekdays + 4 below
   static const _weekdayFont = 12.0;
@@ -547,8 +547,8 @@ class _DayCell extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 SizedBox(
-                  height: 6,
-                  child: _Dots(marks: marks, scheme: scheme),
+                  height: DoseCalendarMetrics._dotsHeight,
+                  child: _Dots(marks: marks),
                 ),
               ],
             ),
@@ -559,31 +559,35 @@ class _DayCell extends StatelessWidget {
   }
 }
 
+/// Status-Has-a-Shape Rule, in miniature: each mark is [DayDoseStyle]'s own
+/// glyph+color pairing, not a bare color-only dot, so a colorblind or
+/// low-vision reader isn't left to distinguish status by hue alone here
+/// either — the exact gap this widget used to have.
 class _Dots extends StatelessWidget {
-  const _Dots({required this.marks, required this.scheme});
+  const _Dots({required this.marks});
 
   final CalendarDayMarks marks;
-  final ColorScheme scheme;
 
   @override
   Widget build(BuildContext context) {
-    final colors = <Color>[
-      if (marks.taken) _takenDot,
-      if (marks.missed) scheme.error,
-      if (marks.pending) _pendingDot,
-      if (marks.snoozed) scheme.tertiary,
-      if (marks.notRecorded) scheme.outline,
+    final statuses = <DayDoseStatus>[
+      if (marks.taken) DayDoseStatus.taken,
+      if (marks.missed) DayDoseStatus.missed,
+      if (marks.pending) DayDoseStatus.pending,
+      if (marks.snoozed) DayDoseStatus.snoozed,
+      if (marks.notRecorded) DayDoseStatus.notRecorded,
     ];
-    if (colors.length > 3) colors.removeRange(3, colors.length);
-    if (colors.isEmpty) return const SizedBox.shrink();
+    if (statuses.length > 3) statuses.removeRange(3, statuses.length);
+    if (statuses.isEmpty) return const SizedBox.shrink();
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        for (var i = 0; i < colors.length; i++) ...[
+        for (var i = 0; i < statuses.length; i++) ...[
           if (i > 0) const SizedBox(width: 3),
-          DecoratedBox(
-            decoration: BoxDecoration(color: colors[i], shape: BoxShape.circle),
-            child: const SizedBox(width: 6, height: 6),
+          Icon(
+            DayDoseStyle.glyph(statuses[i]),
+            size: DoseCalendarMetrics._dotsHeight,
+            color: DayDoseStyle.color(context, statuses[i]),
           ),
         ],
       ],

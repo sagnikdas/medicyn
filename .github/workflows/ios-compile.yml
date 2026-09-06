@@ -1,0 +1,66 @@
+name: iOS compile health
+
+on:
+  pull_request:
+    paths:
+      - app/**
+      - .github/workflows/ios-compile.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-compile-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compile:
+    name: Compile unsigned iOS app
+    runs-on: macos-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.41.3'
+          channel: stable
+          cache: true
+
+      - name: Resolve Dart and CocoaPods inputs
+        run: flutter pub get
+
+      - name: Compile unsigned iOS app
+        run: flutter build ios --release --no-codesign
+
+      # Flutter's no-codesign build produces a real device .app, not an
+      # installable IPA. Package that compiled app as an explicitly unsigned
+      # artifact so consumers cannot mistake it for a release build.
+      - name: Package unsigned IPA artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          app_path="$(find build/ios -type d -name Runner.app -print -quit)"
+          test -n "$app_path"
+          test -d "$app_path"
+
+          ipa_dir="$RUNNER_TEMP/medicyn-unsigned-ipa"
+          mkdir -p "$ipa_dir/Payload"
+          cp -R "$app_path" "$ipa_dir/Payload/Runner.app"
+          ditto -c -k --sequesterRsrc --keepParent \
+            "$ipa_dir/Payload" \
+            build/ios/Medicyn-unsigned.ipa
+
+      - name: Upload unsigned iOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: medicyn-ios-unsigned-${{ github.sha }}
+          path: app/build/ios/Medicyn-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 7

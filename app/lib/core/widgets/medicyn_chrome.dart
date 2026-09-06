@@ -1,8 +1,10 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../motion.dart';
 import '../theme.dart';
 import 'medicyn_motion.dart';
+import 'medicyn_platform.dart';
 
 /// Greeting copy from the Stitch Today screen, keyed off the local hour.
 String greetingFor(DateTime now) {
@@ -283,12 +285,17 @@ class MedicynBottomNav extends StatelessWidget {
     super.key,
     required this.index,
     required this.onChanged,
-    this.profileImageUrl,
+    this.profileInitial,
   });
 
   final int index;
   final ValueChanged<int> onChanged;
-  final String? profileImageUrl;
+
+  /// A single uppercase letter for the signed-in account, or null when
+  /// signed out. Never a third-party photo, so the Profile tab stays on the
+  /// app's own teal-on-mint mark instead of an arbitrary, uncontrolled
+  /// color on every screen.
+  final String? profileInitial;
 
   static const items = [
     (
@@ -312,6 +319,27 @@ class MedicynBottomNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    if (isApplePlatform(context)) {
+      return CupertinoTabBar(
+        currentIndex: index,
+        onTap: onChanged,
+        activeColor: scheme.primary,
+        inactiveColor: scheme.onSurfaceVariant,
+        backgroundColor: scheme.surfaceContainer,
+        border: Border(
+          top: BorderSide(color: scheme.outlineVariant, width: 0.5),
+        ),
+        items: [
+          for (var i = 0; i < items.length; i++)
+            BottomNavigationBarItem(
+              icon: _iconForItem(context, i, selected: false),
+              activeIcon: _iconForItem(context, i, selected: true),
+              label: items[i].label,
+            ),
+        ],
+      );
+    }
+
     return Material(
       color: scheme.surfaceContainer,
       elevation: 0,
@@ -344,11 +372,67 @@ class MedicynBottomNav extends StatelessWidget {
                     child: _NavItem(
                       item: items[i],
                       selected: i == index,
-                      profileImageUrl: i == 3 ? profileImageUrl : null,
+                      profileInitial: i == 3 ? profileInitial : null,
                       onTap: () => onChanged(i),
                     ),
                   ),
               ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _iconForItem(
+    BuildContext context,
+    int index, {
+    required bool selected,
+  }) {
+    final item = items[index];
+    final initial = index == 3 ? profileInitial : null;
+    if (initial == null) {
+      return Icon(selected ? item.selected : item.icon);
+    }
+    return _InitialAvatar(initial: initial, diameter: 22);
+  }
+}
+
+/// The app's own avatar mark: a single initial on the same
+/// secondaryContainer/onSecondaryContainer pairing Settings uses for its
+/// profile hero, so identity never introduces a color the design system
+/// doesn't already own.
+class _InitialAvatar extends StatelessWidget {
+  const _InitialAvatar({
+    super.key,
+    required this.initial,
+    required this.diameter,
+  });
+
+  final String initial;
+  final double diameter;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      width: diameter,
+      height: diameter,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: scheme.secondaryContainer,
+        shape: BoxShape.circle,
+      ),
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Padding(
+          padding: const EdgeInsets.all(2),
+          child: Text(
+            initial,
+            maxLines: 1,
+            style: TextStyle(
+              color: scheme.onSecondaryContainer,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ),
@@ -361,13 +445,13 @@ class _NavItem extends StatelessWidget {
   const _NavItem({
     required this.item,
     required this.selected,
-    this.profileImageUrl,
+    this.profileInitial,
     required this.onTap,
   });
 
   final ({IconData icon, IconData selected, String label}) item;
   final bool selected;
-  final String? profileImageUrl;
+  final String? profileInitial;
   final VoidCallback onTap;
 
   @override
@@ -380,27 +464,17 @@ class _NavItem extends StatelessWidget {
         AnimatedSwitcher(
           duration: MedicynMotion.duration(context, MedicynMotion.fast),
           switchInCurve: MedicynMotion.decelerate,
-          child: profileImageUrl == null
+          child: profileInitial == null
               ? Icon(
                   selected ? item.selected : item.icon,
                   key: ValueKey<bool>(selected),
                   size: 22,
                   color: color,
                 )
-              : ClipOval(
-                  key: const ValueKey('profile-image'),
-                  child: Image.network(
-                    profileImageUrl!,
-                    width: 22,
-                    height: 22,
-                    fit: BoxFit.cover,
-                    excludeFromSemantics: true,
-                    errorBuilder: (context, error, stackTrace) => Icon(
-                      selected ? item.selected : item.icon,
-                      size: 22,
-                      color: color,
-                    ),
-                  ),
+              : _InitialAvatar(
+                  key: const ValueKey('profile-initial'),
+                  initial: profileInitial!,
+                  diameter: 22,
                 ),
         ),
         const SizedBox(height: 4),

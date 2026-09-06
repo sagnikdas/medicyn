@@ -113,11 +113,15 @@ class _ChangeHistoryScreenState extends State<ChangeHistoryScreen> {
                 children: [
                   Text(
                     edit.summary,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.titleSmall,
                   ),
                   const SizedBox(height: 4),
                   Text(
                     '$who · ${describeRelativeDay(edit.createdAt)}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ],

@@ -7,10 +7,11 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../../core/app_navigation.dart';
 import '../../core/app_settings.dart';
 import '../../data/local/database.dart';
+import '../../data/local/lifecycle.dart';
 import '../../data/local/tables.dart';
 import '../care/dose_feed_screen.dart';
 import '../care/phone_dial.dart';
-import '../dose_confirm/dose_confirm_screen.dart';
+import '../reminders_home/today_care_events.dart';
 import 'missed_doses.dart';
 import 'notification_service.dart';
 
@@ -46,7 +47,9 @@ void notificationTapBackground(NotificationResponse response) {
 /// buttons (Taken/Snooze), opens its own short-lived database connection
 /// rather than relying on an app-wide singleton, since a background isolate
 /// has none of the app's state. For a plain tap on the notification body,
-/// pushes [DoseConfirmScreen] instead — which does the same on its own.
+/// brings the app to its root instead — see the branch below — and lets
+/// Home's own attention detection show the same bold Taken/Snooze dialog it
+/// already shows for any due dose.
 ///
 /// Returns a [Future] (rather than plain `void`) so main.dart's cold-start
 /// launch path can await it before marking that launch handled — a
@@ -89,6 +92,12 @@ Future<void> handleNotificationResponse(NotificationResponse response) async {
     return;
   }
 
+  final todayCareId = payload[todayCarePayloadKey];
+  if (todayCareId is String && todayCareId.isNotEmpty) {
+    openTodayCareReminder(todayCareId);
+    return;
+  }
+
   final scheduleId = payload['scheduleId'] as String?;
   if (scheduleId == null) return;
   // The dose was due whenever the alarm was set for — not whenever the user
@@ -96,20 +105,16 @@ Future<void> handleNotificationResponse(NotificationResponse response) async {
   final scheduledAt = _scheduledAtFromPayload(payload) ?? DateTime.now();
 
   if (actionId != actionTaken && actionId != actionSnooze) {
-    // Plain tap on the notification body (not an action button) — bring up
-    // the Taken/Snooze prompt. Only reachable with a live widget tree
-    // (foreground, or backgrounded-but-alive): a cold start's launch tap is
-    // handled separately via NotificationService.consumeLaunchNotificationResponse,
-    // since no navigator exists yet when this fires on a background isolate.
-    navigatorKey.currentState?.push(
-      MaterialPageRoute(
-        builder: (_) => DoseConfirmScreen(
-          scheduleId: scheduleId,
-          scheduledAt: scheduledAt,
-          db: AppDatabase(),
-        ),
-      ),
-    );
+    // Plain tap on the notification body (not an action button). Dismiss
+    // whatever screen was open before this — responding to the reminder
+    // takes priority — so Home (kept mounted underneath every route) is
+    // current again and its own attention detection can show the bold
+    // Taken/Snooze dialog immediately, reading the same due dose straight
+    // from the database rather than needing scheduleId/scheduledAt threaded
+    // through a dedicated confirm screen the way an earlier build did.
+    // `scheduleId`/`scheduledAt` above still matter for the action-button
+    // branches below.
+    navigatorKey.currentState?.popUntil((route) => route.isFirst);
     return;
   }
 
@@ -160,14 +165,48 @@ Future<void> recordDoseTaken(
     action: DoseAction.taken,
     source: source,
   );
-  // Taking a dose through Home or the confirmation screen must cancel any
-  // pending snooze re-reminder. The notification action itself is normally
-  // auto-cancelled by Android, but these in-app paths otherwise leave the
-  // one-off alarm armed and produce a false reminder later.
-  await NotificationService.instance.cancelSnooze(
-    scheduleId: scheduleId,
-    scheduledAt: scheduledAt,
-  );
+  // Taking a dose — whether ahead of its own alarm or after it already
+  // rang — must stop that occurrence's alarm(s) from ringing again, and
+  // must not leave a pending snooze one-off behind either. A full re-arm
+  // does both: see _rescheduleAfterSettle.
+  await _rescheduleAfterSettle(db, scheduleId);
+}
+
+/// Cancels and re-arms one schedule's alarms from scratch, now that a dose
+/// has just been settled (Taken or Snoozed).
+///
+/// A fresh full re-arm — rather than trying to cancel just the one pending
+/// notification that was answered — is what correctly retires today's
+/// occurrence while keeping a daily/specificDays schedule's alarm intact for
+/// its next one. flutter_local_notifications reschedules that alarm from
+/// its own native fire handler without ever refreshing its payload, so
+/// targeting a specific pending request by payload risks matching (or
+/// missing) the wrong instance once that payload has gone stale — a
+/// schedule that hasn't been reconciled today, say. `cancelForSchedule`
+/// instead matches on the schedule id alone, which is never stale, and the
+/// re-arm that follows both skips any occurrence already logged Taken (see
+/// NotificationService.scheduleForScheduleWithMedicine) and — since "now" is
+/// already past a dose that was due enough to answer — naturally resolves
+/// to the next occurrence for one that was only Snoozed.
+///
+/// No-ops quietly if the schedule or medicine can no longer be found (the
+/// medicine was deleted moments after this dose was answered, say) — there
+/// is nothing left to re-arm, and cancelForSchedule already ran when the
+/// medicine/schedule was deleted.
+Future<void> _rescheduleAfterSettle(AppDatabase db, String scheduleId) async {
+  final schedule = await db.scheduleById(scheduleId);
+  if (schedule == null) return;
+  final medicine = await db.medicineById(schedule.medicineId);
+  if (medicine == null) return;
+  try {
+    await NotificationService.instance.scheduleForScheduleWithMedicine(
+      ScheduleWithMedicine(schedule, medicine),
+      db: db,
+    );
+  } catch (_) {
+    // Best-effort: the dose action is already persisted, and the next
+    // foreground's reconcile picks this schedule back up regardless.
+  }
 }
 
 /// Logs the snooze, then arms a one-off reminder [delay] out.
@@ -218,6 +257,21 @@ Future<void> recordDoseSnoozed(
   if (schedule == null) return;
   final medicine = await db.medicineById(schedule.medicineId);
   if (medicine == null) return;
+
+  // Retire today's regular alarm(s) before arming the one-off below — see
+  // _rescheduleAfterSettle. Order matters here: that re-arm's own cancel
+  // sweep would wipe out the snooze this method is about to arm if it ran
+  // after it instead of before.
+  await _rescheduleAfterSettle(db, scheduleId);
+
+  // Re-check freshness right before arming: `schedule` above was loaded
+  // before _rescheduleAfterSettle's own awaited plugin calls, so someone
+  // deleting or stopping this medicine in that window would otherwise be
+  // invisible here — arming the snooze regardless resurrected a reminder
+  // for a medicine that no longer exists, ringing on a phone with nothing
+  // left to say it was for.
+  final current = await db.scheduleById(scheduleId);
+  if (current == null || !reminderIsActive(current)) return;
 
   await NotificationService.instance.scheduleSnooze(
     scheduleId: scheduleId,
