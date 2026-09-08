@@ -74,7 +74,9 @@ camera at different paper.
 
 - [ ] **N1 — Refill basket.** Collapse per-medicine warnings into one list on
       one date a month. Plugs into `refill.dart`,
-      `Medicines.tabletsRemaining`; no schema change needed.
+      `Medicines.tabletsRemaining`; no schema change needed. Not unit-aware —
+      still a raw tablet count, so it won't sensibly cover ml, puffs, drops,
+      or injections if one of those is ever added as a dose unit.
 - [ ] **N2 — Tests that are due.** The monitoring a regimen implies
       (levothyroxine → TSH, warfarin → INR, metformin → HbA1c, statin →
       lipids + LFT). Plugs into `insights_screen.dart`, `TodayCareReminders`.
@@ -240,8 +242,12 @@ Device script: [`testing/REAL-DEVICE-VALIDATION-TEST-PLAN.md`](testing/REAL-DEVI
 - [ ] Locale-aware dates — no `DateFormat(` usage anywhere in the app;
       weekday/month names and relative-time strings are hardcoded English
       arrays. Tracked in [issue #100](https://github.com/sagnikdas/medicyn/issues/100).
-- [ ] Insights calculation and accessibility fixes
-- [ ] Refill workflow (superseded in shape by N1)
+- [x] Insights calculation and accessibility fixes — verified: the named
+      bug ("most-consistent" period was hardcoded to `DayPart.morning`) is
+      fixed; `insights_screen.dart` now computes rates for all `DayPart`
+      values and picks the real max. No distinct Insights-specific
+      accessibility issue found beyond the general text-scale work already
+      tracked in issue #96.
 
 ### Product gaps — after a successful launch
 - [ ] Multiple caregivers / multiple patients, and escalation
