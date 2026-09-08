@@ -203,12 +203,21 @@ Device script: [`testing/REAL-DEVICE-VALIDATION-TEST-PLAN.md`](testing/REAL-DEVI
       merge: the first deploy used `fs.readFileSync` for the markdown,
       which 500'd on Cloudflare Workers (no filesystem at request time);
       fixed by inlining the content as string literals instead.
-      private browser window before Play submission.
 - [ ] Release keystore and `app/android/key.properties` (see `app/README.md`)
 - [ ] Play Console Data safety form, matching `compliance/PRIVACY.md` (answers prepared in `compliance/pack/PLAY-DATA-SAFETY.md`)
 - [ ] Complete the Play declaration for `SCHEDULE_EXACT_ALARM`
 - [ ] `flutter build appbundle --release`, upload to internal testing
-- [ ] Register an Android OAuth client for each SHA-1 Play shows (app signing key and upload key), add both to Supabase Client IDs
+- [ ] Register an Android OAuth client for each SHA-1 Play shows (app
+      signing key and upload key), add both to Supabase Client IDs — full
+      walkthrough restored to `app/README.md` § Auth (was in the deleted
+      root `README.md`, never migrated during the docs consolidation).
+      **New risk found while restoring it:** the debug OAuth client was
+      last confirmed working 2026-08-18, but the app's package name
+      renamed `com.sagnikdas.dosely` → `com.sagnikdas.medicyn` on
+      2026-09-03 — an Android OAuth client is keyed on package name *and*
+      SHA-1 together, so the rename likely orphaned it even though the
+      debug keystore itself never changed. Verify debug sign-in still
+      works with a fresh `flutter run` before assuming it does.
 - [ ] Closed testing for the required period
 - [ ] Store listing written to the caregiver child, not the parent
 - [ ] Overlay-install verification on the Galaxy M33
