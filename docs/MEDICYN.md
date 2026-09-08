@@ -258,13 +258,14 @@ not built, nothing stale to correct.
 - [ ] Travel assistant; home-screen widget
 - [ ] Billing tiers, if retention supports them
 - [ ] Certificate pinning (needs backup pins and a rotation plan — Let's Encrypt leaf pins will break the app)
-- [ ] **Expired claimed care-links permanently lock out the caregiver's
-      account** — sharper than "auto-revoke" implies: `claim_care_invite`'s
-      `already_a_caregiver` guard matches any non-`revoked` status,
-      including a stale expired `claimed` row, so a caregiver whose claim
-      times out unconfirmed can never claim another invite without operator
-      intervention. Filed as a bug:
-      [issue #101](https://github.com/sagnikdas/medicyn/issues/101).
+- [x] **Expired claimed care-links permanently lock out the caregiver's
+      account** — fixed and deployed. `claim_care_invite` and
+      `create_care_invite` now self-heal the caller's own expired
+      `pending`/`claimed` rows before their guard checks run
+      (`20260908120000_claim_invite_selfheals_stale.sql`), verified against
+      `local_harness.sql` and pushed to the hosted Supabase project.
+      [Issue #101](https://github.com/sagnikdas/medicyn/issues/101) /
+      [PR #102](https://github.com/sagnikdas/medicyn/pull/102).
 
 ### iOS
 Scoped, none of it built. iOS ships to the same bar Android already meets —
