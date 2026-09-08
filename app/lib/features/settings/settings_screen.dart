@@ -8,6 +8,7 @@ import '../../core/privacy_policy.dart';
 import '../../core/widgets/medicyn_chrome.dart';
 import '../../core/widgets/medicyn_layout.dart';
 import '../../core/widgets/medicyn_motion.dart';
+import '../../data/export/adherence_export_service.dart';
 import '../../data/export/data_export_service.dart';
 import '../../data/local/database.dart';
 import '../../data/local/encrypted_database.dart';
@@ -57,6 +58,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _signingIn = false;
   String? _signInError;
   bool _exporting = false;
+  bool _sharingReport = false;
   late final ScrollController _scrollController = ScrollController();
 
   @override
@@ -431,11 +433,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     const SizedBox(height: 12),
                     OutlinedButton.icon(
-                      onPressed: _exporting ? null : _downloadMyData,
+                      onPressed: _exportBusy ? null : _downloadMyData,
                       icon: MedicynSwitcher(
                         child: _exporting
                             ? const SizedBox(
-                                key: ValueKey(true),
+                                key: ValueKey('json-busy'),
                                 height: 20,
                                 width: 20,
                                 child: CircularProgressIndicator(
@@ -444,11 +446,39 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               )
                             : const Icon(
                                 Icons.download_outlined,
-                                key: ValueKey(false),
+                                key: ValueKey('json'),
                               ),
                       ),
                       label: Text(
                         _exporting ? 'Preparing…' : 'Download my data',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'A four-week PDF of medicines and what was marked taken — '
+                      'for a clinic visit, not a full copy of your account.',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      onPressed: _exportBusy ? null : _shareDoctorReport,
+                      icon: MedicynSwitcher(
+                        child: _sharingReport
+                            ? const SizedBox(
+                                key: ValueKey('pdf-busy'),
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(
+                                Icons.picture_as_pdf_outlined,
+                                key: ValueKey('pdf'),
+                              ),
+                      ),
+                      label: Text(
+                        _sharingReport ? 'Preparing…' : 'Share with my doctor',
                       ),
                     ),
                     const SizedBox(height: 28),
@@ -519,8 +549,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  bool get _exportBusy => _exporting || _sharingReport;
+
   Future<void> _downloadMyData() async {
-    if (_exporting) return;
+    if (_exportBusy) return;
     setState(() => _exporting = true);
     try {
       final box = context.findRenderObject() as RenderBox?;
@@ -548,6 +580,38 @@ class _SettingsScreenState extends State<SettingsScreen> {
       );
     } finally {
       if (mounted) setState(() => _exporting = false);
+    }
+  }
+
+  Future<void> _shareDoctorReport() async {
+    if (_exportBusy) return;
+    setState(() => _sharingReport = true);
+    try {
+      final box = context.findRenderObject() as RenderBox?;
+      await AdherenceExportService(widget.db).exportAndShare(
+        sharePositionOrigin: box != null
+            ? box.localToGlobal(Offset.zero) & box.size
+            : null,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      await showAdaptiveDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog.adaptive(
+          title: const Text('Could not prepare the report'),
+          content: const Text(
+            'The PDF could not be prepared right now. Check your storage and try again.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _sharingReport = false);
     }
   }
 
