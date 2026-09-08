@@ -5,6 +5,7 @@ import '../../core/motion.dart';
 import '../../core/theme.dart';
 import '../../core/widgets/medicyn_chrome.dart';
 import '../../core/widgets/medicyn_motion.dart';
+import '../../data/export/adherence_export_service.dart';
 import '../../data/local/database.dart';
 import '../reminders_home/day_occurrences.dart';
 
@@ -33,6 +34,7 @@ class _InsightsScreenState extends State<InsightsScreen> {
       .watchSchedulesWithMedicines();
   late final Stream<List<DoseLog>> _doseLogsStream = widget.db.watchDoseLogs();
   late final ScrollController _scrollController = ScrollController();
+  bool _sharing = false;
 
   @override
   void didUpdateWidget(covariant InsightsScreen oldWidget) {
@@ -83,12 +85,46 @@ class _InsightsScreenState extends State<InsightsScreen> {
                 schedules: scheduleSnap.data ?? const [],
                 logs: logSnap.data ?? const [],
                 scrollController: _scrollController,
+                sharing: _sharing,
+                onShare: _shareDoctorReport,
               );
             },
           );
         },
       ),
     );
+  }
+
+  Future<void> _shareDoctorReport() async {
+    if (_sharing) return;
+    setState(() => _sharing = true);
+    try {
+      final box = context.findRenderObject() as RenderBox?;
+      await AdherenceExportService(widget.db).exportAndShare(
+        sharePositionOrigin: box != null
+            ? box.localToGlobal(Offset.zero) & box.size
+            : null,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      await showAdaptiveDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog.adaptive(
+          title: const Text('Could not prepare the report'),
+          content: const Text(
+            'The PDF could not be prepared right now. Check your storage and try again.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _sharing = false);
+    }
   }
 }
 
@@ -97,11 +133,15 @@ class _InsightsBody extends StatelessWidget {
     required this.schedules,
     required this.logs,
     required this.scrollController,
+    required this.sharing,
+    required this.onShare,
   });
 
   final List<ScheduleWithMedicine> schedules;
   final List<DoseLog> logs;
   final ScrollController scrollController;
+  final bool sharing;
+  final VoidCallback onShare;
 
   @override
   Widget build(BuildContext context) {
@@ -418,6 +458,42 @@ class _InsightsBody extends StatelessWidget {
                     ),
                   ],
                 ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 24),
+        MedicynFadeIn(
+          delay: const Duration(milliseconds: 120),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Share with my doctor',
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'A four-week PDF of your medicines and what was marked taken. '
+                'It is not a medical record.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 12),
+              FilledButton.icon(
+                onPressed: sharing ? null : onShare,
+                icon: sharing
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.picture_as_pdf_outlined),
+                label: Text(sharing ? 'Preparing…' : 'Share with my doctor'),
               ),
             ],
           ),

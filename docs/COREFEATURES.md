@@ -16,14 +16,12 @@ architecture decisions, and pending items beyond features.
   in #68.
 - **F4 — Family sharing + missed-dose alerts.** 1:1 only —
   `CareService.currentLink()` returns a single link.
+- **F6 — Doctor-ready adherence export.** GDPR JSON export, the Insights
+  screen's weekly adherence, per-schedule history, and a formatted 4-week
+  clinician PDF (`adherence_report.dart` + `adherence_pdf.dart`), shared via
+  "Share with my doctor" on Settings and Insights.
 
 ## Partially done
-
-### F6 — Doctor-ready adherence export
-- [x] GDPR JSON export
-- [x] Insights screen with weekly adherence
-- [x] Per-schedule history
-- [ ] Formatted PDF
 
 ### F7 — Virtual caregiver dashboard
 - [x] Dose feed

@@ -296,31 +296,27 @@ Map<DateTime, DayCellMarks> cellMarksForRange({
   return marks;
 }
 
-/// Adherence for the Sunday–Saturday week that contains [now].
-///
-/// [taken] is every occurrence already marked taken. [expected] is every
-/// occurrence that is already due or past — not [upcoming], and not a
-/// future day's pending — so a Friday afternoon is not scored against
-/// Saturday's doses.
-({int taken, int expected}) weekAdherence({
+/// Taken vs expected between [rangeStart] (inclusive civil day) and
+/// [rangeEndExclusive], using the same scoring as [weekAdherence]:
+/// upcoming and future days are not in the denominator.
+({int taken, int expected}) rangeAdherence({
   required List<ScheduleWithMedicine> items,
   List<DoseRecord> logs = const [],
   DoseRecordIndex? index,
   required DateTime now,
+  required DateTime rangeStart,
+  required DateTime rangeEndExclusive,
   Duration grace = MissedDoseDetector.grace,
   Duration snoozeWindow = const Duration(minutes: 10),
   WallClock? wallClock,
 }) {
   final logIndex = index ?? DoseRecordIndex(logs);
   final today = calendarDay(now);
-  final storedWeekday = now.weekday == DateTime.sunday ? 0 : now.weekday;
-  final sunday = _civilAddDays(today, -storedWeekday);
-  final nextSunday = _civilAddDays(sunday, 7);
-
   var taken = 0;
   var expected = 0;
-  var day = sunday;
-  while (day.isBefore(nextSunday)) {
+  var day = calendarDay(rangeStart);
+  final end = calendarDay(rangeEndExclusive);
+  while (day.isBefore(end)) {
     final occs = occurrencesOnDay(
       items: items,
       index: logIndex,
@@ -339,6 +335,37 @@ Map<DateTime, DayCellMarks> cellMarksForRange({
     day = _civilAddDays(day, 1);
   }
   return (taken: taken, expected: expected);
+}
+
+/// Adherence for the Sunday–Saturday week that contains [now].
+///
+/// [taken] is every occurrence already marked taken. [expected] is every
+/// occurrence that is already due or past — not [upcoming], and not a
+/// future day's pending — so a Friday afternoon is not scored against
+/// Saturday's doses.
+({int taken, int expected}) weekAdherence({
+  required List<ScheduleWithMedicine> items,
+  List<DoseRecord> logs = const [],
+  DoseRecordIndex? index,
+  required DateTime now,
+  Duration grace = MissedDoseDetector.grace,
+  Duration snoozeWindow = const Duration(minutes: 10),
+  WallClock? wallClock,
+}) {
+  final today = calendarDay(now);
+  final storedWeekday = now.weekday == DateTime.sunday ? 0 : now.weekday;
+  final sunday = _civilAddDays(today, -storedWeekday);
+  return rangeAdherence(
+    items: items,
+    logs: logs,
+    index: index,
+    now: now,
+    rangeStart: sunday,
+    rangeEndExclusive: _civilAddDays(sunday, 7),
+    grace: grace,
+    snoozeWindow: snoozeWindow,
+    wallClock: wallClock,
+  );
 }
 
 /// Morning before noon, afternoon until 17:00, evening after that.
