@@ -3208,6 +3208,366 @@ class TodayCareRemindersCompanion extends UpdateCompanion<TodayCareReminder> {
   }
 }
 
+class $EmergencyInfoTable extends EmergencyInfo
+    with TableInfo<$EmergencyInfoTable, EmergencyInfoData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $EmergencyInfoTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _bloodGroupMeta = const VerificationMeta(
+    'bloodGroup',
+  );
+  @override
+  late final GeneratedColumn<String> bloodGroup = GeneratedColumn<String>(
+    'blood_group',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _allergiesMeta = const VerificationMeta(
+    'allergies',
+  );
+  @override
+  late final GeneratedColumn<String> allergies = GeneratedColumn<String>(
+    'allergies',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _conditionsMeta = const VerificationMeta(
+    'conditions',
+  );
+  @override
+  late final GeneratedColumn<String> conditions = GeneratedColumn<String>(
+    'conditions',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    bloodGroup,
+    allergies,
+    conditions,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'emergency_info';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<EmergencyInfoData> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('blood_group')) {
+      context.handle(
+        _bloodGroupMeta,
+        bloodGroup.isAcceptableOrUnknown(data['blood_group']!, _bloodGroupMeta),
+      );
+    }
+    if (data.containsKey('allergies')) {
+      context.handle(
+        _allergiesMeta,
+        allergies.isAcceptableOrUnknown(data['allergies']!, _allergiesMeta),
+      );
+    }
+    if (data.containsKey('conditions')) {
+      context.handle(
+        _conditionsMeta,
+        conditions.isAcceptableOrUnknown(data['conditions']!, _conditionsMeta),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  EmergencyInfoData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return EmergencyInfoData(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      bloodGroup: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}blood_group'],
+      )!,
+      allergies: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}allergies'],
+      )!,
+      conditions: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}conditions'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $EmergencyInfoTable createAlias(String alias) {
+    return $EmergencyInfoTable(attachedDatabase, alias);
+  }
+}
+
+class EmergencyInfoData extends DataClass
+    implements Insertable<EmergencyInfoData> {
+  final String id;
+  final String bloodGroup;
+  final String allergies;
+  final String conditions;
+  final DateTime updatedAt;
+  const EmergencyInfoData({
+    required this.id,
+    required this.bloodGroup,
+    required this.allergies,
+    required this.conditions,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['blood_group'] = Variable<String>(bloodGroup);
+    map['allergies'] = Variable<String>(allergies);
+    map['conditions'] = Variable<String>(conditions);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  EmergencyInfoCompanion toCompanion(bool nullToAbsent) {
+    return EmergencyInfoCompanion(
+      id: Value(id),
+      bloodGroup: Value(bloodGroup),
+      allergies: Value(allergies),
+      conditions: Value(conditions),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory EmergencyInfoData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return EmergencyInfoData(
+      id: serializer.fromJson<String>(json['id']),
+      bloodGroup: serializer.fromJson<String>(json['bloodGroup']),
+      allergies: serializer.fromJson<String>(json['allergies']),
+      conditions: serializer.fromJson<String>(json['conditions']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'bloodGroup': serializer.toJson<String>(bloodGroup),
+      'allergies': serializer.toJson<String>(allergies),
+      'conditions': serializer.toJson<String>(conditions),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  EmergencyInfoData copyWith({
+    String? id,
+    String? bloodGroup,
+    String? allergies,
+    String? conditions,
+    DateTime? updatedAt,
+  }) => EmergencyInfoData(
+    id: id ?? this.id,
+    bloodGroup: bloodGroup ?? this.bloodGroup,
+    allergies: allergies ?? this.allergies,
+    conditions: conditions ?? this.conditions,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  EmergencyInfoData copyWithCompanion(EmergencyInfoCompanion data) {
+    return EmergencyInfoData(
+      id: data.id.present ? data.id.value : this.id,
+      bloodGroup: data.bloodGroup.present
+          ? data.bloodGroup.value
+          : this.bloodGroup,
+      allergies: data.allergies.present ? data.allergies.value : this.allergies,
+      conditions: data.conditions.present
+          ? data.conditions.value
+          : this.conditions,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('EmergencyInfoData(')
+          ..write('id: $id, ')
+          ..write('bloodGroup: $bloodGroup, ')
+          ..write('allergies: $allergies, ')
+          ..write('conditions: $conditions, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(id, bloodGroup, allergies, conditions, updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is EmergencyInfoData &&
+          other.id == this.id &&
+          other.bloodGroup == this.bloodGroup &&
+          other.allergies == this.allergies &&
+          other.conditions == this.conditions &&
+          other.updatedAt == this.updatedAt);
+}
+
+class EmergencyInfoCompanion extends UpdateCompanion<EmergencyInfoData> {
+  final Value<String> id;
+  final Value<String> bloodGroup;
+  final Value<String> allergies;
+  final Value<String> conditions;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const EmergencyInfoCompanion({
+    this.id = const Value.absent(),
+    this.bloodGroup = const Value.absent(),
+    this.allergies = const Value.absent(),
+    this.conditions = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  EmergencyInfoCompanion.insert({
+    required String id,
+    this.bloodGroup = const Value.absent(),
+    this.allergies = const Value.absent(),
+    this.conditions = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id);
+  static Insertable<EmergencyInfoData> custom({
+    Expression<String>? id,
+    Expression<String>? bloodGroup,
+    Expression<String>? allergies,
+    Expression<String>? conditions,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (bloodGroup != null) 'blood_group': bloodGroup,
+      if (allergies != null) 'allergies': allergies,
+      if (conditions != null) 'conditions': conditions,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  EmergencyInfoCompanion copyWith({
+    Value<String>? id,
+    Value<String>? bloodGroup,
+    Value<String>? allergies,
+    Value<String>? conditions,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return EmergencyInfoCompanion(
+      id: id ?? this.id,
+      bloodGroup: bloodGroup ?? this.bloodGroup,
+      allergies: allergies ?? this.allergies,
+      conditions: conditions ?? this.conditions,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (bloodGroup.present) {
+      map['blood_group'] = Variable<String>(bloodGroup.value);
+    }
+    if (allergies.present) {
+      map['allergies'] = Variable<String>(allergies.value);
+    }
+    if (conditions.present) {
+      map['conditions'] = Variable<String>(conditions.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('EmergencyInfoCompanion(')
+          ..write('id: $id, ')
+          ..write('bloodGroup: $bloodGroup, ')
+          ..write('allergies: $allergies, ')
+          ..write('conditions: $conditions, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -3219,6 +3579,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   );
   late final $TodayCareRemindersTable todayCareReminders =
       $TodayCareRemindersTable(this);
+  late final $EmergencyInfoTable emergencyInfo = $EmergencyInfoTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -3229,6 +3590,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     doseLogs,
     doseLogContests,
     todayCareReminders,
+    emergencyInfo,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
@@ -5463,6 +5825,214 @@ typedef $$TodayCareRemindersTableProcessedTableManager =
       TodayCareReminder,
       PrefetchHooks Function()
     >;
+typedef $$EmergencyInfoTableCreateCompanionBuilder =
+    EmergencyInfoCompanion Function({
+      required String id,
+      Value<String> bloodGroup,
+      Value<String> allergies,
+      Value<String> conditions,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+typedef $$EmergencyInfoTableUpdateCompanionBuilder =
+    EmergencyInfoCompanion Function({
+      Value<String> id,
+      Value<String> bloodGroup,
+      Value<String> allergies,
+      Value<String> conditions,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$EmergencyInfoTableFilterComposer
+    extends Composer<_$AppDatabase, $EmergencyInfoTable> {
+  $$EmergencyInfoTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get bloodGroup => $composableBuilder(
+    column: $table.bloodGroup,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get allergies => $composableBuilder(
+    column: $table.allergies,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get conditions => $composableBuilder(
+    column: $table.conditions,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$EmergencyInfoTableOrderingComposer
+    extends Composer<_$AppDatabase, $EmergencyInfoTable> {
+  $$EmergencyInfoTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get bloodGroup => $composableBuilder(
+    column: $table.bloodGroup,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get allergies => $composableBuilder(
+    column: $table.allergies,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get conditions => $composableBuilder(
+    column: $table.conditions,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$EmergencyInfoTableAnnotationComposer
+    extends Composer<_$AppDatabase, $EmergencyInfoTable> {
+  $$EmergencyInfoTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get bloodGroup => $composableBuilder(
+    column: $table.bloodGroup,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get allergies =>
+      $composableBuilder(column: $table.allergies, builder: (column) => column);
+
+  GeneratedColumn<String> get conditions => $composableBuilder(
+    column: $table.conditions,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$EmergencyInfoTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $EmergencyInfoTable,
+          EmergencyInfoData,
+          $$EmergencyInfoTableFilterComposer,
+          $$EmergencyInfoTableOrderingComposer,
+          $$EmergencyInfoTableAnnotationComposer,
+          $$EmergencyInfoTableCreateCompanionBuilder,
+          $$EmergencyInfoTableUpdateCompanionBuilder,
+          (
+            EmergencyInfoData,
+            BaseReferences<
+              _$AppDatabase,
+              $EmergencyInfoTable,
+              EmergencyInfoData
+            >,
+          ),
+          EmergencyInfoData,
+          PrefetchHooks Function()
+        > {
+  $$EmergencyInfoTableTableManager(_$AppDatabase db, $EmergencyInfoTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$EmergencyInfoTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$EmergencyInfoTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$EmergencyInfoTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> bloodGroup = const Value.absent(),
+                Value<String> allergies = const Value.absent(),
+                Value<String> conditions = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => EmergencyInfoCompanion(
+                id: id,
+                bloodGroup: bloodGroup,
+                allergies: allergies,
+                conditions: conditions,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                Value<String> bloodGroup = const Value.absent(),
+                Value<String> allergies = const Value.absent(),
+                Value<String> conditions = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => EmergencyInfoCompanion.insert(
+                id: id,
+                bloodGroup: bloodGroup,
+                allergies: allergies,
+                conditions: conditions,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$EmergencyInfoTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $EmergencyInfoTable,
+      EmergencyInfoData,
+      $$EmergencyInfoTableFilterComposer,
+      $$EmergencyInfoTableOrderingComposer,
+      $$EmergencyInfoTableAnnotationComposer,
+      $$EmergencyInfoTableCreateCompanionBuilder,
+      $$EmergencyInfoTableUpdateCompanionBuilder,
+      (
+        EmergencyInfoData,
+        BaseReferences<_$AppDatabase, $EmergencyInfoTable, EmergencyInfoData>,
+      ),
+      EmergencyInfoData,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -5477,4 +6047,6 @@ class $AppDatabaseManager {
       $$DoseLogContestsTableTableManager(_db, _db.doseLogContests);
   $$TodayCareRemindersTableTableManager get todayCareReminders =>
       $$TodayCareRemindersTableTableManager(_db, _db.todayCareReminders);
+  $$EmergencyInfoTableTableManager get emergencyInfo =>
+      $$EmergencyInfoTableTableManager(_db, _db.emergencyInfo);
 }

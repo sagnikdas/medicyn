@@ -20,6 +20,10 @@ architecture decisions, and pending items beyond features.
   screen's weekly adherence, per-schedule history, and a formatted 4-week
   clinician PDF (`adherence_report.dart` + `adherence_pdf.dart`), shared via
   "Share with my doctor" on Settings and Insights.
+- **N3 — Emergency card.** Blood group, allergies, conditions, current
+  medicines, and the caregiver's number, one tap from Profile
+  (`emergency_card_screen.dart`). Local-only, never synced. A printable PDF
+  (`emergency_card_pdf.dart`) and included in the GDPR export.
 
 ## Partially done
 
@@ -64,12 +68,11 @@ camera at different paper.
 - **N2 — Tests that are due.** The monitoring a regimen implies
   (levothyroxine → TSH, warfarin → INR, metformin → HbA1c, statin → lipids
   + LFT). Plugs into `insights_screen.dart`, `TodayCareReminders`.
-- **N3 — Emergency card.** Medicines, doses, allergies, conditions, blood
-  group, caregiver's number. Plugs into `data_export_service.dart`,
-  Profile.
 - **N4 — Discharge summary translator.** Photograph a discharge summary →
   plain language, every medicine created with times, red flags, follow-up
   date. Reuses the OCR → `parse-medicine` → review-and-confirm pipeline.
+
+N3 is done — see "Fully done" above.
 
 **Before N1/N2/N4 can start:**
 - `Medicines.tabletsRemaining` is nullable/opt-in — N1's basket is empty
@@ -81,8 +84,6 @@ camera at different paper.
 - N2 must ask once for treatment start date and store it —
   `Medicines.createdAt` is when it was added to Medicyn, not when the
   doctor started it.
-- N3 must not be a lock-screen surface — one tap from Profile, plus a
-  printable copy.
 - N4 needs list-shaped extraction (current `sanitiseExtraction()` /
   `ParsedMedicine` assume one medicine), a multi-item review screen, and a
   re-weighted quota (`parse-medicine/quota.ts`).

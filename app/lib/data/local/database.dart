@@ -23,7 +23,14 @@ class DoseLogWithContest {
 }
 
 @DriftDatabase(
-  tables: [Medicines, Schedules, DoseLogs, DoseLogContests, TodayCareReminders],
+  tables: [
+    Medicines,
+    Schedules,
+    DoseLogs,
+    DoseLogContests,
+    TodayCareReminders,
+    EmergencyInfo,
+  ],
 )
 class AppDatabase extends _$AppDatabase {
   /// Opens the encrypted per-account file via [openEncryptedAppDatabase].
@@ -38,7 +45,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 8;
+  int get schemaVersion => 9;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -99,6 +106,9 @@ class AppDatabase extends _$AppDatabase {
             ],
           ),
         );
+      }
+      if (from < 9) {
+        await m.createTable(emergencyInfo);
       }
     },
   );
@@ -490,6 +500,33 @@ class AppDatabase extends _$AppDatabase {
         note: Value(trimmed),
         updatedAt: Value(now),
         pendingSync: const Value(true),
+      ),
+    );
+  }
+
+  /// The emergency card's one row, if it has ever been filled in. Null
+  /// (not an empty-fields row) until the first save, so the card and its
+  /// edit screen can tell "never set up" from "set up with blanks."
+  Stream<EmergencyInfoData?> watchEmergencyInfo() => (select(
+    emergencyInfo,
+  )..where((t) => t.id.equals(EmergencyInfo.singletonId))).watchSingleOrNull();
+
+  Future<EmergencyInfoData?> emergencyInfoOnce() => (select(
+    emergencyInfo,
+  )..where((t) => t.id.equals(EmergencyInfo.singletonId))).getSingleOrNull();
+
+  Future<void> upsertEmergencyInfo({
+    required String bloodGroup,
+    required String allergies,
+    required String conditions,
+  }) {
+    return into(emergencyInfo).insertOnConflictUpdate(
+      EmergencyInfoCompanion.insert(
+        id: EmergencyInfo.singletonId,
+        bloodGroup: Value(bloodGroup.trim()),
+        allergies: Value(allergies.trim()),
+        conditions: Value(conditions.trim()),
+        updatedAt: Value(DateTime.now()),
       ),
     );
   }

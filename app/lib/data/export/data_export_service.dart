@@ -28,7 +28,7 @@ class DataExportService {
 
   /// Increment when the shape of an export changes. Consumers can migrate a
   /// saved export without guessing which optional fields were present.
-  static const exportSchemaVersion = 3;
+  static const exportSchemaVersion = 4;
   static const _networkTimeout = Duration(seconds: 8);
 
   /// JSON-encodable map. Safe to call with no network and no account.
@@ -40,6 +40,7 @@ class DataExportService {
     final logs = await _db.select(_db.doseLogs).get();
     final contests = await _db.select(_db.doseLogContests).get();
     final care = await _db.select(_db.todayCareReminders).get();
+    final emergencyInfo = await _db.emergencyInfoOnce();
 
     final export = <String, dynamic>{
       'metadata': <String, dynamic>{
@@ -68,6 +69,14 @@ class DataExportService {
             'deleted': c.deleted,
           },
       ],
+      'emergency_info': emergencyInfo == null
+          ? null
+          : {
+              'blood_group': emergencyInfo.bloodGroup,
+              'allergies': emergencyInfo.allergies,
+              'conditions': emergencyInfo.conditions,
+              'updated_at': _iso(emergencyInfo.updatedAt),
+            },
       'consents': {
         for (final purpose in ConsentPurpose.values)
           purpose.id: ConsentService.instance.isGranted(purpose),

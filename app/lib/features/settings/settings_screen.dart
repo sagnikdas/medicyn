@@ -20,6 +20,7 @@ import '../care/care_service.dart';
 import '../care/dose_feed_screen.dart';
 import '../consent/consent_purpose.dart';
 import '../consent/consent_service.dart';
+import '../emergency/emergency_card_screen.dart';
 import '../notification_engine/notification_service.dart';
 import '../notification_engine/reminder_reliability_screen.dart';
 
@@ -278,6 +279,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       builder: (context, _) => _BackupStatusCard(
                         signedIn: _signedIn,
                         onRetry: _retrySync,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Text(
+                      'Emergency card',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    ProfileMenuRow(
+                      icon: Icons.emergency_outlined,
+                      title: 'Emergency card',
+                      subtitle:
+                          'Blood group, allergies, conditions, and your medicines — for a first responder or new clinician.',
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => EmergencyCardScreen(db: widget.db),
+                        ),
                       ),
                     ),
                     const SizedBox(height: 24),

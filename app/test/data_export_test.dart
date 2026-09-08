@@ -64,10 +64,26 @@ void main() {
     expect(export['dose_logs'], isNotEmpty);
     expect(export['consents'], isA<Map>());
     expect(export.containsKey('profile'), isFalse);
+    expect(export['emergency_info'], isNull);
 
     for (final secret in exportExcludedSecrets) {
       expect(encoded.toLowerCase(), isNot(contains(secret)));
     }
+  });
+
+  test('export JSON includes the emergency card once saved', () async {
+    await db.upsertEmergencyInfo(
+      bloodGroup: 'O+',
+      allergies: 'Penicillin',
+      conditions: 'Type 2 diabetes',
+    );
+    final export = await DataExportService(
+      db,
+    ).buildExport(now: DateTime.utc(2026, 8, 20, 12));
+
+    expect(export['emergency_info']['blood_group'], 'O+');
+    expect(export['emergency_info']['allergies'], 'Penicillin');
+    expect(export['emergency_info']['conditions'], 'Type 2 diabetes');
   });
 
   test('works with no account and still includes local consents', () async {

@@ -14,6 +14,26 @@ enum ReminderStatus { active, paused, completed, asNeeded }
 /// What happened to a scheduled dose. Stored as plain text (`.name`).
 enum DoseAction { taken, snoozed, missed }
 
+/// N3, the emergency card: a single local-only row (id is always [singletonId])
+/// holding the facts a first responder or a new clinician needs that Medicyn
+/// has no other reason to ask for. Deliberately not synced -- unlike
+/// medicines and schedules, this never needs to reach a caregiver's phone;
+/// the card's whole purpose is a physical or on-device copy that travels
+/// with the person it describes, not a shared record. See N3's own note in
+/// MEDICYN.md: it must never be a lock-screen surface.
+class EmergencyInfo extends Table {
+  TextColumn get id => text()();
+  TextColumn get bloodGroup => text().withDefault(const Constant(''))();
+  TextColumn get allergies => text().withDefault(const Constant(''))();
+  TextColumn get conditions => text().withDefault(const Constant(''))();
+  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+
+  @override
+  Set<Column> get primaryKey => {id};
+
+  static const singletonId = 'self';
+}
+
 class Medicines extends Table {
   TextColumn get id => text()(); // client-generated uuid, matches Supabase PK
   TextColumn get drugName => text()();
