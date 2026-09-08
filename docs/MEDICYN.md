@@ -16,6 +16,11 @@ Save. An exact alarm is scheduled on the device itself, Drift/SQLite is the
 source of truth for *when*. Supabase is backup and sync only. The alarm fires
 with no network and no live app process.
 
+Visual design tokens (the "Bedside Chart" theme) live in `../DESIGN.md`,
+paired with `.impeccable/design.json` and cited by name from
+`android_today_screen.dart`, `day_dose_list.dart`, and
+`.impeccable/surfaces/app.md` — kept at the repo root, machine-read.
+
 ---
 
 ## Core features
