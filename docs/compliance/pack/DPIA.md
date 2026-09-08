@@ -1,10 +1,14 @@
 # 3.1 — Data Protection Impact Assessment
 
-**Controller:** Sagnik Das.
+**Controller:** Doezly (changed from Sagnik Das personally on 8 September
+2026 — see the note at the signature below; the assessment itself was not
+redone).
 **Processing:** Medicyn Android app (`com.sagnikdas.medicyn`) and its backend.
 **Date:** 20 August 2026.
 **Version:** 1. Against `main` @ `f73aed5`.
-**Next review:** before Play release, and whenever a data flow is added.
+**Next review:** before Play release, and whenever a data flow is added or
+the controller changes — this qualifies, and is still owed a real re-read,
+not just a name swap.
 
 This is the DPIA GDPR Art. 35 and EDPB WP248 require. It is written from the
 code and from `PLAN.md`'s Known gaps, not from a template that pretends the
@@ -250,3 +254,9 @@ ones WP248 expects a small controller to take, and the un-ticked consents
 are the main brake.
 
 Signed (controller): Sagnik Das, 20 August 2026.
+
+**Controller change, 8 September 2026:** the controller is now recorded as
+Doezly rather than Sagnik Das personally. Nothing above was re-assessed
+against that change. Treat this DPIA as due for a real re-read (per "Next
+review" above) before relying on it as current, not as already covering
+the change.

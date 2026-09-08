@@ -1,7 +1,7 @@
 # 3.6 — Markets, representative, DPO, privacy contact
 
 **Decision date:** 20 August 2026.
-**Decided by:** Sagnik Das (sole controller).
+**Decided by:** Doezly (sole controller).
 
 ## Target markets
 
@@ -21,7 +21,7 @@ as a way of dodging GDPR. If that ever changes, record it here and in
 GDPR Art. 27 requires a representative in the Union when a non-EU controller
 offers goods or services to people in the EEA.
 
-**Status: not appointed.** Sagnik Das is in India. There is no EU office.
+**Status: not appointed.** Doezly is based in India. There is no EU office.
 
 Operator action before the first EEA country is enabled in Play Console:
 
@@ -42,13 +42,13 @@ scale, and it is not a processor whose core activity is large-scale
 special-category processing. It is a solo consumer reminder app.
 
 `PRIVACY.md` must say there is no DPO and must still give a privacy contact.
-That contact is **sagnikd91@gmail.com** — the same address as the controller.
+That contact is **contact@doezly.com** — the same address as the controller.
 
 ## Privacy contact
 
 | | |
 |---|---|
-| Name | Sagnik Das |
-| Email | sagnikd91@gmail.com |
+| Name | Doezly |
+| Email | contact@doezly.com |
 | Other channels | None. Correspondence is by email only. |
 | Response clock | One month (GDPR Art. 12(3)), as already stated in `PRIVACY.md`. |

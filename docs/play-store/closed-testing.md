@@ -207,7 +207,7 @@ rule in Console; Google has changed it before.
 
 27. Set category to Medical or Health & fitness (pick one; keep it
     consistent with the Health apps form). Set contact email to
-    **sagnikd91@gmail.com**.
+    **contact@doezly.com**.
 
 28. Save the store listing. You can polish wording during the 14 days. You
     cannot start a test track without the policy URL and screenshots.

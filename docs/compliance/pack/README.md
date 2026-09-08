@@ -16,5 +16,5 @@ Play form. Those are operator actions called out in each file.
 | 3.7 MHMD | [../MHMD.md](../MHMD.md) | Separate consumer health data policy | Host it on a *public* URL; the GitHub copy is on a private repo |
 | 3.8 Play Data Safety | [PLAY-DATA-SAFETY.md](PLAY-DATA-SAFETY.md) | Form answers that match `PRIVACY.md` | Paste into Play Console; complete Health apps + restricted-permission declarations |
 
-Controller: Sagnik Das. Privacy contact: sagnikd91@gmail.com.
+Controller: Doezly. Privacy contact: contact@doezly.com.
 This pack is not legal advice.

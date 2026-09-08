@@ -13,7 +13,7 @@ void main() {
     await tester.tap(find.widgetWithText(TextButton, 'Privacy policy'));
     await tester.pumpAndSettle();
     expect(find.byType(PrivacyPolicyScreen), findsOneWidget);
-    expect(find.textContaining('Sagnik Das'), findsWidgets);
-    expect(find.textContaining('sagnikd91@gmail.com'), findsWidgets);
+    expect(find.textContaining('Doezly'), findsWidgets);
+    expect(find.textContaining('contact@doezly.com'), findsWidgets);
   });
 }

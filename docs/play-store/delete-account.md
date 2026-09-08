@@ -16,7 +16,7 @@ dose history, any family link, and the notification tokens for your phones.
 
 ## If you cannot open the app
 
-Email **sagnikd91@gmail.com** from the **same Google address** you signed in
+Email **contact@doezly.com** from the **same Google address** you signed in
 with, and ask for the account to be deleted. We need that address so we can
 tell the request is yours.
 

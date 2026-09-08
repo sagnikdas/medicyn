@@ -1,12 +1,12 @@
 # Privacy Policy for Medicyn
 
 **Last updated:** 6 September 2026
-**Contact:** sagnikd91@gmail.com
+**Contact:** contact@doezly.com
 
 ## Who is responsible
 
-The controller is **Sagnik Das**, the sole developer of Medicyn. Correspondence
-is by email only, at **sagnikd91@gmail.com**. There is no other contact
+The controller is **Doezly**, the developer of Medicyn. Correspondence
+is by email only, at **contact@doezly.com**. There is no other contact
 address.
 
 Medicyn is a medication reminder app (Android package
@@ -254,7 +254,7 @@ Uninstalling the app removes the copy on that phone.
 ## Your rights
 
 You have the rights below. We will answer requests **within one month**
-(GDPR Article 12(3)). Email **sagnikd91@gmail.com**, or use the in-app
+(GDPR Article 12(3)). Email **contact@doezly.com**, or use the in-app
 paths where they exist.
 
 - **Access and portability.** Open **Settings** and tap **Download my
@@ -296,7 +296,7 @@ Signed-in users can delete their account in the app: open **Settings** and
 tap **Delete account**. You will be asked twice, so it cannot happen by
 accident.
 
-If you cannot open the app, email **sagnikd91@gmail.com** from the Google
+If you cannot open the app, email **contact@doezly.com** from the Google
 address you signed in with, or use this page:
 
 https://sagnikdas.github.io/medicyn/delete-account/
@@ -329,7 +329,7 @@ the date at the top will change.
 ## Data Protection Officer
 
 Medicyn has no Data Protection Officer. That role is not required at this
-scale. Privacy questions still go to **sagnikd91@gmail.com**. There is
+scale. Privacy questions still go to **contact@doezly.com**. There is
 not yet an EU or UK representative (GDPR / UK GDPR Article 27). If you
 are in the EEA or the UK, that gap is ours, not yours — you can still
 write to the email above and to your supervisory authority.
@@ -344,4 +344,4 @@ second consent before family sharing.
 
 ## Contact
 
-sagnikd91@gmail.com
+contact@doezly.com

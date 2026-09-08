@@ -1,7 +1,7 @@
 # Consumer Health Data Privacy Policy (Washington MHMD / Nevada SB370)
 
 **Last updated:** 20 August 2026
-**Contact:** sagnikd91@gmail.com
+**Contact:** contact@doezly.com
 
 This policy is **only** about consumer health data. The general
 [Privacy Policy](PRIVACY.md) still applies. Washington's My Health My
@@ -14,7 +14,7 @@ note you attach to a dose, and the fact that a missed-dose alert was
 sent.
 
 Medicyn is the Android app `com.sagnikdas.medicyn`. The controller is
-Sagnik Das.
+Doezly.
 
 ## What we collect, and from where
 
@@ -80,7 +80,7 @@ You can:
 
 - **Access** what we hold — Settings → Download my data, or email.
 - **Delete** — Settings → Delete account, or delete one medicine and its
-  history, or email sagnikd91@gmail.com.
+  history, or email contact@doezly.com.
 - **Withdraw consent** — Settings toggles.
 - **Appeal** a refusal — email the same address and say it is an appeal.
   If we still refuse, Washington residents may complain to the Attorney
@@ -91,4 +91,4 @@ for GDPR, which we already promise).
 
 ## How to contact us
 
-sagnikd91@gmail.com only.
+contact@doezly.com only.
