@@ -9,6 +9,15 @@ const _muted = PdfColor.fromInt(0xFF5C4F3B);
 const _rule = PdfColor.fromInt(0xFFD9CBAA);
 const _paper = PdfColor.fromInt(0xFFFBF7EC);
 const _banner = PdfColor.fromInt(0xFFEDE4CE);
+// DESIGN.md's surface-container-low: one tonal step above the page, used
+// only for zebra striping so a six-row table stays scannable without a
+// second border weight.
+const _stripe = PdfColor.fromInt(0xFFF6F0E1);
+// The same two tokens DayDoseStyle.color resolves scheme.error / scheme.outline
+// to for Missed / Not recorded, so the printed chart and the on-screen one
+// agree on what each mark means.
+const _missed = PdfColor.fromInt(0xFFBA1A1A);
+const _notRecorded = PdfColor.fromInt(0xFF8A7A5E);
 
 const _months = [
   'January',
@@ -82,6 +91,7 @@ Future<List<int>> buildAdherencePdf(AdherenceReport report) async {
         _subhead('By week'),
         _table(
           headers: const ['Week of', 'Taken', 'Due', '%'],
+          rightAlign: const {1, 2, 3},
           rows: [
             for (final week in report.byWeek)
               [
@@ -101,6 +111,7 @@ Future<List<int>> buildAdherencePdf(AdherenceReport report) async {
         else
           _table(
             headers: const ['Medicine', 'Taken', 'Due', '%'],
+            rightAlign: const {1, 2, 3},
             rows: [
               for (final row in report.byMedicine)
                 [
@@ -112,55 +123,129 @@ Future<List<int>> buildAdherencePdf(AdherenceReport report) async {
             ],
           ),
         pw.SizedBox(height: 20),
-        _sectionTitle('Unanswered doses'),
-        if (report.unanswered.isEmpty)
-          _body('None in this window.')
+        // Both lists are "nothing to report" on the common good-adherence
+        // report -- the two full sections below (title, explanation, table)
+        // spent that document's entire second page saying so twice. One
+        // compact line replaces both only when neither has anything to add;
+        // real content still gets the full, separately-titled treatment.
+        if (report.unanswered.isEmpty && report.corrections.isEmpty)
+          _mutedLine('No unanswered doses or correction notes in this window.')
         else ...[
-          _table(
-            headers: const ['When', 'Medicine', 'Status'],
-            rows: [
-              for (final row in report.unanswered)
-                [_dateTime(row.scheduledAt), row.medicineName, row.statusLabel],
-            ],
-          ),
-          if (report.unansweredOmitted > 0) ...[
-            pw.SizedBox(height: 6),
-            _mutedLine(
-              'And ${report.unansweredOmitted} more unanswered dose'
-              '${report.unansweredOmitted == 1 ? '' : 's'} not printed.',
+          _sectionTitle('Unanswered doses'),
+          if (report.unanswered.isEmpty)
+            _body('None in this window.')
+          else ...[
+            _table(
+              headers: const ['When', 'Medicine', 'Status'],
+              cellBuilder: _unansweredStatusCell,
+              rows: [
+                for (final row in report.unanswered)
+                  [
+                    _dateTime(row.scheduledAt),
+                    row.medicineName,
+                    row.statusLabel,
+                  ],
+              ],
             ),
-          ],
-        ],
-        pw.SizedBox(height: 20),
-        _sectionTitle('Correction notes'),
-        _mutedLine(
-          'The original Taken / Missed / Snoozed mark is never edited. '
-          'A note here is a later correction from the person or caregiver.',
-        ),
-        pw.SizedBox(height: 8),
-        if (report.corrections.isEmpty)
-          _body('None in this window.')
-        else
-          _table(
-            headers: const ['When', 'Medicine', 'Note'],
-            rows: [
-              for (final row in report.corrections)
-                [_dateTime(row.scheduledAt), row.medicineName, row.note],
+            if (report.unansweredOmitted > 0) ...[
+              pw.SizedBox(height: 6),
+              _mutedLine(
+                'And ${report.unansweredOmitted} more unanswered dose'
+                '${report.unansweredOmitted == 1 ? '' : 's'} not printed.',
+              ),
             ],
+          ],
+          pw.SizedBox(height: 20),
+          _sectionTitle('Correction notes'),
+          _mutedLine(
+            'The original Taken / Missed / Snoozed mark is never edited. '
+            'A note here is a later correction from the person or caregiver.',
           ),
+          pw.SizedBox(height: 8),
+          if (report.corrections.isEmpty)
+            _body('None in this window.')
+          else
+            _table(
+              headers: const ['When', 'Medicine', 'Note'],
+              rows: [
+                for (final row in report.corrections)
+                  [_dateTime(row.scheduledAt), row.medicineName, row.note],
+              ],
+            ),
+        ],
       ],
     ),
   );
   return doc.save();
 }
 
+/// Status column for the unanswered-doses table: a glyph before the word,
+/// the same triangle/ellipsis-and-color pairing DayDoseStyle uses on
+/// screen for Missed / Not recorded, so the printed chart and the on-screen
+/// one speak the same mark language. Only those two statuses ever reach
+/// this table (see AdherenceReport.build), but an unrecognised label still
+/// falls back to plain text rather than guessing at a glyph for it.
+pw.Widget? _unansweredStatusCell(int index, dynamic data, int rowNum) {
+  if (index != 2 || rowNum == 0) return null;
+  final label = data as String;
+  final pw.Widget? glyph = switch (label) {
+    'Missed' => _triangleGlyph(),
+    'Not recorded' => _ellipsisGlyph(),
+    _ => null,
+  };
+  if (glyph == null) {
+    return pw.Text(label, style: const pw.TextStyle(fontSize: 9, color: _ink));
+  }
+  return pw.Row(
+    mainAxisSize: pw.MainAxisSize.min,
+    crossAxisAlignment: pw.CrossAxisAlignment.center,
+    children: [
+      glyph,
+      pw.SizedBox(width: 5),
+      pw.Text(label, style: const pw.TextStyle(fontSize: 9, color: _ink)),
+    ],
+  );
+}
+
+pw.Widget _triangleGlyph() {
+  return pw.CustomPaint(
+    size: const PdfPoint(8, 8),
+    painter: (canvas, size) {
+      canvas
+        ..setColor(_missed)
+        ..moveTo(size.x / 2, size.y)
+        ..lineTo(0, 0)
+        ..lineTo(size.x, 0)
+        ..closePath()
+        ..fillPath();
+    },
+  );
+}
+
+pw.Widget _ellipsisGlyph() {
+  return pw.CustomPaint(
+    size: const PdfPoint(16, 8),
+    painter: (canvas, size) {
+      canvas.setColor(_notRecorded);
+      for (final cx in [2.0, 8.0, 14.0]) {
+        canvas
+          ..drawEllipse(cx, size.y / 2, 1.5, 1.5)
+          ..fillPath();
+      }
+    },
+  );
+}
+
 pw.Widget _header(AdherenceReport report) {
   return pw.Container(
     width: double.infinity,
     padding: const pw.EdgeInsets.fromLTRB(16, 14, 16, 14),
-    decoration: pw.BoxDecoration(
+    decoration: const pw.BoxDecoration(
       color: _banner,
-      border: pw.Border(left: pw.BorderSide(color: _teal, width: 4)),
+      // A hairline under the block, not a colored accent bar down the side:
+      // the same "structural, not brand" role DESIGN.md gives the app's own
+      // top-bar hairline. Teal already carries the brand mark in the text.
+      border: pw.Border(bottom: pw.BorderSide(color: _rule, width: 1)),
     ),
     child: pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -253,6 +338,8 @@ pw.Widget _mutedLine(String text) {
 pw.Widget _table({
   required List<String> headers,
   required List<List<String>> rows,
+  Set<int> rightAlign = const {},
+  pw.OnCell? cellBuilder,
 }) {
   return pw.TableHelper.fromTextArray(
     headers: headers,
@@ -264,11 +351,30 @@ pw.Widget _table({
     ),
     cellStyle: const pw.TextStyle(fontSize: 9, color: _ink),
     headerDecoration: const pw.BoxDecoration(color: _banner),
+    // A step above the page per odd row: six-plus rows of otherwise-
+    // identical white cells is where a table stops being scannable at a
+    // glance, which is exactly the failure mode a clinician skimming this
+    // during an appointment can't afford.
+    oddRowDecoration: const pw.BoxDecoration(color: _stripe),
     border: pw.TableBorder.all(color: _rule, width: 0.4),
     cellPadding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+    // Column 0's header used the package default (centered) while every
+    // body cell was left-aligned -- a heading over its own column should
+    // agree with the text beneath it, so every column gets one explicit
+    // alignment shared by header and cells alike.
     cellAlignments: {
-      for (var i = 1; i < headers.length; i++) i: pw.Alignment.centerLeft,
+      for (var i = 0; i < headers.length; i++)
+        i: rightAlign.contains(i)
+            ? pw.Alignment.centerRight
+            : pw.Alignment.centerLeft,
     },
+    headerAlignments: {
+      for (var i = 0; i < headers.length; i++)
+        i: rightAlign.contains(i)
+            ? pw.Alignment.centerRight
+            : pw.Alignment.centerLeft,
+    },
+    cellBuilder: cellBuilder,
   );
 }
 
