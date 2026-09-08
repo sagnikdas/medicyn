@@ -541,8 +541,36 @@ select pg_temp.expect_exception(
   'a claimed link cannot be confirmed after its window expires'
 );
 
+-- An expired claimed row must not lock the caregiver out of trying again.
+-- The new invite has to come from someone with no stake in the stale row
+-- (stranger, not parent) -- parent creating one would supersede their own
+-- side of it regardless of expiry (see create_care_invite above) and mask
+-- the bug this is meant to catch. Only child's own claim can prove the
+-- self-heal, since child (not parent) is who the dead row still blocks.
+select pg_temp.become(:'stranger');
+select create_care_invite() as selfheal_code \gset
+select pg_temp.become(:'child');
+-- Captured as the raw jsonb, not ->>'id' straight into \gset: a failed
+-- claim returns no "id" key, which would leave the psql variable unset
+-- (and every reference to it below a bare, unresolved ":'...'") instead of
+-- failing this assertion with a readable message.
+select claim_care_invite(:'selfheal_code') as selfheal_result \gset
+select pg_temp.expect(
+  (:'selfheal_result')::jsonb ? 'id',
+  'a caregiver whose earlier claim expired can still claim a new invite'
+);
+select pg_temp.expect(
+  (select status = 'revoked'
+     from care_links
+    where id = current_setting('test.expired_link_id')::uuid),
+  'claiming again self-heals the caller''s own stale expired claim'
+);
+-- Free child of this proof-only link; it exists only to show the self-heal
+-- fired, not to carry the rest of the file's fixture forward.
+select revoke_care_link(((:'selfheal_result')::jsonb->>'id')::uuid);
+
 -- Happy path on a fresh invite: claim then confirm while the window is open.
-select revoke_care_link(current_setting('test.expired_link_id')::uuid);
+select pg_temp.become(:'parent');
 select create_care_invite() as code3 \gset
 select pg_temp.become(:'child');
 select claim_care_invite(:'code3')->>'id' as fresh_link_id \gset
