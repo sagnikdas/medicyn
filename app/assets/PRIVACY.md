@@ -1,6 +1,6 @@
 # Privacy Policy for Medicyn
 
-**Last updated:** 6 September 2026
+**Last updated:** 6 September 2026  
 **Contact:** contact@doezly.com
 
 ## Who is responsible
@@ -299,7 +299,7 @@ accident.
 If you cannot open the app, email **contact@doezly.com** from the Google
 address you signed in with, or use this page:
 
-https://sagnikdas.github.io/medicyn/delete-account/
+https://medicyn.doezly.com/delete-account
 
 That deletes your account, the cloud backup, any family link, and
 notification tokens. Uninstalling the app removes the copy on your phone
@@ -337,10 +337,9 @@ write to the email above and to your supervisory authority.
 ## Washington and Nevada health privacy
 
 If Washington's My Health My Data Act or Nevada SB370 applies to you,
-there is a **separate** consumer health data policy in `docs/compliance/MHMD.md` in
-the Medicyn source tree. Ask for it by email if you cannot open that
-file. It names Supabase, Anthropic, and Google, and it describes the
-second consent before family sharing.
+there is a **separate** consumer health data policy at
+https://medicyn.doezly.com/mhmd. It names Supabase, Anthropic, and Google,
+and it describes the second consent before family sharing.
 
 ## Contact
 

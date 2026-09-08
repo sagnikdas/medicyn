@@ -1,9 +1,10 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Play-required web URL for requesting account deletion without the app.
-/// Rendered from `docs/play-store/delete-account.md` by the public Pages site.
-const deleteAccountWebUrl =
-    'https://sagnikdas.github.io/medicyn/delete-account/';
+/// Rendered from `docs/play-store/delete-account.md` by the Doezly landing
+/// site (medicyn.doezly.com), not GitHub Pages: this repo is private, and
+/// Pages on a private repo needs a paid GitHub plan.
+const deleteAccountWebUrl = 'https://medicyn.doezly.com/delete-account';
 
 class AccountDeletionException implements Exception {
   const AccountDeletionException(this.message);

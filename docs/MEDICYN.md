@@ -191,13 +191,15 @@ Device script: [`testing/REAL-DEVICE-VALIDATION-TEST-PLAN.md`](testing/REAL-DEVI
 - [x] Fill the three placeholders in `compliance/PRIVACY.md` — already
       done: real effective date and contact email are in place, not
       placeholders
-- [ ] Host the policy at a public URL / enable GitHub Pages — the content
-      and `.github/workflows/pages.yml` automation are fully built, but
-      GitHub Pages has never been enabled on this repo (`gh api
-      repos/.../pages` → 404) and every run of the workflow has failed as a
-      result. Blocked on the repo being private: Pages on a private repo
-      needs a paid GitHub plan. Decide: upgrade the plan, or publish the
-      legal pages from a separate public repo instead.
+- [ ] Host the policy at a public URL — moved off GitHub Pages (this repo
+      is private; Pages on a private repo needs a paid plan, and every run
+      of the old `.github/workflows/pages.yml`, now removed, failed as a
+      result). Now served from the `sagnikdas/doezly` landing-site repo at
+      `medicyn.doezly.com/privacy`, `/delete-account`, `/support`, and
+      `/mhmd`. `app/lib/core/privacy_policy.dart` and
+      `account_deletion.dart` point at the new URLs. Still needs: the
+      `doezly` PR merged and deployed, then each URL verified live in a
+      private browser window before Play submission.
 - [ ] Release keystore and `app/android/key.properties` (see `app/README.md`)
 - [ ] Play Console Data safety form, matching `compliance/PRIVACY.md` (answers prepared in `compliance/pack/PLAY-DATA-SAFETY.md`)
 - [ ] Complete the Play declaration for `SCHEDULE_EXACT_ALARM`
@@ -300,6 +302,8 @@ reminders that fire with no network and no live app process.
       `compliance/pack/DPIA.md`, not yet actually re-assessed)
 - [ ] Keep the ROPA in step when a processor or purpose appears
 - [ ] Host MHMD policy on a public URL if Washington distribution is enabled
+      — page built at `medicyn.doezly.com/mhmd` alongside the others above;
+      same "needs the doezly PR merged and deployed" caveat applies
 - [x] ~~Resolve the `PRIVACY.md` duplication~~ — verified already resolved:
       `docs/compliance/PRIVACY.md` is a symlink to `app/assets/PRIVACY.md`
       (added in #71, "so drift is no longer possible"). The doc's claim of

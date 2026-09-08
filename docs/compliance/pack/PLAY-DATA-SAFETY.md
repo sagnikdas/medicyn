@@ -41,7 +41,7 @@ Declare **shared** for:
 
 Encrypted in transit: **Yes** (TLS; cleartext disallowed).
 Users can request deletion: **Yes** (Settings → Delete account and the public
-Pages URL `https://sagnikdas.github.io/medicyn/delete-account/`).
+URL `https://medicyn.doezly.com/delete-account`).
 Data collected for app functionality: **Yes**.
 Sold: **No**.
 Optional, account-creation not required: **Yes** (local-only mode).

@@ -1,6 +1,6 @@
 # Consumer Health Data Privacy Policy (Washington MHMD / Nevada SB370)
 
-**Last updated:** 20 August 2026
+**Last updated:** 20 August 2026  
 **Contact:** contact@doezly.com
 
 This policy is **only** about consumer health data. The general

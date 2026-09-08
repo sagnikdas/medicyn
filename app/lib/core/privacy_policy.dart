@@ -8,8 +8,10 @@ import 'package:flutter/services.dart';
 const privacyPolicyAsset = 'assets/PRIVACY.md';
 
 /// Public policy endpoint used for Play Console. The bundled asset remains
-/// the offline source of truth for users who have no network.
-const privacyPolicyWebUrl = 'https://sagnikdas.github.io/medicyn/privacy/';
+/// the offline source of truth for users who have no network. Served by the
+/// Doezly landing site (medicyn.doezly.com), not GitHub Pages: this repo is
+/// private, and Pages on a private repo needs a paid GitHub plan.
+const privacyPolicyWebUrl = 'https://medicyn.doezly.com/privacy';
 
 /// Opens the in-app policy so the user can actually read it, even offline.
 void openPrivacyPolicy(BuildContext context) {
