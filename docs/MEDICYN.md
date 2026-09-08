@@ -210,8 +210,18 @@ Device script: [`testing/REAL-DEVICE-VALIDATION-TEST-PLAN.md`](testing/REAL-DEVI
       "Check reminder access" on Settings loses "...then send a test
       reminder" down to "...then send a..."). Fix tracked in
       [issue #96](https://github.com/sagnikdas/medicyn/issues/96).
-- [ ] Add-method chooser and shorter onboarding ("scan or speak" as a real choice)
-- [ ] Sync and family-delivery status visible to the user
+- [x] Add-method chooser and shorter onboarding ("scan or speak" as a real
+      choice) — verified in code and on-device: `onboarding_screen.dart` is a
+      single-page value/privacy screen, and the Add flow already offers Scan
+      label / Speak details / Enter manually as three co-equal options (built
+      in `fdb96c0`, the same day as the audit that raised this). The doc's
+      "not a first-class entry route" complaint no longer applies.
+- [x] Device↔cloud sync status — already shipped: `SyncStatusStore` /
+      `_BackupStatusCard` on Settings covers syncing, error, pending-count,
+      and last-success states.
+- [ ] Family-delivery status (did an edit reach the other side's phone) —
+      split out as its own item, not shipped. Tracked in
+      [issue #98](https://github.com/sagnikdas/medicyn/issues/98).
 - [ ] As-needed logging, pause/completion, corrections
 - [ ] Complete export and locale-aware dates
 - [ ] Insights calculation and accessibility fixes
