@@ -426,7 +426,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     Text(
                       'This is a copy of the data Medicyn holds about you (Art. 15/20). '
                       'Other requests are answered within one month (Art. 12(3)) by email '
-                      'sagnikd91@gmail.com.',
+                      'contact@doezly.com.',
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                     const SizedBox(height: 12),

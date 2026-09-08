@@ -12,7 +12,7 @@ file is the internal TIA.
 
 | Personal data | Exporter | Importer | Country | Adequacy? | Intended safeguard |
 |---|---|---|---|---|---|
-| Account, medicines, schedules, dose logs, contests, consents, profiles, care links, alerts, tokens | Sagnik Das (India) / the user's device | Supabase | Singapore `ap-southeast-1` | No | Supabase DPA + EU SCCs (module controller-to-processor) + UK IDTA addendum |
+| Account, medicines, schedules, dose logs, contests, consents, profiles, care links, alerts, tokens | Doezly (India) / the user's device | Supabase | Singapore `ap-southeast-1` | No | Supabase DPA + EU SCCs (module controller-to-processor) + UK IDTA addendum |
 | OCR text + transcript | The user's device | Anthropic | United States | No (unless DPF applies to that entity) | Anthropic DPA; DPF if the contracting entity is certified; else SCCs |
 | FCM token + notification body | Supabase edge (`notify-care`) | Google FCM | United States | DPF for Google LLC if used | Cloud DPA; DPF |
 | Google account email / name / id | The user's device | Google Sign-In | United States | DPF | Independent controller — Google's own transfers |

@@ -30,16 +30,17 @@ rule in Console; Google has changed it before.
 
 4. Keep one or two of your own phones ready for the first Play install.
 
-5. Host the legal pages on a **public** https site. This repository includes
-   a GitHub Pages workflow that publishes the current policy and deletion
-   source files. Enable Pages for the repository, wait for the workflow, and
-   verify these URLs in a private browser window before continuing:
+5. Host the legal pages on a **public** https site. This repository is
+   private, and GitHub Pages on a private repo needs a paid GitHub plan, so
+   the pages are published from the `sagnikdas/doezly` landing-site repo at
+   `medicyn.doezly.com` instead. Verify these URLs in a private browser
+   window before continuing:
 
-   - `https://sagnikdas.github.io/medicyn/privacy/`
-   - `https://sagnikdas.github.io/medicyn/delete-account/`
-   - `https://sagnikdas.github.io/medicyn/support/`
+   - `https://medicyn.doezly.com/privacy`
+   - `https://medicyn.doezly.com/delete-account`
+   - `https://medicyn.doezly.com/support`
 
-   If any URL asks for a GitHub login or does not load, Play cannot read it.
+   If any URL does not load, Play cannot read it.
 
 6. Understand the `.jks`: Play does **not** give you this file. You create
    it on this Mac with Java `keytool`. Play only receives the AAB you sign
@@ -207,7 +208,7 @@ rule in Console; Google has changed it before.
 
 27. Set category to Medical or Health & fitness (pick one; keep it
     consistent with the Health apps form). Set contact email to
-    **sagnikd91@gmail.com**.
+    **contact@doezly.com**.
 
 28. Save the store listing. You can polish wording during the 14 days. You
     cannot start a test track without the policy URL and screenshots.

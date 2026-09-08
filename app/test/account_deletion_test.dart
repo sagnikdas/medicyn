@@ -5,7 +5,7 @@ void main() {
   test('the Play web URL points at the public Pages deletion page', () {
     expect(
       deleteAccountWebUrl,
-      'https://sagnikdas.github.io/medicyn/delete-account/',
+      'https://medicyn.doezly.com/delete-account',
     );
   });
 

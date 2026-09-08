@@ -1,7 +1,7 @@
 # 3.5 — Breach response
 
-**Controller:** Sagnik Das.
-**Reachable contact:** sagnikd91@gmail.com (same as the privacy contact).
+**Controller:** Doezly.
+**Reachable contact:** contact@doezly.com (same as the privacy contact).
 **Date:** 20 August 2026.
 
 GDPR Art. 33/34, UK GDPR, and the FTC Health Breach Notification Rule
@@ -130,7 +130,7 @@ Closed (UTC):
 
 ## Contact list (keep off git if numbers are private)
 
-- Controller email: sagnikd91@gmail.com
+- Controller email: contact@doezly.com
 - Supervisory authority: once Art. 27 exists, the representative's SA;
   UK users: ICO (ico.org.uk)
 - Supabase support / status page

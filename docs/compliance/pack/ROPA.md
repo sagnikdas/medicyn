@@ -1,6 +1,6 @@
 # 3.4 — Record of processing (GDPR Art. 30)
 
-**Controller:** Sagnik Das, sagnikd91@gmail.com.
+**Controller:** Doezly, contact@doezly.com.
 **Date:** 20 August 2026.
 **Version:** 1. Against `main` @ `f73aed5`.
 
@@ -14,8 +14,8 @@ Medicyn is not a processor for anyone else. There is no Art. 30(2) section.
 
 | | |
 |---|---|
-| Controller | Sagnik Das |
-| Contact | sagnikd91@gmail.com |
+| Controller | Doezly |
+| Contact | contact@doezly.com |
 | DPO | None — see [SCOPE.md](SCOPE.md) |
 | EU / UK representative | None appointed — see [SCOPE.md](SCOPE.md) |
 | Joint controllers | None. Google is an independent controller of Sign-In, Play, and (typically) speech audio. |
