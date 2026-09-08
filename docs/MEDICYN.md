@@ -74,7 +74,9 @@ camera at different paper.
 
 - [ ] **N1 — Refill basket.** Collapse per-medicine warnings into one list on
       one date a month. Plugs into `refill.dart`,
-      `Medicines.tabletsRemaining`; no schema change needed.
+      `Medicines.tabletsRemaining`; no schema change needed. Not unit-aware —
+      still a raw tablet count, so it won't sensibly cover ml, puffs, drops,
+      or injections if one of those is ever added as a dose unit.
 - [ ] **N2 — Tests that are due.** The monitoring a regimen implies
       (levothyroxine → TSH, warfarin → INR, metformin → HbA1c, statin →
       lipids + LFT). Plugs into `insights_screen.dart`, `TodayCareReminders`.
@@ -199,23 +201,70 @@ Device script: [`testing/REAL-DEVICE-VALIDATION-TEST-PLAN.md`](testing/REAL-DEVI
 - [ ] Overlay-install verification on the Galaxy M33
 
 ### Product gaps — before broad acquisition
-- [ ] System accessibility scaling — the app overrides Android's own
-      text-size preference with an in-app scaler capped at 150%
-      (`app/lib/main.dart:104-107`); some controls are also undersized
-- [ ] Add-method chooser and shorter onboarding ("scan or speak" as a real choice)
-- [ ] Sync and family-delivery status visible to the user
-- [ ] As-needed logging, pause/completion, corrections
-- [ ] Complete export and locale-aware dates
-- [ ] Insights calculation and accessibility fixes
-- [ ] Refill workflow (superseded in shape by N1)
+- [x] System accessibility scaling — verified on-device (emulator, system
+      font scale 1.3× + the in-app slider maxed at 150%) that
+      `app/lib/main.dart` no longer overrides the OS text-size preference; it
+      multiplies the device's own scale by the in-app one
+      (`deviceScale * AppSettings.instance.textScale`). The doc's old claim
+      was stale. Found instead: `ProfileMenuRow` (`app/lib/core/widgets/medicyn_chrome.dart`)
+      hardcodes `maxLines: 3` on its subtitle, so at large combined scale
+      real instructions get truncated with no way to see the rest (e.g.
+      "Check reminder access" on Settings loses "...then send a test
+      reminder" down to "...then send a..."). Fix tracked in
+      [issue #96](https://github.com/sagnikdas/medicyn/issues/96).
+- [x] Add-method chooser and shorter onboarding ("scan or speak" as a real
+      choice) — verified in code and on-device: `onboarding_screen.dart` is a
+      single-page value/privacy screen, and the Add flow already offers Scan
+      label / Speak details / Enter manually as three co-equal options (built
+      in `fdb96c0`, the same day as the audit that raised this). The doc's
+      "not a first-class entry route" complaint no longer applies.
+- [x] Device↔cloud sync status — already shipped: `SyncStatusStore` /
+      `_BackupStatusCard` on Settings covers syncing, error, pending-count,
+      and last-success states.
+- [ ] Family-delivery status (did an edit reach the other side's phone) —
+      split out as its own item, not shipped. Tracked in
+      [issue #98](https://github.com/sagnikdas/medicyn/issues/98).
+- [x] Pause/completion — shipped: `pauseSchedule`/`resumeSchedule`/`completeSchedule`
+      wired to UI in `review_edit_screen.dart`, with status shown on the
+      reminder card.
+- [x] Corrections — shipped: the `DoseLogContest` note feature in
+      `dose_history_screen.dart` lets a user dispute/correct a logged dose,
+      reachable from the home screen and review/edit screen.
+- [ ] As-needed (PRN) logging — no manual "log now" action exists for
+      `FrequencyType.asNeeded` medicines, since `expected_doses.dart`
+      deliberately yields no occurrences for them. Tracked in
+      [issue #99](https://github.com/sagnikdas/medicyn/issues/99).
+- [x] Complete export — verified: `data_export_service.dart` covers
+      medicines, schedules, dose logs, contest notes, today-care-reminders
+      and consents locally, plus profile, care_links, care_alerts and
+      medicine_edits from Supabase, with a `remote_gaps` field if a remote
+      fetch fails. Matches what `compliance/COMPLIANCE.md` §2.4 asked for.
+- [ ] Locale-aware dates — no `DateFormat(` usage anywhere in the app;
+      weekday/month names and relative-time strings are hardcoded English
+      arrays. Tracked in [issue #100](https://github.com/sagnikdas/medicyn/issues/100).
+- [x] Insights calculation and accessibility fixes — verified: the named
+      bug ("most-consistent" period was hardcoded to `DayPart.morning`) is
+      fixed; `insights_screen.dart` now computes rates for all `DayPart`
+      values and picks the real max. No distinct Insights-specific
+      accessibility issue found beyond the general text-scale work already
+      tracked in issue #96.
 
 ### Product gaps — after a successful launch
-- [ ] Multiple caregivers / multiple patients, and escalation
+Reviewed on 2026-09-08. The first five are confirmed accurate — genuinely
+not built, nothing stale to correct.
+- [ ] Multiple caregivers / multiple patients, and escalation — still
+      blocked by the locked 1:1 care-link decision
 - [ ] PDF clinician report (F6's missing half)
 - [ ] Travel assistant; home-screen widget
 - [ ] Billing tiers, if retention supports them
 - [ ] Certificate pinning (needs backup pins and a rotation plan — Let's Encrypt leaf pins will break the app)
-- [ ] Auto-revoke stale `claimed` care links
+- [ ] **Expired claimed care-links permanently lock out the caregiver's
+      account** — sharper than "auto-revoke" implies: `claim_care_invite`'s
+      `already_a_caregiver` guard matches any non-`revoked` status,
+      including a stale expired `claimed` row, so a caregiver whose claim
+      times out unconfirmed can never claim another invite without operator
+      intervention. Filed as a bug:
+      [issue #101](https://github.com/sagnikdas/medicyn/issues/101).
 
 ### iOS
 Scoped, none of it built. iOS ships to the same bar Android already meets —
@@ -246,7 +295,6 @@ reminders that fire with no network and no live app process.
 
 ### Decisions needed
 - [ ] Grace period before a dose counts as missed — flat 30 minutes today, probably wants to be per-medicine
-- [ ] What the parent is told when an alert fires
 - [ ] What happens when a link is broken and remade (e.g. a sibling taking over)
 - [ ] Play Billing vs web checkout for the caregiver subscription
 - [ ] Whether a lapsed caregiver can still see the read-only feed
@@ -261,7 +309,10 @@ reminders that fire with no network and no live app process.
 ## Known gaps and limitations
 
 Real limits in what is already merged. None are bugs; all are choices worth
-remembering.
+remembering. Reviewed point-by-point on 2026-09-08; fixes for the three
+marked below are tracked in
+[issue #96](https://github.com/sagnikdas/medicyn/issues/96), everything else
+here was deliberately kept as-is.
 
 - **A sweep forfeits backfill from before a schedule was last edited.**
   `MissedDoseDetector.wasArmed` bounds every occurrence on the schedule's
@@ -270,26 +321,36 @@ remembering.
   three days of 8am doses as skipped — nine of the eleven missed doses in the
   live database were fabricated that way, and each would have been a
   notification on a family member's phone. Sweeps run on every foreground, so
-  in practice almost nothing is lost, and silence beats a false alarm.
+  in practice almost nothing is lost, and silence beats a false alarm. The
+  cost is that *any* edit resets this, including a cosmetic one (a spelling
+  fix) that never changed what alarms actually fired. **Fix tracked in #96:**
+  split a new `timingDefinedAt` from `updatedAt` so only a timing-relevant
+  edit resets the anchor.
 - **Every-X-hours doses share one lattice** between the alarm scheduler and
   missed-dose detection (`intervalDoseSequence`). The origin is the calendar
-  day of `updatedAt`, so the same `wasArmed` rule applies.
+  day of `updatedAt`, so the same `wasArmed` rule applies, and the same #96
+  fix covers it.
 - **A missed dose is only noticed while the parent's app runs.** The sweep is
   device-side, on foreground. A parent who does not open the app for two days
-  generates no missed doses and therefore no alerts. Silent-device detection
-  covers the "app did not run" case — a caregiver must never read "no
-  missed-dose alerts" as "all is well".
+  generates no missed doses and therefore no alerts. A `device_silent` alert
+  path already exists end-to-end (client heartbeat, RPC, push copy) but
+  nothing ever calls it — no scheduler exists in the repo. **Fix tracked in
+  #96:** an hourly GitHub Actions workflow to invoke it.
 - **A caregiver's edit re-arms the parent's alarms** via the silent
   `data_changed` push, but the parent's phone still has to be reachable by
   FCM. Offline or force-stopped, the change sits until the next foreground
-  pull.
+  pull. Reviewed and kept as-is: the failure modes (no connectivity, a
+  force-stopped app) are outside what any push mechanism can fix, and the
+  send path already uses FCM high priority and the default long TTL.
 - **A missed-dose alert waits for connectivity.** It is late by however long
-  the phone stays offline, not by minutes.
+  the phone stays offline, not by minutes. Reviewed and kept as-is.
 - **An alert is only offered for 24 hours** (`CareNotifier.announceWindow`).
   A dose missed longer ago is in the feed but will never ring a phone.
-- **The parent is told nothing when an alert fires.** Deliberately
-  unresolved — see Decisions needed. `care_alerts` is readable by both sides,
-  so whatever is decided needs no migration.
+  Reviewed and kept as-is.
+- **The parent is told nothing when an alert fires.** Resolved: a gentle
+  in-app banner on the Today screen when one of the parent's own doses is
+  logged missed, worded as a supportive nudge rather than a report that the
+  caregiver was told. **Fix tracked in #96.**
 - **Sibling sharing is impossible** by design. Nobody can be both a parent
   and a caregiver in different pairs.
 - **Voice input is not on-device.** `SpeechListenOptions.onDevice` is false,
