@@ -229,12 +229,20 @@ class ProfileMenuRow extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.onTap,
+    this.iconBackgroundColor,
+    this.iconColor,
   });
 
   final IconData icon;
   final String title;
   final String subtitle;
   final VoidCallback onTap;
+
+  /// Override the leading icon's circle, e.g. to give one row (emergency
+  /// card) the app's "needs attention" red instead of every row's usual
+  /// teal. Null keeps the standard secondaryContainer treatment.
+  final Color? iconBackgroundColor;
+  final Color? iconColor;
 
   @override
   Widget build(BuildContext context) {
@@ -247,10 +255,10 @@ class ProfileMenuRow extends StatelessWidget {
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: scheme.secondaryContainer,
+              color: iconBackgroundColor ?? scheme.secondaryContainer,
               shape: BoxShape.circle,
             ),
-            child: Icon(icon, color: scheme.onSecondaryContainer),
+            child: Icon(icon, color: iconColor ?? scheme.onSecondaryContainer),
           ),
           const SizedBox(width: 16),
           Expanded(

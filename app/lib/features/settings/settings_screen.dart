@@ -118,33 +118,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   child: Center(
                     child: Column(
                       children: [
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            CircleAvatar(
-                              radius: 48,
-                              backgroundColor: Theme.of(
-                                context,
-                              ).colorScheme.secondaryContainer,
-                              foregroundColor: Theme.of(
-                                context,
-                              ).colorScheme.onSecondaryContainer,
-                              // No foregroundImage: a third-party account
-                              // photo (Google's default is a saturated,
-                              // uncontrolled color) would break the
-                              // single-accent rule on the one screen meant
-                              // to be its home. The initial below is the
-                              // only avatar treatment.
-                              child: Text(
-                                (name.isEmpty ? 'D' : name.substring(0, 1))
-                                    .toUpperCase(),
-                                style: Theme.of(context).textTheme.titleLarge,
-                              ),
-                            ),
-                            const SizedBox(width: 14),
-                            _EmergencyCardBadge(db: widget.db),
-                          ],
+                        CircleAvatar(
+                          radius: 48,
+                          backgroundColor: Theme.of(
+                            context,
+                          ).colorScheme.secondaryContainer,
+                          foregroundColor: Theme.of(
+                            context,
+                          ).colorScheme.onSecondaryContainer,
+                          // No foregroundImage: a third-party account photo
+                          // (Google's default is a saturated, uncontrolled
+                          // color) would break the single-accent rule on the
+                          // one screen meant to be its home. The initial
+                          // below is the only avatar treatment.
+                          child: Text(
+                            (name.isEmpty ? 'D' : name.substring(0, 1))
+                                .toUpperCase(),
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
                         ),
                         const SizedBox(height: 16),
                         Text(
@@ -257,6 +248,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Text(
+                      'Emergency card',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    ProfileMenuRow(
+                      icon: Icons.local_hospital,
+                      // The app's one "needs attention" red (same as
+                      // DayDoseStyle's Missed mark), not the usual teal —
+                      // this is the one row on the screen meant to read as
+                      // urgent rather than routine.
+                      iconBackgroundColor: Theme.of(context).colorScheme.error,
+                      iconColor: Theme.of(context).colorScheme.onError,
+                      title: 'Emergency card',
+                      subtitle:
+                          'Blood group, allergies, conditions, and your medicines — for a first responder or new clinician.',
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => EmergencyCardScreen(db: widget.db),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Text(
                       'Family',
                       style: Theme.of(context).textTheme.titleSmall?.copyWith(
                         color: Theme.of(context).colorScheme.primary,
@@ -288,25 +304,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       builder: (context, _) => _BackupStatusCard(
                         signedIn: _signedIn,
                         onRetry: _retrySync,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    Text(
-                      'Emergency card',
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    ProfileMenuRow(
-                      icon: Icons.emergency_outlined,
-                      title: 'Emergency card',
-                      subtitle:
-                          'Blood group, allergies, conditions, and your medicines — for a first responder or new clinician.',
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => EmergencyCardScreen(db: widget.db),
-                        ),
                       ),
                     ),
                     const SizedBox(height: 24),
@@ -981,56 +978,6 @@ class _BackupStatusCard extends StatelessWidget {
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Sits beside the avatar on the Profile tab -- a first-aid-red shortcut to
-/// the emergency card, the one thing on this screen someone else might need
-/// to find in a hurry. Same red as DayDoseStyle's Missed mark, so this
-/// borrows the app's one existing "needs attention" color rather than
-/// inventing a second one.
-class _EmergencyCardBadge extends StatelessWidget {
-  const _EmergencyCardBadge({required this.db});
-
-  final AppDatabase db;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Semantics(
-      button: true,
-      label: 'Emergency card',
-      child: Tooltip(
-        message: 'Emergency card',
-        child: SizedBox(
-          width: 84,
-          height: 96,
-          child: AmbientCard(
-            color: scheme.error,
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => EmergencyCardScreen(db: db)),
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.local_hospital, color: scheme.onError, size: 30),
-                const SizedBox(height: 6),
-                Text(
-                  'Emergency',
-                  textAlign: TextAlign.center,
-                  maxLines: 1,
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: scheme.onError,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
         ),
       ),
     );
