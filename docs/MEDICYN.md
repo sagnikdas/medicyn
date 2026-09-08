@@ -65,10 +65,6 @@ paired with `.impeccable/design.json` and cited by name from
       which the 1:1 lock forbids today.
 - [ ] **F10 — Premium caregiver dashboard.** Foundation only.
 - [ ] **F11 — "Ask about my meds" assistant.** Same Claude pipe, new prompt.
-- [ ] **F12 — Medicare RTM billing (US, B2B).** Would trigger HIPAA. Not
-      started.
-- [ ] **F13 — Pharma data licensing.** Deferred — needs ~100K users and
-      conflicts with the privacy stance today.
 
 ### New — accepted, not started
 
