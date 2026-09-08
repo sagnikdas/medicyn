@@ -246,7 +246,6 @@ reminders that fire with no network and no live app process.
 
 ### Decisions needed
 - [ ] Grace period before a dose counts as missed — flat 30 minutes today, probably wants to be per-medicine
-- [ ] What the parent is told when an alert fires
 - [ ] What happens when a link is broken and remade (e.g. a sibling taking over)
 - [ ] Play Billing vs web checkout for the caregiver subscription
 - [ ] Whether a lapsed caregiver can still see the read-only feed
@@ -261,7 +260,10 @@ reminders that fire with no network and no live app process.
 ## Known gaps and limitations
 
 Real limits in what is already merged. None are bugs; all are choices worth
-remembering.
+remembering. Reviewed point-by-point on 2026-09-08; fixes for the three
+marked below are tracked in
+[issue #96](https://github.com/sagnikdas/medicyn/issues/96), everything else
+here was deliberately kept as-is.
 
 - **A sweep forfeits backfill from before a schedule was last edited.**
   `MissedDoseDetector.wasArmed` bounds every occurrence on the schedule's
@@ -270,26 +272,36 @@ remembering.
   three days of 8am doses as skipped — nine of the eleven missed doses in the
   live database were fabricated that way, and each would have been a
   notification on a family member's phone. Sweeps run on every foreground, so
-  in practice almost nothing is lost, and silence beats a false alarm.
+  in practice almost nothing is lost, and silence beats a false alarm. The
+  cost is that *any* edit resets this, including a cosmetic one (a spelling
+  fix) that never changed what alarms actually fired. **Fix tracked in #96:**
+  split a new `timingDefinedAt` from `updatedAt` so only a timing-relevant
+  edit resets the anchor.
 - **Every-X-hours doses share one lattice** between the alarm scheduler and
   missed-dose detection (`intervalDoseSequence`). The origin is the calendar
-  day of `updatedAt`, so the same `wasArmed` rule applies.
+  day of `updatedAt`, so the same `wasArmed` rule applies, and the same #96
+  fix covers it.
 - **A missed dose is only noticed while the parent's app runs.** The sweep is
   device-side, on foreground. A parent who does not open the app for two days
-  generates no missed doses and therefore no alerts. Silent-device detection
-  covers the "app did not run" case — a caregiver must never read "no
-  missed-dose alerts" as "all is well".
+  generates no missed doses and therefore no alerts. A `device_silent` alert
+  path already exists end-to-end (client heartbeat, RPC, push copy) but
+  nothing ever calls it — no scheduler exists in the repo. **Fix tracked in
+  #96:** an hourly GitHub Actions workflow to invoke it.
 - **A caregiver's edit re-arms the parent's alarms** via the silent
   `data_changed` push, but the parent's phone still has to be reachable by
   FCM. Offline or force-stopped, the change sits until the next foreground
-  pull.
+  pull. Reviewed and kept as-is: the failure modes (no connectivity, a
+  force-stopped app) are outside what any push mechanism can fix, and the
+  send path already uses FCM high priority and the default long TTL.
 - **A missed-dose alert waits for connectivity.** It is late by however long
-  the phone stays offline, not by minutes.
+  the phone stays offline, not by minutes. Reviewed and kept as-is.
 - **An alert is only offered for 24 hours** (`CareNotifier.announceWindow`).
   A dose missed longer ago is in the feed but will never ring a phone.
-- **The parent is told nothing when an alert fires.** Deliberately
-  unresolved — see Decisions needed. `care_alerts` is readable by both sides,
-  so whatever is decided needs no migration.
+  Reviewed and kept as-is.
+- **The parent is told nothing when an alert fires.** Resolved: a gentle
+  in-app banner on the Today screen when one of the parent's own doses is
+  logged missed, worded as a supportive nudge rather than a report that the
+  caregiver was told. **Fix tracked in #96.**
 - **Sibling sharing is impossible** by design. Nobody can be both a parent
   and a caregiver in different pairs.
 - **Voice input is not on-device.** `SpeechListenOptions.onDevice` is false,
