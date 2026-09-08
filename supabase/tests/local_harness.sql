@@ -25,7 +25,11 @@
 --     -f supabase/migrations/20260820210000_stamp_writer_per_table.sql \
 --     -f supabase/migrations/20260820220000_phase3_care_extras.sql \
 --     -f supabase/migrations/20260820230000_claim_invite_no_dblink.sql \
+--     -f supabase/migrations/20260824120000_retry_unsent_device_silent.sql \
+--     -f supabase/migrations/20260824130000_revoked_care_link_unreadable.sql \
 --     -f supabase/migrations/20260826100000_phase3_lifecycle.sql \
+--     -f supabase/migrations/20260906170000_today_care_reminders.sql \
+--     -f supabase/migrations/20260908120000_claim_invite_selfheals_stale.sql \
 --     -f supabase/tests/care_links_rls_test.sql
 --
 -- and the push tables' own assertions, which need a fresh database because
