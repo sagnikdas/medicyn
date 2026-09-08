@@ -232,7 +232,14 @@ Device script: [`testing/REAL-DEVICE-VALIDATION-TEST-PLAN.md`](testing/REAL-DEVI
       `FrequencyType.asNeeded` medicines, since `expected_doses.dart`
       deliberately yields no occurrences for them. Tracked in
       [issue #99](https://github.com/sagnikdas/medicyn/issues/99).
-- [ ] Complete export and locale-aware dates
+- [x] Complete export — verified: `data_export_service.dart` covers
+      medicines, schedules, dose logs, contest notes, today-care-reminders
+      and consents locally, plus profile, care_links, care_alerts and
+      medicine_edits from Supabase, with a `remote_gaps` field if a remote
+      fetch fails. Matches what `compliance/COMPLIANCE.md` §2.4 asked for.
+- [ ] Locale-aware dates — no `DateFormat(` usage anywhere in the app;
+      weekday/month names and relative-time strings are hardcoded English
+      arrays. Tracked in [issue #100](https://github.com/sagnikdas/medicyn/issues/100).
 - [ ] Insights calculation and accessibility fixes
 - [ ] Refill workflow (superseded in shape by N1)
 
