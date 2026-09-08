@@ -222,7 +222,16 @@ Device script: [`testing/REAL-DEVICE-VALIDATION-TEST-PLAN.md`](testing/REAL-DEVI
 - [ ] Family-delivery status (did an edit reach the other side's phone) —
       split out as its own item, not shipped. Tracked in
       [issue #98](https://github.com/sagnikdas/medicyn/issues/98).
-- [ ] As-needed logging, pause/completion, corrections
+- [x] Pause/completion — shipped: `pauseSchedule`/`resumeSchedule`/`completeSchedule`
+      wired to UI in `review_edit_screen.dart`, with status shown on the
+      reminder card.
+- [x] Corrections — shipped: the `DoseLogContest` note feature in
+      `dose_history_screen.dart` lets a user dispute/correct a logged dose,
+      reachable from the home screen and review/edit screen.
+- [ ] As-needed (PRN) logging — no manual "log now" action exists for
+      `FrequencyType.asNeeded` medicines, since `expected_doses.dart`
+      deliberately yields no occurrences for them. Tracked in
+      [issue #99](https://github.com/sagnikdas/medicyn/issues/99).
 - [ ] Complete export and locale-aware dates
 - [ ] Insights calculation and accessibility fixes
 - [ ] Refill workflow (superseded in shape by N1)
