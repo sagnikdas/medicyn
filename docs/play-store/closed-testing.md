@@ -404,9 +404,8 @@ rule in Console; Google has changed it before.
 
 If you are stuck, these files match the steps above:
 
-- Why this runs in parallel with other work: [`PLAN.md`](../product/PLAN.md) Phase 4
-- Upload keystore (same commands): [`app/README.md`](../../app/README.md),
-  [`README.md`](../../README.md) “Before shipping a release build”
+- Why this runs in parallel with other work: [`docs/MEDICYN.md`](../MEDICYN.md) Pending
+- Upload keystore (same commands): [`app/README.md`](../../app/README.md)
 - Data Safety / health / permissions:
   [`docs/compliance/pack/PLAY-DATA-SAFETY.md`](../compliance/pack/PLAY-DATA-SAFETY.md)
 - Privacy policy source: [`PRIVACY.md`](../compliance/PRIVACY.md)
