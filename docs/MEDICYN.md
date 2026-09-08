@@ -199,9 +199,17 @@ Device script: [`testing/REAL-DEVICE-VALIDATION-TEST-PLAN.md`](testing/REAL-DEVI
 - [ ] Overlay-install verification on the Galaxy M33
 
 ### Product gaps — before broad acquisition
-- [ ] System accessibility scaling — the app overrides Android's own
-      text-size preference with an in-app scaler capped at 150%
-      (`app/lib/main.dart:104-107`); some controls are also undersized
+- [x] System accessibility scaling — verified on-device (emulator, system
+      font scale 1.3× + the in-app slider maxed at 150%) that
+      `app/lib/main.dart` no longer overrides the OS text-size preference; it
+      multiplies the device's own scale by the in-app one
+      (`deviceScale * AppSettings.instance.textScale`). The doc's old claim
+      was stale. Found instead: `ProfileMenuRow` (`app/lib/core/widgets/medicyn_chrome.dart`)
+      hardcodes `maxLines: 3` on its subtitle, so at large combined scale
+      real instructions get truncated with no way to see the rest (e.g.
+      "Check reminder access" on Settings loses "...then send a test
+      reminder" down to "...then send a..."). Fix tracked in
+      [issue #96](https://github.com/sagnikdas/medicyn/issues/96).
 - [ ] Add-method chooser and shorter onboarding ("scan or speak" as a real choice)
 - [ ] Sync and family-delivery status visible to the user
 - [ ] As-needed logging, pause/completion, corrections
