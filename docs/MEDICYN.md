@@ -250,12 +250,21 @@ Device script: [`testing/REAL-DEVICE-VALIDATION-TEST-PLAN.md`](testing/REAL-DEVI
       tracked in issue #96.
 
 ### Product gaps — after a successful launch
-- [ ] Multiple caregivers / multiple patients, and escalation
+Reviewed on 2026-09-08. The first five are confirmed accurate — genuinely
+not built, nothing stale to correct.
+- [ ] Multiple caregivers / multiple patients, and escalation — still
+      blocked by the locked 1:1 care-link decision
 - [ ] PDF clinician report (F6's missing half)
 - [ ] Travel assistant; home-screen widget
 - [ ] Billing tiers, if retention supports them
 - [ ] Certificate pinning (needs backup pins and a rotation plan — Let's Encrypt leaf pins will break the app)
-- [ ] Auto-revoke stale `claimed` care links
+- [ ] **Expired claimed care-links permanently lock out the caregiver's
+      account** — sharper than "auto-revoke" implies: `claim_care_invite`'s
+      `already_a_caregiver` guard matches any non-`revoked` status,
+      including a stale expired `claimed` row, so a caregiver whose claim
+      times out unconfirmed can never claim another invite without operator
+      intervention. Filed as a bug:
+      [issue #101](https://github.com/sagnikdas/medicyn/issues/101).
 
 ### iOS
 Scoped, none of it built. iOS ships to the same bar Android already meets —
