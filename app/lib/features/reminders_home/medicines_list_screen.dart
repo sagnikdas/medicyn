@@ -226,20 +226,20 @@ class _MedicinesListScreenState extends State<MedicinesListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      // Embedded (the Plan tab): no app bar. The page announces itself with
+      // its own large heading in the body instead, matching Today — this
+      // used to be a "Medicyn" wordmark bar stacked directly above a much
+      // smaller "Your plan" label, repeating the app's own name on a screen
+      // that's already reachable only from inside the app.
       appBar: widget.embedded
-          ? AppBar(
-              automaticallyImplyLeading: false,
-              toolbarHeight: 64,
-              titleSpacing: 20,
-              title: const MedicynBrandMark(compact: true),
-            )
+          ? null
           : AppBar(title: const Text('My medicines')),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: widget.onAdd,
         icon: const Icon(Icons.add),
         label: const Text('Add medicine'),
       ),
-      body: MedicynContent(child: _body()),
+      body: SafeArea(child: MedicynContent(child: _body())),
     );
   }
 
@@ -273,25 +273,12 @@ class _MedicinesListScreenState extends State<MedicinesListScreen> {
         controller: _scrollController,
         slivers: [
           if (widget.embedded)
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+            const SliverPadding(
+              padding: EdgeInsets.fromLTRB(20, 24, 20, 12),
               sliver: SliverToBoxAdapter(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Your plan',
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Everything you take, and when.',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                  ],
+                child: MedicynPageHeading(
+                  title: 'Plan',
+                  subtitle: 'Everything you take, and when.',
                 ),
               ),
             ),
@@ -316,39 +303,46 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(32, 32, 32, 96),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (embedded) ...[
-              Text(
-                'Your plan',
-                style: Theme.of(context).textTheme.titleLarge,
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 24),
-            ],
-            Icon(
-              Icons.medication_outlined,
-              size: 64,
-              color: Theme.of(context).colorScheme.primary,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'No reminders yet',
-              style: Theme.of(context).textTheme.titleLarge,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Scan a label or speak the details.',
-              style: Theme.of(context).textTheme.bodyMedium,
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
+    final message = Padding(
+      padding: const EdgeInsets.fromLTRB(32, 32, 32, 96),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.medication_outlined,
+            size: 64,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'No reminders yet',
+            style: Theme.of(context).textTheme.titleLarge,
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Scan a label or speak the details.',
+            style: Theme.of(context).textTheme.bodyMedium,
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+    if (!embedded) return Center(child: message);
+    // The heading stays pinned top-left, matching the populated list's own
+    // header, rather than getting pulled into the centered empty-state
+    // block below it.
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const MedicynPageHeading(
+            title: 'Plan',
+            subtitle: 'Everything you take, and when.',
+          ),
+          Expanded(child: Center(child: message)),
+        ],
       ),
     );
   }

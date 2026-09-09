@@ -76,6 +76,74 @@ class MedicynTopBar extends StatelessWidget implements PreferredSizeWidget {
   }
 }
 
+/// The large page-identity heading shared by every primary tab: a short,
+/// page-specific name at headline size, with an optional small uppercase
+/// eyebrow above it and a one-line description below — the same shape
+/// Today already used. Deliberately not a repeated "Medicyn" wordmark:
+/// once a tab is on screen the user already knows which app they're in,
+/// so the brand mark now lives only at entry points (onboarding, sign-in,
+/// the label-capture flow) where nothing else has established that yet.
+class MedicynPageHeading extends StatelessWidget {
+  const MedicynPageHeading({
+    super.key,
+    required this.title,
+    this.eyebrow,
+    this.subtitle,
+    this.trailing,
+  });
+
+  final String title;
+  final String? eyebrow;
+  final String? subtitle;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (eyebrow != null) ...[
+          Text(
+            eyebrow!.toUpperCase(),
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: scheme.primary,
+              letterSpacing: 1.1,
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                title,
+                style: theme.textTheme.headlineLarge?.copyWith(
+                  fontSize: 38,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: -1.4,
+                  color: scheme.primary,
+                ),
+              ),
+            ),
+            if (trailing != null) ...[const SizedBox(width: 12), trailing!],
+          ],
+        ),
+        if (subtitle != null) ...[
+          const SizedBox(height: 8),
+          Text(
+            subtitle!,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: scheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
 /// The system's signature container — a "page" resting on the chart's
 /// linen ground. When tappable, it visibly lifts (a deeper, wider shadow)
 /// the instant a finger touches it, on top of the existing 2% press-scale,
