@@ -20,6 +20,7 @@ import '../care/care_service.dart';
 import '../care/dose_feed_screen.dart';
 import '../consent/consent_purpose.dart';
 import '../consent/consent_service.dart';
+import '../emergency/emergency_card_screen.dart';
 import '../notification_engine/notification_service.dart';
 import '../notification_engine/reminder_reliability_screen.dart';
 
@@ -246,6 +247,41 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    Text(
+                      'Emergency card',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    ProfileMenuRow(
+                      icon: Icons.local_hospital,
+                      // The app's one "needs attention" red (same as
+                      // DayDoseStyle's Missed mark), not the usual teal —
+                      // this is the one row on the screen meant to read as
+                      // urgent rather than routine.
+                      iconBackgroundColor: Theme.of(context).colorScheme.error,
+                      iconColor: Theme.of(context).colorScheme.onError,
+                      title: 'Emergency card',
+                      subtitle:
+                          'Blood group, allergies, conditions, and your medicines — for a first responder or new clinician.',
+                      onTap: () {
+                        // A second tap can land before the first push's
+                        // transition covers this row -- without this guard
+                        // it queues a second push that races the first
+                        // route's still-in-flight animation (visible
+                        // ghosting, and a hit-test crash on a render object
+                        // that hasn't been laid out yet).
+                        final route = ModalRoute.of(context);
+                        if (route != null && !route.isCurrent) return;
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => EmergencyCardScreen(db: widget.db),
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 24),
                     Text(
                       'Family',
                       style: Theme.of(context).textTheme.titleSmall?.copyWith(

@@ -84,9 +84,13 @@ camera at different paper.
 - [ ] **N2 — Tests that are due.** The monitoring a regimen implies
       (levothyroxine → TSH, warfarin → INR, metformin → HbA1c, statin →
       lipids + LFT). Plugs into `insights_screen.dart`, `TodayCareReminders`.
-- [ ] **N3 — Emergency card.** Medicines, doses, allergies, conditions, blood
-      group, caregiver's number. Plugs into `data_export_service.dart`,
-      Profile.
+- [x] **N3 — Emergency card.** Medicines, doses, allergies, conditions, blood
+      group, caregiver's number. Local-only (`EmergencyInfo` table) — unlike
+      medicines/schedules this never needs to reach a caregiver's phone, so
+      it deliberately does not sync. One tap from Profile
+      (`emergency_card_screen.dart`), a printable PDF
+      (`emergency_card_pdf.dart`), and included in the GDPR export
+      (`data_export_service.dart`, schema v4) — see #107.
 - [ ] **N4 — Discharge summary translator.** Photograph a discharge summary →
       plain language, every medicine created with times, red flags,
       follow-up date. Reuses the OCR → `parse-medicine` → review-and-confirm
@@ -102,8 +106,8 @@ camera at different paper.
 - [ ] N2 must ask once for treatment start date and store it —
       `Medicines.createdAt` is when it was added to Medicyn, not when the
       doctor started it.
-- [ ] N3 must not be a lock-screen surface — one tap from Profile, plus a
-      printable copy.
+- [x] N3 must not be a lock-screen surface — one tap from Profile, plus a
+      printable copy. Satisfied by construction: no notification touches it.
 - [ ] N4 needs list-shaped extraction (current `sanitiseExtraction()` /
       `ParsedMedicine` assume one medicine), a multi-item review screen, and
       a re-weighted quota (`parse-medicine/quota.ts`).

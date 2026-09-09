@@ -3208,6 +3208,732 @@ class TodayCareRemindersCompanion extends UpdateCompanion<TodayCareReminder> {
   }
 }
 
+class $EmergencyInfoTable extends EmergencyInfo
+    with TableInfo<$EmergencyInfoTable, EmergencyInfoData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $EmergencyInfoTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _bloodGroupMeta = const VerificationMeta(
+    'bloodGroup',
+  );
+  @override
+  late final GeneratedColumn<String> bloodGroup = GeneratedColumn<String>(
+    'blood_group',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _allergiesMeta = const VerificationMeta(
+    'allergies',
+  );
+  @override
+  late final GeneratedColumn<String> allergies = GeneratedColumn<String>(
+    'allergies',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _allergiesSevereMeta = const VerificationMeta(
+    'allergiesSevere',
+  );
+  @override
+  late final GeneratedColumn<bool> allergiesSevere = GeneratedColumn<bool>(
+    'allergies_severe',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("allergies_severe" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _conditionsMeta = const VerificationMeta(
+    'conditions',
+  );
+  @override
+  late final GeneratedColumn<String> conditions = GeneratedColumn<String>(
+    'conditions',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _notesMeta = const VerificationMeta('notes');
+  @override
+  late final GeneratedColumn<String> notes = GeneratedColumn<String>(
+    'notes',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _insuranceNumberMeta = const VerificationMeta(
+    'insuranceNumber',
+  );
+  @override
+  late final GeneratedColumn<String> insuranceNumber = GeneratedColumn<String>(
+    'insurance_number',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _nationalIdMeta = const VerificationMeta(
+    'nationalId',
+  );
+  @override
+  late final GeneratedColumn<String> nationalId = GeneratedColumn<String>(
+    'national_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _healthCardNumberMeta = const VerificationMeta(
+    'healthCardNumber',
+  );
+  @override
+  late final GeneratedColumn<String> healthCardNumber = GeneratedColumn<String>(
+    'health_card_number',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _emergencyContactNameMeta =
+      const VerificationMeta('emergencyContactName');
+  @override
+  late final GeneratedColumn<String> emergencyContactName =
+      GeneratedColumn<String>(
+        'emergency_contact_name',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant(''),
+      );
+  static const VerificationMeta _emergencyContactPhoneMeta =
+      const VerificationMeta('emergencyContactPhone');
+  @override
+  late final GeneratedColumn<String> emergencyContactPhone =
+      GeneratedColumn<String>(
+        'emergency_contact_phone',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant(''),
+      );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    bloodGroup,
+    allergies,
+    allergiesSevere,
+    conditions,
+    notes,
+    insuranceNumber,
+    nationalId,
+    healthCardNumber,
+    emergencyContactName,
+    emergencyContactPhone,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'emergency_info';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<EmergencyInfoData> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('blood_group')) {
+      context.handle(
+        _bloodGroupMeta,
+        bloodGroup.isAcceptableOrUnknown(data['blood_group']!, _bloodGroupMeta),
+      );
+    }
+    if (data.containsKey('allergies')) {
+      context.handle(
+        _allergiesMeta,
+        allergies.isAcceptableOrUnknown(data['allergies']!, _allergiesMeta),
+      );
+    }
+    if (data.containsKey('allergies_severe')) {
+      context.handle(
+        _allergiesSevereMeta,
+        allergiesSevere.isAcceptableOrUnknown(
+          data['allergies_severe']!,
+          _allergiesSevereMeta,
+        ),
+      );
+    }
+    if (data.containsKey('conditions')) {
+      context.handle(
+        _conditionsMeta,
+        conditions.isAcceptableOrUnknown(data['conditions']!, _conditionsMeta),
+      );
+    }
+    if (data.containsKey('notes')) {
+      context.handle(
+        _notesMeta,
+        notes.isAcceptableOrUnknown(data['notes']!, _notesMeta),
+      );
+    }
+    if (data.containsKey('insurance_number')) {
+      context.handle(
+        _insuranceNumberMeta,
+        insuranceNumber.isAcceptableOrUnknown(
+          data['insurance_number']!,
+          _insuranceNumberMeta,
+        ),
+      );
+    }
+    if (data.containsKey('national_id')) {
+      context.handle(
+        _nationalIdMeta,
+        nationalId.isAcceptableOrUnknown(data['national_id']!, _nationalIdMeta),
+      );
+    }
+    if (data.containsKey('health_card_number')) {
+      context.handle(
+        _healthCardNumberMeta,
+        healthCardNumber.isAcceptableOrUnknown(
+          data['health_card_number']!,
+          _healthCardNumberMeta,
+        ),
+      );
+    }
+    if (data.containsKey('emergency_contact_name')) {
+      context.handle(
+        _emergencyContactNameMeta,
+        emergencyContactName.isAcceptableOrUnknown(
+          data['emergency_contact_name']!,
+          _emergencyContactNameMeta,
+        ),
+      );
+    }
+    if (data.containsKey('emergency_contact_phone')) {
+      context.handle(
+        _emergencyContactPhoneMeta,
+        emergencyContactPhone.isAcceptableOrUnknown(
+          data['emergency_contact_phone']!,
+          _emergencyContactPhoneMeta,
+        ),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  EmergencyInfoData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return EmergencyInfoData(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      bloodGroup: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}blood_group'],
+      )!,
+      allergies: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}allergies'],
+      )!,
+      allergiesSevere: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}allergies_severe'],
+      )!,
+      conditions: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}conditions'],
+      )!,
+      notes: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}notes'],
+      )!,
+      insuranceNumber: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}insurance_number'],
+      )!,
+      nationalId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}national_id'],
+      )!,
+      healthCardNumber: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}health_card_number'],
+      )!,
+      emergencyContactName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}emergency_contact_name'],
+      )!,
+      emergencyContactPhone: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}emergency_contact_phone'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $EmergencyInfoTable createAlias(String alias) {
+    return $EmergencyInfoTable(attachedDatabase, alias);
+  }
+}
+
+class EmergencyInfoData extends DataClass
+    implements Insertable<EmergencyInfoData> {
+  final String id;
+  final String bloodGroup;
+  final String allergies;
+  final bool allergiesSevere;
+  final String conditions;
+  final String notes;
+  final String insuranceNumber;
+  final String nationalId;
+  final String healthCardNumber;
+  final String emergencyContactName;
+  final String emergencyContactPhone;
+  final DateTime updatedAt;
+  const EmergencyInfoData({
+    required this.id,
+    required this.bloodGroup,
+    required this.allergies,
+    required this.allergiesSevere,
+    required this.conditions,
+    required this.notes,
+    required this.insuranceNumber,
+    required this.nationalId,
+    required this.healthCardNumber,
+    required this.emergencyContactName,
+    required this.emergencyContactPhone,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['blood_group'] = Variable<String>(bloodGroup);
+    map['allergies'] = Variable<String>(allergies);
+    map['allergies_severe'] = Variable<bool>(allergiesSevere);
+    map['conditions'] = Variable<String>(conditions);
+    map['notes'] = Variable<String>(notes);
+    map['insurance_number'] = Variable<String>(insuranceNumber);
+    map['national_id'] = Variable<String>(nationalId);
+    map['health_card_number'] = Variable<String>(healthCardNumber);
+    map['emergency_contact_name'] = Variable<String>(emergencyContactName);
+    map['emergency_contact_phone'] = Variable<String>(emergencyContactPhone);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  EmergencyInfoCompanion toCompanion(bool nullToAbsent) {
+    return EmergencyInfoCompanion(
+      id: Value(id),
+      bloodGroup: Value(bloodGroup),
+      allergies: Value(allergies),
+      allergiesSevere: Value(allergiesSevere),
+      conditions: Value(conditions),
+      notes: Value(notes),
+      insuranceNumber: Value(insuranceNumber),
+      nationalId: Value(nationalId),
+      healthCardNumber: Value(healthCardNumber),
+      emergencyContactName: Value(emergencyContactName),
+      emergencyContactPhone: Value(emergencyContactPhone),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory EmergencyInfoData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return EmergencyInfoData(
+      id: serializer.fromJson<String>(json['id']),
+      bloodGroup: serializer.fromJson<String>(json['bloodGroup']),
+      allergies: serializer.fromJson<String>(json['allergies']),
+      allergiesSevere: serializer.fromJson<bool>(json['allergiesSevere']),
+      conditions: serializer.fromJson<String>(json['conditions']),
+      notes: serializer.fromJson<String>(json['notes']),
+      insuranceNumber: serializer.fromJson<String>(json['insuranceNumber']),
+      nationalId: serializer.fromJson<String>(json['nationalId']),
+      healthCardNumber: serializer.fromJson<String>(json['healthCardNumber']),
+      emergencyContactName: serializer.fromJson<String>(
+        json['emergencyContactName'],
+      ),
+      emergencyContactPhone: serializer.fromJson<String>(
+        json['emergencyContactPhone'],
+      ),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'bloodGroup': serializer.toJson<String>(bloodGroup),
+      'allergies': serializer.toJson<String>(allergies),
+      'allergiesSevere': serializer.toJson<bool>(allergiesSevere),
+      'conditions': serializer.toJson<String>(conditions),
+      'notes': serializer.toJson<String>(notes),
+      'insuranceNumber': serializer.toJson<String>(insuranceNumber),
+      'nationalId': serializer.toJson<String>(nationalId),
+      'healthCardNumber': serializer.toJson<String>(healthCardNumber),
+      'emergencyContactName': serializer.toJson<String>(emergencyContactName),
+      'emergencyContactPhone': serializer.toJson<String>(emergencyContactPhone),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  EmergencyInfoData copyWith({
+    String? id,
+    String? bloodGroup,
+    String? allergies,
+    bool? allergiesSevere,
+    String? conditions,
+    String? notes,
+    String? insuranceNumber,
+    String? nationalId,
+    String? healthCardNumber,
+    String? emergencyContactName,
+    String? emergencyContactPhone,
+    DateTime? updatedAt,
+  }) => EmergencyInfoData(
+    id: id ?? this.id,
+    bloodGroup: bloodGroup ?? this.bloodGroup,
+    allergies: allergies ?? this.allergies,
+    allergiesSevere: allergiesSevere ?? this.allergiesSevere,
+    conditions: conditions ?? this.conditions,
+    notes: notes ?? this.notes,
+    insuranceNumber: insuranceNumber ?? this.insuranceNumber,
+    nationalId: nationalId ?? this.nationalId,
+    healthCardNumber: healthCardNumber ?? this.healthCardNumber,
+    emergencyContactName: emergencyContactName ?? this.emergencyContactName,
+    emergencyContactPhone: emergencyContactPhone ?? this.emergencyContactPhone,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  EmergencyInfoData copyWithCompanion(EmergencyInfoCompanion data) {
+    return EmergencyInfoData(
+      id: data.id.present ? data.id.value : this.id,
+      bloodGroup: data.bloodGroup.present
+          ? data.bloodGroup.value
+          : this.bloodGroup,
+      allergies: data.allergies.present ? data.allergies.value : this.allergies,
+      allergiesSevere: data.allergiesSevere.present
+          ? data.allergiesSevere.value
+          : this.allergiesSevere,
+      conditions: data.conditions.present
+          ? data.conditions.value
+          : this.conditions,
+      notes: data.notes.present ? data.notes.value : this.notes,
+      insuranceNumber: data.insuranceNumber.present
+          ? data.insuranceNumber.value
+          : this.insuranceNumber,
+      nationalId: data.nationalId.present
+          ? data.nationalId.value
+          : this.nationalId,
+      healthCardNumber: data.healthCardNumber.present
+          ? data.healthCardNumber.value
+          : this.healthCardNumber,
+      emergencyContactName: data.emergencyContactName.present
+          ? data.emergencyContactName.value
+          : this.emergencyContactName,
+      emergencyContactPhone: data.emergencyContactPhone.present
+          ? data.emergencyContactPhone.value
+          : this.emergencyContactPhone,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('EmergencyInfoData(')
+          ..write('id: $id, ')
+          ..write('bloodGroup: $bloodGroup, ')
+          ..write('allergies: $allergies, ')
+          ..write('allergiesSevere: $allergiesSevere, ')
+          ..write('conditions: $conditions, ')
+          ..write('notes: $notes, ')
+          ..write('insuranceNumber: $insuranceNumber, ')
+          ..write('nationalId: $nationalId, ')
+          ..write('healthCardNumber: $healthCardNumber, ')
+          ..write('emergencyContactName: $emergencyContactName, ')
+          ..write('emergencyContactPhone: $emergencyContactPhone, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    bloodGroup,
+    allergies,
+    allergiesSevere,
+    conditions,
+    notes,
+    insuranceNumber,
+    nationalId,
+    healthCardNumber,
+    emergencyContactName,
+    emergencyContactPhone,
+    updatedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is EmergencyInfoData &&
+          other.id == this.id &&
+          other.bloodGroup == this.bloodGroup &&
+          other.allergies == this.allergies &&
+          other.allergiesSevere == this.allergiesSevere &&
+          other.conditions == this.conditions &&
+          other.notes == this.notes &&
+          other.insuranceNumber == this.insuranceNumber &&
+          other.nationalId == this.nationalId &&
+          other.healthCardNumber == this.healthCardNumber &&
+          other.emergencyContactName == this.emergencyContactName &&
+          other.emergencyContactPhone == this.emergencyContactPhone &&
+          other.updatedAt == this.updatedAt);
+}
+
+class EmergencyInfoCompanion extends UpdateCompanion<EmergencyInfoData> {
+  final Value<String> id;
+  final Value<String> bloodGroup;
+  final Value<String> allergies;
+  final Value<bool> allergiesSevere;
+  final Value<String> conditions;
+  final Value<String> notes;
+  final Value<String> insuranceNumber;
+  final Value<String> nationalId;
+  final Value<String> healthCardNumber;
+  final Value<String> emergencyContactName;
+  final Value<String> emergencyContactPhone;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const EmergencyInfoCompanion({
+    this.id = const Value.absent(),
+    this.bloodGroup = const Value.absent(),
+    this.allergies = const Value.absent(),
+    this.allergiesSevere = const Value.absent(),
+    this.conditions = const Value.absent(),
+    this.notes = const Value.absent(),
+    this.insuranceNumber = const Value.absent(),
+    this.nationalId = const Value.absent(),
+    this.healthCardNumber = const Value.absent(),
+    this.emergencyContactName = const Value.absent(),
+    this.emergencyContactPhone = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  EmergencyInfoCompanion.insert({
+    required String id,
+    this.bloodGroup = const Value.absent(),
+    this.allergies = const Value.absent(),
+    this.allergiesSevere = const Value.absent(),
+    this.conditions = const Value.absent(),
+    this.notes = const Value.absent(),
+    this.insuranceNumber = const Value.absent(),
+    this.nationalId = const Value.absent(),
+    this.healthCardNumber = const Value.absent(),
+    this.emergencyContactName = const Value.absent(),
+    this.emergencyContactPhone = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id);
+  static Insertable<EmergencyInfoData> custom({
+    Expression<String>? id,
+    Expression<String>? bloodGroup,
+    Expression<String>? allergies,
+    Expression<bool>? allergiesSevere,
+    Expression<String>? conditions,
+    Expression<String>? notes,
+    Expression<String>? insuranceNumber,
+    Expression<String>? nationalId,
+    Expression<String>? healthCardNumber,
+    Expression<String>? emergencyContactName,
+    Expression<String>? emergencyContactPhone,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (bloodGroup != null) 'blood_group': bloodGroup,
+      if (allergies != null) 'allergies': allergies,
+      if (allergiesSevere != null) 'allergies_severe': allergiesSevere,
+      if (conditions != null) 'conditions': conditions,
+      if (notes != null) 'notes': notes,
+      if (insuranceNumber != null) 'insurance_number': insuranceNumber,
+      if (nationalId != null) 'national_id': nationalId,
+      if (healthCardNumber != null) 'health_card_number': healthCardNumber,
+      if (emergencyContactName != null)
+        'emergency_contact_name': emergencyContactName,
+      if (emergencyContactPhone != null)
+        'emergency_contact_phone': emergencyContactPhone,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  EmergencyInfoCompanion copyWith({
+    Value<String>? id,
+    Value<String>? bloodGroup,
+    Value<String>? allergies,
+    Value<bool>? allergiesSevere,
+    Value<String>? conditions,
+    Value<String>? notes,
+    Value<String>? insuranceNumber,
+    Value<String>? nationalId,
+    Value<String>? healthCardNumber,
+    Value<String>? emergencyContactName,
+    Value<String>? emergencyContactPhone,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return EmergencyInfoCompanion(
+      id: id ?? this.id,
+      bloodGroup: bloodGroup ?? this.bloodGroup,
+      allergies: allergies ?? this.allergies,
+      allergiesSevere: allergiesSevere ?? this.allergiesSevere,
+      conditions: conditions ?? this.conditions,
+      notes: notes ?? this.notes,
+      insuranceNumber: insuranceNumber ?? this.insuranceNumber,
+      nationalId: nationalId ?? this.nationalId,
+      healthCardNumber: healthCardNumber ?? this.healthCardNumber,
+      emergencyContactName: emergencyContactName ?? this.emergencyContactName,
+      emergencyContactPhone:
+          emergencyContactPhone ?? this.emergencyContactPhone,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (bloodGroup.present) {
+      map['blood_group'] = Variable<String>(bloodGroup.value);
+    }
+    if (allergies.present) {
+      map['allergies'] = Variable<String>(allergies.value);
+    }
+    if (allergiesSevere.present) {
+      map['allergies_severe'] = Variable<bool>(allergiesSevere.value);
+    }
+    if (conditions.present) {
+      map['conditions'] = Variable<String>(conditions.value);
+    }
+    if (notes.present) {
+      map['notes'] = Variable<String>(notes.value);
+    }
+    if (insuranceNumber.present) {
+      map['insurance_number'] = Variable<String>(insuranceNumber.value);
+    }
+    if (nationalId.present) {
+      map['national_id'] = Variable<String>(nationalId.value);
+    }
+    if (healthCardNumber.present) {
+      map['health_card_number'] = Variable<String>(healthCardNumber.value);
+    }
+    if (emergencyContactName.present) {
+      map['emergency_contact_name'] = Variable<String>(
+        emergencyContactName.value,
+      );
+    }
+    if (emergencyContactPhone.present) {
+      map['emergency_contact_phone'] = Variable<String>(
+        emergencyContactPhone.value,
+      );
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('EmergencyInfoCompanion(')
+          ..write('id: $id, ')
+          ..write('bloodGroup: $bloodGroup, ')
+          ..write('allergies: $allergies, ')
+          ..write('allergiesSevere: $allergiesSevere, ')
+          ..write('conditions: $conditions, ')
+          ..write('notes: $notes, ')
+          ..write('insuranceNumber: $insuranceNumber, ')
+          ..write('nationalId: $nationalId, ')
+          ..write('healthCardNumber: $healthCardNumber, ')
+          ..write('emergencyContactName: $emergencyContactName, ')
+          ..write('emergencyContactPhone: $emergencyContactPhone, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -3219,6 +3945,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   );
   late final $TodayCareRemindersTable todayCareReminders =
       $TodayCareRemindersTable(this);
+  late final $EmergencyInfoTable emergencyInfo = $EmergencyInfoTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -3229,6 +3956,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     doseLogs,
     doseLogContests,
     todayCareReminders,
+    emergencyInfo,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
@@ -5463,6 +6191,359 @@ typedef $$TodayCareRemindersTableProcessedTableManager =
       TodayCareReminder,
       PrefetchHooks Function()
     >;
+typedef $$EmergencyInfoTableCreateCompanionBuilder =
+    EmergencyInfoCompanion Function({
+      required String id,
+      Value<String> bloodGroup,
+      Value<String> allergies,
+      Value<bool> allergiesSevere,
+      Value<String> conditions,
+      Value<String> notes,
+      Value<String> insuranceNumber,
+      Value<String> nationalId,
+      Value<String> healthCardNumber,
+      Value<String> emergencyContactName,
+      Value<String> emergencyContactPhone,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+typedef $$EmergencyInfoTableUpdateCompanionBuilder =
+    EmergencyInfoCompanion Function({
+      Value<String> id,
+      Value<String> bloodGroup,
+      Value<String> allergies,
+      Value<bool> allergiesSevere,
+      Value<String> conditions,
+      Value<String> notes,
+      Value<String> insuranceNumber,
+      Value<String> nationalId,
+      Value<String> healthCardNumber,
+      Value<String> emergencyContactName,
+      Value<String> emergencyContactPhone,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$EmergencyInfoTableFilterComposer
+    extends Composer<_$AppDatabase, $EmergencyInfoTable> {
+  $$EmergencyInfoTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get bloodGroup => $composableBuilder(
+    column: $table.bloodGroup,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get allergies => $composableBuilder(
+    column: $table.allergies,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get allergiesSevere => $composableBuilder(
+    column: $table.allergiesSevere,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get conditions => $composableBuilder(
+    column: $table.conditions,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get notes => $composableBuilder(
+    column: $table.notes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get insuranceNumber => $composableBuilder(
+    column: $table.insuranceNumber,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get nationalId => $composableBuilder(
+    column: $table.nationalId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get healthCardNumber => $composableBuilder(
+    column: $table.healthCardNumber,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get emergencyContactName => $composableBuilder(
+    column: $table.emergencyContactName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get emergencyContactPhone => $composableBuilder(
+    column: $table.emergencyContactPhone,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$EmergencyInfoTableOrderingComposer
+    extends Composer<_$AppDatabase, $EmergencyInfoTable> {
+  $$EmergencyInfoTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get bloodGroup => $composableBuilder(
+    column: $table.bloodGroup,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get allergies => $composableBuilder(
+    column: $table.allergies,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get allergiesSevere => $composableBuilder(
+    column: $table.allergiesSevere,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get conditions => $composableBuilder(
+    column: $table.conditions,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get notes => $composableBuilder(
+    column: $table.notes,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get insuranceNumber => $composableBuilder(
+    column: $table.insuranceNumber,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get nationalId => $composableBuilder(
+    column: $table.nationalId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get healthCardNumber => $composableBuilder(
+    column: $table.healthCardNumber,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get emergencyContactName => $composableBuilder(
+    column: $table.emergencyContactName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get emergencyContactPhone => $composableBuilder(
+    column: $table.emergencyContactPhone,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$EmergencyInfoTableAnnotationComposer
+    extends Composer<_$AppDatabase, $EmergencyInfoTable> {
+  $$EmergencyInfoTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get bloodGroup => $composableBuilder(
+    column: $table.bloodGroup,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get allergies =>
+      $composableBuilder(column: $table.allergies, builder: (column) => column);
+
+  GeneratedColumn<bool> get allergiesSevere => $composableBuilder(
+    column: $table.allergiesSevere,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get conditions => $composableBuilder(
+    column: $table.conditions,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get notes =>
+      $composableBuilder(column: $table.notes, builder: (column) => column);
+
+  GeneratedColumn<String> get insuranceNumber => $composableBuilder(
+    column: $table.insuranceNumber,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get nationalId => $composableBuilder(
+    column: $table.nationalId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get healthCardNumber => $composableBuilder(
+    column: $table.healthCardNumber,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get emergencyContactName => $composableBuilder(
+    column: $table.emergencyContactName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get emergencyContactPhone => $composableBuilder(
+    column: $table.emergencyContactPhone,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$EmergencyInfoTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $EmergencyInfoTable,
+          EmergencyInfoData,
+          $$EmergencyInfoTableFilterComposer,
+          $$EmergencyInfoTableOrderingComposer,
+          $$EmergencyInfoTableAnnotationComposer,
+          $$EmergencyInfoTableCreateCompanionBuilder,
+          $$EmergencyInfoTableUpdateCompanionBuilder,
+          (
+            EmergencyInfoData,
+            BaseReferences<
+              _$AppDatabase,
+              $EmergencyInfoTable,
+              EmergencyInfoData
+            >,
+          ),
+          EmergencyInfoData,
+          PrefetchHooks Function()
+        > {
+  $$EmergencyInfoTableTableManager(_$AppDatabase db, $EmergencyInfoTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$EmergencyInfoTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$EmergencyInfoTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$EmergencyInfoTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> bloodGroup = const Value.absent(),
+                Value<String> allergies = const Value.absent(),
+                Value<bool> allergiesSevere = const Value.absent(),
+                Value<String> conditions = const Value.absent(),
+                Value<String> notes = const Value.absent(),
+                Value<String> insuranceNumber = const Value.absent(),
+                Value<String> nationalId = const Value.absent(),
+                Value<String> healthCardNumber = const Value.absent(),
+                Value<String> emergencyContactName = const Value.absent(),
+                Value<String> emergencyContactPhone = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => EmergencyInfoCompanion(
+                id: id,
+                bloodGroup: bloodGroup,
+                allergies: allergies,
+                allergiesSevere: allergiesSevere,
+                conditions: conditions,
+                notes: notes,
+                insuranceNumber: insuranceNumber,
+                nationalId: nationalId,
+                healthCardNumber: healthCardNumber,
+                emergencyContactName: emergencyContactName,
+                emergencyContactPhone: emergencyContactPhone,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                Value<String> bloodGroup = const Value.absent(),
+                Value<String> allergies = const Value.absent(),
+                Value<bool> allergiesSevere = const Value.absent(),
+                Value<String> conditions = const Value.absent(),
+                Value<String> notes = const Value.absent(),
+                Value<String> insuranceNumber = const Value.absent(),
+                Value<String> nationalId = const Value.absent(),
+                Value<String> healthCardNumber = const Value.absent(),
+                Value<String> emergencyContactName = const Value.absent(),
+                Value<String> emergencyContactPhone = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => EmergencyInfoCompanion.insert(
+                id: id,
+                bloodGroup: bloodGroup,
+                allergies: allergies,
+                allergiesSevere: allergiesSevere,
+                conditions: conditions,
+                notes: notes,
+                insuranceNumber: insuranceNumber,
+                nationalId: nationalId,
+                healthCardNumber: healthCardNumber,
+                emergencyContactName: emergencyContactName,
+                emergencyContactPhone: emergencyContactPhone,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$EmergencyInfoTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $EmergencyInfoTable,
+      EmergencyInfoData,
+      $$EmergencyInfoTableFilterComposer,
+      $$EmergencyInfoTableOrderingComposer,
+      $$EmergencyInfoTableAnnotationComposer,
+      $$EmergencyInfoTableCreateCompanionBuilder,
+      $$EmergencyInfoTableUpdateCompanionBuilder,
+      (
+        EmergencyInfoData,
+        BaseReferences<_$AppDatabase, $EmergencyInfoTable, EmergencyInfoData>,
+      ),
+      EmergencyInfoData,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -5477,4 +6558,6 @@ class $AppDatabaseManager {
       $$DoseLogContestsTableTableManager(_db, _db.doseLogContests);
   $$TodayCareRemindersTableTableManager get todayCareReminders =>
       $$TodayCareRemindersTableTableManager(_db, _db.todayCareReminders);
+  $$EmergencyInfoTableTableManager get emergencyInfo =>
+      $$EmergencyInfoTableTableManager(_db, _db.emergencyInfo);
 }

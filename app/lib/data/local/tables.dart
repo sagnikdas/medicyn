@@ -14,6 +14,51 @@ enum ReminderStatus { active, paused, completed, asNeeded }
 /// What happened to a scheduled dose. Stored as plain text (`.name`).
 enum DoseAction { taken, snoozed, missed }
 
+/// N3, the emergency card: a single local-only row (id is always [singletonId])
+/// holding the facts a first responder or a new clinician needs that Medicyn
+/// has no other reason to ask for. Deliberately not synced -- unlike
+/// medicines and schedules, this never needs to reach a caregiver's phone;
+/// the card's whole purpose is a physical or on-device copy that travels
+/// with the person it describes, not a shared record. See N3's own note in
+/// MEDICYN.md: it must never be a lock-screen surface.
+class EmergencyInfo extends Table {
+  TextColumn get id => text()();
+  TextColumn get bloodGroup => text().withDefault(const Constant(''))();
+  TextColumn get allergies => text().withDefault(const Constant(''))();
+  // True marks an allergy severe/anaphylaxis-risk rather than mild, so the
+  // card can call it out instead of burying it in the same plain text as
+  // everything else.
+  BoolColumn get allergiesSevere =>
+      boolean().withDefault(const Constant(false))();
+  TextColumn get conditions => text().withDefault(const Constant(''))();
+  // Anything that doesn't fit the fields above -- pacemaker, pregnant, DNR
+  // on file -- for a first responder who only has seconds to read this.
+  TextColumn get notes => text().withDefault(const Constant(''))();
+  TextColumn get insuranceNumber => text().withDefault(const Constant(''))();
+  // Deliberately one generic field rather than a country-gated one: the app
+  // has no reliable signal for which country's ID a person means (Aadhaar,
+  // SSN, NHS number, ...), so the edit form labels this "National ID" and
+  // lets the person write whichever applies.
+  TextColumn get nationalId => text().withDefault(const Constant(''))();
+  TextColumn get healthCardNumber => text().withDefault(const Constant(''))();
+  // A person to call in an emergency, entered directly on this card --
+  // independent of the Family care-link feature, which only ever names a
+  // caregiver for whoever is the *patient* side of a link (and says
+  // nothing for someone with no link at all, or who is themselves the
+  // caregiver). Everyone filling out this card should be able to name
+  // someone, whether or not they use Family sharing.
+  TextColumn get emergencyContactName =>
+      text().withDefault(const Constant(''))();
+  TextColumn get emergencyContactPhone =>
+      text().withDefault(const Constant(''))();
+  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+
+  @override
+  Set<Column> get primaryKey => {id};
+
+  static const singletonId = 'self';
+}
+
 class Medicines extends Table {
   TextColumn get id => text()(); // client-generated uuid, matches Supabase PK
   TextColumn get drugName => text()();

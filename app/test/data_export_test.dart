@@ -64,10 +64,43 @@ void main() {
     expect(export['dose_logs'], isNotEmpty);
     expect(export['consents'], isA<Map>());
     expect(export.containsKey('profile'), isFalse);
+    expect(export['emergency_info'], isNull);
 
     for (final secret in exportExcludedSecrets) {
       expect(encoded.toLowerCase(), isNot(contains(secret)));
     }
+  });
+
+  test('export JSON includes the emergency card once saved', () async {
+    await db.upsertEmergencyInfo(
+      bloodGroup: 'O+',
+      allergies: 'Penicillin',
+      allergiesSevere: true,
+      conditions: 'Type 2 diabetes',
+      notes: 'Pacemaker fitted 2022',
+      insuranceNumber: 'INS-4471',
+      nationalId: '1234 5678 9012',
+      healthCardNumber: 'HC-88213',
+      emergencyContactName: 'Priya Kapoor',
+      emergencyContactPhone: '+919876500000',
+    );
+    final export = await DataExportService(
+      db,
+    ).buildExport(now: DateTime.utc(2026, 8, 20, 12));
+
+    expect(export['emergency_info']['blood_group'], 'O+');
+    expect(export['emergency_info']['allergies'], 'Penicillin');
+    expect(export['emergency_info']['allergies_severe'], isTrue);
+    expect(export['emergency_info']['conditions'], 'Type 2 diabetes');
+    expect(export['emergency_info']['notes'], 'Pacemaker fitted 2022');
+    expect(export['emergency_info']['insurance_number'], 'INS-4471');
+    expect(export['emergency_info']['national_id'], '1234 5678 9012');
+    expect(export['emergency_info']['health_card_number'], 'HC-88213');
+    expect(export['emergency_info']['emergency_contact_name'], 'Priya Kapoor');
+    expect(
+      export['emergency_info']['emergency_contact_phone'],
+      '+919876500000',
+    );
   });
 
   test('works with no account and still includes local consents', () async {

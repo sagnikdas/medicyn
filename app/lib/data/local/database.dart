@@ -23,7 +23,14 @@ class DoseLogWithContest {
 }
 
 @DriftDatabase(
-  tables: [Medicines, Schedules, DoseLogs, DoseLogContests, TodayCareReminders],
+  tables: [
+    Medicines,
+    Schedules,
+    DoseLogs,
+    DoseLogContests,
+    TodayCareReminders,
+    EmergencyInfo,
+  ],
 )
 class AppDatabase extends _$AppDatabase {
   /// Opens the encrypted per-account file via [openEncryptedAppDatabase].
@@ -38,7 +45,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 8;
+  int get schemaVersion => 11;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -98,6 +105,53 @@ class AppDatabase extends _$AppDatabase {
               todayCareReminders.deleted,
             ],
           ),
+        );
+      }
+      if (from < 9) {
+        // createTable builds from *today's* EmergencyInfo definition, so a
+        // database created here already gets every column added below for
+        // free. Only a database that already has the v9 table (from >= 9)
+        // needs the ALTER TABLEs.
+        await m.createTable(emergencyInfo);
+      }
+      if (from == 9) {
+        // Idempotent: this app opens the same file from more than one
+        // isolate (the main UI isolate and the notification/FCM background
+        // isolate, see the AppDatabase doc comment below), and two of them
+        // racing this migration on the same cold start can both decide they
+        // need to run it. A plain addColumn crashes the second one with
+        // "duplicate column name" -- which fails the whole database open,
+        // for every screen, not just this table -- so check first.
+        await _addColumnIfMissing(
+          m,
+          emergencyInfo,
+          emergencyInfo.allergiesSevere,
+        );
+        await _addColumnIfMissing(m, emergencyInfo, emergencyInfo.notes);
+        await _addColumnIfMissing(
+          m,
+          emergencyInfo,
+          emergencyInfo.insuranceNumber,
+        );
+        await _addColumnIfMissing(m, emergencyInfo, emergencyInfo.nationalId);
+        await _addColumnIfMissing(
+          m,
+          emergencyInfo,
+          emergencyInfo.healthCardNumber,
+        );
+      }
+      if (from >= 9 && from < 11) {
+        // Covers both a v10 database and one jumping straight from v9 to
+        // v11 in one upgrade -- same idempotency reasoning as above.
+        await _addColumnIfMissing(
+          m,
+          emergencyInfo,
+          emergencyInfo.emergencyContactName,
+        );
+        await _addColumnIfMissing(
+          m,
+          emergencyInfo,
+          emergencyInfo.emergencyContactPhone,
         );
       }
     },
@@ -174,6 +228,26 @@ class AppDatabase extends _$AppDatabase {
       plainColumns: ['dose_log_id', 'note', 'pending_sync'],
       dateTimeColumns: ['created_at', 'updated_at'],
     );
+  }
+
+  /// [Migrator.addColumn], but a no-op if the column is already there.
+  /// SQLite's `ALTER TABLE ADD COLUMN` isn't idempotent on its own -- a
+  /// second attempt throws "duplicate column name" -- and that's not just
+  /// theoretical here: this app opens the same encrypted file from more
+  /// than one isolate (see [AppDatabase]'s doc comment), so two isolates
+  /// racing a cold start can both decide the same migration still needs to
+  /// run.
+  Future<void> _addColumnIfMissing(
+    Migrator m,
+    TableInfo table,
+    GeneratedColumn column,
+  ) async {
+    final existing = await customSelect(
+      "SELECT 1 FROM pragma_table_info('${table.actualTableName}') WHERE name = ?",
+      variables: [Variable(column.name)],
+    ).get();
+    if (existing.isNotEmpty) return;
+    await m.addColumn(table, column);
   }
 
   // --- Medicines ---------------------------------------------------------
@@ -490,6 +564,47 @@ class AppDatabase extends _$AppDatabase {
         note: Value(trimmed),
         updatedAt: Value(now),
         pendingSync: const Value(true),
+      ),
+    );
+  }
+
+  /// The emergency card's one row, if it has ever been filled in. Null
+  /// (not an empty-fields row) until the first save, so the card and its
+  /// edit screen can tell "never set up" from "set up with blanks."
+  Stream<EmergencyInfoData?> watchEmergencyInfo() => (select(
+    emergencyInfo,
+  )..where((t) => t.id.equals(EmergencyInfo.singletonId))).watchSingleOrNull();
+
+  Future<EmergencyInfoData?> emergencyInfoOnce() => (select(
+    emergencyInfo,
+  )..where((t) => t.id.equals(EmergencyInfo.singletonId))).getSingleOrNull();
+
+  Future<void> upsertEmergencyInfo({
+    required String bloodGroup,
+    required String allergies,
+    bool allergiesSevere = false,
+    required String conditions,
+    String notes = '',
+    String insuranceNumber = '',
+    String nationalId = '',
+    String healthCardNumber = '',
+    String emergencyContactName = '',
+    String emergencyContactPhone = '',
+  }) {
+    return into(emergencyInfo).insertOnConflictUpdate(
+      EmergencyInfoCompanion.insert(
+        id: EmergencyInfo.singletonId,
+        bloodGroup: Value(bloodGroup.trim()),
+        allergies: Value(allergies.trim()),
+        allergiesSevere: Value(allergiesSevere),
+        conditions: Value(conditions.trim()),
+        notes: Value(notes.trim()),
+        insuranceNumber: Value(insuranceNumber.trim()),
+        nationalId: Value(nationalId.trim()),
+        healthCardNumber: Value(healthCardNumber.trim()),
+        emergencyContactName: Value(emergencyContactName.trim()),
+        emergencyContactPhone: Value(emergencyContactPhone.trim()),
+        updatedAt: Value(DateTime.now()),
       ),
     );
   }
