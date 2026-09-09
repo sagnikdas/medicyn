@@ -58,39 +58,37 @@ class _InsightsScreenState extends State<InsightsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // No app bar, no repeated "Medicyn" wordmark: the page announces itself
+    // with its own large heading in the body, matching Today and Plan.
     return Scaffold(
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        toolbarHeight: 64,
-        titleSpacing: 20,
-        title: const MedicynBrandMark(compact: true),
-      ),
-      body: StreamBuilder<List<ScheduleWithMedicine>>(
-        stream: _schedulesStream,
-        builder: (context, scheduleSnap) {
-          return StreamBuilder<List<DoseLog>>(
-            stream: _doseLogsStream,
-            builder: (context, logSnap) {
-              // See the matching guard in HomeScreen: without it this tab
-              // shows "Nothing due this week yet" / all-zero stats for the
-              // moment before the database's first watch() emission, then
-              // jumps to the real numbers.
-              if ((scheduleSnap.connectionState == ConnectionState.waiting &&
-                      !scheduleSnap.hasData) ||
-                  (logSnap.connectionState == ConnectionState.waiting &&
-                      !logSnap.hasData)) {
-                return const Center(child: CircularProgressIndicator());
-              }
-              return _InsightsBody(
-                schedules: scheduleSnap.data ?? const [],
-                logs: logSnap.data ?? const [],
-                scrollController: _scrollController,
-                sharing: _sharing,
-                onShare: _shareDoctorReport,
-              );
-            },
-          );
-        },
+      body: SafeArea(
+        child: StreamBuilder<List<ScheduleWithMedicine>>(
+          stream: _schedulesStream,
+          builder: (context, scheduleSnap) {
+            return StreamBuilder<List<DoseLog>>(
+              stream: _doseLogsStream,
+              builder: (context, logSnap) {
+                // See the matching guard in HomeScreen: without it this tab
+                // shows "Nothing due this week yet" / all-zero stats for the
+                // moment before the database's first watch() emission, then
+                // jumps to the real numbers.
+                if ((scheduleSnap.connectionState == ConnectionState.waiting &&
+                        !scheduleSnap.hasData) ||
+                    (logSnap.connectionState == ConnectionState.waiting &&
+                        !logSnap.hasData)) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                return _InsightsBody(
+                  schedules: scheduleSnap.data ?? const [],
+                  logs: logSnap.data ?? const [],
+                  scrollController: _scrollController,
+                  sharing: _sharing,
+                  onShare: _shareDoctorReport,
+                );
+              },
+            );
+          },
+        ),
       ),
     );
   }
@@ -202,24 +200,12 @@ class _InsightsBody extends StatelessWidget {
 
     return ListView(
       controller: scrollController,
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
       children: [
-        MedicynFadeIn(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Your health insights',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'What actually happened with your medicines this week.',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
+        const MedicynFadeIn(
+          child: MedicynPageHeading(
+            title: 'Insights',
+            subtitle: 'What actually happened with your medicines this week.',
           ),
         ),
         const SizedBox(height: 24),

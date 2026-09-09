@@ -100,6 +100,37 @@ class _SettingsScreenState extends State<SettingsScreen> {
     });
   }
 
+  /// Shared by the two places a sign-in prompt can appear: the standalone
+  /// Settings entry point, and the Profile tab's avatar hero (embedded),
+  /// which shows the hero first and this button underneath it.
+  Widget _signInButton() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        OutlinedButton(
+          onPressed: _signingIn ? null : _signInWithGoogle,
+          child: MedicynSwitcher(
+            child: _signingIn
+                ? const SizedBox(
+                    key: ValueKey(true),
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text('Sign in with Google', key: ValueKey(false)),
+          ),
+        ),
+        if (_signInError != null) ...[
+          const SizedBox(height: 12),
+          Text(
+            _signInError!,
+            style: TextStyle(color: Theme.of(context).colorScheme.error),
+          ),
+        ],
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final email = AuthService.instance.currentUser?.email ?? '';
@@ -188,71 +219,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 const SizedBox(height: 24),
               ] else ...[
-                OutlinedButton(
-                  onPressed: _signingIn ? null : _signInWithGoogle,
-                  child: MedicynSwitcher(
-                    child: _signingIn
-                        ? const SizedBox(
-                            key: ValueKey(true),
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Text(
-                            'Sign in with Google',
-                            key: ValueKey(false),
-                          ),
-                  ),
-                ),
-                if (_signInError != null) ...[
-                  const SizedBox(height: 12),
-                  Text(
-                    _signInError!,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
-                    ),
-                  ),
-                ],
+                _signInButton(),
                 const SizedBox(height: 24),
               ],
               if (widget.embedded && !_signedIn) ...[
-                OutlinedButton(
-                  onPressed: _signingIn ? null : _signInWithGoogle,
-                  child: MedicynSwitcher(
-                    child: _signingIn
-                        ? const SizedBox(
-                            key: ValueKey(true),
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Text(
-                            'Sign in with Google',
-                            key: ValueKey(false),
-                          ),
-                  ),
-                ),
-                if (_signInError != null) ...[
-                  const SizedBox(height: 12),
-                  Text(
-                    _signInError!,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
-                    ),
-                  ),
-                ],
+                _signInButton(),
                 const SizedBox(height: 24),
               ],
               MedicynFadeIn(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Text(
-                      'Emergency card',
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                    ),
+                    const _SectionHeader('Emergency card'),
                     const SizedBox(height: 8),
                     ProfileMenuRow(
                       icon: Icons.local_hospital,
@@ -282,12 +260,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       },
                     ),
                     const SizedBox(height: 24),
-                    Text(
-                      'Family',
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                    ),
+                    const _SectionHeader('Family'),
                     const SizedBox(height: 8),
                     IgnorePointer(
                       ignoring: !_signedIn,
@@ -309,20 +282,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     const _FamilyFeedLink(),
                     const SizedBox(height: 24),
-                    ListenableBuilder(
-                      listenable: SyncStatusStore.instance,
-                      builder: (context, _) => _BackupStatusCard(
-                        signedIn: _signedIn,
-                        onRetry: _retrySync,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    Text(
-                      'Reminder reliability',
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                    ),
+                    const _SectionHeader('Reminders'),
                     const SizedBox(height: 8),
                     ProfileMenuRow(
                       icon: Icons.notifications_active_outlined,
@@ -336,14 +296,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 24),
-                    Text(
-                      'Dose responses',
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 16),
                     ListenableBuilder(
                       listenable: AppSettings.instance,
                       builder: (context, _) => DropdownButtonFormField<int>(
@@ -366,18 +319,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                     ),
                     const SizedBox(height: 24),
-                    Text(
+                    const _SectionHeader(
                       'Appearance',
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
+                      subtitle:
+                          '100% is the default size. Drag right to make text and buttons larger.',
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '100% is the default size. Drag right to make text and buttons larger.',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 8),
                     // Nothing previews the setting better than the screen you're on:
                     // the slider rescales the whole app live as it's dragged, this
                     // row included.
@@ -410,9 +357,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       },
                     ),
                     const SizedBox(height: 20),
-                    Text(
-                      'Theme',
-                      style: Theme.of(context).textTheme.titleSmall,
+                    Semantics(
+                      header: true,
+                      child: Text(
+                        'Theme',
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -456,11 +406,47 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                     ),
                     const SizedBox(height: 28),
-                    Text(
-                      'Your data',
-                      style: Theme.of(context).textTheme.titleSmall,
+                    const _SectionHeader('Data & privacy'),
+                    const SizedBox(height: 8),
+                    // The status card and the switch that actually turns
+                    // Cloud backup on live in the same section on purpose —
+                    // the card's "below" copy used to mean a full screen's
+                    // worth of scrolling past Reminders and Appearance to
+                    // reach the toggle it was describing.
+                    ListenableBuilder(
+                      listenable: SyncStatusStore.instance,
+                      builder: (context, _) => _BackupStatusCard(
+                        signedIn: _signedIn,
+                        onRetry: _retrySync,
+                      ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 20),
+                    Text(
+                      'Turning any of these off takes effect straight away, the same as turning them on.',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                    const SizedBox(height: 8),
+                    ListenableBuilder(
+                      listenable: AppSettings.instance,
+                      builder: (context, _) {
+                        return Column(
+                          children: [
+                            for (final purpose in ConsentPurpose.values)
+                              SwitchListTile.adaptive(
+                                contentPadding: EdgeInsets.zero,
+                                title: Text(purpose.title),
+                                subtitle: Text(purpose.sentence),
+                                value: ConsentService.instance.isGranted(
+                                  purpose,
+                                ),
+                                onChanged: (v) =>
+                                    _onConsentChanged(context, purpose, v),
+                              ),
+                          ],
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 20),
                     Text(
                       'This is a copy of the data Medicyn holds about you (Art. 15/20). '
                       'Other requests are answered within one month (Art. 12(3)) by email '
@@ -489,7 +475,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         _exporting ? 'Preparing…' : 'Download my data',
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 16),
                     Text(
                       'A four-week PDF of medicines and what was marked taken — '
                       'for a clinic visit, not a full copy of your account.',
@@ -517,39 +503,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         _sharingReport ? 'Preparing…' : 'Share with my doctor',
                       ),
                     ),
-                    const SizedBox(height: 28),
-                    Text(
-                      'Manage what Medicyn can do',
-                      style: Theme.of(context).textTheme.titleSmall,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Turning any of these off takes effect straight away, the same as turning them on.',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                    const SizedBox(height: 8),
-                    ListenableBuilder(
-                      listenable: AppSettings.instance,
-                      builder: (context, _) {
-                        return Column(
-                          children: [
-                            for (final purpose in ConsentPurpose.values)
-                              SwitchListTile.adaptive(
-                                contentPadding: EdgeInsets.zero,
-                                title: Text(purpose.title),
-                                subtitle: Text(purpose.sentence),
-                                value: ConsentService.instance.isGranted(
-                                  purpose,
-                                ),
-                                onChanged: (v) =>
-                                    _onConsentChanged(context, purpose, v),
-                              ),
-                          ],
-                        );
-                      },
-                    ),
                     if (_signedIn) ...[
                       const SizedBox(height: 28),
+                      const _SectionHeader('Account'),
+                      const SizedBox(height: 8),
                       OutlinedButton(
                         onPressed: () => _confirmSignOut(context),
                         child: const Text('Sign out'),
@@ -934,6 +891,42 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 }
 
+/// One consistent look for every top-level section title on this screen —
+/// same primary-tinted style, and marked as a heading so TalkBack/VoiceOver
+/// users can jump between sections instead of swiping through every row.
+/// Previously each section wrote this out by hand, and a few (Your data,
+/// Manage what Medicyn can do) had drifted to the unstyled default color
+/// with no heading semantics at all.
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader(this.title, {this.subtitle});
+
+  final String title;
+  final String? subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Semantics(
+          header: true,
+          child: Text(
+            title,
+            style: theme.textTheme.titleSmall?.copyWith(
+              color: theme.colorScheme.primary,
+            ),
+          ),
+        ),
+        if (subtitle != null) ...[
+          const SizedBox(height: 4),
+          Text(subtitle!, style: theme.textTheme.bodySmall),
+        ],
+      ],
+    );
+  }
+}
+
 class _BackupStatusCard extends StatelessWidget {
   const _BackupStatusCard({required this.signedIn, required this.onRetry});
 
@@ -946,49 +939,50 @@ class _BackupStatusCard extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final enabled = status.backupEnabled;
     final waiting = status.pendingWork > 0;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  enabled
-                      ? (waiting
-                            ? Icons.cloud_upload_outlined
-                            : Icons.cloud_done_outlined)
-                      : Icons.cloud_off_outlined,
-                  color: enabled ? scheme.primary : scheme.onSurfaceVariant,
+    // AmbientCard, not a bare Material Card: every other card-like element
+    // on this screen (each ProfileMenuRow) already uses it, and a plain
+    // Card has a different corner radius and elevation model that made this
+    // one row look like it belonged to a different screen.
+    return AmbientCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                enabled
+                    ? (waiting
+                          ? Icons.cloud_upload_outlined
+                          : Icons.cloud_done_outlined)
+                    : Icons.cloud_off_outlined,
+                color: enabled ? scheme.primary : scheme.onSurfaceVariant,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Backup',
+                  style: Theme.of(context).textTheme.titleMedium,
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'Backup',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
+              ),
+              if (signedIn && enabled)
+                TextButton(
+                  onPressed: status.syncing ? null : onRetry,
+                  child: const Text('Retry'),
                 ),
-                if (signedIn && enabled)
-                  TextButton(
-                    onPressed: status.syncing ? null : onRetry,
-                    child: const Text('Retry'),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Text(status.summary, style: Theme.of(context).textTheme.bodyMedium),
-            const SizedBox(height: 4),
-            Text(
-              enabled
-                  ? 'Your local reminders keep working even while backup is waiting.'
-                  : signedIn
-                  ? 'Turn on Cloud backup below when you want another device to restore this data.'
-                  : 'Sign in when you want to enable backup on another device.',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ],
-        ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(status.summary, style: Theme.of(context).textTheme.bodyMedium),
+          const SizedBox(height: 4),
+          Text(
+            enabled
+                ? 'Your local reminders keep working even while backup is waiting.'
+                : signedIn
+                ? 'Turn on Cloud backup below when you want another device to restore this data.'
+                : 'Sign in when you want to enable backup on another device.',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ],
       ),
     );
   }

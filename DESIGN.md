@@ -117,8 +117,7 @@ uses a distinct symbol per entry rather than trusting ink color under a
 bedside lamp. A faint, always-present ruled time-grid sits behind Today's
 list — the "graticule" the eye locates against — and every dose row carries
 a permanent colored tab on its leading edge, the chart's margin mark for
-that entry. A small steel clip motif sits at the top of Today and Care,
-holding the "page" in place.
+that entry.
 
 Depth grew more present than Clinical Calm's flat baseline: the system's
 one recurring shadow — warm ink-tinted now, not teal-tinted — reads with
@@ -134,7 +133,6 @@ typeface doesn't have.
 - Teal stays the one brand/confirming color, inherited from Clinical Calm
 - Every status = one color **and** one persistent glyph, never color alone
 - A faint ruled time-grid behind Today; a colored margin tab on every dose row
-- A steel clip motif marking the chart's "page" at Today and Care
 - One warm-ink shadow at rest, a deeper "lift" shadow on active press
 - Motion stays short (150–400ms) and fully honors reduced motion
 
@@ -240,8 +238,7 @@ fixed at 72px with four destinations (Today, Plan, Insights, Profile).
 **New:** Today (and Care) render inside `ChartPaperTexture` +
 `ChartRuleLines` (`core/widgets/chart_grid.dart`) — a sparse, fixed-seed
 paper-grain layer and a faint horizontal rule grid (96px pitch) painted
-once behind the scrollable content. A `MedicynClip` steel-clip motif sits
-at the top of both screens.
+once behind the scrollable content.
 
 ## Elevation & Depth
 
@@ -317,14 +314,12 @@ The flagship "chart entry." New in this system:
   per row, capped at 6), so a day's chart settles onto the page rather
   than appearing all at once.
 
-### Chart Grid, Paper Texture, Clip — `core/widgets/chart_grid.dart`
-Three new, purely structural/decorative primitives:
+### Chart Grid, Paper Texture — `core/widgets/chart_grid.dart`
+Two structural/decorative primitives:
 - **`ChartRuleLines`**: faint horizontal rules (Grid Ink, 96px pitch)
   behind Today's scrollable content.
 - **`ChartPaperTexture`**: a sparse, fixed-seed fleck field (Paper Grain)
   giving the linen ground material texture without a bundled image asset.
-- **`MedicynClip`**: a small painted steel bedside-clip clasp at the top of
-  Today and Care. Purely decorative; excluded from the semantics tree.
 
 ### Chart Date Heading — `ChartHandLetteredText`
 The day-list's date heading (e.g. "Today, Wed 3 September"): Public Sans
