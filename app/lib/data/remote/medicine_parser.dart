@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../features/review_edit/parsed_medicine.dart';
+import 'edge_function_errors.dart';
 import 'label_redactor.dart';
 
 class MedicineParseException implements Exception {
@@ -54,21 +55,10 @@ class MedicineParser {
 /// screen can show. `quota_exceeded` is a real limit, not a parse failure,
 /// so it gets its own wording; everything else stays the same generic
 /// "could not read that" the form already recovered from with Fill in manually.
-String messageForParseMedicineError(Object? payload, {int? status}) {
-  if (_errorCode(payload) == 'quota_exceeded') {
-    return "You've scanned quite a few times today. Try again tomorrow.";
-  }
-  if (status == 0 ||
-      status == 503 ||
-      _errorCode(payload) == 'quota_unavailable') {
-    return 'Could not reach the server. Check your connection and try again.';
-  }
-  return 'Could not read that. Try again or fill it in yourself.';
-}
-
-String? _errorCode(Object? payload) {
-  if (payload is Map && payload['error'] is String) {
-    return payload['error'] as String;
-  }
-  return null;
-}
+String messageForParseMedicineError(Object? payload, {int? status}) =>
+    messageForEdgeFunctionError(
+      payload,
+      status: status,
+      quotaExceededMessage:
+          "You've scanned quite a few times today. Try again tomorrow.",
+    );
