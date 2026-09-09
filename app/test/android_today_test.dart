@@ -242,7 +242,9 @@ void main() {
     tester,
   ) async {
     await pump(tester, _agenda(doses: []));
-    expect(find.text('Room to take it easy'), findsOneWidget);
+    // Copy for the "nothing scheduled" state rotates by day-of-month; _now
+    // is the 5th, so index 5 % 4 == 1.
+    expect(find.text('A quiet start today'), findsOneWidget);
     await pump(
       tester,
       _agenda(

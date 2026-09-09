@@ -592,6 +592,7 @@ class TodayAgenda extends StatelessWidget {
                         children: [
                           if (entries.isEmpty)
                             _QuietDay(
+                              now: now,
                               completed: completed > 0,
                               loading: careLoading,
                               error: careError,
@@ -698,12 +699,39 @@ class _SectionLabel extends StatelessWidget {
   );
 }
 
+/// Wording for the common case: nothing scheduled today, nothing broken. A
+/// few equally calm variants so the screen someone opens every single day
+/// doesn't read as a canned system message on day 200. Picked by the date
+/// (stable all day, changes tomorrow) rather than randomly per rebuild,
+/// which would make the heading flicker between unrelated phrasings as the
+/// rest of the screen updates.
+const _quietDayVariants = [
+  (
+    title: 'Room to take it easy',
+    subtitle: 'Nothing scheduled today. Add a reminder when you need one.',
+  ),
+  (
+    title: 'A quiet start today',
+    subtitle: "Nothing's due right now — add a reminder whenever you need one.",
+  ),
+  (
+    title: 'Nothing on the chart today',
+    subtitle: "No reminders scheduled. Add one whenever you're ready.",
+  ),
+  (
+    title: 'A little breathing room',
+    subtitle: "Nothing's due today. Add a reminder when you need one.",
+  ),
+];
+
 class _QuietDay extends StatelessWidget {
   const _QuietDay({
+    required this.now,
     required this.completed,
     required this.loading,
     required this.error,
   });
+  final DateTime now;
   final bool completed;
   final bool loading;
   final bool error;
@@ -711,6 +739,7 @@ class _QuietDay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final quietDay = _quietDayVariants[now.day % _quietDayVariants.length];
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 32),
       child: Column(
@@ -735,7 +764,7 @@ class _QuietDay extends StatelessWidget {
                 ? 'Care reminders unavailable'
                 : completed
                 ? 'All clear for today'
-                : 'Room to take it easy',
+                : quietDay.title,
             style: theme.textTheme.titleLarge,
           ),
           const SizedBox(height: 8),
@@ -746,7 +775,7 @@ class _QuietDay extends StatelessWidget {
                 ? 'Reopen Today to try again.'
                 : completed
                 ? 'Everything is checked off. Enjoy the rest of your day.'
-                : 'Nothing scheduled today. Add a reminder when you need one.',
+                : quietDay.subtitle,
             style: theme.textTheme.bodyMedium?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
