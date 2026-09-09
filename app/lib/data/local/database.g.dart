@@ -3320,6 +3320,30 @@ class $EmergencyInfoTable extends EmergencyInfo
     requiredDuringInsert: false,
     defaultValue: const Constant(''),
   );
+  static const VerificationMeta _emergencyContactNameMeta =
+      const VerificationMeta('emergencyContactName');
+  @override
+  late final GeneratedColumn<String> emergencyContactName =
+      GeneratedColumn<String>(
+        'emergency_contact_name',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant(''),
+      );
+  static const VerificationMeta _emergencyContactPhoneMeta =
+      const VerificationMeta('emergencyContactPhone');
+  @override
+  late final GeneratedColumn<String> emergencyContactPhone =
+      GeneratedColumn<String>(
+        'emergency_contact_phone',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant(''),
+      );
   static const VerificationMeta _updatedAtMeta = const VerificationMeta(
     'updatedAt',
   );
@@ -3343,6 +3367,8 @@ class $EmergencyInfoTable extends EmergencyInfo
     insuranceNumber,
     nationalId,
     healthCardNumber,
+    emergencyContactName,
+    emergencyContactPhone,
     updatedAt,
   ];
   @override
@@ -3419,6 +3445,24 @@ class $EmergencyInfoTable extends EmergencyInfo
         ),
       );
     }
+    if (data.containsKey('emergency_contact_name')) {
+      context.handle(
+        _emergencyContactNameMeta,
+        emergencyContactName.isAcceptableOrUnknown(
+          data['emergency_contact_name']!,
+          _emergencyContactNameMeta,
+        ),
+      );
+    }
+    if (data.containsKey('emergency_contact_phone')) {
+      context.handle(
+        _emergencyContactPhoneMeta,
+        emergencyContactPhone.isAcceptableOrUnknown(
+          data['emergency_contact_phone']!,
+          _emergencyContactPhoneMeta,
+        ),
+      );
+    }
     if (data.containsKey('updated_at')) {
       context.handle(
         _updatedAtMeta,
@@ -3470,6 +3514,14 @@ class $EmergencyInfoTable extends EmergencyInfo
         DriftSqlType.string,
         data['${effectivePrefix}health_card_number'],
       )!,
+      emergencyContactName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}emergency_contact_name'],
+      )!,
+      emergencyContactPhone: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}emergency_contact_phone'],
+      )!,
       updatedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}updated_at'],
@@ -3494,6 +3546,8 @@ class EmergencyInfoData extends DataClass
   final String insuranceNumber;
   final String nationalId;
   final String healthCardNumber;
+  final String emergencyContactName;
+  final String emergencyContactPhone;
   final DateTime updatedAt;
   const EmergencyInfoData({
     required this.id,
@@ -3505,6 +3559,8 @@ class EmergencyInfoData extends DataClass
     required this.insuranceNumber,
     required this.nationalId,
     required this.healthCardNumber,
+    required this.emergencyContactName,
+    required this.emergencyContactPhone,
     required this.updatedAt,
   });
   @override
@@ -3519,6 +3575,8 @@ class EmergencyInfoData extends DataClass
     map['insurance_number'] = Variable<String>(insuranceNumber);
     map['national_id'] = Variable<String>(nationalId);
     map['health_card_number'] = Variable<String>(healthCardNumber);
+    map['emergency_contact_name'] = Variable<String>(emergencyContactName);
+    map['emergency_contact_phone'] = Variable<String>(emergencyContactPhone);
     map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
   }
@@ -3534,6 +3592,8 @@ class EmergencyInfoData extends DataClass
       insuranceNumber: Value(insuranceNumber),
       nationalId: Value(nationalId),
       healthCardNumber: Value(healthCardNumber),
+      emergencyContactName: Value(emergencyContactName),
+      emergencyContactPhone: Value(emergencyContactPhone),
       updatedAt: Value(updatedAt),
     );
   }
@@ -3553,6 +3613,12 @@ class EmergencyInfoData extends DataClass
       insuranceNumber: serializer.fromJson<String>(json['insuranceNumber']),
       nationalId: serializer.fromJson<String>(json['nationalId']),
       healthCardNumber: serializer.fromJson<String>(json['healthCardNumber']),
+      emergencyContactName: serializer.fromJson<String>(
+        json['emergencyContactName'],
+      ),
+      emergencyContactPhone: serializer.fromJson<String>(
+        json['emergencyContactPhone'],
+      ),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
   }
@@ -3569,6 +3635,8 @@ class EmergencyInfoData extends DataClass
       'insuranceNumber': serializer.toJson<String>(insuranceNumber),
       'nationalId': serializer.toJson<String>(nationalId),
       'healthCardNumber': serializer.toJson<String>(healthCardNumber),
+      'emergencyContactName': serializer.toJson<String>(emergencyContactName),
+      'emergencyContactPhone': serializer.toJson<String>(emergencyContactPhone),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
   }
@@ -3583,6 +3651,8 @@ class EmergencyInfoData extends DataClass
     String? insuranceNumber,
     String? nationalId,
     String? healthCardNumber,
+    String? emergencyContactName,
+    String? emergencyContactPhone,
     DateTime? updatedAt,
   }) => EmergencyInfoData(
     id: id ?? this.id,
@@ -3594,6 +3664,8 @@ class EmergencyInfoData extends DataClass
     insuranceNumber: insuranceNumber ?? this.insuranceNumber,
     nationalId: nationalId ?? this.nationalId,
     healthCardNumber: healthCardNumber ?? this.healthCardNumber,
+    emergencyContactName: emergencyContactName ?? this.emergencyContactName,
+    emergencyContactPhone: emergencyContactPhone ?? this.emergencyContactPhone,
     updatedAt: updatedAt ?? this.updatedAt,
   );
   EmergencyInfoData copyWithCompanion(EmergencyInfoCompanion data) {
@@ -3619,6 +3691,12 @@ class EmergencyInfoData extends DataClass
       healthCardNumber: data.healthCardNumber.present
           ? data.healthCardNumber.value
           : this.healthCardNumber,
+      emergencyContactName: data.emergencyContactName.present
+          ? data.emergencyContactName.value
+          : this.emergencyContactName,
+      emergencyContactPhone: data.emergencyContactPhone.present
+          ? data.emergencyContactPhone.value
+          : this.emergencyContactPhone,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
   }
@@ -3635,6 +3713,8 @@ class EmergencyInfoData extends DataClass
           ..write('insuranceNumber: $insuranceNumber, ')
           ..write('nationalId: $nationalId, ')
           ..write('healthCardNumber: $healthCardNumber, ')
+          ..write('emergencyContactName: $emergencyContactName, ')
+          ..write('emergencyContactPhone: $emergencyContactPhone, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
         .toString();
@@ -3651,6 +3731,8 @@ class EmergencyInfoData extends DataClass
     insuranceNumber,
     nationalId,
     healthCardNumber,
+    emergencyContactName,
+    emergencyContactPhone,
     updatedAt,
   );
   @override
@@ -3666,6 +3748,8 @@ class EmergencyInfoData extends DataClass
           other.insuranceNumber == this.insuranceNumber &&
           other.nationalId == this.nationalId &&
           other.healthCardNumber == this.healthCardNumber &&
+          other.emergencyContactName == this.emergencyContactName &&
+          other.emergencyContactPhone == this.emergencyContactPhone &&
           other.updatedAt == this.updatedAt);
 }
 
@@ -3679,6 +3763,8 @@ class EmergencyInfoCompanion extends UpdateCompanion<EmergencyInfoData> {
   final Value<String> insuranceNumber;
   final Value<String> nationalId;
   final Value<String> healthCardNumber;
+  final Value<String> emergencyContactName;
+  final Value<String> emergencyContactPhone;
   final Value<DateTime> updatedAt;
   final Value<int> rowid;
   const EmergencyInfoCompanion({
@@ -3691,6 +3777,8 @@ class EmergencyInfoCompanion extends UpdateCompanion<EmergencyInfoData> {
     this.insuranceNumber = const Value.absent(),
     this.nationalId = const Value.absent(),
     this.healthCardNumber = const Value.absent(),
+    this.emergencyContactName = const Value.absent(),
+    this.emergencyContactPhone = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -3704,6 +3792,8 @@ class EmergencyInfoCompanion extends UpdateCompanion<EmergencyInfoData> {
     this.insuranceNumber = const Value.absent(),
     this.nationalId = const Value.absent(),
     this.healthCardNumber = const Value.absent(),
+    this.emergencyContactName = const Value.absent(),
+    this.emergencyContactPhone = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id);
@@ -3717,6 +3807,8 @@ class EmergencyInfoCompanion extends UpdateCompanion<EmergencyInfoData> {
     Expression<String>? insuranceNumber,
     Expression<String>? nationalId,
     Expression<String>? healthCardNumber,
+    Expression<String>? emergencyContactName,
+    Expression<String>? emergencyContactPhone,
     Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
   }) {
@@ -3730,6 +3822,10 @@ class EmergencyInfoCompanion extends UpdateCompanion<EmergencyInfoData> {
       if (insuranceNumber != null) 'insurance_number': insuranceNumber,
       if (nationalId != null) 'national_id': nationalId,
       if (healthCardNumber != null) 'health_card_number': healthCardNumber,
+      if (emergencyContactName != null)
+        'emergency_contact_name': emergencyContactName,
+      if (emergencyContactPhone != null)
+        'emergency_contact_phone': emergencyContactPhone,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -3745,6 +3841,8 @@ class EmergencyInfoCompanion extends UpdateCompanion<EmergencyInfoData> {
     Value<String>? insuranceNumber,
     Value<String>? nationalId,
     Value<String>? healthCardNumber,
+    Value<String>? emergencyContactName,
+    Value<String>? emergencyContactPhone,
     Value<DateTime>? updatedAt,
     Value<int>? rowid,
   }) {
@@ -3758,6 +3856,9 @@ class EmergencyInfoCompanion extends UpdateCompanion<EmergencyInfoData> {
       insuranceNumber: insuranceNumber ?? this.insuranceNumber,
       nationalId: nationalId ?? this.nationalId,
       healthCardNumber: healthCardNumber ?? this.healthCardNumber,
+      emergencyContactName: emergencyContactName ?? this.emergencyContactName,
+      emergencyContactPhone:
+          emergencyContactPhone ?? this.emergencyContactPhone,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
     );
@@ -3793,6 +3894,16 @@ class EmergencyInfoCompanion extends UpdateCompanion<EmergencyInfoData> {
     if (healthCardNumber.present) {
       map['health_card_number'] = Variable<String>(healthCardNumber.value);
     }
+    if (emergencyContactName.present) {
+      map['emergency_contact_name'] = Variable<String>(
+        emergencyContactName.value,
+      );
+    }
+    if (emergencyContactPhone.present) {
+      map['emergency_contact_phone'] = Variable<String>(
+        emergencyContactPhone.value,
+      );
+    }
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
@@ -3814,6 +3925,8 @@ class EmergencyInfoCompanion extends UpdateCompanion<EmergencyInfoData> {
           ..write('insuranceNumber: $insuranceNumber, ')
           ..write('nationalId: $nationalId, ')
           ..write('healthCardNumber: $healthCardNumber, ')
+          ..write('emergencyContactName: $emergencyContactName, ')
+          ..write('emergencyContactPhone: $emergencyContactPhone, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -6089,6 +6202,8 @@ typedef $$EmergencyInfoTableCreateCompanionBuilder =
       Value<String> insuranceNumber,
       Value<String> nationalId,
       Value<String> healthCardNumber,
+      Value<String> emergencyContactName,
+      Value<String> emergencyContactPhone,
       Value<DateTime> updatedAt,
       Value<int> rowid,
     });
@@ -6103,6 +6218,8 @@ typedef $$EmergencyInfoTableUpdateCompanionBuilder =
       Value<String> insuranceNumber,
       Value<String> nationalId,
       Value<String> healthCardNumber,
+      Value<String> emergencyContactName,
+      Value<String> emergencyContactPhone,
       Value<DateTime> updatedAt,
       Value<int> rowid,
     });
@@ -6158,6 +6275,16 @@ class $$EmergencyInfoTableFilterComposer
 
   ColumnFilters<String> get healthCardNumber => $composableBuilder(
     column: $table.healthCardNumber,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get emergencyContactName => $composableBuilder(
+    column: $table.emergencyContactName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get emergencyContactPhone => $composableBuilder(
+    column: $table.emergencyContactPhone,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -6221,6 +6348,16 @@ class $$EmergencyInfoTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get emergencyContactName => $composableBuilder(
+    column: $table.emergencyContactName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get emergencyContactPhone => $composableBuilder(
+    column: $table.emergencyContactPhone,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
     column: $table.updatedAt,
     builder: (column) => ColumnOrderings(column),
@@ -6275,6 +6412,16 @@ class $$EmergencyInfoTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<String> get emergencyContactName => $composableBuilder(
+    column: $table.emergencyContactName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get emergencyContactPhone => $composableBuilder(
+    column: $table.emergencyContactPhone,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
 }
@@ -6323,6 +6470,8 @@ class $$EmergencyInfoTableTableManager
                 Value<String> insuranceNumber = const Value.absent(),
                 Value<String> nationalId = const Value.absent(),
                 Value<String> healthCardNumber = const Value.absent(),
+                Value<String> emergencyContactName = const Value.absent(),
+                Value<String> emergencyContactPhone = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => EmergencyInfoCompanion(
@@ -6335,6 +6484,8 @@ class $$EmergencyInfoTableTableManager
                 insuranceNumber: insuranceNumber,
                 nationalId: nationalId,
                 healthCardNumber: healthCardNumber,
+                emergencyContactName: emergencyContactName,
+                emergencyContactPhone: emergencyContactPhone,
                 updatedAt: updatedAt,
                 rowid: rowid,
               ),
@@ -6349,6 +6500,8 @@ class $$EmergencyInfoTableTableManager
                 Value<String> insuranceNumber = const Value.absent(),
                 Value<String> nationalId = const Value.absent(),
                 Value<String> healthCardNumber = const Value.absent(),
+                Value<String> emergencyContactName = const Value.absent(),
+                Value<String> emergencyContactPhone = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => EmergencyInfoCompanion.insert(
@@ -6361,6 +6514,8 @@ class $$EmergencyInfoTableTableManager
                 insuranceNumber: insuranceNumber,
                 nationalId: nationalId,
                 healthCardNumber: healthCardNumber,
+                emergencyContactName: emergencyContactName,
+                emergencyContactPhone: emergencyContactPhone,
                 updatedAt: updatedAt,
                 rowid: rowid,
               ),

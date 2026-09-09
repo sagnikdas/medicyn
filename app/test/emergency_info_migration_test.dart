@@ -103,4 +103,74 @@ void main() {
       expect(await db.emergencyInfoOnce(), isNull);
     },
   );
+
+  test(
+    'a v10 database gains the emergency contact columns on upgrade to v11',
+    () async {
+      final db = AppDatabase.forTesting(
+        NativeDatabase.memory(
+          setup: (rawDb) {
+            rawDb.execute('''
+              CREATE TABLE emergency_info (
+                id TEXT NOT NULL PRIMARY KEY,
+                blood_group TEXT NOT NULL DEFAULT '',
+                allergies TEXT NOT NULL DEFAULT '',
+                allergies_severe INTEGER NOT NULL DEFAULT 0 CHECK (allergies_severe IN (0, 1)),
+                conditions TEXT NOT NULL DEFAULT '',
+                notes TEXT NOT NULL DEFAULT '',
+                insurance_number TEXT NOT NULL DEFAULT '',
+                national_id TEXT NOT NULL DEFAULT '',
+                health_card_number TEXT NOT NULL DEFAULT '',
+                updated_at TEXT NOT NULL
+              );
+            ''');
+            rawDb.execute('''
+              INSERT INTO emergency_info (id, blood_group, allergies, conditions, updated_at)
+              VALUES ('self', 'O+', 'Penicillin', '', '2026-08-01T09:00:00.000Z');
+            ''');
+            rawDb.execute('PRAGMA user_version = 10');
+          },
+        ),
+      );
+      addTearDown(db.close);
+
+      final info = await db.emergencyInfoOnce();
+      expect(info!.bloodGroup, 'O+');
+      expect(info.emergencyContactName, '');
+      expect(info.emergencyContactPhone, '');
+
+      await db.upsertEmergencyInfo(
+        bloodGroup: 'O+',
+        allergies: 'Penicillin',
+        conditions: '',
+        emergencyContactName: 'Priya Kapoor',
+        emergencyContactPhone: '+919876500000',
+      );
+      final updated = await db.emergencyInfoOnce();
+      expect(updated!.emergencyContactName, 'Priya Kapoor');
+      expect(updated.emergencyContactPhone, '+919876500000');
+    },
+  );
+
+  test(
+    'a v9 database jumping straight to v11 gains every added column',
+    () async {
+      final db = AppDatabase.forTesting(seedPartiallyMigratedV9Database());
+      addTearDown(db.close);
+
+      final info = await db.emergencyInfoOnce();
+      expect(info!.bloodGroup, 'O+');
+
+      await db.upsertEmergencyInfo(
+        bloodGroup: 'O+',
+        allergies: 'Penicillin',
+        conditions: '',
+        emergencyContactName: 'Priya Kapoor',
+        emergencyContactPhone: '+919876500000',
+      );
+      final updated = await db.emergencyInfoOnce();
+      expect(updated!.emergencyContactName, 'Priya Kapoor');
+      expect(updated.emergencyContactPhone, '+919876500000');
+    },
+  );
 }

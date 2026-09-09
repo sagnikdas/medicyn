@@ -31,24 +31,27 @@ void main() {
     expect(info.conditions, 'Type 2 diabetes');
   });
 
-  test('a second save overwrites the same row rather than adding one', () async {
-    await db.upsertEmergencyInfo(
-      bloodGroup: 'O+',
-      allergies: 'Penicillin',
-      conditions: 'Type 2 diabetes',
-    );
-    await db.upsertEmergencyInfo(
-      bloodGroup: 'AB-',
-      allergies: '',
-      conditions: 'Asthma',
-    );
+  test(
+    'a second save overwrites the same row rather than adding one',
+    () async {
+      await db.upsertEmergencyInfo(
+        bloodGroup: 'O+',
+        allergies: 'Penicillin',
+        conditions: 'Type 2 diabetes',
+      );
+      await db.upsertEmergencyInfo(
+        bloodGroup: 'AB-',
+        allergies: '',
+        conditions: 'Asthma',
+      );
 
-    final rows = await db.select(db.emergencyInfo).get();
-    expect(rows, hasLength(1));
-    expect(rows.single.bloodGroup, 'AB-');
-    expect(rows.single.allergies, '');
-    expect(rows.single.conditions, 'Asthma');
-  });
+      final rows = await db.select(db.emergencyInfo).get();
+      expect(rows, hasLength(1));
+      expect(rows.single.bloodGroup, 'AB-');
+      expect(rows.single.allergies, '');
+      expect(rows.single.conditions, 'Asthma');
+    },
+  );
 
   test('fields are trimmed before storage', () async {
     await db.upsertEmergencyInfo(
@@ -96,6 +99,22 @@ void main() {
     expect(info.insuranceNumber, '');
     expect(info.nationalId, '');
     expect(info.healthCardNumber, '');
+    expect(info.emergencyContactName, '');
+    expect(info.emergencyContactPhone, '');
+  });
+
+  test('upsertEmergencyInfo stores the emergency contact', () async {
+    await db.upsertEmergencyInfo(
+      bloodGroup: 'B+',
+      allergies: '',
+      conditions: '',
+      emergencyContactName: '  Priya Kapoor  ',
+      emergencyContactPhone: '  +919876500000  ',
+    );
+
+    final info = await db.emergencyInfoOnce();
+    expect(info!.emergencyContactName, 'Priya Kapoor');
+    expect(info.emergencyContactPhone, '+919876500000');
   });
 
   test('watchEmergencyInfo emits after a save', () async {

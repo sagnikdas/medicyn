@@ -45,7 +45,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 10;
+  int get schemaVersion => 11;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -109,9 +109,9 @@ class AppDatabase extends _$AppDatabase {
       }
       if (from < 9) {
         // createTable builds from *today's* EmergencyInfo definition, so a
-        // database created here already gets the v10 columns below for
-        // free. Only a database that already has the v9 table (from < 9 is
-        // false but from < 10 is true) needs the ALTER TABLEs.
+        // database created here already gets every column added below for
+        // free. Only a database that already has the v9 table (from >= 9)
+        // needs the ALTER TABLEs.
         await m.createTable(emergencyInfo);
       }
       if (from == 9) {
@@ -122,7 +122,11 @@ class AppDatabase extends _$AppDatabase {
         // need to run it. A plain addColumn crashes the second one with
         // "duplicate column name" -- which fails the whole database open,
         // for every screen, not just this table -- so check first.
-        await _addColumnIfMissing(m, emergencyInfo, emergencyInfo.allergiesSevere);
+        await _addColumnIfMissing(
+          m,
+          emergencyInfo,
+          emergencyInfo.allergiesSevere,
+        );
         await _addColumnIfMissing(m, emergencyInfo, emergencyInfo.notes);
         await _addColumnIfMissing(
           m,
@@ -134,6 +138,20 @@ class AppDatabase extends _$AppDatabase {
           m,
           emergencyInfo,
           emergencyInfo.healthCardNumber,
+        );
+      }
+      if (from >= 9 && from < 11) {
+        // Covers both a v10 database and one jumping straight from v9 to
+        // v11 in one upgrade -- same idempotency reasoning as above.
+        await _addColumnIfMissing(
+          m,
+          emergencyInfo,
+          emergencyInfo.emergencyContactName,
+        );
+        await _addColumnIfMissing(
+          m,
+          emergencyInfo,
+          emergencyInfo.emergencyContactPhone,
         );
       }
     },
@@ -570,6 +588,8 @@ class AppDatabase extends _$AppDatabase {
     String insuranceNumber = '',
     String nationalId = '',
     String healthCardNumber = '',
+    String emergencyContactName = '',
+    String emergencyContactPhone = '',
   }) {
     return into(emergencyInfo).insertOnConflictUpdate(
       EmergencyInfoCompanion.insert(
@@ -582,6 +602,8 @@ class AppDatabase extends _$AppDatabase {
         insuranceNumber: Value(insuranceNumber.trim()),
         nationalId: Value(nationalId.trim()),
         healthCardNumber: Value(healthCardNumber.trim()),
+        emergencyContactName: Value(emergencyContactName.trim()),
+        emergencyContactPhone: Value(emergencyContactPhone.trim()),
         updatedAt: Value(DateTime.now()),
       ),
     );

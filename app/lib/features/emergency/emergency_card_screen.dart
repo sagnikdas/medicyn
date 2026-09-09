@@ -127,6 +127,8 @@ class _EmergencyCardScreenState extends State<EmergencyCardScreen> {
         insuranceNumber: current?.insuranceNumber ?? '',
         nationalId: current?.nationalId ?? '',
         healthCardNumber: current?.healthCardNumber ?? '',
+        emergencyContactName: current?.emergencyContactName ?? '',
+        emergencyContactPhone: current?.emergencyContactPhone ?? '',
       ),
     );
     if (result == null) return;
@@ -139,6 +141,8 @@ class _EmergencyCardScreenState extends State<EmergencyCardScreen> {
       insuranceNumber: result.insuranceNumber,
       nationalId: result.nationalId,
       healthCardNumber: result.healthCardNumber,
+      emergencyContactName: result.emergencyContactName,
+      emergencyContactPhone: result.emergencyContactPhone,
     );
   }
 
@@ -243,6 +247,29 @@ class _EmergencyCardScreenState extends State<EmergencyCardScreen> {
                   ),
                   _line(
                     context,
+                    'Emergency contact name',
+                    (info?.emergencyContactName.trim().isNotEmpty ?? false)
+                        ? info!.emergencyContactName
+                        : 'Not set',
+                  ),
+                  _line(
+                    context,
+                    'Emergency contact number',
+                    (info?.emergencyContactPhone.trim().isNotEmpty ?? false)
+                        ? info!.emergencyContactPhone
+                        : 'Not set',
+                  ),
+                  if (info?.emergencyContactPhone.trim().isNotEmpty ??
+                      false) ...[
+                    OutlinedButton(
+                      onPressed: () =>
+                          openDialer(info!.emergencyContactPhone.trim()),
+                      child: const Text('Call emergency contact'),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+                  _line(
+                    context,
                     'Updated',
                     info?.updatedAt != null
                         ? _shortDate(info!.updatedAt)
@@ -337,6 +364,8 @@ class _EmergencyEditResult {
     required this.insuranceNumber,
     required this.nationalId,
     required this.healthCardNumber,
+    required this.emergencyContactName,
+    required this.emergencyContactPhone,
   });
 
   final String bloodGroup;
@@ -347,6 +376,8 @@ class _EmergencyEditResult {
   final String insuranceNumber;
   final String nationalId;
   final String healthCardNumber;
+  final String emergencyContactName;
+  final String emergencyContactPhone;
 }
 
 class _EmergencyEditDialog extends StatefulWidget {
@@ -359,6 +390,8 @@ class _EmergencyEditDialog extends StatefulWidget {
     required this.insuranceNumber,
     required this.nationalId,
     required this.healthCardNumber,
+    required this.emergencyContactName,
+    required this.emergencyContactPhone,
   });
 
   final String bloodGroup;
@@ -369,6 +402,8 @@ class _EmergencyEditDialog extends StatefulWidget {
   final String insuranceNumber;
   final String nationalId;
   final String healthCardNumber;
+  final String emergencyContactName;
+  final String emergencyContactPhone;
 
   @override
   State<_EmergencyEditDialog> createState() => _EmergencyEditDialogState();
@@ -383,6 +418,8 @@ class _EmergencyEditDialogState extends State<_EmergencyEditDialog> {
   late final TextEditingController _insuranceNumber;
   late final TextEditingController _nationalId;
   late final TextEditingController _healthCardNumber;
+  late final TextEditingController _emergencyContactName;
+  late final TextEditingController _emergencyContactPhone;
 
   @override
   void initState() {
@@ -397,6 +434,12 @@ class _EmergencyEditDialogState extends State<_EmergencyEditDialog> {
     _insuranceNumber = TextEditingController(text: widget.insuranceNumber);
     _nationalId = TextEditingController(text: widget.nationalId);
     _healthCardNumber = TextEditingController(text: widget.healthCardNumber);
+    _emergencyContactName = TextEditingController(
+      text: widget.emergencyContactName,
+    );
+    _emergencyContactPhone = TextEditingController(
+      text: widget.emergencyContactPhone,
+    );
   }
 
   @override
@@ -407,6 +450,8 @@ class _EmergencyEditDialogState extends State<_EmergencyEditDialog> {
     _insuranceNumber.dispose();
     _nationalId.dispose();
     _healthCardNumber.dispose();
+    _emergencyContactName.dispose();
+    _emergencyContactPhone.dispose();
     super.dispose();
   }
 
@@ -484,6 +529,22 @@ class _EmergencyEditDialogState extends State<_EmergencyEditDialog> {
               controller: _healthCardNumber,
               decoration: const InputDecoration(labelText: 'Health card no.'),
             ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _emergencyContactName,
+              decoration: const InputDecoration(
+                labelText: 'Emergency contact name',
+                hintText: 'Who should a first responder call?',
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _emergencyContactPhone,
+              keyboardType: TextInputType.phone,
+              decoration: const InputDecoration(
+                labelText: 'Emergency contact number',
+              ),
+            ),
           ],
         ),
       ),
@@ -503,6 +564,8 @@ class _EmergencyEditDialogState extends State<_EmergencyEditDialog> {
               insuranceNumber: _insuranceNumber.text.trim(),
               nationalId: _nationalId.text.trim(),
               healthCardNumber: _healthCardNumber.text.trim(),
+              emergencyContactName: _emergencyContactName.text.trim(),
+              emergencyContactPhone: _emergencyContactPhone.text.trim(),
             ),
           ),
           child: const Text('Save'),

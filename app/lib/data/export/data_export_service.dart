@@ -28,7 +28,7 @@ class DataExportService {
 
   /// Increment when the shape of an export changes. Consumers can migrate a
   /// saved export without guessing which optional fields were present.
-  static const exportSchemaVersion = 5;
+  static const exportSchemaVersion = 6;
   static const _networkTimeout = Duration(seconds: 8);
 
   /// JSON-encodable map. Safe to call with no network and no account.
@@ -80,6 +80,8 @@ class DataExportService {
               'insurance_number': emergencyInfo.insuranceNumber,
               'national_id': emergencyInfo.nationalId,
               'health_card_number': emergencyInfo.healthCardNumber,
+              'emergency_contact_name': emergencyInfo.emergencyContactName,
+              'emergency_contact_phone': emergencyInfo.emergencyContactPhone,
               'updated_at': _iso(emergencyInfo.updatedAt),
             },
       'consents': {

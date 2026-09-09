@@ -41,6 +41,16 @@ class EmergencyInfo extends Table {
   // lets the person write whichever applies.
   TextColumn get nationalId => text().withDefault(const Constant(''))();
   TextColumn get healthCardNumber => text().withDefault(const Constant(''))();
+  // A person to call in an emergency, entered directly on this card --
+  // independent of the Family care-link feature, which only ever names a
+  // caregiver for whoever is the *patient* side of a link (and says
+  // nothing for someone with no link at all, or who is themselves the
+  // caregiver). Everyone filling out this card should be able to name
+  // someone, whether or not they use Family sharing.
+  TextColumn get emergencyContactName =>
+      text().withDefault(const Constant(''))();
+  TextColumn get emergencyContactPhone =>
+      text().withDefault(const Constant(''))();
   DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
 
   @override

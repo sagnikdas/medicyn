@@ -28,6 +28,8 @@ class EmergencyCardData {
     required this.insuranceNumber,
     required this.nationalId,
     required this.healthCardNumber,
+    required this.emergencyContactName,
+    required this.emergencyContactPhone,
     required this.medicines,
     required this.caregiverName,
     required this.caregiverPhone,
@@ -44,6 +46,12 @@ class EmergencyCardData {
   final String insuranceNumber;
   final String nationalId;
   final String healthCardNumber;
+
+  /// Entered directly on the card, independent of Family sharing -- see
+  /// [EmergencyInfo.emergencyContactName] for why this is separate from
+  /// [caregiverName].
+  final String emergencyContactName;
+  final String emergencyContactPhone;
   final List<EmergencyMedicineRow> medicines;
 
   /// Best-effort display name for the person on the other end of the active
@@ -82,12 +90,18 @@ class EmergencyCardData {
         final profile = await CareService.instance.profile(userId);
         patientName = _printableName(profile?.displayName);
         final link = await CareService.instance.currentLink();
-        caregiverPhone = dialablePhone(link?.phoneToCall(userId));
-        final otherPartyId = link?.otherPartyId(userId);
-        if (otherPartyId != null) {
-          caregiverName = _printableName(
-            await CareService.instance.displayName(otherPartyId),
-          );
+        // Only the patient side of a link has a caregiver to report here --
+        // otherPartyId/phoneToCall return whoever is on the other end
+        // regardless of role, which for the caregiver side of a link is
+        // the patient they help, not their own caregiver.
+        if (link != null && link.isPatient(userId)) {
+          caregiverPhone = dialablePhone(link.phoneToCall(userId));
+          final otherPartyId = link.otherPartyId(userId);
+          if (otherPartyId != null) {
+            caregiverName = _printableName(
+              await CareService.instance.displayName(otherPartyId),
+            );
+          }
         }
       }
     } catch (_) {
@@ -106,6 +120,8 @@ class EmergencyCardData {
       insuranceNumber: info?.insuranceNumber.trim() ?? '',
       nationalId: info?.nationalId.trim() ?? '',
       healthCardNumber: info?.healthCardNumber.trim() ?? '',
+      emergencyContactName: info?.emergencyContactName.trim() ?? '',
+      emergencyContactPhone: info?.emergencyContactPhone.trim() ?? '',
       medicines: medicines,
       caregiverName: caregiverName,
       caregiverPhone: caregiverPhone,

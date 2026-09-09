@@ -15,6 +15,8 @@ void main() {
       insuranceNumber: 'INS-4471',
       nationalId: '1234 5678 9012',
       healthCardNumber: 'HC-88213',
+      emergencyContactName: 'Priya Kapoor',
+      emergencyContactPhone: '+919876500000',
       medicines: const [
         EmergencyMedicineRow(title: 'Metformin 500mg', dose: '1 tablet'),
       ],
@@ -41,6 +43,8 @@ void main() {
       insuranceNumber: '',
       nationalId: '',
       healthCardNumber: '',
+      emergencyContactName: '',
+      emergencyContactPhone: '',
       medicines: const [],
       caregiverName: null,
       caregiverPhone: null,

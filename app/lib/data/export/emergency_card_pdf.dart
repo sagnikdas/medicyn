@@ -64,6 +64,8 @@ Future<List<int>> buildEmergencyCardPdf(EmergencyCardData data) async {
             _fact('Notes', data.notes),
           ],
           pw.SizedBox(height: 12),
+          _fact('Emergency contact', _emergencyContactLine(data)),
+          pw.SizedBox(height: 12),
           _fact('Caregiver', _caregiverLine(data)),
           if (data.insuranceNumber.isNotEmpty ||
               data.nationalId.isNotEmpty ||
@@ -238,6 +240,12 @@ String _caregiverLine(EmergencyCardData data) {
   if (phone == null) return 'Not set';
   final name = data.caregiverName;
   return name == null ? phone : '$name  ·  $phone';
+}
+
+String _emergencyContactLine(EmergencyCardData data) {
+  if (data.emergencyContactPhone.isEmpty) return 'Not set';
+  if (data.emergencyContactName.isEmpty) return data.emergencyContactPhone;
+  return '${data.emergencyContactName}  ·  ${data.emergencyContactPhone}';
 }
 
 pw.Widget _sectionTitle(String text) {
