@@ -265,11 +265,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       title: 'Emergency card',
                       subtitle:
                           'Blood group, allergies, conditions, and your medicines — for a first responder or new clinician.',
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => EmergencyCardScreen(db: widget.db),
-                        ),
-                      ),
+                      onTap: () {
+                        // A second tap can land before the first push's
+                        // transition covers this row -- without this guard
+                        // it queues a second push that races the first
+                        // route's still-in-flight animation (visible
+                        // ghosting, and a hit-test crash on a render object
+                        // that hasn't been laid out yet).
+                        final route = ModalRoute.of(context);
+                        if (route != null && !route.isCurrent) return;
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => EmergencyCardScreen(db: widget.db),
+                          ),
+                        );
+                      },
                     ),
                     const SizedBox(height: 24),
                     Text(
