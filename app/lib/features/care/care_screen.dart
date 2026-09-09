@@ -222,8 +222,7 @@ class _CareScreenState extends State<CareScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const MedicynFadeIn(child: Center(child: MedicynClip())),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 12),
                     MedicynSwitcher(
                       alignment: Alignment.topCenter,
                       duration: MedicynMotion.medium,
