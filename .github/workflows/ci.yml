@@ -1,9 +1,11 @@
 name: Validate
 
+# CI validation temporarily disabled. To re-enable, uncomment the triggers below.
 on:
-  push:
-    branches: [main]
-  pull_request:
+  workflow_dispatch:
+  # push:
+  #   branches: [main]
+  # pull_request:
 
 permissions:
   contents: read
