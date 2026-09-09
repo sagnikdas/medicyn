@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../core/widgets/medicyn_chrome.dart';
-import '../../core/widgets/medicyn_motion.dart';
 import '../../data/export/emergency_card_export_service.dart';
 import '../../data/local/database.dart';
 import '../auth/auth_service.dart';
@@ -46,6 +44,12 @@ String _shortDate(DateTime value) {
 /// database (the same source Today and Insights use) and the caregiver's
 /// name/number from whatever care link is currently active, so this card can
 /// never say something the rest of the app disagrees with.
+///
+/// Deliberately plain text, no cards/badges/animation: a styled version of
+/// this screen was found to render corrupted (misplaced text) on at least
+/// one real device once the caregiver's name arrived a couple of seconds
+/// after first paint. This trades the visual polish for something that
+/// cannot have that class of bug.
 class EmergencyCardScreen extends StatefulWidget {
   const EmergencyCardScreen({super.key, required this.db});
 
@@ -68,8 +72,8 @@ class _EmergencyCardScreenState extends State<EmergencyCardScreen> {
   }
 
   /// Bounds the caregiver lookup so a slow or flaky connection can't leave
-  /// the small in-section spinner spinning indefinitely -- everything else
-  /// on the card is local and already visible by the time this matters.
+  /// the "Loading…" line stuck indefinitely -- everything else on this
+  /// screen is local and already visible by the time this matters.
   static const _caregiverLookupTimeout = Duration(seconds: 5);
 
   Future<void> _loadCaregiverContact() async {
@@ -91,7 +95,7 @@ class _EmergencyCardScreenState extends State<EmergencyCardScreen> {
       }
     } catch (_) {
       // Leave both null. A failed or slow lookup should not block the rest
-      // of the card.
+      // of the screen.
     }
     if (mounted) {
       setState(() {
@@ -101,9 +105,6 @@ class _EmergencyCardScreenState extends State<EmergencyCardScreen> {
       });
     }
   }
-
-  @override
-  Widget build(BuildContext context) => _buildScaffold(context);
 
   Future<void> _edit(EmergencyInfoData? current) async {
     final result = await showAdaptiveDialog<_EmergencyEditResult>(
@@ -164,254 +165,114 @@ class _EmergencyCardScreenState extends State<EmergencyCardScreen> {
     }
   }
 
-  Widget _buildScaffold(BuildContext context) {
-    final text = Theme.of(context).textTheme;
-    final scheme = Theme.of(context).colorScheme;
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Emergency card')),
       body: StreamBuilder<EmergencyInfoData?>(
         stream: widget.db.watchEmergencyInfo(),
         builder: (context, infoSnapshot) {
           final info = infoSnapshot.data;
-          return MedicynFadeIn(
-            child: ListView(
-              padding: const EdgeInsets.all(20),
-              children: [
-                Text(
-                  'For a first responder, a new clinician, or a caregiver to '
-                  'check quickly. Keep it up to date.',
-                  style: text.bodyMedium?.copyWith(
-                    color: scheme.onSurfaceVariant,
-                  ),
+          return ListView(
+            padding: const EdgeInsets.all(20),
+            children: [
+              _line(
+                'Blood group',
+                (info?.bloodGroup.trim().isNotEmpty ?? false)
+                    ? info!.bloodGroup
+                    : 'Not set',
+              ),
+              _line(
+                'Allergies',
+                (info?.allergies.trim().isNotEmpty ?? false)
+                    ? info!.allergies
+                    : 'Not set',
+              ),
+              _line(
+                'Allergies severe',
+                (info?.allergiesSevere ?? false) ? 'Yes' : 'No',
+              ),
+              _line(
+                'Conditions',
+                (info?.conditions.trim().isNotEmpty ?? false)
+                    ? info!.conditions
+                    : 'Not set',
+              ),
+              _line(
+                'Notes',
+                (info?.notes.trim().isNotEmpty ?? false)
+                    ? info!.notes
+                    : 'Not set',
+              ),
+              _line(
+                'Insurance number',
+                (info?.insuranceNumber.trim().isNotEmpty ?? false)
+                    ? info!.insuranceNumber
+                    : 'Not set',
+              ),
+              _line(
+                'National ID (Aadhaar / SSN / etc.)',
+                (info?.nationalId.trim().isNotEmpty ?? false)
+                    ? info!.nationalId
+                    : 'Not set',
+              ),
+              _line(
+                'Health card no.',
+                (info?.healthCardNumber.trim().isNotEmpty ?? false)
+                    ? info!.healthCardNumber
+                    : 'Not set',
+              ),
+              _line(
+                'Updated',
+                info?.updatedAt != null
+                    ? _shortDate(info!.updatedAt)
+                    : 'Not set up yet',
+              ),
+              const SizedBox(height: 12),
+              TextButton(
+                onPressed: () => _edit(info),
+                child: const Text('Edit'),
+              ),
+              const SizedBox(height: 20),
+              _line(
+                "Caregiver's number",
+                _loadingPhone
+                    ? 'Loading…'
+                    : (_caregiverPhone ?? 'No number on file.'),
+              ),
+              if (_caregiverName != null)
+                _line('Caregiver name', _caregiverName!),
+              if (_caregiverPhone != null)
+                TextButton(
+                  onPressed: () => openDialer(_caregiverPhone!),
+                  child: const Text('Call'),
                 ),
-                const SizedBox(height: 16),
-                RepaintBoundary(
-                  child: AmbientCard(
-                    padding: const EdgeInsets.all(20),
-                    borderColor: scheme.outlineVariant,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            _BloodGroupBadge(
-                              bloodGroup:
-                                  (info?.bloodGroup.trim().isNotEmpty ?? false)
-                                  ? info!.bloodGroup
-                                  : '',
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Emergency Medical Card',
-                                    style: text.titleLarge?.copyWith(
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    info?.updatedAt != null
-                                        ? 'Updated ${_shortDate(info!.updatedAt)}'
-                                        : 'Not set up yet',
-                                    style: text.bodySmall?.copyWith(
-                                      color: scheme.onSurfaceVariant,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 20),
-                        Divider(color: scheme.outlineVariant, height: 1),
-                        const SizedBox(height: 16),
-                        _AllergyFact(
-                          allergies:
-                              (info?.allergies.trim().isNotEmpty ?? false)
-                              ? info!.allergies
-                              : 'Not set',
-                          severe: info?.allergiesSevere ?? false,
-                        ),
-                        const SizedBox(height: 16),
-                        _FactRow(
-                          icon: Icons.medical_information_outlined,
-                          label: 'Conditions',
-                          value: (info?.conditions.trim().isNotEmpty ?? false)
-                              ? info!.conditions
-                              : 'Not set',
-                        ),
-                        if (info?.notes.trim().isNotEmpty ?? false) ...[
-                          const SizedBox(height: 16),
-                          _FactRow(
-                            icon: Icons.sticky_note_2_outlined,
-                            label: 'Notes',
-                            value: info!.notes,
-                          ),
-                        ],
-                        const SizedBox(height: 16),
-                        OutlinedButton.icon(
-                          onPressed: () => _edit(info),
-                          icon: const Icon(Icons.edit_outlined),
-                          label: const Text('Edit'),
-                        ),
-                        const SizedBox(height: 20),
-                        Divider(color: scheme.outlineVariant, height: 1),
-                        const SizedBox(height: 16),
-                        _SectionTitle('Identification'),
-                        const SizedBox(height: 12),
-                        _FactRow(
-                          icon: Icons.shield_outlined,
-                          label: 'Insurance number',
-                          value:
-                              (info?.insuranceNumber.trim().isNotEmpty ?? false)
-                              ? info!.insuranceNumber
-                              : 'Not set',
-                          monospace: true,
-                        ),
-                        const SizedBox(height: 12),
-                        _FactRow(
-                          icon: Icons.badge_outlined,
-                          label: 'National ID (Aadhaar / SSN / etc.)',
-                          value: (info?.nationalId.trim().isNotEmpty ?? false)
-                              ? info!.nationalId
-                              : 'Not set',
-                          monospace: true,
-                        ),
-                        const SizedBox(height: 12),
-                        _FactRow(
-                          icon: Icons.local_hospital_outlined,
-                          label: 'Health card no.',
-                          value:
-                              (info?.healthCardNumber.trim().isNotEmpty ??
-                                  false)
-                              ? info!.healthCardNumber
-                              : 'Not set',
-                          monospace: true,
-                        ),
-                        const SizedBox(height: 20),
-                        Divider(color: scheme.outlineVariant, height: 1),
-                        const SizedBox(height: 16),
-                        _SectionTitle("Caregiver's number"),
-                        const SizedBox(height: 8),
-                        if (_loadingPhone)
-                          const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        else if (_caregiverPhone == null)
-                          Text(
-                            'No number on file. Connect with family in Settings to add one.',
-                            style: text.bodyMedium,
-                          )
-                        else
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              if (_caregiverName != null) ...[
-                                Text(
-                                  _caregiverName!,
-                                  style: text.bodyLarge?.copyWith(
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                              ],
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      _caregiverPhone!,
-                                      style: text.bodyLarge,
-                                    ),
-                                  ),
-                                  FilledButton.tonalIcon(
-                                    onPressed: () =>
-                                        openDialer(_caregiverPhone!),
-                                    icon: const Icon(Icons.phone),
-                                    label: const Text('Call'),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        const SizedBox(height: 20),
-                        Divider(color: scheme.outlineVariant, height: 1),
-                        const SizedBox(height: 16),
-                        StreamBuilder<List<ScheduleWithMedicine>>(
-                          stream: widget.db.watchActiveSchedules(),
-                          builder: (context, medsSnapshot) {
-                            final items = medsSnapshot.data ?? const [];
-                            return Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _SectionTitle(
-                                  items.isEmpty
-                                      ? 'Current medicines'
-                                      : 'Current medicines (${items.length})',
-                                ),
-                                const SizedBox(height: 8),
-                                if (items.isEmpty)
-                                  Text(
-                                    'No medicines on this device.',
-                                    style: text.bodyMedium,
-                                  )
-                                else
-                                  for (final item in items)
-                                    Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        vertical: 4,
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          Expanded(
-                                            child: Text(
-                                              medicineTitle(item.medicine),
-                                              style: text.bodyLarge,
-                                            ),
-                                          ),
-                                          if (item.medicine.doseAmount
-                                              .trim()
-                                              .isNotEmpty)
-                                            Text(
-                                              item.medicine.doseAmount,
-                                              style: text.bodyMedium,
-                                            ),
-                                        ],
-                                      ),
-                                    ),
-                              ],
-                            );
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                OutlinedButton.icon(
-                  onPressed: _sharing ? null : _share,
-                  icon: MedicynSwitcher(
-                    child: _sharing
-                        ? const SizedBox(
-                            key: ValueKey('busy'),
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(
-                            Icons.picture_as_pdf_outlined,
-                            key: ValueKey('pdf'),
-                          ),
-                  ),
-                  label: Text(_sharing ? 'Preparing…' : 'Print or share'),
-                ),
-              ],
-            ),
+              const SizedBox(height: 20),
+              StreamBuilder<List<ScheduleWithMedicine>>(
+                stream: widget.db.watchActiveSchedules(),
+                builder: (context, medsSnapshot) {
+                  final items = medsSnapshot.data ?? const [];
+                  return _line(
+                    'Current medicines',
+                    items.isEmpty
+                        ? 'No medicines on this device.'
+                        : items
+                              .map(
+                                (item) =>
+                                    item.medicine.doseAmount.trim().isEmpty
+                                    ? medicineTitle(item.medicine)
+                                    : '${medicineTitle(item.medicine)} - ${item.medicine.doseAmount}',
+                              )
+                              .join('\n'),
+                  );
+                },
+              ),
+              const SizedBox(height: 20),
+              TextButton(
+                onPressed: _sharing ? null : _share,
+                child: Text(_sharing ? 'Preparing…' : 'Print or share'),
+              ),
+            ],
           );
         },
       ),
@@ -419,158 +280,16 @@ class _EmergencyCardScreenState extends State<EmergencyCardScreen> {
   }
 }
 
-class _BloodGroupBadge extends StatelessWidget {
-  const _BloodGroupBadge({required this.bloodGroup});
-
-  final String bloodGroup;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final text = Theme.of(context).textTheme;
-    final hasValue = bloodGroup.trim().isNotEmpty;
-    return Container(
-      width: 60,
-      height: 60,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: scheme.errorContainer,
-        shape: BoxShape.circle,
-        border: Border.all(color: scheme.error, width: 1.5),
-      ),
-      child: Text(
-        hasValue ? bloodGroup : '?',
-        style: text.titleLarge?.copyWith(
-          color: scheme.onErrorContainer,
-          fontWeight: FontWeight.w800,
-        ),
-      ),
-    );
-  }
-}
-
-class _SectionTitle extends StatelessWidget {
-  const _SectionTitle(this.label);
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      label,
-      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-        color: Theme.of(context).colorScheme.primary,
-        fontWeight: FontWeight.w700,
-      ),
-    );
-  }
-}
-
-class _FactRow extends StatelessWidget {
-  const _FactRow({
-    required this.label,
-    required this.value,
-    this.icon,
-    this.monospace = false,
-  });
-
-  final String label;
-  final String value;
-  final IconData? icon;
-  final bool monospace;
-
-  @override
-  Widget build(BuildContext context) {
-    final text = Theme.of(context).textTheme;
-    final scheme = Theme.of(context).colorScheme;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            if (icon != null) ...[
-              Icon(icon, size: 16, color: scheme.primary),
-              const SizedBox(width: 6),
-            ],
-            Expanded(
-              child: Text(
-                label,
-                style: text.titleSmall?.copyWith(color: scheme.primary),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          style: text.bodyLarge?.copyWith(
-            fontFeatures: monospace
-                ? const [FontFeature.tabularFigures()]
-                : null,
-            letterSpacing: monospace ? 0.6 : null,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-/// The allergies fact, called out in a red-tinted box when marked severe --
-/// the one field on this card where a rushed read is dangerous.
-class _AllergyFact extends StatelessWidget {
-  const _AllergyFact({required this.allergies, required this.severe});
-
-  final String allergies;
-  final bool severe;
-
-  @override
-  Widget build(BuildContext context) {
-    if (!severe) {
-      return _FactRow(
-        icon: Icons.warning_amber_outlined,
-        label: 'Allergies',
-        value: allergies,
-      );
-    }
-    final scheme = Theme.of(context).colorScheme;
-    final text = Theme.of(context).textTheme;
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: scheme.errorContainer,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: scheme.error),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.warning_amber_rounded, size: 18, color: scheme.error),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  'ALLERGIES — SEVERE / ANAPHYLAXIS RISK',
-                  style: text.labelMedium?.copyWith(
-                    color: scheme.error,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.4,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(
-            allergies,
-            style: text.bodyLarge?.copyWith(color: scheme.onErrorContainer),
-          ),
-        ],
-      ),
-    );
-  }
-}
+Widget _line(String label, String value) => Padding(
+  padding: const EdgeInsets.only(bottom: 16),
+  child: Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
+      Text(value),
+    ],
+  ),
+);
 
 class _EmergencyEditResult {
   const _EmergencyEditResult({
