@@ -52,6 +52,17 @@
             android:name="flutterEmbedding"
             android:value="2" />
 
+        <!-- Impeller (Flutter's default Android renderer) has known
+             compositing bugs on some budget/MediaTek GPUs, confirmed on a
+             Moto G22 (MediaTek Helio-class): the previous route stayed
+             visibly composited underneath a new, opaque pushed route,
+             persisting across backgrounding, reproducible on a single tap,
+             specific to certain screens' layouts. Falling back to Skia
+             avoids that whole class of engine-level rendering bug. -->
+        <meta-data
+            android:name="io.flutter.embedding.android.EnableImpeller"
+            android:value="false" />
+
         <!-- Where an FCM notification lands if it names no channel of its own.
              The notify-care function always names the care-alert channel
              explicitly, so this is the fallback for anything that doesn't —
