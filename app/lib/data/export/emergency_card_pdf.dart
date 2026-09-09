@@ -14,6 +14,8 @@ const _rule = PdfColor.fromInt(0xFFD9CBAA);
 const _paper = PdfColor.fromInt(0xFFFBF7EC);
 const _banner = PdfColor.fromInt(0xFFEDE4CE);
 const _stripe = PdfColor.fromInt(0xFFF6F0E1);
+const _alert = PdfColor.fromInt(0xFFBA1A1A);
+const _alertBg = PdfColor.fromInt(0xFFFFDAD6);
 
 const _months = [
   'January',
@@ -54,11 +56,35 @@ Future<List<int>> buildEmergencyCardPdf(EmergencyCardData data) async {
           pw.SizedBox(height: 20),
           _fact('Blood group', data.bloodGroup),
           pw.SizedBox(height: 12),
-          _fact('Allergies', data.allergies),
+          _allergyFact(data.allergies, data.allergiesSevere),
           pw.SizedBox(height: 12),
           _fact('Conditions', data.conditions),
+          if (data.notes.isNotEmpty) ...[
+            pw.SizedBox(height: 12),
+            _fact('Notes', data.notes),
+          ],
           pw.SizedBox(height: 12),
-          _fact("Caregiver's number", data.caregiverPhone ?? 'Not set'),
+          _fact('Caregiver', _caregiverLine(data)),
+          if (data.insuranceNumber.isNotEmpty ||
+              data.nationalId.isNotEmpty ||
+              data.healthCardNumber.isNotEmpty) ...[
+            pw.SizedBox(height: 20),
+            _sectionTitle('Identification'),
+            pw.Row(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Expanded(
+                  child: _fact('Insurance number', data.insuranceNumber),
+                ),
+                pw.SizedBox(width: 16),
+                pw.Expanded(child: _fact('National ID', data.nationalId)),
+                pw.SizedBox(width: 16),
+                pw.Expanded(
+                  child: _fact('Health card no.', data.healthCardNumber),
+                ),
+              ],
+            ),
+          ],
           pw.SizedBox(height: 20),
           _sectionTitle('Current medicines'),
           if (data.medicines.isEmpty)
@@ -170,6 +196,48 @@ pw.Widget _fact(String label, String value) {
       ),
     ],
   );
+}
+
+/// The allergies fact, called out in a red-bordered box when marked severe
+/// -- the one field on this card where a first responder reading past it
+/// too quickly is dangerous.
+pw.Widget _allergyFact(String allergies, bool severe) {
+  if (!severe) return _fact('Allergies', allergies);
+  return pw.Container(
+    width: double.infinity,
+    padding: const pw.EdgeInsets.all(10),
+    decoration: pw.BoxDecoration(
+      color: _alertBg,
+      border: pw.Border.all(color: _alert, width: 1),
+      borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
+    ),
+    child: pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.Text(
+          'ALLERGIES -- SEVERE / ANAPHYLAXIS RISK',
+          style: pw.TextStyle(
+            fontSize: 9,
+            fontWeight: pw.FontWeight.bold,
+            letterSpacing: 0.6,
+            color: _alert,
+          ),
+        ),
+        pw.SizedBox(height: 3),
+        pw.Text(
+          allergies.isEmpty ? 'Not recorded' : allergies,
+          style: pw.TextStyle(fontSize: 12, color: _ink),
+        ),
+      ],
+    ),
+  );
+}
+
+String _caregiverLine(EmergencyCardData data) {
+  final phone = data.caregiverPhone;
+  if (phone == null) return 'Not set';
+  final name = data.caregiverName;
+  return name == null ? phone : '$name  ·  $phone';
 }
 
 pw.Widget _sectionTitle(String text) {

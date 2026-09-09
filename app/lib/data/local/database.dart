@@ -45,7 +45,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 9;
+  int get schemaVersion => 10;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -108,7 +108,18 @@ class AppDatabase extends _$AppDatabase {
         );
       }
       if (from < 9) {
+        // createTable builds from *today's* EmergencyInfo definition, so a
+        // database created here already gets the v10 columns below for
+        // free. Only a database that already has the v9 table (from < 9 is
+        // false but from < 10 is true) needs the ALTER TABLEs.
         await m.createTable(emergencyInfo);
+      }
+      if (from == 9) {
+        await m.addColumn(emergencyInfo, emergencyInfo.allergiesSevere);
+        await m.addColumn(emergencyInfo, emergencyInfo.notes);
+        await m.addColumn(emergencyInfo, emergencyInfo.insuranceNumber);
+        await m.addColumn(emergencyInfo, emergencyInfo.nationalId);
+        await m.addColumn(emergencyInfo, emergencyInfo.healthCardNumber);
       }
     },
   );
@@ -518,14 +529,24 @@ class AppDatabase extends _$AppDatabase {
   Future<void> upsertEmergencyInfo({
     required String bloodGroup,
     required String allergies,
+    bool allergiesSevere = false,
     required String conditions,
+    String notes = '',
+    String insuranceNumber = '',
+    String nationalId = '',
+    String healthCardNumber = '',
   }) {
     return into(emergencyInfo).insertOnConflictUpdate(
       EmergencyInfoCompanion.insert(
         id: EmergencyInfo.singletonId,
         bloodGroup: Value(bloodGroup.trim()),
         allergies: Value(allergies.trim()),
+        allergiesSevere: Value(allergiesSevere),
         conditions: Value(conditions.trim()),
+        notes: Value(notes.trim()),
+        insuranceNumber: Value(insuranceNumber.trim()),
+        nationalId: Value(nationalId.trim()),
+        healthCardNumber: Value(healthCardNumber.trim()),
         updatedAt: Value(DateTime.now()),
       ),
     );

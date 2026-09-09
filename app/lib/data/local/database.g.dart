@@ -3247,12 +3247,73 @@ class $EmergencyInfoTable extends EmergencyInfo
     requiredDuringInsert: false,
     defaultValue: const Constant(''),
   );
+  static const VerificationMeta _allergiesSevereMeta = const VerificationMeta(
+    'allergiesSevere',
+  );
+  @override
+  late final GeneratedColumn<bool> allergiesSevere = GeneratedColumn<bool>(
+    'allergies_severe',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("allergies_severe" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   static const VerificationMeta _conditionsMeta = const VerificationMeta(
     'conditions',
   );
   @override
   late final GeneratedColumn<String> conditions = GeneratedColumn<String>(
     'conditions',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _notesMeta = const VerificationMeta('notes');
+  @override
+  late final GeneratedColumn<String> notes = GeneratedColumn<String>(
+    'notes',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _insuranceNumberMeta = const VerificationMeta(
+    'insuranceNumber',
+  );
+  @override
+  late final GeneratedColumn<String> insuranceNumber = GeneratedColumn<String>(
+    'insurance_number',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _nationalIdMeta = const VerificationMeta(
+    'nationalId',
+  );
+  @override
+  late final GeneratedColumn<String> nationalId = GeneratedColumn<String>(
+    'national_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _healthCardNumberMeta = const VerificationMeta(
+    'healthCardNumber',
+  );
+  @override
+  late final GeneratedColumn<String> healthCardNumber = GeneratedColumn<String>(
+    'health_card_number',
     aliasedName,
     false,
     type: DriftSqlType.string,
@@ -3276,7 +3337,12 @@ class $EmergencyInfoTable extends EmergencyInfo
     id,
     bloodGroup,
     allergies,
+    allergiesSevere,
     conditions,
+    notes,
+    insuranceNumber,
+    nationalId,
+    healthCardNumber,
     updatedAt,
   ];
   @override
@@ -3308,10 +3374,49 @@ class $EmergencyInfoTable extends EmergencyInfo
         allergies.isAcceptableOrUnknown(data['allergies']!, _allergiesMeta),
       );
     }
+    if (data.containsKey('allergies_severe')) {
+      context.handle(
+        _allergiesSevereMeta,
+        allergiesSevere.isAcceptableOrUnknown(
+          data['allergies_severe']!,
+          _allergiesSevereMeta,
+        ),
+      );
+    }
     if (data.containsKey('conditions')) {
       context.handle(
         _conditionsMeta,
         conditions.isAcceptableOrUnknown(data['conditions']!, _conditionsMeta),
+      );
+    }
+    if (data.containsKey('notes')) {
+      context.handle(
+        _notesMeta,
+        notes.isAcceptableOrUnknown(data['notes']!, _notesMeta),
+      );
+    }
+    if (data.containsKey('insurance_number')) {
+      context.handle(
+        _insuranceNumberMeta,
+        insuranceNumber.isAcceptableOrUnknown(
+          data['insurance_number']!,
+          _insuranceNumberMeta,
+        ),
+      );
+    }
+    if (data.containsKey('national_id')) {
+      context.handle(
+        _nationalIdMeta,
+        nationalId.isAcceptableOrUnknown(data['national_id']!, _nationalIdMeta),
+      );
+    }
+    if (data.containsKey('health_card_number')) {
+      context.handle(
+        _healthCardNumberMeta,
+        healthCardNumber.isAcceptableOrUnknown(
+          data['health_card_number']!,
+          _healthCardNumberMeta,
+        ),
       );
     }
     if (data.containsKey('updated_at')) {
@@ -3341,9 +3446,29 @@ class $EmergencyInfoTable extends EmergencyInfo
         DriftSqlType.string,
         data['${effectivePrefix}allergies'],
       )!,
+      allergiesSevere: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}allergies_severe'],
+      )!,
       conditions: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}conditions'],
+      )!,
+      notes: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}notes'],
+      )!,
+      insuranceNumber: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}insurance_number'],
+      )!,
+      nationalId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}national_id'],
+      )!,
+      healthCardNumber: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}health_card_number'],
       )!,
       updatedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
@@ -3363,13 +3488,23 @@ class EmergencyInfoData extends DataClass
   final String id;
   final String bloodGroup;
   final String allergies;
+  final bool allergiesSevere;
   final String conditions;
+  final String notes;
+  final String insuranceNumber;
+  final String nationalId;
+  final String healthCardNumber;
   final DateTime updatedAt;
   const EmergencyInfoData({
     required this.id,
     required this.bloodGroup,
     required this.allergies,
+    required this.allergiesSevere,
     required this.conditions,
+    required this.notes,
+    required this.insuranceNumber,
+    required this.nationalId,
+    required this.healthCardNumber,
     required this.updatedAt,
   });
   @override
@@ -3378,7 +3513,12 @@ class EmergencyInfoData extends DataClass
     map['id'] = Variable<String>(id);
     map['blood_group'] = Variable<String>(bloodGroup);
     map['allergies'] = Variable<String>(allergies);
+    map['allergies_severe'] = Variable<bool>(allergiesSevere);
     map['conditions'] = Variable<String>(conditions);
+    map['notes'] = Variable<String>(notes);
+    map['insurance_number'] = Variable<String>(insuranceNumber);
+    map['national_id'] = Variable<String>(nationalId);
+    map['health_card_number'] = Variable<String>(healthCardNumber);
     map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
   }
@@ -3388,7 +3528,12 @@ class EmergencyInfoData extends DataClass
       id: Value(id),
       bloodGroup: Value(bloodGroup),
       allergies: Value(allergies),
+      allergiesSevere: Value(allergiesSevere),
       conditions: Value(conditions),
+      notes: Value(notes),
+      insuranceNumber: Value(insuranceNumber),
+      nationalId: Value(nationalId),
+      healthCardNumber: Value(healthCardNumber),
       updatedAt: Value(updatedAt),
     );
   }
@@ -3402,7 +3547,12 @@ class EmergencyInfoData extends DataClass
       id: serializer.fromJson<String>(json['id']),
       bloodGroup: serializer.fromJson<String>(json['bloodGroup']),
       allergies: serializer.fromJson<String>(json['allergies']),
+      allergiesSevere: serializer.fromJson<bool>(json['allergiesSevere']),
       conditions: serializer.fromJson<String>(json['conditions']),
+      notes: serializer.fromJson<String>(json['notes']),
+      insuranceNumber: serializer.fromJson<String>(json['insuranceNumber']),
+      nationalId: serializer.fromJson<String>(json['nationalId']),
+      healthCardNumber: serializer.fromJson<String>(json['healthCardNumber']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
   }
@@ -3413,7 +3563,12 @@ class EmergencyInfoData extends DataClass
       'id': serializer.toJson<String>(id),
       'bloodGroup': serializer.toJson<String>(bloodGroup),
       'allergies': serializer.toJson<String>(allergies),
+      'allergiesSevere': serializer.toJson<bool>(allergiesSevere),
       'conditions': serializer.toJson<String>(conditions),
+      'notes': serializer.toJson<String>(notes),
+      'insuranceNumber': serializer.toJson<String>(insuranceNumber),
+      'nationalId': serializer.toJson<String>(nationalId),
+      'healthCardNumber': serializer.toJson<String>(healthCardNumber),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
   }
@@ -3422,13 +3577,23 @@ class EmergencyInfoData extends DataClass
     String? id,
     String? bloodGroup,
     String? allergies,
+    bool? allergiesSevere,
     String? conditions,
+    String? notes,
+    String? insuranceNumber,
+    String? nationalId,
+    String? healthCardNumber,
     DateTime? updatedAt,
   }) => EmergencyInfoData(
     id: id ?? this.id,
     bloodGroup: bloodGroup ?? this.bloodGroup,
     allergies: allergies ?? this.allergies,
+    allergiesSevere: allergiesSevere ?? this.allergiesSevere,
     conditions: conditions ?? this.conditions,
+    notes: notes ?? this.notes,
+    insuranceNumber: insuranceNumber ?? this.insuranceNumber,
+    nationalId: nationalId ?? this.nationalId,
+    healthCardNumber: healthCardNumber ?? this.healthCardNumber,
     updatedAt: updatedAt ?? this.updatedAt,
   );
   EmergencyInfoData copyWithCompanion(EmergencyInfoCompanion data) {
@@ -3438,9 +3603,22 @@ class EmergencyInfoData extends DataClass
           ? data.bloodGroup.value
           : this.bloodGroup,
       allergies: data.allergies.present ? data.allergies.value : this.allergies,
+      allergiesSevere: data.allergiesSevere.present
+          ? data.allergiesSevere.value
+          : this.allergiesSevere,
       conditions: data.conditions.present
           ? data.conditions.value
           : this.conditions,
+      notes: data.notes.present ? data.notes.value : this.notes,
+      insuranceNumber: data.insuranceNumber.present
+          ? data.insuranceNumber.value
+          : this.insuranceNumber,
+      nationalId: data.nationalId.present
+          ? data.nationalId.value
+          : this.nationalId,
+      healthCardNumber: data.healthCardNumber.present
+          ? data.healthCardNumber.value
+          : this.healthCardNumber,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
   }
@@ -3451,15 +3629,30 @@ class EmergencyInfoData extends DataClass
           ..write('id: $id, ')
           ..write('bloodGroup: $bloodGroup, ')
           ..write('allergies: $allergies, ')
+          ..write('allergiesSevere: $allergiesSevere, ')
           ..write('conditions: $conditions, ')
+          ..write('notes: $notes, ')
+          ..write('insuranceNumber: $insuranceNumber, ')
+          ..write('nationalId: $nationalId, ')
+          ..write('healthCardNumber: $healthCardNumber, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, bloodGroup, allergies, conditions, updatedAt);
+  int get hashCode => Object.hash(
+    id,
+    bloodGroup,
+    allergies,
+    allergiesSevere,
+    conditions,
+    notes,
+    insuranceNumber,
+    nationalId,
+    healthCardNumber,
+    updatedAt,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -3467,7 +3660,12 @@ class EmergencyInfoData extends DataClass
           other.id == this.id &&
           other.bloodGroup == this.bloodGroup &&
           other.allergies == this.allergies &&
+          other.allergiesSevere == this.allergiesSevere &&
           other.conditions == this.conditions &&
+          other.notes == this.notes &&
+          other.insuranceNumber == this.insuranceNumber &&
+          other.nationalId == this.nationalId &&
+          other.healthCardNumber == this.healthCardNumber &&
           other.updatedAt == this.updatedAt);
 }
 
@@ -3475,14 +3673,24 @@ class EmergencyInfoCompanion extends UpdateCompanion<EmergencyInfoData> {
   final Value<String> id;
   final Value<String> bloodGroup;
   final Value<String> allergies;
+  final Value<bool> allergiesSevere;
   final Value<String> conditions;
+  final Value<String> notes;
+  final Value<String> insuranceNumber;
+  final Value<String> nationalId;
+  final Value<String> healthCardNumber;
   final Value<DateTime> updatedAt;
   final Value<int> rowid;
   const EmergencyInfoCompanion({
     this.id = const Value.absent(),
     this.bloodGroup = const Value.absent(),
     this.allergies = const Value.absent(),
+    this.allergiesSevere = const Value.absent(),
     this.conditions = const Value.absent(),
+    this.notes = const Value.absent(),
+    this.insuranceNumber = const Value.absent(),
+    this.nationalId = const Value.absent(),
+    this.healthCardNumber = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -3490,7 +3698,12 @@ class EmergencyInfoCompanion extends UpdateCompanion<EmergencyInfoData> {
     required String id,
     this.bloodGroup = const Value.absent(),
     this.allergies = const Value.absent(),
+    this.allergiesSevere = const Value.absent(),
     this.conditions = const Value.absent(),
+    this.notes = const Value.absent(),
+    this.insuranceNumber = const Value.absent(),
+    this.nationalId = const Value.absent(),
+    this.healthCardNumber = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id);
@@ -3498,7 +3711,12 @@ class EmergencyInfoCompanion extends UpdateCompanion<EmergencyInfoData> {
     Expression<String>? id,
     Expression<String>? bloodGroup,
     Expression<String>? allergies,
+    Expression<bool>? allergiesSevere,
     Expression<String>? conditions,
+    Expression<String>? notes,
+    Expression<String>? insuranceNumber,
+    Expression<String>? nationalId,
+    Expression<String>? healthCardNumber,
     Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
   }) {
@@ -3506,7 +3724,12 @@ class EmergencyInfoCompanion extends UpdateCompanion<EmergencyInfoData> {
       if (id != null) 'id': id,
       if (bloodGroup != null) 'blood_group': bloodGroup,
       if (allergies != null) 'allergies': allergies,
+      if (allergiesSevere != null) 'allergies_severe': allergiesSevere,
       if (conditions != null) 'conditions': conditions,
+      if (notes != null) 'notes': notes,
+      if (insuranceNumber != null) 'insurance_number': insuranceNumber,
+      if (nationalId != null) 'national_id': nationalId,
+      if (healthCardNumber != null) 'health_card_number': healthCardNumber,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -3516,7 +3739,12 @@ class EmergencyInfoCompanion extends UpdateCompanion<EmergencyInfoData> {
     Value<String>? id,
     Value<String>? bloodGroup,
     Value<String>? allergies,
+    Value<bool>? allergiesSevere,
     Value<String>? conditions,
+    Value<String>? notes,
+    Value<String>? insuranceNumber,
+    Value<String>? nationalId,
+    Value<String>? healthCardNumber,
     Value<DateTime>? updatedAt,
     Value<int>? rowid,
   }) {
@@ -3524,7 +3752,12 @@ class EmergencyInfoCompanion extends UpdateCompanion<EmergencyInfoData> {
       id: id ?? this.id,
       bloodGroup: bloodGroup ?? this.bloodGroup,
       allergies: allergies ?? this.allergies,
+      allergiesSevere: allergiesSevere ?? this.allergiesSevere,
       conditions: conditions ?? this.conditions,
+      notes: notes ?? this.notes,
+      insuranceNumber: insuranceNumber ?? this.insuranceNumber,
+      nationalId: nationalId ?? this.nationalId,
+      healthCardNumber: healthCardNumber ?? this.healthCardNumber,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
     );
@@ -3542,8 +3775,23 @@ class EmergencyInfoCompanion extends UpdateCompanion<EmergencyInfoData> {
     if (allergies.present) {
       map['allergies'] = Variable<String>(allergies.value);
     }
+    if (allergiesSevere.present) {
+      map['allergies_severe'] = Variable<bool>(allergiesSevere.value);
+    }
     if (conditions.present) {
       map['conditions'] = Variable<String>(conditions.value);
+    }
+    if (notes.present) {
+      map['notes'] = Variable<String>(notes.value);
+    }
+    if (insuranceNumber.present) {
+      map['insurance_number'] = Variable<String>(insuranceNumber.value);
+    }
+    if (nationalId.present) {
+      map['national_id'] = Variable<String>(nationalId.value);
+    }
+    if (healthCardNumber.present) {
+      map['health_card_number'] = Variable<String>(healthCardNumber.value);
     }
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
@@ -3560,7 +3808,12 @@ class EmergencyInfoCompanion extends UpdateCompanion<EmergencyInfoData> {
           ..write('id: $id, ')
           ..write('bloodGroup: $bloodGroup, ')
           ..write('allergies: $allergies, ')
+          ..write('allergiesSevere: $allergiesSevere, ')
           ..write('conditions: $conditions, ')
+          ..write('notes: $notes, ')
+          ..write('insuranceNumber: $insuranceNumber, ')
+          ..write('nationalId: $nationalId, ')
+          ..write('healthCardNumber: $healthCardNumber, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -5830,7 +6083,12 @@ typedef $$EmergencyInfoTableCreateCompanionBuilder =
       required String id,
       Value<String> bloodGroup,
       Value<String> allergies,
+      Value<bool> allergiesSevere,
       Value<String> conditions,
+      Value<String> notes,
+      Value<String> insuranceNumber,
+      Value<String> nationalId,
+      Value<String> healthCardNumber,
       Value<DateTime> updatedAt,
       Value<int> rowid,
     });
@@ -5839,7 +6097,12 @@ typedef $$EmergencyInfoTableUpdateCompanionBuilder =
       Value<String> id,
       Value<String> bloodGroup,
       Value<String> allergies,
+      Value<bool> allergiesSevere,
       Value<String> conditions,
+      Value<String> notes,
+      Value<String> insuranceNumber,
+      Value<String> nationalId,
+      Value<String> healthCardNumber,
       Value<DateTime> updatedAt,
       Value<int> rowid,
     });
@@ -5868,8 +6131,33 @@ class $$EmergencyInfoTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<bool> get allergiesSevere => $composableBuilder(
+    column: $table.allergiesSevere,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<String> get conditions => $composableBuilder(
     column: $table.conditions,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get notes => $composableBuilder(
+    column: $table.notes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get insuranceNumber => $composableBuilder(
+    column: $table.insuranceNumber,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get nationalId => $composableBuilder(
+    column: $table.nationalId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get healthCardNumber => $composableBuilder(
+    column: $table.healthCardNumber,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -5903,8 +6191,33 @@ class $$EmergencyInfoTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get allergiesSevere => $composableBuilder(
+    column: $table.allergiesSevere,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get conditions => $composableBuilder(
     column: $table.conditions,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get notes => $composableBuilder(
+    column: $table.notes,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get insuranceNumber => $composableBuilder(
+    column: $table.insuranceNumber,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get nationalId => $composableBuilder(
+    column: $table.nationalId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get healthCardNumber => $composableBuilder(
+    column: $table.healthCardNumber,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -5934,8 +6247,31 @@ class $$EmergencyInfoTableAnnotationComposer
   GeneratedColumn<String> get allergies =>
       $composableBuilder(column: $table.allergies, builder: (column) => column);
 
+  GeneratedColumn<bool> get allergiesSevere => $composableBuilder(
+    column: $table.allergiesSevere,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<String> get conditions => $composableBuilder(
     column: $table.conditions,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get notes =>
+      $composableBuilder(column: $table.notes, builder: (column) => column);
+
+  GeneratedColumn<String> get insuranceNumber => $composableBuilder(
+    column: $table.insuranceNumber,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get nationalId => $composableBuilder(
+    column: $table.nationalId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get healthCardNumber => $composableBuilder(
+    column: $table.healthCardNumber,
     builder: (column) => column,
   );
 
@@ -5981,14 +6317,24 @@ class $$EmergencyInfoTableTableManager
                 Value<String> id = const Value.absent(),
                 Value<String> bloodGroup = const Value.absent(),
                 Value<String> allergies = const Value.absent(),
+                Value<bool> allergiesSevere = const Value.absent(),
                 Value<String> conditions = const Value.absent(),
+                Value<String> notes = const Value.absent(),
+                Value<String> insuranceNumber = const Value.absent(),
+                Value<String> nationalId = const Value.absent(),
+                Value<String> healthCardNumber = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => EmergencyInfoCompanion(
                 id: id,
                 bloodGroup: bloodGroup,
                 allergies: allergies,
+                allergiesSevere: allergiesSevere,
                 conditions: conditions,
+                notes: notes,
+                insuranceNumber: insuranceNumber,
+                nationalId: nationalId,
+                healthCardNumber: healthCardNumber,
                 updatedAt: updatedAt,
                 rowid: rowid,
               ),
@@ -5997,14 +6343,24 @@ class $$EmergencyInfoTableTableManager
                 required String id,
                 Value<String> bloodGroup = const Value.absent(),
                 Value<String> allergies = const Value.absent(),
+                Value<bool> allergiesSevere = const Value.absent(),
                 Value<String> conditions = const Value.absent(),
+                Value<String> notes = const Value.absent(),
+                Value<String> insuranceNumber = const Value.absent(),
+                Value<String> nationalId = const Value.absent(),
+                Value<String> healthCardNumber = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => EmergencyInfoCompanion.insert(
                 id: id,
                 bloodGroup: bloodGroup,
                 allergies: allergies,
+                allergiesSevere: allergiesSevere,
                 conditions: conditions,
+                notes: notes,
+                insuranceNumber: insuranceNumber,
+                nationalId: nationalId,
+                healthCardNumber: healthCardNumber,
                 updatedAt: updatedAt,
                 rowid: rowid,
               ),

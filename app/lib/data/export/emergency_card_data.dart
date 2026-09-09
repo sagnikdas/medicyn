@@ -22,22 +22,42 @@ class EmergencyCardData {
     required this.patientName,
     required this.bloodGroup,
     required this.allergies,
+    required this.allergiesSevere,
     required this.conditions,
+    required this.notes,
+    required this.insuranceNumber,
+    required this.nationalId,
+    required this.healthCardNumber,
     required this.medicines,
+    required this.caregiverName,
     required this.caregiverPhone,
+    required this.updatedAt,
   });
 
   final DateTime generatedAt;
   final String? patientName;
   final String bloodGroup;
   final String allergies;
+  final bool allergiesSevere;
   final String conditions;
+  final String notes;
+  final String insuranceNumber;
+  final String nationalId;
+  final String healthCardNumber;
   final List<EmergencyMedicineRow> medicines;
+
+  /// Best-effort display name for the person on the other end of the active
+  /// care link, resolved the same way [caregiverPhone] is.
+  final String? caregiverName;
 
   /// Dialable, or null if there is no active care link or it carries no
   /// number. Read from the *caregiver's* stored number, same as the Family
   /// screen's own "Call them" button.
   final String? caregiverPhone;
+
+  /// When the emergency-info fields (blood group, allergies, conditions,
+  /// notes, IDs) were last edited. Null when nothing has ever been saved.
+  final DateTime? updatedAt;
 
   static Future<EmergencyCardData> fromDatabase(
     AppDatabase db, {
@@ -54,6 +74,7 @@ class EmergencyCardData {
     ]..sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
 
     String? patientName;
+    String? caregiverName;
     String? caregiverPhone;
     try {
       final userId = AuthService.instance.currentUser?.id;
@@ -62,10 +83,16 @@ class EmergencyCardData {
         patientName = _printableName(profile?.displayName);
         final link = await CareService.instance.currentLink();
         caregiverPhone = dialablePhone(link?.phoneToCall(userId));
+        final otherPartyId = link?.otherPartyId(userId);
+        if (otherPartyId != null) {
+          caregiverName = _printableName(
+            await CareService.instance.displayName(otherPartyId),
+          );
+        }
       }
     } catch (_) {
       // Best-effort: the card is still useful with just local data even
-      // when the network call for the caregiver's number fails.
+      // when the network call for the caregiver's details fails.
     }
 
     return EmergencyCardData(
@@ -73,9 +100,16 @@ class EmergencyCardData {
       patientName: patientName,
       bloodGroup: info?.bloodGroup.trim() ?? '',
       allergies: info?.allergies.trim() ?? '',
+      allergiesSevere: info?.allergiesSevere ?? false,
       conditions: info?.conditions.trim() ?? '',
+      notes: info?.notes.trim() ?? '',
+      insuranceNumber: info?.insuranceNumber.trim() ?? '',
+      nationalId: info?.nationalId.trim() ?? '',
+      healthCardNumber: info?.healthCardNumber.trim() ?? '',
       medicines: medicines,
+      caregiverName: caregiverName,
       caregiverPhone: caregiverPhone,
+      updatedAt: info?.updatedAt,
     );
   }
 }

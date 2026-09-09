@@ -9,11 +9,18 @@ void main() {
       patientName: 'Asha Kapoor',
       bloodGroup: 'O+',
       allergies: 'Penicillin, peanuts',
+      allergiesSevere: true,
       conditions: 'Type 2 diabetes',
+      notes: 'Pacemaker fitted 2022',
+      insuranceNumber: 'INS-4471',
+      nationalId: '1234 5678 9012',
+      healthCardNumber: 'HC-88213',
       medicines: const [
         EmergencyMedicineRow(title: 'Metformin 500mg', dose: '1 tablet'),
       ],
+      caregiverName: 'Rohit Kapoor',
       caregiverPhone: '+919876543210',
+      updatedAt: DateTime(2026, 9, 1),
     );
 
     final bytes = await buildEmergencyCardPdf(data);
@@ -28,9 +35,16 @@ void main() {
       patientName: null,
       bloodGroup: '',
       allergies: '',
+      allergiesSevere: false,
       conditions: '',
+      notes: '',
+      insuranceNumber: '',
+      nationalId: '',
+      healthCardNumber: '',
       medicines: const [],
+      caregiverName: null,
       caregiverPhone: null,
+      updatedAt: null,
     );
 
     final bytes = await buildEmergencyCardPdf(data);

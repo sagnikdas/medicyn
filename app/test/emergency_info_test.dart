@@ -63,6 +63,41 @@ void main() {
     expect(info.conditions, '');
   });
 
+  test('upsertEmergencyInfo stores the severity flag and ID fields', () async {
+    await db.upsertEmergencyInfo(
+      bloodGroup: 'B+',
+      allergies: 'Bee stings',
+      allergiesSevere: true,
+      conditions: '',
+      notes: 'Pacemaker fitted 2022',
+      insuranceNumber: 'INS-4471',
+      nationalId: '1234 5678 9012',
+      healthCardNumber: 'HC-88213',
+    );
+
+    final info = await db.emergencyInfoOnce();
+    expect(info!.allergiesSevere, isTrue);
+    expect(info.notes, 'Pacemaker fitted 2022');
+    expect(info.insuranceNumber, 'INS-4471');
+    expect(info.nationalId, '1234 5678 9012');
+    expect(info.healthCardNumber, 'HC-88213');
+  });
+
+  test('the severity flag and new text fields default safely', () async {
+    await db.upsertEmergencyInfo(
+      bloodGroup: 'B+',
+      allergies: '',
+      conditions: '',
+    );
+
+    final info = await db.emergencyInfoOnce();
+    expect(info!.allergiesSevere, isFalse);
+    expect(info.notes, '');
+    expect(info.insuranceNumber, '');
+    expect(info.nationalId, '');
+    expect(info.healthCardNumber, '');
+  });
+
   test('watchEmergencyInfo emits after a save', () async {
     final emissions = <EmergencyInfoData?>[];
     final sub = db.watchEmergencyInfo().listen(emissions.add);

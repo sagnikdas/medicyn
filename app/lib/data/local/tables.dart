@@ -25,7 +25,22 @@ class EmergencyInfo extends Table {
   TextColumn get id => text()();
   TextColumn get bloodGroup => text().withDefault(const Constant(''))();
   TextColumn get allergies => text().withDefault(const Constant(''))();
+  // True marks an allergy severe/anaphylaxis-risk rather than mild, so the
+  // card can call it out instead of burying it in the same plain text as
+  // everything else.
+  BoolColumn get allergiesSevere =>
+      boolean().withDefault(const Constant(false))();
   TextColumn get conditions => text().withDefault(const Constant(''))();
+  // Anything that doesn't fit the fields above -- pacemaker, pregnant, DNR
+  // on file -- for a first responder who only has seconds to read this.
+  TextColumn get notes => text().withDefault(const Constant(''))();
+  TextColumn get insuranceNumber => text().withDefault(const Constant(''))();
+  // Deliberately one generic field rather than a country-gated one: the app
+  // has no reliable signal for which country's ID a person means (Aadhaar,
+  // SSN, NHS number, ...), so the edit form labels this "National ID" and
+  // lets the person write whichever applies.
+  TextColumn get nationalId => text().withDefault(const Constant(''))();
+  TextColumn get healthCardNumber => text().withDefault(const Constant(''))();
   DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
 
   @override
