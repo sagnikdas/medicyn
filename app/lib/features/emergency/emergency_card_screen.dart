@@ -86,12 +86,20 @@ class _EmergencyCardScreenState extends State<EmergencyCardScreen> {
         final link = await CareService.instance.currentLink().timeout(
           _caregiverLookupTimeout,
         );
-        phone = dialablePhone(link?.phoneToCall(userId));
-        final otherPartyId = link?.otherPartyId(userId);
-        if (otherPartyId != null) {
-          name = await CareService.instance
-              .displayName(otherPartyId)
-              .timeout(_caregiverLookupTimeout);
+        // otherPartyId/phoneToCall return "whoever is on the other end,"
+        // which is right for the Family screen's "call them" button but
+        // wrong here: if this device's owner is the *caregiver* side of
+        // the link, the other party is the patient they help, not this
+        // person's own caregiver. Only the patient side has a caregiver to
+        // show on their own emergency card.
+        if (link != null && link.isPatient(userId)) {
+          phone = dialablePhone(link.phoneToCall(userId));
+          final otherPartyId = link.otherPartyId(userId);
+          if (otherPartyId != null) {
+            name = await CareService.instance
+                .displayName(otherPartyId)
+                .timeout(_caregiverLookupTimeout);
+          }
         }
       }
     } catch (_) {
