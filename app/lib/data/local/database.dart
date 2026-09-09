@@ -115,11 +115,26 @@ class AppDatabase extends _$AppDatabase {
         await m.createTable(emergencyInfo);
       }
       if (from == 9) {
-        await m.addColumn(emergencyInfo, emergencyInfo.allergiesSevere);
-        await m.addColumn(emergencyInfo, emergencyInfo.notes);
-        await m.addColumn(emergencyInfo, emergencyInfo.insuranceNumber);
-        await m.addColumn(emergencyInfo, emergencyInfo.nationalId);
-        await m.addColumn(emergencyInfo, emergencyInfo.healthCardNumber);
+        // Idempotent: this app opens the same file from more than one
+        // isolate (the main UI isolate and the notification/FCM background
+        // isolate, see the AppDatabase doc comment below), and two of them
+        // racing this migration on the same cold start can both decide they
+        // need to run it. A plain addColumn crashes the second one with
+        // "duplicate column name" -- which fails the whole database open,
+        // for every screen, not just this table -- so check first.
+        await _addColumnIfMissing(m, emergencyInfo, emergencyInfo.allergiesSevere);
+        await _addColumnIfMissing(m, emergencyInfo, emergencyInfo.notes);
+        await _addColumnIfMissing(
+          m,
+          emergencyInfo,
+          emergencyInfo.insuranceNumber,
+        );
+        await _addColumnIfMissing(m, emergencyInfo, emergencyInfo.nationalId);
+        await _addColumnIfMissing(
+          m,
+          emergencyInfo,
+          emergencyInfo.healthCardNumber,
+        );
       }
     },
   );
@@ -195,6 +210,26 @@ class AppDatabase extends _$AppDatabase {
       plainColumns: ['dose_log_id', 'note', 'pending_sync'],
       dateTimeColumns: ['created_at', 'updated_at'],
     );
+  }
+
+  /// [Migrator.addColumn], but a no-op if the column is already there.
+  /// SQLite's `ALTER TABLE ADD COLUMN` isn't idempotent on its own -- a
+  /// second attempt throws "duplicate column name" -- and that's not just
+  /// theoretical here: this app opens the same encrypted file from more
+  /// than one isolate (see [AppDatabase]'s doc comment), so two isolates
+  /// racing a cold start can both decide the same migration still needs to
+  /// run.
+  Future<void> _addColumnIfMissing(
+    Migrator m,
+    TableInfo table,
+    GeneratedColumn column,
+  ) async {
+    final existing = await customSelect(
+      "SELECT 1 FROM pragma_table_info('${table.actualTableName}') WHERE name = ?",
+      variables: [Variable(column.name)],
+    ).get();
+    if (existing.isNotEmpty) return;
+    await m.addColumn(table, column);
   }
 
   // --- Medicines ---------------------------------------------------------
