@@ -17,6 +17,7 @@ import '../../data/remote/sync_service.dart';
 import '../../data/remote/sync_status.dart';
 import '../auth/auth_service.dart';
 import '../capture_ocr/ocr_capture_screen.dart';
+import '../capture_prescription/pdf_prescription_capture_screen.dart';
 import '../care/care_service.dart';
 import '../history/dose_history_screen.dart';
 import '../notification_engine/missed_doses.dart';
@@ -26,6 +27,7 @@ import '../notification_engine/notification_service.dart';
 import '../notification_engine/reminder_reliability_screen.dart';
 import '../push/push_service.dart';
 import '../review_edit/review_edit_screen.dart';
+import '../review_prescription/prescription_review_screen.dart';
 import '../voice_capture/voice_capture_screen.dart';
 import 'android_today_screen.dart';
 import 'calendar_collapse_sliver.dart';
@@ -39,7 +41,7 @@ import 'today_care_events.dart';
 
 enum _ReminderDisposition { stop, deleteHistory }
 
-enum _CaptureMethod { scan, speak, manual }
+enum _CaptureMethod { scan, speak, manual, prescriptionPhoto, prescriptionPdf }
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
@@ -400,6 +402,20 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       Navigator.pop(sheetContext, _CaptureMethod.manual),
                   child: const Text('Enter manually'),
                 ),
+                CupertinoActionSheetAction(
+                  onPressed: () => Navigator.pop(
+                    sheetContext,
+                    _CaptureMethod.prescriptionPhoto,
+                  ),
+                  child: const Text('Scan a prescription'),
+                ),
+                CupertinoActionSheetAction(
+                  onPressed: () => Navigator.pop(
+                    sheetContext,
+                    _CaptureMethod.prescriptionPdf,
+                  ),
+                  child: const Text('Upload a prescription PDF'),
+                ),
               ],
               cancelButton: CupertinoActionSheetAction(
                 onPressed: () => Navigator.pop(sheetContext),
@@ -463,6 +479,34 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       onTap: () =>
                           Navigator.pop(sheetContext, _CaptureMethod.manual),
                     ),
+                    const Divider(height: 24),
+                    Text(
+                      'PRESCRIPTION',
+                      style: Theme.of(sheetContext).textTheme.labelSmall,
+                    ),
+                    const SizedBox(height: 8),
+                    ListTile(
+                      minTileHeight: 56,
+                      leading: const Icon(Icons.receipt_long_outlined),
+                      title: const Text('Scan a prescription'),
+                      subtitle: const Text(
+                        'Medicines, scans and therapy in one document',
+                      ),
+                      onTap: () => Navigator.pop(
+                        sheetContext,
+                        _CaptureMethod.prescriptionPhoto,
+                      ),
+                    ),
+                    ListTile(
+                      minTileHeight: 56,
+                      leading: const Icon(Icons.picture_as_pdf_outlined),
+                      title: const Text('Upload a prescription PDF'),
+                      subtitle: const Text('For a multi-page document'),
+                      onTap: () => Navigator.pop(
+                        sheetContext,
+                        _CaptureMethod.prescriptionPdf,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -501,6 +545,37 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       case _CaptureMethod.manual:
         await navigator.push(
           MaterialPageRoute(builder: (_) => ReviewEditScreen(db: widget.db)),
+        );
+      case _CaptureMethod.prescriptionPhoto:
+        final ocrText = await navigator.push<String>(
+          MaterialPageRoute(
+            builder: (_) => const OcrCaptureScreen(),
+          ),
+        );
+        if (ocrText == null || !mounted) return;
+        // '' is OcrCaptureScreen's "Skip -- enter manually" -- the same
+        // intent the single-medicine scan case falls through to a form
+        // for, so this does too, rather than showing a "could not find
+        // anything" message for a page the user never asked to be parsed.
+        await navigator.push(
+          MaterialPageRoute(
+            builder: (_) => ocrText.isEmpty
+                ? ReviewEditScreen(db: widget.db)
+                : PrescriptionReviewScreen(ocrText: ocrText, db: widget.db),
+          ),
+        );
+      case _CaptureMethod.prescriptionPdf:
+        final ocrText = await navigator.push<String>(
+          MaterialPageRoute(
+            builder: (_) => const PdfPrescriptionCaptureScreen(),
+          ),
+        );
+        if (ocrText == null || !mounted) return;
+        await navigator.push(
+          MaterialPageRoute(
+            builder: (_) =>
+                PrescriptionReviewScreen(ocrText: ocrText, db: widget.db),
+          ),
         );
     }
   }
