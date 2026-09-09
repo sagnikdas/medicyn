@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'widgets/medicyn_layout.dart';
+
 /// The privacy policy bundled with the app. `docs/compliance/PRIVACY.md` in
 /// the repo is a symlink to this file, so there is one source of truth. The
 /// GitHub blob URL is not used: the repository is private, so that link
@@ -29,30 +31,33 @@ class PrivacyPolicyScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Privacy policy')),
       body: SafeArea(
-        child: FutureBuilder<String>(
-          future: rootBundle.loadString(privacyPolicyAsset),
-          builder: (context, snapshot) {
-            if (snapshot.hasError) {
-              return Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Text(
-                    'Could not load the privacy policy.',
-                    style: text.bodyLarge,
+        child: MedicynContent(
+          child: FutureBuilder<String>(
+            future: rootBundle.loadString(privacyPolicyAsset),
+            builder: (context, snapshot) {
+              if (snapshot.hasError) {
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Text(
+                      'Could not load the privacy policy.',
+                      style: text.bodyLarge,
+                    ),
                   ),
-                ),
+                );
+              }
+              if (!snapshot.hasData) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              return ListView(
+                padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
+                children: [
+                  for (final block in _policyBlocks(snapshot.data!, text))
+                    block,
+                ],
               );
-            }
-            if (!snapshot.hasData) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            return ListView(
-              padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
-              children: [
-                for (final block in _policyBlocks(snapshot.data!, text)) block,
-              ],
-            );
-          },
+            },
+          ),
         ),
       ),
     );
@@ -72,14 +77,26 @@ List<Widget> _policyBlocks(String markdown, TextTheme text) {
     }
     if (line.startsWith('# ')) {
       widgets.add(
-        SelectableText(_unbold(line.substring(2)), style: text.headlineSmall),
+        Semantics(
+          header: true,
+          child: SelectableText(
+            _unbold(line.substring(2)),
+            style: text.headlineSmall,
+          ),
+        ),
       );
       continue;
     }
     if (line.startsWith('## ')) {
       widgets.add(const SizedBox(height: 8));
       widgets.add(
-        SelectableText(_unbold(line.substring(3)), style: text.titleMedium),
+        Semantics(
+          header: true,
+          child: SelectableText(
+            _unbold(line.substring(3)),
+            style: text.titleMedium,
+          ),
+        ),
       );
       continue;
     }

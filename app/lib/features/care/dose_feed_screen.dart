@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:timezone/timezone.dart' as tz;
 
 import '../../core/app_navigation.dart';
+import '../../core/widgets/medicyn_chrome.dart';
 import '../../core/widgets/medicyn_layout.dart';
 import '../../core/widgets/medicyn_motion.dart';
 import '../../data/local/database.dart';
@@ -430,51 +431,49 @@ class _DoseEventCard extends StatelessWidget {
     final text = Theme.of(context).textTheme;
     final punctuality = event.punctuality;
     final attribution = event.attributionNote(patientId);
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(visuals.icon, color: visuals.color, size: 32),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    event.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: text.titleMedium,
-                  ),
+    return AmbientCard(
+      padding: const EdgeInsets.all(14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(visuals.icon, color: visuals.color, size: 32),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  event.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: text.titleMedium,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${visuals.label} · due ${_clock(clockTime)}',
+                  style: text.bodyMedium?.copyWith(color: visuals.color),
+                ),
+                if (punctuality != null) ...[
+                  const SizedBox(height: 2),
+                  Text(punctuality, style: text.bodySmall),
+                ],
+                if (event.doseAmount.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(event.doseAmount, style: text.bodySmall),
+                ],
+                if (attribution != null) ...[
                   const SizedBox(height: 2),
                   Text(
-                    '${visuals.label} · due ${_clock(clockTime)}',
-                    style: text.bodyMedium?.copyWith(color: visuals.color),
-                  ),
-                  if (punctuality != null) ...[
-                    const SizedBox(height: 2),
-                    Text(punctuality, style: text.bodySmall),
-                  ],
-                  if (event.doseAmount.isNotEmpty) ...[
-                    const SizedBox(height: 2),
-                    Text(event.doseAmount, style: text.bodySmall),
-                  ],
-                  if (attribution != null) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      attribution,
-                      style: text.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.outline,
-                      ),
+                    attribution,
+                    style: text.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.outline,
                     ),
-                  ],
+                  ),
                 ],
-              ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
