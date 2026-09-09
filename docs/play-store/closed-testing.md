@@ -239,8 +239,11 @@ rule in Console; Google has changed it before.
     6. Encrypted in transit: **Yes**. Deletion: **Yes**. Sold: **No**.
        Account not required: **Yes** (Use without an account).
     7. Paste the **public account-deletion URL** from step 5.
-    8. If `app/lib/core/sentry_config.dart` still has an empty DSN, do
-       **not** declare crash-reporting collection.
+    8. If the release build has no `android/app/google-services.json` (crash
+       reporting stays off — see `app/README.md`'s Crash reporting section),
+       do **not** declare crash-reporting collection. If it does, declare
+       Crash logs under App info and performance, per
+       `PLAY-DATA-SAFETY.md`.
 
 34. Health apps: medication reminder; stores what the user entered; **not**
     a medical device, **not** a clinical decision system, **not** connected

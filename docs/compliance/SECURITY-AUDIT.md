@@ -189,6 +189,18 @@ patient→caregiver arm), `can_access_user_data(null)`, the one-live-link
 unique indexes, and `notify-care` authorization branches. `notify-care`
 redeployed to hosted so the extracted helper matches production.
 
+**Crash reporting swapped from Sentry to Firebase Crashlytics.** The
+"Checked and found clean" note below about the empty Sentry DSN
+(`SECURITY-AUDIT.md:939`) describes the codebase as it was on 2026-08-19 and
+is not rewritten, per this document's own convention — but Sentry is gone
+from the binary as of this change, replaced by `firebase_crashlytics`. Same
+posture as before: gated on `google-services.json` /
+`GoogleService-Info.plist` being present, absent by default, and CI does not
+currently materialize either file for a release build — so, as with Sentry's
+DSN, nothing has actually been transmitted from a shipped artifact yet. See
+`ROPA.md` B7 and `app/README.md`'s Crash reporting section for the current
+state.
+
 ---
 
 Everything above is what changed. The finding sections below still describe

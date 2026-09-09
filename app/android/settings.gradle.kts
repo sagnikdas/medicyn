@@ -26,6 +26,9 @@ plugins {
     // git-ignored) still builds — the plugin fails the build outright if it is
     // applied with no config file to read.
     id("com.google.gms.google-services") version "4.4.4" apply false
+    // Uploads Crashlytics mapping/symbol info at build time. Same conditional
+    // apply as google-services above, and for the same reason.
+    id("com.google.firebase.crashlytics") version "3.0.6" apply false
 }
 
 include(":app")

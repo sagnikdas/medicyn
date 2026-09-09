@@ -57,10 +57,6 @@
 -keep,allowobfuscation,allowshrinking class * extends com.google.gson.reflect.TypeToken
 -dontwarn sun.misc.**
 
-# Sentry (DSN empty by default; JNI + stack traces). The plugin also ships
-# consumer rules; keep the package so a later DSN still works.
--keep class io.sentry.** { *; }
-
 # Drift / sqlite (encryption is sqlite3mc, not sqlcipher_flutter_libs).
 -keep class androidx.sqlite.** { *; }
 -keep class io.requery.android.database.** { *; }

@@ -15,7 +15,8 @@ a hacker.
 
 There is no SIEM and no 24/7 monitor. Detection is:
 
-- Operator noticing (SQL, Sentry if it is ever enabled, user email).
+- Operator noticing (SQL, Firebase Crashlytics once it is live in a shipped
+  build, user email).
 - Adversarial tests and migrations that assert invariants (the timestamp
   fix caught itself with `scheduled_at > now()`).
 - A user or caregiver reporting a wrong time, a false missed dose, or an

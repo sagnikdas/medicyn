@@ -343,11 +343,27 @@ the account or the code is wrong.
 > for every release SHA-1 (upload key, Play App Signing) the next time a
 > release build is cut — those clients are just as orphaned by a rename.
 
-## Crash reporting (Sentry)
+## Crash reporting (Firebase Crashlytics)
 
-Crash reporting uses `sentry_flutter`, configured via
-`lib/core/sentry_config.dart`. `SentryConfig.dsn` defaults to an empty
-string, in which case `SentryFlutter.init` is a no-op (no crash capture, no
-network calls) and the app behaves exactly as it would without Sentry. To
-enable it, set a real DSN in `SentryConfig.dsn` (or wire it up via a
-build-time define) before shipping a release build.
+Crash reporting uses `firebase_crashlytics`, wired in
+`lib/core/telemetry.dart` (`MedicynTelemetry.init`, called first thing in
+`main()`). It rides the same gate as push: both need
+`android/app/google-services.json` (Android) /
+`ios/Runner/GoogleService-Info.plist` (iOS), both git-ignored and absent by
+default. Without them, `Firebase.initializeApp()` throws, `MedicynTelemetry`
+stays unavailable, and every crash-reporting call becomes a silent no-op —
+the app behaves exactly as it would without Crashlytics at all, the same way
+it already behaves without push.
+
+Unlike Sentry's DSN, there is no separate secret to wire up: whatever build
+has the config file(s) present has crash reporting live. CI does not
+currently materialize either config file for release builds — see the
+Firebase Console setup notes for what an operator needs to do before a real
+release actually reports crashes.
+
+On Android, the Crashlytics Gradle plugin (`app/android/settings.gradle.kts`,
+`app/android/app/build.gradle.kts`) applies conditionally alongside
+`google-services`, and uploads mapping/symbol info automatically on a
+release build. On iOS, dSYM upload for symbolicated native crashes needs an
+Xcode "Run Script" build phase — not something a config file alone
+provides; see the Firebase Console steps for the exact script.

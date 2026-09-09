@@ -44,11 +44,9 @@ jobs:
           } > key.properties
       - name: Build signed AAB
         working-directory: app
-        env:
-          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
         run: |
           flutter pub get
-          flutter build appbundle --release --dart-define=SENTRY_DSN="$SENTRY_DSN"
+          flutter build appbundle --release
       - uses: actions/upload-artifact@v4
         with:
           name: medicyn-release-aab

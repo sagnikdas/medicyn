@@ -15,9 +15,9 @@ controller. There is no DPA to sign for it. Consent (`google_speech`) or
 | Supabase | Processor | Account, medicines, schedules, dose logs, contests, consents, profiles, care links, alerts, device tokens | [Supabase DPA](https://supabase.com/legal/dpa) (includes SCCs) | Supabase Dashboard → Organization → Legal / DPA | No |
 | Anthropic | Processor (confirm in writing) | OCR text + transcript, ≤ 4,000 characters | Commercial DPA; **request zero data retention** | Anthropic Console / sales legal | No |
 | Google (Firebase Cloud Messaging) | Processor for delivery | FCM token + notification body (display name, medicine, due time) | [Google Cloud DPA](https://cloud.google.com/terms/data-processing-addendum) / Firebase | Google Cloud Console → Account → Legal / GDPR | No |
+| Google (Firebase Crashlytics) | Processor for crash diagnostics | Stack trace, app version, device manufacturer/OS version, anonymous install id | Same [Google Cloud DPA](https://cloud.google.com/terms/data-processing-addendum) / Firebase as the FCM row — one acceptance covers both | Google Cloud Console → Account → Legal / GDPR | No |
 | Google (speech) | **Controller** | Raw audio | None available | — | N/A |
 | Google (Sign-In, Play) | Independent controller | Account identity, install / store data | Google's own policies | Disclose in `PRIVACY.md` (done) | N/A |
-| Sentry | Not processing | Nothing (SDK off) | Would need a DPA before enable | — | N/A |
 
 ## Operator steps (do in this order)
 
@@ -26,7 +26,7 @@ controller. There is no DPA to sign for it. Consent (`google_speech`) or
    placeholder company. Keep a PDF of the executed copy next to this file
    (do not commit it if it contains signatures you do not want in git).
 2. **Google Cloud / Firebase** for project `twybepxnqayypzljhcnx`. Accept
-   the Cloud DPA. FCM is in scope.
+   the Cloud DPA. FCM and Crashlytics are both in scope.
 3. **Anthropic.** Execute the commercial DPA. Email legal and ask, in
    writing, for **zero data retention** on API inputs for the
    `parse-medicine` workspace, and for written confirmation that Anthropic

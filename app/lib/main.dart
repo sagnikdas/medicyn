@@ -1,13 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/app_navigation.dart';
 import 'core/app_settings.dart';
 import 'core/motion.dart';
-import 'core/sentry_config.dart';
 import 'core/supabase_init.dart';
 import 'core/theme.dart';
 import 'core/telemetry.dart';
@@ -24,37 +22,31 @@ import 'features/push/push_service.dart';
 import 'features/shell/app_shell.dart';
 
 void main() async {
-  // With SentryConfig.dsn empty (the default), SentryFlutter.init disables
-  // the SDK entirely — no crash capture, no network calls — so this is a
-  // no-op wrapper until a real DSN is configured.
-  await SentryFlutter.init(
-    (options) {
-      options.dsn = SentryConfig.dsn;
-      options.beforeSend = redactSentryEvent;
-    },
-    appRunner: () async {
-      WidgetsFlutterBinding.ensureInitialized();
-      // Supabase→AppSettings is a real dependency (AppSettings.init reads
-      // the signed-in user id), but nothing ties that pair to
-      // NotificationService.init (timezone data + local-notifications
-      // plugin) or PushService.init (Firebase) — each was already
-      // independently required to finish before runApp, just not before
-      // *each other*. Running the three chains concurrently instead of one
-      // after another cuts real wall-clock time off the blank screen before
-      // the first frame.
-      await Future.wait([
-        _initSupabaseAndSettings(),
-        NotificationService.instance.init(),
-        PushService.instance.init(),
-      ]);
-      // Must happen after NotificationService.init above — the plugin has
-      // to be initialized first to answer getNotificationAppLaunchDetails —
-      // and before runApp.
-      final launch = await NotificationService.instance
-          .consumeLaunchNotificationResponse();
-      runApp(MedicynApp(launchNotification: launch));
-    },
-  );
+  WidgetsFlutterBinding.ensureInitialized();
+  // Brings up Firebase and arms Crashlytics's error hooks before anything
+  // else runs, so a crash in the concurrent init block below is still
+  // captured. A no-op when Firebase is unconfigured — see
+  // MedicynTelemetry.init.
+  await MedicynTelemetry.instance.init();
+  // Supabase→AppSettings is a real dependency (AppSettings.init reads
+  // the signed-in user id), but nothing ties that pair to
+  // NotificationService.init (timezone data + local-notifications
+  // plugin) or PushService.init (Firebase) — each was already
+  // independently required to finish before runApp, just not before
+  // *each other*. Running the three chains concurrently instead of one
+  // after another cuts real wall-clock time off the blank screen before
+  // the first frame.
+  await Future.wait([
+    _initSupabaseAndSettings(),
+    NotificationService.instance.init(),
+    PushService.instance.init(),
+  ]);
+  // Must happen after NotificationService.init above — the plugin has
+  // to be initialized first to answer getNotificationAppLaunchDetails —
+  // and before runApp.
+  final launch = await NotificationService.instance
+      .consumeLaunchNotificationResponse();
+  runApp(MedicynApp(launchNotification: launch));
 }
 
 Future<void> _initSupabaseAndSettings() async {
