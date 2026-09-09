@@ -75,7 +75,12 @@ void main() {
     await db.upsertEmergencyInfo(
       bloodGroup: 'O+',
       allergies: 'Penicillin',
+      allergiesSevere: true,
       conditions: 'Type 2 diabetes',
+      notes: 'Pacemaker fitted 2022',
+      insuranceNumber: 'INS-4471',
+      nationalId: '1234 5678 9012',
+      healthCardNumber: 'HC-88213',
     );
     final export = await DataExportService(
       db,
@@ -83,7 +88,12 @@ void main() {
 
     expect(export['emergency_info']['blood_group'], 'O+');
     expect(export['emergency_info']['allergies'], 'Penicillin');
+    expect(export['emergency_info']['allergies_severe'], isTrue);
     expect(export['emergency_info']['conditions'], 'Type 2 diabetes');
+    expect(export['emergency_info']['notes'], 'Pacemaker fitted 2022');
+    expect(export['emergency_info']['insurance_number'], 'INS-4471');
+    expect(export['emergency_info']['national_id'], '1234 5678 9012');
+    expect(export['emergency_info']['health_card_number'], 'HC-88213');
   });
 
   test('works with no account and still includes local consents', () async {

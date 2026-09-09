@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/widgets/medicyn_layout.dart';
 import '../../data/export/emergency_card_export_service.dart';
 import '../../data/local/database.dart';
 import '../auth/auth_service.dart';
@@ -169,127 +170,154 @@ class _EmergencyCardScreenState extends State<EmergencyCardScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Emergency card')),
-      body: StreamBuilder<EmergencyInfoData?>(
-        stream: widget.db.watchEmergencyInfo(),
-        builder: (context, infoSnapshot) {
-          final info = infoSnapshot.data;
-          return ListView(
-            padding: const EdgeInsets.all(20),
-            children: [
-              _line(
-                'Blood group',
-                (info?.bloodGroup.trim().isNotEmpty ?? false)
-                    ? info!.bloodGroup
-                    : 'Not set',
-              ),
-              _line(
-                'Allergies',
-                (info?.allergies.trim().isNotEmpty ?? false)
-                    ? info!.allergies
-                    : 'Not set',
-              ),
-              _line(
-                'Allergies severe',
-                (info?.allergiesSevere ?? false) ? 'Yes' : 'No',
-              ),
-              _line(
-                'Conditions',
-                (info?.conditions.trim().isNotEmpty ?? false)
-                    ? info!.conditions
-                    : 'Not set',
-              ),
-              _line(
-                'Notes',
-                (info?.notes.trim().isNotEmpty ?? false)
-                    ? info!.notes
-                    : 'Not set',
-              ),
-              _line(
-                'Insurance number',
-                (info?.insuranceNumber.trim().isNotEmpty ?? false)
-                    ? info!.insuranceNumber
-                    : 'Not set',
-              ),
-              _line(
-                'National ID (Aadhaar / SSN / etc.)',
-                (info?.nationalId.trim().isNotEmpty ?? false)
-                    ? info!.nationalId
-                    : 'Not set',
-              ),
-              _line(
-                'Health card no.',
-                (info?.healthCardNumber.trim().isNotEmpty ?? false)
-                    ? info!.healthCardNumber
-                    : 'Not set',
-              ),
-              _line(
-                'Updated',
-                info?.updatedAt != null
-                    ? _shortDate(info!.updatedAt)
-                    : 'Not set up yet',
-              ),
-              const SizedBox(height: 12),
-              TextButton(
-                onPressed: () => _edit(info),
-                child: const Text('Edit'),
-              ),
-              const SizedBox(height: 20),
-              _line(
-                "Caregiver's number",
-                _loadingPhone
-                    ? 'Loading…'
-                    : (_caregiverPhone ?? 'No number on file.'),
-              ),
-              if (_caregiverName != null)
-                _line('Caregiver name', _caregiverName!),
-              if (_caregiverPhone != null)
-                TextButton(
-                  onPressed: () => openDialer(_caregiverPhone!),
-                  child: const Text('Call'),
-                ),
-              const SizedBox(height: 20),
-              StreamBuilder<List<ScheduleWithMedicine>>(
-                stream: widget.db.watchActiveSchedules(),
-                builder: (context, medsSnapshot) {
-                  final items = medsSnapshot.data ?? const [];
-                  return _line(
-                    'Current medicines',
-                    items.isEmpty
-                        ? 'No medicines on this device.'
-                        : items
-                              .map(
-                                (item) =>
-                                    item.medicine.doseAmount.trim().isEmpty
-                                    ? medicineTitle(item.medicine)
-                                    : '${medicineTitle(item.medicine)} - ${item.medicine.doseAmount}',
-                              )
-                              .join('\n'),
-                  );
-                },
-              ),
-              const SizedBox(height: 20),
-              TextButton(
-                onPressed: _sharing ? null : _share,
-                child: Text(_sharing ? 'Preparing…' : 'Print or share'),
-              ),
-            ],
-          );
-        },
+      body: SafeArea(
+        child: MedicynContent(
+          child: StreamBuilder<EmergencyInfoData?>(
+            stream: widget.db.watchEmergencyInfo(),
+            builder: (context, infoSnapshot) {
+              final info = infoSnapshot.data;
+              return ListView(
+                padding: const EdgeInsets.all(20),
+                children: [
+                  _line(
+                    context,
+                    'Blood group',
+                    (info?.bloodGroup.trim().isNotEmpty ?? false)
+                        ? info!.bloodGroup
+                        : 'Not set',
+                  ),
+                  _line(
+                    context,
+                    'Allergies',
+                    (info?.allergies.trim().isNotEmpty ?? false)
+                        ? info!.allergies
+                        : 'Not set',
+                  ),
+                  _line(
+                    context,
+                    'Allergies severe',
+                    (info?.allergiesSevere ?? false) ? 'Yes' : 'No',
+                  ),
+                  _line(
+                    context,
+                    'Conditions',
+                    (info?.conditions.trim().isNotEmpty ?? false)
+                        ? info!.conditions
+                        : 'Not set',
+                  ),
+                  _line(
+                    context,
+                    'Notes',
+                    (info?.notes.trim().isNotEmpty ?? false)
+                        ? info!.notes
+                        : 'Not set',
+                  ),
+                  _line(
+                    context,
+                    'Insurance number',
+                    (info?.insuranceNumber.trim().isNotEmpty ?? false)
+                        ? info!.insuranceNumber
+                        : 'Not set',
+                  ),
+                  _line(
+                    context,
+                    'National ID (Aadhaar / SSN / etc.)',
+                    (info?.nationalId.trim().isNotEmpty ?? false)
+                        ? info!.nationalId
+                        : 'Not set',
+                  ),
+                  _line(
+                    context,
+                    'Health card no.',
+                    (info?.healthCardNumber.trim().isNotEmpty ?? false)
+                        ? info!.healthCardNumber
+                        : 'Not set',
+                  ),
+                  _line(
+                    context,
+                    'Updated',
+                    info?.updatedAt != null
+                        ? _shortDate(info!.updatedAt)
+                        : 'Not set up yet',
+                  ),
+                  const SizedBox(height: 12),
+                  OutlinedButton(
+                    onPressed: () => _edit(info),
+                    child: const Text('Edit'),
+                  ),
+                  const SizedBox(height: 20),
+                  _line(
+                    context,
+                    "Caregiver's number",
+                    _loadingPhone
+                        ? 'Loading…'
+                        : (_caregiverPhone ?? 'No number on file.'),
+                  ),
+                  if (_caregiverName != null)
+                    _line(context, 'Caregiver name', _caregiverName!),
+                  if (_caregiverPhone != null)
+                    OutlinedButton(
+                      onPressed: () => openDialer(_caregiverPhone!),
+                      child: const Text('Call'),
+                    ),
+                  const SizedBox(height: 20),
+                  StreamBuilder<List<ScheduleWithMedicine>>(
+                    stream: widget.db.watchActiveSchedules(),
+                    builder: (context, medsSnapshot) {
+                      final items = medsSnapshot.data ?? const [];
+                      return _line(
+                        context,
+                        'Current medicines',
+                        items.isEmpty
+                            ? 'No medicines on this device.'
+                            : items
+                                  .map(
+                                    (item) =>
+                                        item.medicine.doseAmount.trim().isEmpty
+                                        ? medicineTitle(item.medicine)
+                                        : '${medicineTitle(item.medicine)} - ${item.medicine.doseAmount}',
+                                  )
+                                  .join('\n'),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 20),
+                  OutlinedButton(
+                    onPressed: _sharing ? null : _share,
+                    child: Text(_sharing ? 'Preparing…' : 'Print or share'),
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
       ),
     );
   }
 }
 
-Widget _line(String label, String value) => Padding(
-  padding: const EdgeInsets.only(bottom: 16),
-  child: Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
-      Text(value),
-    ],
-  ),
-);
+/// One label+value fact. Merged into a single [Semantics] node (rather than
+/// two separate `Text` widgets) so a screen reader announces "label, value"
+/// as one stop instead of two -- this screen exists to be read fast, by a
+/// human or by TalkBack/VoiceOver.
+Widget _line(BuildContext context, String label, String value) {
+  final text = Theme.of(context).textTheme;
+  return Padding(
+    padding: const EdgeInsets.only(bottom: 16),
+    child: Semantics(
+      label: '$label: $value',
+      child: ExcludeSemantics(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: text.labelLarge),
+            Text(value, style: text.bodyLarge),
+          ],
+        ),
+      ),
+    ),
+  );
+}
 
 class _EmergencyEditResult {
   const _EmergencyEditResult({
