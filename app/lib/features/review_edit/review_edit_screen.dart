@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:drift/drift.dart' hide Column;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../../core/ids.dart';
 import '../../core/motion.dart';
@@ -27,6 +26,7 @@ import '../history/dose_history_screen.dart';
 import '../notification_engine/notification_service.dart';
 import '../notification_engine/schedule_validation.dart';
 import '../reminders_home/refill.dart';
+import 'medicine_fields_form.dart';
 import 'parsed_medicine.dart';
 
 /// The one gate everything else in the capture flow passes through: nothing
@@ -85,8 +85,6 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
   final Set<int> _daysOfWeek = {};
   bool _saving = false;
   bool _drugNameFilled = false;
-
-  static const _dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
   bool get _isEditing => widget.existing != null;
 
@@ -372,13 +370,8 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
   }
 
   Future<void> _addTime() async {
-    final picked = await showMedicynTimePicker(
-      context,
-      initialTime: TimeOfDay.now(),
-    );
-    if (picked == null) return;
-    final formatted =
-        '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
+    final formatted = await pickMedicineTime(context);
+    if (formatted == null) return;
     setState(() {
       if (_frequency == FrequencyType.everyXHours) {
         _times = [formatted];
@@ -781,24 +774,6 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
     );
   }
 
-  Widget _fieldPair(Widget left, Widget right) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        if (constraints.maxWidth < 360) {
-          return Column(children: [left, const SizedBox(height: 12), right]);
-        }
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(child: left),
-            const SizedBox(width: 12),
-            Expanded(child: right),
-          ],
-        );
-      },
-    );
-  }
-
   Widget _form() {
     return ListView(
       padding: const EdgeInsets.all(20),
@@ -812,151 +787,28 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ),
-        if (_confidence != null)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 16),
-            child: Text(
-              'AI read this with ${(_confidence! * 100).round()}% confidence — check it over.',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
+        MedicineFieldsForm(
+          drugNameController: _drugNameController,
+          strengthController: _strengthController,
+          formController: _formController,
+          doseAmountController: _doseAmountController,
+          remainingController: _remainingController,
+          perDoseController: _perDoseController,
+          notesController: _notesController,
+          intervalController: _intervalController,
+          frequency: _frequency,
+          onFrequencyChanged: (f) => setState(() => _frequency = f),
+          daysOfWeek: _daysOfWeek,
+          onDayToggled: (day, selected) => setState(
+            () => selected ? _daysOfWeek.add(day) : _daysOfWeek.remove(day),
           ),
-        TextField(
-          controller: _drugNameController,
-          decoration: const InputDecoration(labelText: 'Medicine name *'),
-        ),
-        const SizedBox(height: 12),
-        _fieldPair(
-          TextField(
-            controller: _strengthController,
-            decoration: const InputDecoration(
-              labelText: 'Strength (e.g. 500mg)',
-            ),
-          ),
-          TextField(
-            controller: _formController,
-            decoration: const InputDecoration(
-              labelText: 'Form (tablet, syrup…)',
-            ),
-          ),
-        ),
-        const SizedBox(height: 12),
-        TextField(
-          controller: _doseAmountController,
-          decoration: const InputDecoration(
-            labelText: 'Dose amount (e.g. 1 tablet)',
-          ),
-        ),
-        const SizedBox(height: 12),
-        _fieldPair(
-          TextField(
-            controller: _remainingController,
-            keyboardType: TextInputType.number,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            decoration: const InputDecoration(
-              labelText: 'Tablets left',
-              helperText: 'Leave blank to skip',
-            ),
-          ),
-          TextField(
-            controller: _perDoseController,
-            keyboardType: TextInputType.number,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            decoration: const InputDecoration(
-              labelText: 'Tablets per dose',
-              helperText: 'Defaults to 1',
-            ),
-          ),
-        ),
-        const SizedBox(height: 20),
-        Text('Frequency', style: Theme.of(context).textTheme.titleSmall),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            for (final option in FrequencyType.values)
-              ChoiceChip(
-                label: Text(switch (option) {
-                  FrequencyType.daily => 'Daily',
-                  FrequencyType.specificDays => 'Some days',
-                  FrequencyType.everyXHours => 'Every X hrs',
-                  FrequencyType.asNeeded => 'As needed',
-                }),
-                selected: _frequency == option,
-                onSelected: (_) => setState(() => _frequency = option),
-              ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        if (_frequency == FrequencyType.specificDays) ...[
-          Wrap(
-            spacing: 8,
-            children: List.generate(7, (i) {
-              final selected = _daysOfWeek.contains(i);
-              return FilterChip(
-                label: Text(_dayLabels[i]),
-                selected: selected,
-                onSelected: (v) => setState(
-                  () => v ? _daysOfWeek.add(i) : _daysOfWeek.remove(i),
-                ),
-              );
-            }),
-          ),
-          const SizedBox(height: 16),
-        ],
-        if (_frequency == FrequencyType.everyXHours) ...[
-          TextField(
-            controller: _intervalController,
-            keyboardType: TextInputType.number,
-            // Digits only, so a stray character cannot reach int.tryParse and
-            // arrive as a null interval. The range is checked separately —
-            // formatters cannot express "not zero".
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            onChanged: (_) => setState(() {}),
-            decoration: InputDecoration(
-              labelText: 'Every how many hours?',
-              // Typing 0 here used to be enough to leave the phone with no
-              // medication alarms at all, so say why it is refused rather
-              // than just disabling Save with no explanation.
-              errorText: _intervalError,
-            ),
-          ),
-          const SizedBox(height: 16),
-        ],
-        if (_frequency != FrequencyType.asNeeded) ...[
-          Text(
-            _frequency == FrequencyType.everyXHours
-                ? 'First dose time'
-                : 'Times',
-            style: Theme.of(context).textTheme.titleSmall,
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final t in _times)
-                Chip(
-                  label: Text(t),
-                  onDeleted: () => setState(
-                    () => _times = _times.where((x) => x != t).toList(),
-                  ),
-                ),
-              ActionChip(
-                avatar: const Icon(Icons.add, size: 18),
-                label: const Text('Add time'),
-                onPressed: _addTime,
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-        ],
-        TextField(
-          controller: _notesController,
-          maxLines: 2,
-          decoration: const InputDecoration(
-            labelText: 'Instructions (optional)',
-          ),
+          times: _times,
+          onTimeRemoved: (t) =>
+              setState(() => _times = _times.where((x) => x != t).toList()),
+          onAddTime: _addTime,
+          intervalError: _intervalError,
+          onIntervalChanged: () => setState(() {}),
+          confidence: _confidence,
         ),
         if (_isEditing) ...[
           const SizedBox(height: 20),
