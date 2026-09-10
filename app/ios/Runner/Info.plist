@@ -77,6 +77,16 @@
 	</dict>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<!-- Lets a silent `data_changed` push (see fcm.ts's apns content-available
+	     block) invoke firebaseMessagingBackgroundHandler while backgrounded —
+	     the re-arm ping that keeps this phone's alarms in sync with a
+	     caregiver's edit. Requires the Push Notifications capability
+	     (Runner.entitlements' aps-environment) to actually receive anything
+	     to wake for. -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>

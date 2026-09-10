@@ -11,7 +11,7 @@
 
 import { assertEquals } from "@std/assert";
 
-import { isStale } from "./fcm.ts";
+import { buildFcmRequestBody, isStale } from "./fcm.ts";
 
 Deno.test("404 UNREGISTERED — the app was uninstalled or its data cleared", () => {
   assertEquals(
@@ -54,4 +54,38 @@ Deno.test("an empty body on an unrecognised status keeps the token", () => {
   // leaves the row alone.
   assertEquals(isStale(418, ""), false);
   assertEquals(isStale(400, ""), false);
+});
+
+Deno.test("a data-only message gets a silent apns payload, not an alert", () => {
+  // The re-arm ping (data_changed) must never surface on the lock screen —
+  // it also must not be dropped, which was the bug: with no `apns` block at
+  // all, iOS treats a message with no alert/sound/badge as nothing to
+  // deliver, silently, with no error anywhere to point at it.
+  const body = buildFcmRequestBody("tok", { data: { event: "data_changed" } });
+  const message = (body.message as Record<string, unknown>);
+  const apns = message.apns as Record<string, unknown>;
+  const payload = apns.payload as Record<string, unknown>;
+  const aps = payload.aps as Record<string, unknown>;
+  assertEquals(aps["content-available"], 1);
+  assertEquals("alert" in aps, false);
+  assertEquals("sound" in aps, false);
+  assertEquals("badge" in aps, false);
+  assertEquals(apns.headers, { "apns-priority": "5", "apns-push-type": "background" });
+});
+
+Deno.test("a message with a notification block gets an audible apns alert", () => {
+  // FCM mirrors `notification` into `aps.alert` on its own; `aps.sound` is
+  // the one thing it does not fill in, so a missed-dose alert would arrive
+  // silent on iOS without this.
+  const body = buildFcmRequestBody("tok", {
+    notification: { title: "Missed dose", body: "Your mother missed a dose." },
+    androidChannelId: "medicyn_care_alerts_v1",
+  });
+  const message = (body.message as Record<string, unknown>);
+  const apns = message.apns as Record<string, unknown>;
+  const payload = apns.payload as Record<string, unknown>;
+  const aps = payload.aps as Record<string, unknown>;
+  assertEquals(aps.sound, "default");
+  assertEquals("content-available" in aps, false);
+  assertEquals(apns.headers, undefined);
 });

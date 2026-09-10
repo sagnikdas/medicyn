@@ -147,17 +147,25 @@ async function getAccessToken(): Promise<string> {
   return token;
 }
 
-/// Sends [message] to one token.
+/// Builds the FCM v1 request body for [message] addressed to [token]. Pure and
+/// exported so the platform-specific shaping below — the part most likely to
+/// silently stop delivering on one OS while the other keeps working — can be
+/// asserted on directly, without a live service account or network access.
 ///
 /// A `notification` block is what lets Android draw the alert with the app
 /// terminated — the point of the whole exercise. Data-only messages instead
 /// need `priority: "high"` or Doze may sit on them for hours, which for a
 /// schedule change means the parent's alarms stay wrong overnight.
-export async function sendToToken(token: string, message: FcmMessage): Promise<SendResult> {
-  const accessTokenValue = await getAccessToken();
-  const projectId = fcmProjectId();
-
-  const body: Record<string, unknown> = {
+///
+/// A `notification` block still needs an explicit `apns` override: FCM does
+/// mirror it into `aps.alert` automatically, but not `aps.sound`, and a
+/// data-only message (data_changed — the re-arm ping) needs the opposite
+/// treatment entirely. Without an `apns` block, iOS silently drops every
+/// data-only push, because a message with no `alert`/`sound`/`badge` and no
+/// `content-available: 1` is not a push APNs will wake a
+/// backgrounded/terminated app for at all.
+export function buildFcmRequestBody(token: string, message: FcmMessage): Record<string, unknown> {
+  return {
     message: {
       token,
       ...(message.notification ? { notification: message.notification } : {}),
@@ -184,12 +192,34 @@ export async function sendToToken(token: string, message: FcmMessage): Promise<S
           }
           : {}),
       },
-      // No `apns` block: iOS is not started (see PLAN.md). When it is, a
-      // data-only message will need `content-available: 1` and the
-      // background-refresh entitlement, neither of which has an Android
-      // equivalent to copy.
+      apns: message.notification
+        ? {
+          payload: { aps: { sound: "default" } },
+        }
+        : {
+          // No `alert`, `sound`, or `badge` — a silent push must carry none
+          // of them, or APNs may treat it as a user-visible notification
+          // instead of a background wake. `content-available: 1` is what
+          // actually invokes firebaseMessagingBackgroundHandler.
+          payload: { aps: { "content-available": 1 } },
+          headers: {
+            // Background pushes are always priority 5 (never 10) and must
+            // declare apns-push-type themselves — APNs no longer infers it
+            // from the payload shape alone.
+            "apns-priority": "5",
+            "apns-push-type": "background",
+          },
+        },
     },
   };
+}
+
+/// Sends [message] to one token.
+export async function sendToToken(token: string, message: FcmMessage): Promise<SendResult> {
+  const accessTokenValue = await getAccessToken();
+  const projectId = fcmProjectId();
+
+  const body = buildFcmRequestBody(token, message);
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), SEND_TIMEOUT_MS);

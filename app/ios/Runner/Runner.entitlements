@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Required for FirebaseMessaging to register this install for APNs and
+	     receive a token. Without this entitlement, PushService.registerToken
+	     silently gets no token on a real device (getToken() throws, caught
+	     and swallowed by design — see push_service.dart), so caregiver
+	     missed-dose alerts and remote schedule pushes never reach this
+	     install. Xcode's own Signing & Capabilities UI writes this same key
+	     when you add the "Push Notifications" capability; it is written by
+	     hand here since capability changes are not part of an automated
+	     Codesign step. Value is swapped by the aps-environment build
+	     setting/profile at archive time in a normal Apple signing flow — a
+	     literal "development" here only matters for local Xcode runs; the
+	     ios-release workflow's provisioning profile controls it for
+	     TestFlight/App Store builds. -->
+	<key>aps-environment</key>
+	<string>development</string>
+</dict>
+</plist>
