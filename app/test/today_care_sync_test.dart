@@ -21,10 +21,18 @@ const _table = TodayCareSyncService.table;
 
 /// Stateful PostgREST transport for two independent device databases. The
 /// actual server guard and RLS are separately exercised by the SQL tests.
+///
+/// `sync_seq` stands in for the server-assigned trigger column added
+/// alongside incremental pulls: every *accepted* write gets the next counter
+/// value, a rejected stale write keeps the row's previous value, and any row
+/// a test drops into [rows] directly (bypassing the write path entirely)
+/// gets backfilled lazily on first read — mirroring the migration's own
+/// backfill of pre-existing rows.
 class _CareBackend extends FakePostgrest {
   final rows = <String, Map<String, dynamic>>{};
   Future<void> Function()? beforeWriteReply;
   bool failReads = false;
+  int _nextSeq = 0;
 
   @override
   http.Client get client => MockClient((request) async {
@@ -41,9 +49,22 @@ class _CareBackend extends FakePostgrest {
       return reply({'message': 'Offline', 'code': '500'}, 500);
     }
     if (request.method == 'GET') {
+      for (final r in rows.values) {
+        r['sync_seq'] ??= ++_nextSeq;
+      }
       final owner = request.url.queryParameters['user_id']?.substring(3);
-      final ordered = rows.values.where((r) => r['user_id'] == owner).toList()
-        ..sort((a, b) => (a['id'] as String).compareTo(b['id'] as String));
+      final since = int.parse(
+        (request.url.queryParameters['sync_seq'] ?? 'gt.0').substring(3),
+      );
+      final ordered =
+          rows.values
+              .where(
+                (r) => r['user_id'] == owner && (r['sync_seq'] as int) > since,
+              )
+              .toList()
+            ..sort(
+              (a, b) => (a['sync_seq'] as int).compareTo(b['sync_seq'] as int),
+            );
       final start = int.parse(request.url.queryParameters['offset'] ?? '0');
       final limit = int.parse(request.url.queryParameters['limit'] ?? '500');
       return reply(ordered.skip(start).take(limit).toList());
@@ -55,6 +76,7 @@ class _CareBackend extends FakePostgrest {
         DateTime.parse(
           incoming['updated_at'] as String,
         ).isAfter(DateTime.parse(old['updated_at'] as String))) {
+      incoming['sync_seq'] = ++_nextSeq;
       rows[id] = incoming;
     }
     final returned = Map<String, dynamic>.from(rows[id]!);
@@ -118,6 +140,7 @@ void main() {
     backend.failing.clear();
     backend.failReads = false;
     backend.beforeWriteReply = null;
+    backend._nextSeq = 0;
     first = AppDatabase.forTesting(NativeDatabase.memory());
     second = AppDatabase.forTesting(NativeDatabase.memory());
   });
@@ -256,8 +279,58 @@ void main() {
     expect(backend.requests, hasLength(2));
     for (final request in backend.requests) {
       expect(request.url.queryParameters['user_id'], 'eq.$_owner');
+      expect(request.url.queryParameters['sync_seq'], 'gt.0');
+    }
+    // Every owned row was backfilled a sync_seq ahead of the stranger's row
+    // added afterwards, so the cursor lands at the owner's own count and a
+    // second pull with nothing new sends no further request.
+    expect(TodayCareSyncService.cursorFor(first), 501);
+    backend.requests.clear();
+    expect(await TodayCareSyncService(first).pull(), isTrue);
+    expect(backend.requests, hasLength(1));
+    for (final request in backend.requests) {
+      expect(request.url.queryParameters['sync_seq'], 'gt.501');
     }
   });
+
+  test(
+    'a clock-skewed write is still caught by another device\'s next pull',
+    () async {
+      // "second" first catches up to a row already on the server, which
+      // advances its cursor past that row's sync_seq.
+      backend.rows['already-synced'] = _remote('already-synced');
+      await TodayCareSyncService(second).pull();
+      expect(
+        (await TodayCareStore(second).watch().first).map((r) => r.id),
+        contains('already-synced'),
+      );
+
+      // A different device now pushes a brand-new reminder, but its clock
+      // is badly wrong: `updated_at` claims a moment years before "second"
+      // was last told about anything. If the pull cursor were based on
+      // `updated_at` instead of `sync_seq`, "second" would treat this as
+      // older than what it already has and silently skip it forever.
+      // `sync_seq` is assigned at write time regardless of the client's
+      // clock, so it must still arrive.
+      backend.rows['care-1'] = _remote('care-1')
+        ..['updated_at'] = DateTime.utc(2000).toIso8601String();
+
+      // The pull below must still ask relative to "second"'s own cursor as
+      // it stood before this call, not fetch the whole table again just
+      // because a badly-dated row arrived.
+      final cursorBeforePull = TodayCareSyncService.cursorFor(second);
+      backend.requests.clear();
+      await TodayCareSyncService(second).pull();
+      expect(
+        (await TodayCareStore(second).watch().first).map((r) => r.id),
+        containsAll(['already-synced', 'care-1']),
+      );
+      expect(
+        backend.requests.single.url.queryParameters['sync_seq'],
+        'gt.$cursorBeforePull',
+      );
+    },
+  );
 
   test('backup disabled and account mismatch never send data', () async {
     await TodayCareStore(first).save(_care('care-1'));

@@ -42,11 +42,32 @@ update today_care_reminders set title = 'Updated scan', completed = true,
 select pg_temp.expect((select title = 'Updated scan' and completed from today_care_reminders where kind = 'scan'), 'owner edits and completes an entry');
 
 update today_care_reminders set deleted = true, updated_at = '2026-09-06 12:00:00Z' where kind = 'scan';
+select pg_temp.expect((select sync_seq from today_care_reminders where kind = 'scan')
+    > (select min(sync_seq) from today_care_reminders where kind <> 'scan'),
+  'an accepted update is stamped with a fresh, higher sync_seq');
+
 -- Simulate an offline client's stale upsert after the delete reached Supabase.
-insert into today_care_reminders(id, user_id, title, kind, scheduled_at, updated_at, deleted)
-select id, user_id, 'Stale scan', kind, scheduled_at, '2026-09-06 11:30:00Z', false
-from today_care_reminders where kind = 'scan'
-on conflict(id) do update set title = excluded.title, deleted = excluded.deleted, updated_at = excluded.updated_at;
+-- Its clock claims an earlier time than the delete it is trying to undo —
+-- exactly the skew sync_seq must not be fooled by: the write is rejected, and
+-- must not advance sync_seq either, or another device's next delta pull
+-- would believe this row changed when it did not.
+do $$
+declare
+  before_seq bigint;
+  after_seq bigint;
+begin
+  select sync_seq into before_seq from today_care_reminders where kind = 'scan';
+  insert into today_care_reminders(id, user_id, title, kind, scheduled_at, updated_at, deleted)
+  select id, user_id, 'Stale scan', kind, scheduled_at, '2026-09-06 11:30:00Z', false
+  from today_care_reminders where kind = 'scan'
+  on conflict(id) do update set title = excluded.title, deleted = excluded.deleted, updated_at = excluded.updated_at;
+  select sync_seq into after_seq from today_care_reminders where kind = 'scan';
+  if after_seq is distinct from before_seq then
+    raise exception 'FAILED: a rejected stale write must not advance sync_seq';
+  end if;
+  raise notice 'ok: a rejected stale write leaves sync_seq unchanged, so it can never advance another device''s cursor';
+end;
+$$;
 select pg_temp.expect((select deleted and title = 'Updated scan' from today_care_reminders where kind = 'scan'), 'stale upsert cannot resurrect a deleted entry');
 
 update today_care_reminders set deleted = false, completed = false, updated_at = '2026-09-06 13:00:00Z' where kind = 'scan';
