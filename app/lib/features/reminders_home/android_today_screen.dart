@@ -57,6 +57,7 @@ class _AndroidTodayScreenState extends State<AndroidTodayScreen>
   bool _reconciling = false;
   bool _reconcileAgain = false;
   bool _syncing = false;
+  bool _syncInFlight = false;
   bool _syncAgain = false;
   bool _syncFailed = false;
   int _pendingSync = 0;
@@ -110,17 +111,25 @@ class _AndroidTodayScreenState extends State<AndroidTodayScreen>
 
   Future<void> _syncCare() async {
     if (!mounted || !_cloudReady) return;
-    if (_syncing) {
+    if (_syncInFlight) {
       _syncAgain = true;
       return;
     }
-    setState(() => _syncing = true);
+    _syncInFlight = true;
+    // Background polls usually find nothing to do and finish quickly; only
+    // surface the "Syncing…" banner once a sync is still running past this
+    // grace period, so routine polling doesn't flash the UI every 30s.
+    final showSyncingTimer = Timer(const Duration(milliseconds: 500), () {
+      if (mounted) setState(() => _syncing = true);
+    });
     var success = false;
     try {
       success = await TodayCareSyncService(widget.db).sync();
     } catch (_) {
       // The local queue survives until connectivity is restored.
     } finally {
+      showSyncingTimer.cancel();
+      _syncInFlight = false;
       if (mounted) {
         setState(() {
           _syncing = false;
