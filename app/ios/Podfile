@@ -40,4 +40,43 @@ post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
   end
+
+  # Xcode's implicit-dependency resolution for the workspace sometimes fails
+  # to schedule the Pods-Runner aggregate target before linking Runner,
+  # producing "Framework 'Pods_Runner' not found". Make the dependency
+  # explicit so Runner always builds it first.
+  runner_project = installer.aggregate_targets.first.user_project
+  runner_target = runner_project.native_targets.find { |t| t.name == 'Runner' }
+  pods_project_path = installer.pods_project.path.to_s
+  subproject_ref = runner_project.reference_for_path(pods_project_path) ||
+    runner_project.main_group.new_reference(pods_project_path)
+  pods_runner_target = installer.pods_project.targets.find { |t| t.name == 'Pods-Runner' }
+  unless runner_target.dependency_for_target(pods_runner_target)
+    runner_target.add_dependency(pods_runner_target)
+  end
+  runner_project.save
+
+  # google_mlkit_commons vendors MLImage.framework/MLKitCommon.framework etc.
+  # as plain fat frameworks whose arm64 slice is device-only (no arm64
+  # simulator slice exists upstream). Building for arm64 simulator therefore
+  # always fails to link. Force x86_64-only simulator builds (runs under
+  # Rosetta) across both the Pods project and the Runner app so their
+  # architectures match.
+  installer.pods_project.build_configurations.each do |config|
+    config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = '$(inherited) arm64'
+  end
+  installer.pods_project.targets.each do |target|
+    target.build_configurations.each do |config|
+      config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = '$(inherited) arm64'
+    end
+  end
+  runner_project.build_configurations.each do |config|
+    config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = '$(inherited) arm64'
+  end
+  runner_project.targets.each do |target|
+    target.build_configurations.each do |config|
+      config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = '$(inherited) arm64'
+    end
+  end
+  runner_project.save
 end
