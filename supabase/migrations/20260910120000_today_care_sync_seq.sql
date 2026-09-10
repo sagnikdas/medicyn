@@ -11,29 +11,20 @@
 -- that landed before it, regardless of any client's clock.
 create sequence public.today_care_reminders_sync_seq;
 
+-- A non-constant default (nextval()) forces Postgres to rewrite the table
+-- rather than add the column as metadata only, backfilling every existing
+-- row with its own sequence value in one pass. This is deliberately a
+-- single statement, not add-then-backfill-then-not-null: this table takes
+-- live writes, and a separate backfill step would leave a window where a
+-- concurrent insert lands with no value at all, exactly the failure a
+-- three-step version of this migration hit against the real database.
+-- ADD COLUMN takes an exclusive lock for the (brief, single-pass) rewrite,
+-- so nothing can write a row past this statement without a value. The
+-- relative order backfilled rows land in doesn't matter — sync_seq is a
+-- pull cursor, not a conflict-resolution timestamp, and every existing row
+-- ends up greater than a fresh device's starting cursor of 0 regardless.
 alter table public.today_care_reminders
-  add column sync_seq bigint;
-
--- Existing rows predate this column. Backfill in `updated_at` order so
--- older edits keep a lower cursor value than newer ones, rather than
--- stamping every existing row with the same "just migrated" instant.
-with ordered as (
-  select id, row_number() over (order by updated_at, id) as rn
-  from public.today_care_reminders
-)
-update public.today_care_reminders t
-set sync_seq = ordered.rn
-from ordered
-where ordered.id = t.id;
-
-select setval(
-  'public.today_care_reminders_sync_seq',
-  coalesce((select max(sync_seq) from public.today_care_reminders), 0) + 1,
-  false
-);
-
-alter table public.today_care_reminders
-  alter column sync_seq set not null;
+  add column sync_seq bigint not null default nextval('today_care_reminders_sync_seq');
 
 create unique index today_care_reminders_sync_seq_idx
   on public.today_care_reminders (sync_seq);
