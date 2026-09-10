@@ -22,6 +22,7 @@ Declare **collected** for:
 | Device or other IDs | Device or other IDs | FCM token; `push_install_id` (not an advertising ID) |
 | Location | Approximate location | IANA timezone on the profile if signed in. Not GPS. |
 | Audio | Voice or sound recordings | Microphone path. Medicyn does not store the recording. On most devices Google's speech service receives the audio. |
+| App info and performance | Crash logs | Firebase Crashlytics: stack trace, app version, device manufacturer/OS version, anonymous install id. Only collected in a build shipped with `google-services.json` / `GoogleService-Info.plist` — see `app/README.md`. |
 
 Do **not** declare: contacts, browsing history, advertising ID, precise
 location, photos **as stored** (the label image is OCR'd and deleted; only
@@ -38,6 +39,7 @@ Declare **shared** for:
 | Device IDs | Google FCM | Deliver the family alert |
 | Approximate location | Linked family account sees timezone | Show reminder times on the patient's clock |
 | Audio | Google (platform speech), if voice input is on | App functionality |
+| Crash logs | Google (Firebase Crashlytics) | Diagnose crashes |
 
 Encrypted in transit: **Yes** (TLS; cleartext disallowed).
 Users can request deletion: **Yes** (Settings → Delete account and the public

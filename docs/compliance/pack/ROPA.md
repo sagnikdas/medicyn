@@ -103,10 +103,25 @@ Medicyn is not a processor for anyone else. There is no Art. 30(2) section.
 
 ### B7. Crash reporting
 
-- **Purpose:** None today. Sentry is in the binary, **off by default**,
-  sends nothing.
-- **Recipients:** None until a future release enables it and this record and
-  `PRIVACY.md` are updated first.
+- **Purpose:** App stability — diagnosing crashes and unhandled errors.
+- **Data:** Stack trace, app version, device manufacturer/OS version, and an
+  anonymous Firebase installation id. Never name, email, account id,
+  medicines, doses, or schedules — enforced by an allow-list in
+  `MedicynTelemetry` (`app/lib/core/telemetry.dart`), not by trusting the
+  vendor's default collection scope.
+- **Recipients:** Google (Firebase Crashlytics), as a processor.
+- **Transfers:** United States.
+- **Retention:** 90 days (Crashlytics' standard retention; not configurable
+  by us).
+- **Legal basis:** Art. 6(1)(f), legitimate interest in diagnosing crashes
+  in an app that manages medication reminders. No special-category data is
+  processed in this record.
+- **Live status:** Wired in code (`firebase_crashlytics`, replacing Sentry
+  as of this change), but gated on the same `google-services.json` /
+  `GoogleService-Info.plist` as push — CI does not currently materialize
+  either file for a release build, so it is not yet live in a shipped
+  artifact. Update this record's status once an operator adds those files
+  to a release pipeline.
 
 ## C. Technical and organisational measures (summary)
 

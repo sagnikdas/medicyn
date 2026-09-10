@@ -166,12 +166,13 @@ turn that text into structured reminder fields for you to check and correct.
 Neither the photo nor the audio is sent. If you type the details in yourself
 instead, nothing is sent to Anthropic at all.
 
-**Crash reporting** is included in the app but is switched off by default and
-sends nothing. If it is ever enabled in a future release, this policy will be
-updated first to say what it reports.
-
-Medicyn does not sell your data, does not share it with advertisers, and
-contains no advertising or analytics SDKs.
+**Crash reporting** uses Firebase Crashlytics. When the app crashes or hits an
+unexpected error, Google receives a stack trace, this app's version, your
+device's manufacturer and OS version, and an anonymous per-install identifier
+— never your name, email, or account id, and never your medicines, doses, or
+schedules. This is diagnostics, not analytics: Medicyn does not sell your
+data, does not share it with advertisers, and contains no advertising or
+behavioral-analytics SDKs.
 
 ## Where your data is sent (international transfers)
 
@@ -179,8 +180,8 @@ If information leaves this phone, it also leaves the European Economic Area
 and the United Kingdom. All three recipients involve a transfer:
 
 - **Supabase.** The database is in `ap-southeast-1` (Singapore).
-- **Google.** Sign-In, Firebase Cloud Messaging, and usually the Android
-  speech recogniser are in the United States.
+- **Google.** Sign-In, Firebase Cloud Messaging, Firebase Crashlytics, and
+  usually the Android speech recogniser are in the United States.
 - **Anthropic.** The parse request goes to `api.anthropic.com` in the United
   States.
 
@@ -247,6 +248,8 @@ If you use the app without an account, there is only the copy on this phone.
 - **Notification tokens** — 90 days without being refreshed. We also try to
   delete the token when you sign out; if that fails, it is dropped when it
   goes stale or when someone else signs in on the same phone.
+- **Crash reports** — kept by Google under Firebase Crashlytics' standard
+  90-day retention, not configurable by us.
 
 If you use the app without an account, there is no cloud copy to retain.
 Uninstalling the app removes the copy on that phone.

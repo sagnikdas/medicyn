@@ -1,4 +1,6 @@
-import 'package:sentry_flutter/sentry_flutter.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'package:flutter/foundation.dart';
 
 /// Non-health product events used to measure the activation and reliability
 /// funnel. Values intentionally describe only buckets and outcomes; callers
@@ -31,31 +33,68 @@ class MedicynTelemetry {
   MedicynTelemetry._();
   static final instance = MedicynTelemetry._();
 
+  bool _available = false;
+
+  /// Brings up Firebase (if [PushService] hasn't already) and wires
+  /// Crashlytics into Flutter's and the platform's uncaught-error hooks.
+  /// Call once, before `runApp` — as early as possible, so a crash during
+  /// the app's own startup work is still captured.
+  ///
+  /// Degrades to a no-op the same way [PushService] does: when there is no
+  /// `google-services.json` / `GoogleService-Info.plist` in this build (a
+  /// fresh checkout, both git-ignored), `Firebase.initializeApp()` throws,
+  /// [_available] stays false, and every method below is a silent no-op —
+  /// the app behaves exactly as it would without Crashlytics at all.
+  Future<void> init() async {
+    try {
+      if (Firebase.apps.isEmpty) {
+        await Firebase.initializeApp();
+      }
+      _available = true;
+    } catch (_) {
+      _available = false;
+      return;
+    }
+    FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
+    PlatformDispatcher.instance.onError = (error, stack) {
+      FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+      return true;
+    };
+  }
+
+  /// Records a breadcrumb-style log line ahead of whatever crash (if any)
+  /// follows it. Only allow-listed keys/values are included — see
+  /// [_allowedKeys] and [_isSafeValue] — so a caller cannot accidentally log
+  /// a medicine name, free text, or an identifier into Crashlytics.
   Future<void> record(
     MedicynEvent event, {
     Map<String, Object?> properties = const {},
   }) async {
+    if (!_available) return;
     final safe = <String, Object?>{};
     for (final entry in properties.entries) {
       if (_allowedKeys.contains(entry.key) && _isSafeValue(entry.value)) {
         safe[entry.key] = entry.value;
       }
     }
-    await Sentry.addBreadcrumb(
-      Breadcrumb(
-        category: 'medicyn.product',
-        type: 'info',
-        message: event.name,
-        data: safe,
-      ),
+    final fields = safe.entries.map((e) => '${e.key}=${e.value}').join(' ');
+    await FirebaseCrashlytics.instance.log(
+      fields.isEmpty ? event.name : '${event.name} $fields',
     );
   }
 
+  /// Reports one of a small, named set of handled-but-notable failures as a
+  /// non-fatal Crashlytics error. Anything not in [_allowedErrorCodes] is
+  /// dropped rather than reported, on purpose — this is not a general
+  /// exception funnel; see the ~120 other `catch` blocks in this app that
+  /// deliberately do not report here.
   Future<void> recordError(String errorCode) async {
+    if (!_available) return;
     if (!_allowedErrorCodes.contains(errorCode)) return;
-    await Sentry.captureMessage(
+    await FirebaseCrashlytics.instance.recordError(
       'medicyn_error:$errorCode',
-      level: SentryLevel.error,
+      null,
+      fatal: false,
     );
   }
 
@@ -99,35 +138,4 @@ class MedicynTelemetry {
         value is num ||
         value is bool;
   }
-}
-
-/// Removes user identity and arbitrary extras before a Sentry event leaves
-/// the device. Breadcrumbs are retained only after their data has passed the
-/// typed allow-list above.
-SentryEvent? redactSentryEvent(SentryEvent event, Hint hint) {
-  event.user = null;
-  event.request = null;
-  // `extra` is deprecated in Sentry but clearing it is still necessary for
-  // older SDK integrations that attach arbitrary request data.
-  // ignore: deprecated_member_use
-  event.extra?.clear();
-  event.breadcrumbs = event.breadcrumbs
-      ?.map(
-        (crumb) => Breadcrumb(
-          timestamp: crumb.timestamp,
-          type: crumb.type,
-          level: crumb.level,
-          category: crumb.category,
-          message: crumb.message,
-          data: {
-            for (final entry
-                in crumb.data?.entries ?? <MapEntry<String, Object?>>[])
-              if (MedicynTelemetry._allowedKeys.contains(entry.key) &&
-                  MedicynTelemetry._isSafeValue(entry.value))
-                entry.key: entry.value,
-          },
-        ),
-      )
-      .toList(growable: false);
-  return event;
 }

@@ -18,9 +18,13 @@ plugins {
 val googleServicesFile = file("google-services.json")
 if (googleServicesFile.exists()) {
     apply(plugin = "com.google.gms.google-services")
+    // Crashlytics needs the same project config as push, so it rides the
+    // same conditional rather than getting its own file check.
+    apply(plugin = "com.google.firebase.crashlytics")
 } else {
     logger.lifecycle(
-        "google-services.json not found — building without push. See README's Push section.",
+        "google-services.json not found — building without push or crash " +
+            "reporting. See README's Push section.",
     )
 }
 

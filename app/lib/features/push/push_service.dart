@@ -24,6 +24,10 @@ import 'push_handlers.dart';
 /// (google-services.json absent — see README's Push section). That is the state
 /// of a fresh checkout, and it must build, run, and keep firing local alarms:
 /// the app's actual job never depended on a network.
+///
+/// Does not call `Firebase.initializeApp()` itself — `MedicynTelemetry.init`
+/// (in `main.dart`, ahead of this) already tried, so this only has to check
+/// whether that succeeded.
 class PushService {
   PushService._();
   static final PushService instance = PushService._();
@@ -51,15 +55,14 @@ class PushService {
   Future<void> init() async {
     if (_initialized) return;
     _initialized = true;
-    try {
-      await Firebase.initializeApp();
-      _available = true;
-    } catch (_) {
-      // No google-services.json in this build, or no Play services on this
-      // device. Local alarms are unaffected; only the care link's push is.
+    if (Firebase.apps.isEmpty) {
+      // No google-services.json in this build, or Firebase.initializeApp()
+      // failed in MedicynTelemetry.init. Local alarms are unaffected; only
+      // the care link's push is.
       _available = false;
       return;
     }
+    _available = true;
 
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
