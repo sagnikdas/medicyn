@@ -1,8 +1,9 @@
 # 3.2 — Processor contracts
 
-**Date:** 20 August 2026.
-**Status:** Tracker only. No DPA has been accepted in a vendor console from
-this pack. Do not tick these rows until you have done it.
+**Date:** 20 August 2026. Updated 10 September 2026: Google Cloud DPA accepted.
+**Status:** Tracker. The Google Cloud DPA (FCM + Crashlytics rows) has been
+accepted in the vendor console. Supabase and Anthropic have not. Do not tick
+those remaining rows until you have done it.
 
 Google's speech recogniser is **not** a processor of Medicyn. It is a
 controller. There is no DPA to sign for it. Consent (`google_speech`) or
@@ -14,8 +15,8 @@ controller. There is no DPA to sign for it. Consent (`google_speech`) or
 |---|---|---|---|---|---|
 | Supabase | Processor | Account, medicines, schedules, dose logs, contests, consents, profiles, care links, alerts, device tokens | [Supabase DPA](https://supabase.com/legal/dpa) (includes SCCs) | Supabase Dashboard → Organization → Legal / DPA | No |
 | Anthropic | Processor (confirm in writing) | OCR text + transcript, ≤ 4,000 characters | Commercial DPA; **request zero data retention** | Anthropic Console / sales legal | No |
-| Google (Firebase Cloud Messaging) | Processor for delivery | FCM token + notification body (display name, medicine, due time) | [Google Cloud DPA](https://cloud.google.com/terms/data-processing-addendum) / Firebase | Google Cloud Console → Account → Legal / GDPR | No |
-| Google (Firebase Crashlytics) | Processor for crash diagnostics | Stack trace, app version, device manufacturer/OS version, anonymous install id | Same [Google Cloud DPA](https://cloud.google.com/terms/data-processing-addendum) / Firebase as the FCM row — one acceptance covers both | Google Cloud Console → Account → Legal / GDPR | No |
+| Google (Firebase Cloud Messaging) | Processor for delivery | FCM token + notification body (display name, medicine, due time) | [Google Cloud DPA](https://cloud.google.com/terms/data-processing-addendum) / Firebase | Google Cloud Console → Account → Legal / GDPR | Yes (10 Sep 2026) |
+| Google (Firebase Crashlytics) | Processor for crash diagnostics | Stack trace, app version, device manufacturer/OS version, anonymous install id | Same [Google Cloud DPA](https://cloud.google.com/terms/data-processing-addendum) / Firebase as the FCM row — one acceptance covers both | Google Cloud Console → Account → Legal / GDPR | Yes (10 Sep 2026) |
 | Google (speech) | **Controller** | Raw audio | None available | — | N/A |
 | Google (Sign-In, Play) | Independent controller | Account identity, install / store data | Google's own policies | Disclose in `PRIVACY.md` (done) | N/A |
 
