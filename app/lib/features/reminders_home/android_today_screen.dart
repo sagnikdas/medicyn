@@ -109,7 +109,7 @@ class _AndroidTodayScreenState extends State<AndroidTodayScreen>
     }
   }
 
-  Future<void> _syncCare() async {
+  Future<void> _syncCare({bool immediate = false}) async {
     if (!mounted || !_cloudReady) return;
     if (_syncInFlight) {
       _syncAgain = true;
@@ -118,17 +118,25 @@ class _AndroidTodayScreenState extends State<AndroidTodayScreen>
     _syncInFlight = true;
     // Background polls usually find nothing to do and finish quickly; only
     // surface the "Syncing…" banner once a sync is still running past this
-    // grace period, so routine polling doesn't flash the UI every 30s.
-    final showSyncingTimer = Timer(const Duration(milliseconds: 500), () {
-      if (mounted) setState(() => _syncing = true);
-    });
+    // grace period, so routine polling doesn't flash the UI every 30s. A
+    // user tapping "retry" on a visible failure is different: they need to
+    // see their tap register right away, not wonder for half a second
+    // whether it landed.
+    Timer? showSyncingTimer;
+    if (immediate) {
+      setState(() => _syncing = true);
+    } else {
+      showSyncingTimer = Timer(const Duration(milliseconds: 500), () {
+        if (mounted) setState(() => _syncing = true);
+      });
+    }
     var success = false;
     try {
       success = await TodayCareSyncService(widget.db).sync();
     } catch (_) {
       // The local queue survives until connectivity is restored.
     } finally {
-      showSyncingTimer.cancel();
+      showSyncingTimer?.cancel();
       _syncInFlight = false;
       if (mounted) {
         setState(() {
@@ -342,7 +350,9 @@ class _AndroidTodayScreenState extends State<AndroidTodayScreen>
                       ? 'These changes are only on this phone. Tap to retry.'
                       : 'Your saved care plans are available. Tap to retry.',
                 ),
-                onTap: _cloudReady ? _syncCare : _openSettings,
+                onTap: _cloudReady
+                    ? () => _syncCare(immediate: true)
+                    : _openSettings,
               )
             : null,
       ),
