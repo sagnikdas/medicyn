@@ -3,11 +3,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../core/app_settings.dart';
+import '../../core/motion.dart';
 import '../../core/theme.dart';
 import '../../core/widgets/medicyn_motion.dart';
 import '../../data/local/database.dart';
 import '../../data/local/lifecycle.dart';
 import '../../data/local/tables.dart';
+import '../notification_engine/notification_actions.dart';
 import 'refill.dart';
 import 'reminder_copy.dart';
 
@@ -85,6 +87,9 @@ class ReminderCard extends StatelessWidget {
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
                         _LifecycleStatus(schedule: item.schedule),
+                        if (reminderStatus(item.schedule) ==
+                            ReminderStatus.asNeeded)
+                          _LogNowAction(db: db, scheduleId: item.schedule.id),
                         _RefillStatus(db: db, item: item),
                         if (attribution != null) ...[
                           const SizedBox(height: 4),
@@ -152,6 +157,67 @@ class _LifecycleStatus extends StatelessWidget {
   String _format(DateTime value) {
     final local = value.toLocal();
     return '${local.day}/${local.month}/${local.year}';
+  }
+}
+
+/// The action an as-needed (PRN) medicine gets instead of a due time: there
+/// is nothing on the calendar to answer, so this is the only way one of
+/// these ever reaches dose history. Tapping it logs Taken for right now,
+/// through the exact same [recordAsNeededDoseTaken] -> [recordDoseTaken] ->
+/// `dose_logs` path a scheduled reminder's own Taken button uses, so it
+/// shows up identically in History, Insights and exports.
+class _LogNowAction extends StatefulWidget {
+  const _LogNowAction({required this.db, required this.scheduleId});
+  final AppDatabase db;
+  final String scheduleId;
+
+  @override
+  State<_LogNowAction> createState() => _LogNowActionState();
+}
+
+class _LogNowActionState extends State<_LogNowAction> {
+  bool _busy = false;
+
+  Future<void> _logNow() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    MedicynMotion.confirm(context);
+    try {
+      await recordAsNeededDoseTaken(widget.db, scheduleId: widget.scheduleId);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Logged as taken')),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: TextButton.icon(
+          onPressed: _busy ? null : _logNow,
+          style: TextButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            minimumSize: const Size(0, 32),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            visualDensity: VisualDensity.compact,
+          ),
+          icon: _busy
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.check_circle_outline, size: 18),
+          label: const Text('Log now'),
+        ),
+      ),
+    );
   }
 }
 
