@@ -19,6 +19,19 @@ jobs:
     name: Compile unsigned iOS app
     runs-on: macos-latest
     timeout-minutes: 45
+    # GoogleService-Info.plist is registered as a required Xcode build
+    # input on the Runner target (needed for Crashlytics — see PR #115),
+    # but it's git-ignored and this workflow had no way to materialize it,
+    # so every run failed with "Build input file cannot be found" after a
+    # full multi-minute pod install + Xcode build — hidden behind the
+    # GitHub Actions billing block until that was fixed and this ran for
+    # real. The secret already exists, scoped to the ios-release
+    # environment (added for ios-release.yml); declaring that environment
+    # here too gives this job the same read access. Verified this
+    # environment has no protection rules that would gate a plain PR run.
+    environment: ios-release
+    env:
+      IOS_GOOGLE_SERVICE_INFO_PLIST_BASE64: ${{ secrets.IOS_GOOGLE_SERVICE_INFO_PLIST_BASE64 }}
     defaults:
       run:
         working-directory: app
@@ -35,6 +48,12 @@ jobs:
 
       - name: Resolve Dart and CocoaPods inputs
         run: flutter pub get
+
+      - name: Materialize Firebase config (optional)
+        if: ${{ env.IOS_GOOGLE_SERVICE_INFO_PLIST_BASE64 != '' }}
+        shell: bash
+        run: |
+          printf '%s' "$IOS_GOOGLE_SERVICE_INFO_PLIST_BASE64" | base64 -D > ios/Runner/GoogleService-Info.plist
 
       - name: Compile unsigned iOS app
         run: flutter build ios --release --no-codesign
