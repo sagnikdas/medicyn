@@ -172,6 +172,35 @@ Future<void> recordDoseTaken(
   await _rescheduleAfterSettle(db, scheduleId);
 }
 
+/// Logs a PRN ("as needed") dose the moment someone taps "Log now" on its
+/// card. An as-needed medicine has no schedule to generate occurrences from
+/// (see [expectedDoses]), so there is no pre-existing `scheduledAt` to log
+/// against the way a due reminder has — the tap itself *is* the occurrence,
+/// so [at] (defaulting to now) is used as both.
+///
+/// Deliberately just a thin wrapper around [recordDoseTaken] rather than a
+/// parallel write path: an as-needed dose has to land in the same
+/// `dose_logs` table, decrement stock, and sync the same way a scheduled
+/// dose does, so it shows up identically in dose history, the calendar and
+/// exports. [_rescheduleAfterSettle] (run inside [recordDoseTaken]) is a
+/// no-op for an as-needed schedule — [FrequencyType.asNeeded] has nothing to
+/// arm — so this never risks scheduling a phantom alarm for a medicine that
+/// has no fixed times.
+Future<void> recordAsNeededDoseTaken(
+  AppDatabase db, {
+  required String scheduleId,
+  DateTime? at,
+  String source = 'manual',
+}) {
+  final loggedAt = at ?? DateTime.now();
+  return recordDoseTaken(
+    db,
+    scheduleId: scheduleId,
+    scheduledAt: loggedAt,
+    source: source,
+  );
+}
+
 /// Cancels and re-arms one schedule's alarms from scratch, now that a dose
 /// has just been settled (Taken or Snoozed).
 ///
