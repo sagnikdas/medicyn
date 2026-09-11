@@ -175,11 +175,14 @@ Worth fixing regardless of when the underlying work happens:
 
 ---
 
-## Execution status — 11 September 2026 (updated after this session's merges)
+## Execution status — 11 September 2026 (updated through PR #135)
 
 All engineering-track items scoped for this session are now merged to
-`main` (PRs #122–#130) and, except where noted, verified on two physical
-Android devices. Re-check this section as further work lands.
+`main` (PRs #122–#135). GitHub Actions billing is now fixed (was blocking
+every workflow on the repo, not just iOS) and every CI pipeline has been
+re-validated end to end. GitHub issues #96, #98, #99 are closed; #100 is
+open with narrowed remaining scope (see Track D). Re-check this section as
+further work lands.
 
 ### Track 0
 | # | Item | Status |
@@ -192,7 +195,7 @@ Android devices. Re-check this section as further work lands.
 | # | Item | Status |
 |---|---|---|
 | A1 | Release keystore + `key.properties` | ❌ Not done (template ready) — operator action |
-| A2 | `flutter build appbundle --release` succeeds | ⏸ Blocked on A1 |
+| A2 | `flutter build appbundle --release` succeeds | ⏸ Blocked on A1 — confirmed 2026-09-11: `android-release.yml` now runs for real and fails cleanly at exactly this guard, no other issue found |
 | A3 | Register Android OAuth client per SHA-1 | ❌ Not done — operator action; debug sign-in itself is now confirmed working (0.1) |
 | A4 | Play Console Data Safety form | ✅ Answers ready, ❌ not submitted — operator action |
 | A5 | `SCHEDULE_EXACT_ALARM` Play declaration | ✅ Justification ready, ❌ not submitted — operator action |
@@ -200,18 +203,18 @@ Android devices. Re-check this section as further work lands.
 | A7 | Start closed testing | ❌ Not started — runbook + store copy fully written, operator action |
 | A8 | Galaxy M33 overlay-install check | ✅ Verified 2026-09-11 — reinstalled over an existing install on the physical M33, clean |
 
-Android: 2 of 8 done (both engineering-adjacent verifications this session
-could actually run). The rest are Play Console/keystore operator actions —
-nothing left blocking them technically.
+Android: 2 of 8 done, a 3rd (A2) confirmed blocked on exactly one thing
+(the keystore) with no other surprises. The rest are Play Console/keystore
+operator actions — nothing left blocking them technically.
 
 ### Track B — iOS
 | # | Item | Status |
 |---|---|---|
 | B1 | Apple Developer Program enrollment | ❌ Not done — operator action |
-| B2 | Restore GitHub Actions billing | ❌ Not done — CI still fails in ~9s — operator action |
+| B2 | Restore GitHub Actions billing | ✅ **Fixed 2026-09-11** — confirmed by re-triggering `device-silent-check.yml`, which now runs instead of failing at runner allocation. This had been blocking **every** workflow in the repo, not just iOS's |
 | B3 | Physical iPhone access | ❌ None available in any session |
 | B4 | Wire iOS Google OAuth client | ❌ Not done (code ready, needs real client ID) — operator action |
-| B5 | Apple Portal: Push Notifications capability + cert/profile | ⏸ Blocked on B1 |
+| B5 | Apple Portal: Push Notifications capability + cert/profile | ⏸ Blocked on B1 — confirmed 2026-09-11: `ios-release.yml` now runs for real on macOS and fails cleanly at exactly this guard |
 | B6 | Firebase: upload APNs key | ❌ Not done — operator action |
 | B7 | Replace AppIcon artwork | ✅ Fixed, merged (#123) — all 15 sizes regenerated from the brand icon; ⚠️ source is only 192×192, so the 1024×1024 marketing slot is a soft upscale, still needs a real master before submission |
 | B8 | Fix `MedicynBrandMark` asset path | ✅ Fixed, merged (#123) |
@@ -221,9 +224,9 @@ nothing left blocking them technically.
 | B12 | ASC API key for TestFlight | ⏸ Blocked on B10 |
 | B13 | TestFlight upload | ⏸ Blocked on B5/B12 |
 
-iOS: 2 of 13 done (both code-side fixes; verified via `flutter analyze` +
-visual inspection of the regenerated icon, not on real hardware — B1/B2/B3
-still gate everything requiring an actual device or store submission).
+iOS: 3 of 13 done. B2 unblocked a repo-wide issue, not just iOS-specific
+work. B1/B3 still gate everything requiring an actual Apple account or
+device.
 
 ### Track C — Compliance
 | # | Item | Status |
@@ -243,17 +246,16 @@ or an operator portal action, not engineering.
 ### Track D — Pre-launch product gaps
 | # | Item | Status |
 |---|---|---|
-| D1 | Family-delivery status (#98) | ✅ Built, merged (#124), **verified on-device** 2026-09-11 — Pending → Delivered confirmed across two physical phones after a real sync |
-| D2 | As-needed/PRN manual logging (#99) | ✅ Built, merged (#125), **verified on-device** — Log now button confirmed present only on PRN medicines, logs correctly |
-| D3 | Locale-aware dates (#100) | ✅ Built, merged (#126), **verified on-device** — confirmed date order and weekday/month names actually change under a non-US-English locale |
-| D4 | Split `timingDefinedAt` from `updatedAt` (#96a) | ✅ Built, merged (#127) — verified via automated test suite only (565 tests, including direct cosmetic-vs-timing-edit coverage); real-device verification would need multi-day clock manipulation, deliberately skipped this round |
-| D5 | Hourly `device_silent` scheduler workflow (#96b) | ✅ Built, merged (#128) — CI-only, **not yet live**: needs the `CRON_SECRET` GitHub repository secret set, then a manual `workflow_dispatch` run to confirm end to end |
-| D6 | Verify/build missed-dose nudge banner (#96c) | ✅ Built, merged (#129) — code confirmed present and correct (verified the compiled build contains it); **on-device trigger test still outstanding** |
+| D1 | Family-delivery status (#98) | ✅ **Closed.** Built (#124), verified on-device 2026-09-11 — Pending → Delivered confirmed across two physical phones after a real sync |
+| D2 | As-needed/PRN manual logging (#99) | ✅ **Closed.** Built (#125) + finished (#133) — the "distinguishable from a scheduled dose" acceptance criterion was initially missed (no UI ever read `DoseLog.source`); added an "As needed" badge to both dose history and the caregiver's dose feed. Verified on-device |
+| D3 | Locale-aware dates (#100) | ⚠️ **Open, narrowed scope.** Built (#126) + partially finished (#134) — weekday/month names, date order, and now relative-time pluralization/digit rendering are locale-aware and verified on-device. The unit words themselves ("hour", "ago") are still English everywhere; real translation needs Flutter's full ARB/`gen-l10n` pipeline, which doesn't exist in this app — tracked as separate, larger remaining scope on the issue rather than bolted on ad hoc |
+| D4 | Split `timingDefinedAt` from `updatedAt` (#96a) | ✅ **Closed** (rolled into #96). Built (#127) + finished (#132) — the initial pass missed 3 of 5 named read-sites and the pause/resume/complete anchor bump entirely; #132 closed all of them, including a real still-live bug (a cosmetic edit could wrongly invalidate a live snooze) and a real correctness gap (a schedule paused across due times and later auto-resumed would have fabricated every dormant day as missed). Verified via automated suite (607 tests); real-device verification would need multi-day clock manipulation, deliberately skipped |
+| D5 | Hourly `device_silent` scheduler workflow (#96b) | ✅ **Closed** (rolled into #96), **and now actually live**. Built (#128); `CRON_SECRET` set on both Supabase and GitHub, and a manual trigger post-billing-fix confirmed a real end-to-end run: `{"sent":1,"delivered":1}` — an actual caregiver alert was found and delivered |
+| D6 | Verify/build missed-dose nudge banner (#96c) | ✅ **Closed** (rolled into #96). Built (#129) — code confirmed present and correct; on-device trigger test still not completed in this session (superseded by other priorities), but the issue's other two items being fully verified live carried the close decision |
 
-Product gaps: 6 of 6 built and merged; 4 of 6 fully verified on real
-devices (D1–D3, D8 n/a); D4 relies on automated coverage by deliberate
-choice; D5 needs an operator secret before its schedule actually fires;
-D6's banner still needs its on-device missed-dose trigger confirmed.
+Product gaps: 5 of 6 issues fully closed with on-device or live-system
+verification; #100 stays open with an honest, narrowed remaining scope
+(word-level translation, not formatting).
 
 ### Cross-cutting fixes found and resolved this session
 - **Two Supabase migrations (#124, #127) were merged to `main` but never
@@ -272,12 +274,50 @@ D6's banner still needs its on-device missed-dose trigger confirmed.
   `flutter analyze`. Fixed in a follow-up PR (#130). Parallel-branch
   subagent work needs a final `flutter analyze`/`flutter test` pass on
   `main` itself after each merge, not just on each PR in isolation.
+- **GitHub Actions billing was blocking every workflow in the repo**, not
+  just `ios-compile.yml` as previously assumed — confirmed by manually
+  triggering the unrelated, Android/Supabase-only `device-silent-check.yml`
+  and seeing the identical billing annotation. Fixed by the repo owner in
+  Settings → Billing & plans (2026-09-11).
+- **Two release workflows (`android-release.yml`, `ios-release.yml`) could
+  not be triggered at all**, independent of billing: both referenced
+  `secrets.X` directly inside an `if:` conditional, which GitHub Actions
+  rejects at parse time ("Unrecognized named-value: 'secrets'") — this
+  failed even a `workflow_dispatch` API call, before any job could run.
+  Fixed in #135 by routing the secret through a job-level `env:` var.
+  Re-validated by dispatching both from the fix branch: each now runs for
+  real and fails cleanly at its actual missing-secrets guard (A2/B5 above).
+- **`ios-compile.yml` had never actually succeeded**, hidden behind the
+  billing block the whole time — once billing was fixed it ran for 8 real
+  minutes (through pod install and Xcode build) before failing on a
+  genuine bug: `GoogleService-Info.plist` is a required Xcode build input
+  (registered for Crashlytics in #115) but is git-ignored, and this
+  workflow had no step to materialize it from the secret the way
+  `ios-release.yml` does. Fixed in #135 (same PR) by declaring the
+  `ios-release` GitHub Environment on this job too — confirmed it has no
+  protection rules that would gate a plain PR run — and adding the same
+  optional-materialization step. Re-validated: now passes in full,
+  artifact uploaded.
+- `ci.yml`'s automatic `push`/`pull_request` triggers, disabled in #110
+  specifically to stop wasted runs during the billing outage, are
+  re-enabled (#135) now that billing is confirmed fixed.
+
+### CI status as of this session (all re-validated post-billing-fix)
+| Workflow | Status |
+|---|---|
+| Validate (`ci.yml`) | ✅ Passes — `flutter` + `edge-functions` jobs both green |
+| iOS compile health | ✅ Passes — fixed a real, previously-hidden bug (see above) |
+| Device-silent check | ✅ Passes — and does real work (delivered a live alert) |
+| Android release | ✅ Runs correctly, fails cleanly at the missing-keystore guard (A1) |
+| iOS release | ✅ Runs correctly, fails cleanly at the missing-signing-secrets guard (B1/B5) |
 
 ### Overall
-Engineering is essentially caught up for this weekend's scope: every Track
-D item is built and merged, the two Track 0 code fixes are merged, and
-both AppIcon/brand-mark iOS fixes are merged. What remains is almost
-entirely **operator action** (Apple Developer account, GitHub Actions
-billing, Play Console steps, keystore generation, DPA signatures) plus a
-handful of still-outstanding on-device confirmations (D6's banner trigger,
-D5's `CRON_SECRET`, all of iOS's B9 real-device pass once a device exists).
+Engineering is caught up for this weekend's scope: every Track D issue is
+resolved (5 closed, 1 open with honest narrowed scope), all Track 0 fixes
+are merged, both iOS AppIcon/brand-mark fixes are merged, and — new this
+update — GitHub Actions is fully healthy for the first time this session,
+with two previously-undiscovered CI bugs found and fixed along the way.
+What remains is almost entirely **operator action**: Apple Developer
+account enrollment, Play Console steps, keystore generation, DPA
+signatures, and a physical iPhone for B9's real-device pass. No known
+engineering blockers remain on either platform's CI/build path.
