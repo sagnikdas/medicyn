@@ -285,7 +285,7 @@ class _DoseFeedScreenState extends State<DoseFeedScreen> {
           for (final event in dayEvents)
             Padding(
               padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-              child: _DoseEventCard(
+              child: DoseEventCard(
                 event: event,
                 clockTime: _inPatientZone(event.scheduledAt),
                 patientId: widget.patientId,
@@ -376,8 +376,9 @@ class _DoseFeedScreenState extends State<DoseFeedScreen> {
   }
 }
 
-class _DoseEventCard extends StatelessWidget {
-  const _DoseEventCard({
+class DoseEventCard extends StatelessWidget {
+  const DoseEventCard({
+    super.key,
     required this.event,
     required this.clockTime,
     required this.patientId,
@@ -449,9 +450,20 @@ class _DoseEventCard extends StatelessWidget {
                   style: text.titleMedium,
                 ),
                 const SizedBox(height: 2),
-                Text(
-                  '${visuals.label} · due ${_clock(clockTime)}',
-                  style: text.bodyMedium?.copyWith(color: visuals.color),
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        '${visuals.label} · due ${_clock(clockTime)}',
+                        overflow: TextOverflow.ellipsis,
+                        style: text.bodyMedium?.copyWith(color: visuals.color),
+                      ),
+                    ),
+                    if (event.isAsNeededLog) ...[
+                      const SizedBox(width: 8),
+                      const _PrnBadge(),
+                    ],
+                  ],
                 ),
                 if (punctuality != null) ...[
                   const SizedBox(height: 2),
@@ -474,6 +486,37 @@ class _DoseEventCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// A compact "As needed" tag for a PRN dose log — see
+/// [DoseEvent.isAsNeededLog] — so a caregiver reading the feed can tell it
+/// apart from a response to a scheduled reminder at a glance, without
+/// needing to parse [DoseEventCard]'s punctuality/attribution text.
+///
+/// Styled as the same rounded, tinted-container pill this screen already
+/// uses for [_DoseFeedScreenState._timezoneNote], just sized to sit inline
+/// next to a line of text instead of spanning the width of the list.
+class _PrnBadge extends StatelessWidget {
+  const _PrnBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: scheme.secondaryContainer,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        'As needed',
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: scheme.onSecondaryContainer,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
   }
