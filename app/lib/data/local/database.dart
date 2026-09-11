@@ -381,6 +381,11 @@ class AppDatabase extends _$AppDatabase {
   /// fresh [Schedules.updatedAt]. Without one it loses every version
   /// comparison against the server's still-active copy, and the reminder
   /// reappears on the next pull.
+  ///
+  /// It also bumps [Schedules.timingDefinedAt]. Deactivating changes what is
+  /// expected going forward (nothing), and if this schedule is ever restarted
+  /// via [resumeSchedule], [MissedDoseDetector.wasArmed] must not treat the
+  /// dormant time in between as occurrences that were actually armed.
   Future<void> deactivateSchedule(String id, {String? by}) =>
       (update(schedules)..where((t) => t.id.equals(id))).write(
         SchedulesCompanion(
@@ -389,6 +394,7 @@ class AppDatabase extends _$AppDatabase {
           pauseUntil: const Value(null),
           pendingSync: const Value(true),
           updatedAt: Value(DateTime.now()),
+          timingDefinedAt: Value(DateTime.now()),
           updatedBy: Value(by),
         ),
       );
@@ -419,6 +425,17 @@ class AppDatabase extends _$AppDatabase {
         by: by,
       );
 
+  /// Also bumps [Schedules.timingDefinedAt], covering pause, resume, and
+  /// complete (and, via [resumeSchedule], "Restart reminder" on a completed
+  /// schedule). Each of these changes what is actually expected: a pause
+  /// stops alarms from firing for a stretch, and `reminderStatus` auto-flips
+  /// a paused schedule back to `active` once `pauseUntil` elapses — without
+  /// re-anchoring here, the next [MissedDoseDetector.sweep] would see the
+  /// schedule as active for the *entire* window it inspects (it only checks
+  /// current status, not per-day historical status) and back-fill every
+  /// paused day as a missed dose nobody could have answered. Anchoring at
+  /// both pause and resume means only occurrences due after the resume (or
+  /// restart) are ever eligible to be judged.
   Future<void> _setScheduleLifecycle(
     String id, {
     required ReminderStatus status,
@@ -432,6 +449,7 @@ class AppDatabase extends _$AppDatabase {
       pauseUntil: Value(pauseUntil),
       pendingSync: const Value(true),
       updatedAt: Value(DateTime.now()),
+      timingDefinedAt: Value(DateTime.now()),
       updatedBy: Value(by),
     ),
   );
