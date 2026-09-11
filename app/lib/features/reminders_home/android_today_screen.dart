@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../core/app_settings.dart';
+import '../../core/locale_dates.dart';
 import '../../core/motion.dart';
 import '../../core/theme.dart';
 import '../../data/local/database.dart';
@@ -1270,28 +1271,6 @@ class _AgendaRowState extends State<_AgendaRow> {
 }
 
 String _dateLabel(DateTime date, {bool weekday = true}) {
-  const days = [
-    'Monday',
-    'Tuesday',
-    'Wednesday',
-    'Thursday',
-    'Friday',
-    'Saturday',
-    'Sunday',
-  ];
-  const months = [
-    'Jan',
-    'Feb',
-    'Mar',
-    'Apr',
-    'May',
-    'Jun',
-    'Jul',
-    'Aug',
-    'Sep',
-    'Oct',
-    'Nov',
-    'Dec',
-  ];
-  return '${weekday ? '${days[date.weekday - 1]}, ' : ''}${date.day} ${months[date.month - 1]}';
+  final prefix = weekday ? '${localeWeekdayName(date)}, ' : '';
+  return '$prefix${localeDayMonthAbbr(date)}';
 }

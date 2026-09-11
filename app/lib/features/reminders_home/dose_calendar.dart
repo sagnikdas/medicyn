@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../../core/locale_dates.dart';
 import '../../core/motion.dart';
 import 'day_dose_style.dart';
 import 'day_occurrences.dart';
@@ -25,23 +26,6 @@ class CalendarDayMarks {
 
   bool get isEmpty => !taken && !pending && !missed && !snoozed && !notRecorded;
 }
-
-const _months = [
-  'January',
-  'February',
-  'March',
-  'April',
-  'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December',
-];
-
-const _weekdayLetters = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
 /// Layout the collapsing sliver has to share with the painted calendar.
 /// Keep these in lockstep with [_Header], weekday row, and [_DayCell].
@@ -256,12 +240,13 @@ class _DoseCalendarState extends State<DoseCalendar> {
     final selected = _dateOnly(widget.selectedDay);
     final visibleMonth = _anchor.month;
     final todayWeekday = today.weekday % 7;
+    final weekdayLetters = localeNarrowWeekdays();
 
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         _Header(
-          title: '${_months[_anchor.month - 1]} ${_anchor.year}',
+          title: localeMonthYear(_anchor),
           week: week,
           showMonthToggle: !weekOnly,
           monthExpanded: _monthExpanded,
@@ -276,7 +261,7 @@ class _DoseCalendarState extends State<DoseCalendar> {
             for (var i = 0; i < 7; i++)
               Expanded(
                 child: Text(
-                  _weekdayLetters[i],
+                  weekdayLetters[i],
                   textAlign: TextAlign.center,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -596,7 +581,7 @@ class _Dots extends StatelessWidget {
 }
 
 String _daySemanticsLabel(DateTime day, CalendarDayMarks marks) {
-  final date = '${day.day} ${_months[day.month - 1]}';
+  final date = localeDayMonth(day);
   if (marks.isEmpty) return date;
   final bits = <String>[
     if (marks.taken) 'taken',

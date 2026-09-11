@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../core/locale_dates.dart';
 import '../../core/widgets/medicyn_platform.dart';
 import '../../data/local/tables.dart';
 
@@ -70,8 +71,6 @@ class MedicineFieldsForm extends StatelessWidget {
   /// fields were entered by hand (manual entry, or editing an existing
   /// reminder) and there is no score to show.
   final double? confidence;
-
-  static const _dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
   Widget _fieldPair(Widget left, Widget right) {
     return LayoutBuilder(
@@ -179,7 +178,7 @@ class MedicineFieldsForm extends StatelessWidget {
             children: List.generate(7, (i) {
               final selected = daysOfWeek.contains(i);
               return FilterChip(
-                label: Text(_dayLabels[i]),
+                label: Text(localeShortWeekdayForSundayIndex(i)),
                 selected: selected,
                 onSelected: (v) => onDayToggled(i, v),
               );

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/locale_dates.dart';
 import '../../core/widgets/medicyn_layout.dart';
 import '../../data/export/emergency_card_export_service.dart';
 import '../../data/local/database.dart';
@@ -20,25 +21,7 @@ const _bloodGroups = [
   'O-',
 ];
 
-const _months = [
-  'Jan',
-  'Feb',
-  'Mar',
-  'Apr',
-  'May',
-  'Jun',
-  'Jul',
-  'Aug',
-  'Sep',
-  'Oct',
-  'Nov',
-  'Dec',
-];
-
-String _shortDate(DateTime value) {
-  final local = value.toLocal();
-  return '${local.day} ${_months[local.month - 1]} ${local.year}';
-}
+String _shortDate(DateTime value) => localeShortDate(value.toLocal());
 
 /// N3: one tap from Profile, plus a printable copy -- deliberately not a
 /// lock-screen surface. Reads the medicines list live from the local

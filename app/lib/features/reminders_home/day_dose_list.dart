@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/locale_dates.dart';
 import '../../core/motion.dart';
 import '../../core/theme.dart';
 import '../../core/widgets/chart_grid.dart';
@@ -7,22 +8,6 @@ import '../../core/widgets/medicyn_motion.dart';
 import 'day_dose_style.dart';
 import 'day_occurrences.dart';
 import 'reminder_copy.dart';
-
-const _weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-const _months = [
-  'January',
-  'February',
-  'March',
-  'April',
-  'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December',
-];
 
 /// Quiet weekly count — facts only, no streak and no scolding.
 class WeekAdherenceLine extends StatelessWidget {
@@ -612,7 +597,7 @@ String _dayHeading(DateTime day, DateTime now) {
   final d = calendarDay(day);
   final t = calendarDay(now);
   final delta = d.difference(t).inDays;
-  final date = '${_weekdays[d.weekday - 1]} ${d.day} ${_months[d.month - 1]}';
+  final date = '${localeWeekdayAbbr(d)} ${localeDayMonth(d)}';
   if (delta == 0) return 'Today, $date';
   if (delta == -1) return 'Yesterday, $date';
   if (delta == 1) return 'Tomorrow, $date';

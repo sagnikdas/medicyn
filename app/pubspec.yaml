@@ -65,6 +65,10 @@ dependencies:
   # 2.4.7 are the newest versions clear of both.
   file_picker: ^11.0.3
   pdfrx: ^2.4.7
+  # Locale-aware weekday/month names and date ordering (core/locale_dates.dart)
+  # -- not a Flutter dependency here, so it isn't already pulled in via
+  # flutter_localizations, which this app doesn't use (see main.dart).
+  intl: ^0.20.3
 
 dev_dependencies:
   flutter_test:
