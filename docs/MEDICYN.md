@@ -1,6 +1,6 @@
 # Medicyn — Feature Checklist
 
-**As of:** 8 September 2026, `main` @ `457b6a4`.
+**As of:** 11 September 2026, `main` @ `bbd7b88`.
 
 A medicine reminder for an elderly parent, and a way for one adult child in
 another city to know it's working. The **parent** photographs a label, says
@@ -220,16 +220,20 @@ Device script: [`testing/REAL-DEVICE-VALIDATION-TEST-PLAN.md`](testing/REAL-DEVI
       signing key and upload key), add both to Supabase Client IDs — full
       walkthrough restored to `app/README.md` § Auth (was in the deleted
       root `README.md`, never migrated during the docs consolidation).
-      **New risk found while restoring it:** the debug OAuth client was
-      last confirmed working 2026-08-18, but the app's package name
-      renamed `com.sagnikdas.dosely` → `com.sagnikdas.medicyn` on
-      2026-09-03 — an Android OAuth client is keyed on package name *and*
-      SHA-1 together, so the rename likely orphaned it even though the
-      debug keystore itself never changed. Verify debug sign-in still
-      works with a fresh `flutter run` before assuming it does.
+      **The 2026-09-03 package-rename risk is now resolved:** debug sign-in
+      was verified working post-rename on 2026-09-11 — two physical Android
+      devices each completed a real Google Sign-In and successfully formed
+      a care link end to end. Still needed: the *release*-signing-key SHA-1
+      client, which debug sign-in cannot substitute for.
 - [ ] Closed testing for the required period
-- [ ] Store listing written to the caregiver child, not the parent
-- [ ] Overlay-install verification on the Galaxy M33
+- [x] Store listing written to the caregiver child, not the parent — already
+      done, just not previously reflected here: full short/long-description
+      copy exists in `docs/play-store/closed-testing.md` (steps 19-22),
+      caregiver-voiced.
+- [x] Overlay-install verification on the Galaxy M33 — verified 2026-09-11:
+      the debug build was installed, then reinstalled over the existing
+      install on the same physical Galaxy M33 (`flutter install` reported
+      "Uninstalling old version..." and completed cleanly).
 
 ### Product gaps — before broad acquisition
 - [x] System accessibility scaling — verified on-device (emulator, system
@@ -270,18 +274,27 @@ Device script: [`testing/REAL-DEVICE-VALIDATION-TEST-PLAN.md`](testing/REAL-DEVI
 - [x] Corrections — shipped: the `DoseLogContest` note feature in
       `dose_history_screen.dart` lets a user dispute/correct a logged dose,
       reachable from the home screen and review/edit screen.
-- [ ] As-needed (PRN) logging — no manual "log now" action exists for
-      `FrequencyType.asNeeded` medicines, since `expected_doses.dart`
-      deliberately yields no occurrences for them. Tracked in
-      [issue #99](https://github.com/sagnikdas/medicyn/issues/99).
+- [x] As-needed (PRN) logging — shipped for
+      [issue #99](https://github.com/sagnikdas/medicyn/issues/99): a "Log
+      now" button on the medicine's card in Plan (the only screen a PRN
+      medicine ever renders on, since `expectedDoses()` still yields no
+      Today occurrences for it) calls the new `recordAsNeededDoseTaken()`, a
+      thin wrapper around the existing `recordDoseTaken()` — so a PRN dose
+      lands in the same `dose_logs` table, stock decrement, and sync path as
+      any scheduled Taken action. Verified on-device.
 - [x] Complete export — verified: `data_export_service.dart` covers
       medicines, schedules, dose logs, contest notes, today-care-reminders
       and consents locally, plus profile, care_links, care_alerts and
       medicine_edits from Supabase, with a `remote_gaps` field if a remote
       fetch fails. Matches what `compliance/COMPLIANCE.md` §2.4 asked for.
-- [ ] Locale-aware dates — no `DateFormat(` usage anywhere in the app;
-      weekday/month names and relative-time strings are hardcoded English
-      arrays. Tracked in [issue #100](https://github.com/sagnikdas/medicyn/issues/100).
+- [x] Locale-aware dates — shipped for
+      [issue #100](https://github.com/sagnikdas/medicyn/issues/100): added
+      `intl` as a direct dependency and `lib/core/locale_dates.dart`, a set
+      of `DateFormat`-backed helpers driven by the device's locale, replacing
+      every hardcoded weekday/month array (9 call sites across Today, the
+      calendar, change history, emergency card, the medicine form, and both
+      PDF exports). Formatting only — surrounding English UI copy is
+      untouched. Verified on-device with a non-US-English locale.
 - [x] Insights calculation and accessibility fixes — verified: the named
       bug ("most-consistent" period was hardcoded to `DayPart.morning`) is
       fixed; `insights_screen.dart` now computes rates for all `DayPart`
@@ -351,22 +364,29 @@ hardware (see below).
       None of this has run on real hardware yet — no iPhone has been
       available in any session so far. Script ready at
       [`docs/ios/REAL_DEVICE_QA.md`](ios/REAL_DEVICE_QA.md).
-- [ ] Move the brand mark off the Android resource path — `MedicynBrandMark`
-      (`medicyn_chrome.dart`) still points `Image.asset` at
-      `android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png`. Renders
-      correctly on iOS today regardless (Flutter bundles it as a plain
-      asset; confirmed on Simulator) — this is a path-hygiene cleanup, not a
-      functional gap.
+- [x] Move the brand mark off the Android resource path — fixed:
+      `MedicynBrandMark` now points at `assets/branding/app_icon.png` (a
+      copy of the icon; the original Android mipmap file stays in place for
+      Android's own manifest), declared in `pubspec.yaml`.
 - [ ] Apple Developer / App Store Connect account, team, certificates, profiles, app record, export-compliance classification
 - [ ] iOS Google OAuth client — code side is ready
       (`GoogleAuthConfig.iosClientId`, and `Info.plist`'s `GIDClientID`/
       URL-scheme block is pre-written as a comment) and just needs a real
-      client id from Google Cloud Console
+      client id from Google Cloud Console. A real bug was found and fixed
+      along the way: `GoogleAuthConfig.isConfigured` only ever checked
+      `serverClientId` (which has a real default), so it silently returned
+      `true` on iOS even with no iOS client configured — `signInWithGoogle()`
+      would skip its friendly "not configured" error and hit a raw native
+      SDK failure instead. Now checks the platform-appropriate id.
 - [ ] APNs key uploaded to Firebase (Firebase's iOS app registration and the
       Crashlytics dSYM upload phase are already done — see Live
       infrastructure, above)
-- [ ] Final branded AppIcon artwork — the asset slot is populated, but with
-      Flutter's default logo, not Medicyn's (confirmed by opening the file)
+- [ ] Final branded AppIcon artwork — the stock Flutter default logo that
+      was there is replaced: all 15 `AppIcon.appiconset` sizes are now
+      regenerated from Medicyn's actual brand icon. The source is only
+      192×192, so the 1024×1024 App Store marketing slot is a ~5.3x upscale
+      and will look soft at full size — still needs a properly produced
+      1024×1024 master before actual submission.
 - [ ] Final App Store screenshots and copy
 
 ### Compliance operator actions
@@ -408,27 +428,29 @@ marked below are tracked in
 here was deliberately kept as-is.
 
 - **A sweep forfeits backfill from before a schedule was last edited.**
-  `MissedDoseDetector.wasArmed` bounds every occurrence on the schedule's
-  `updatedAt`, because the alarms actually armed on the device reflect its
-  *current* definition. Without that bound, adding a 9am reminder reported
-  three days of 8am doses as skipped — nine of the eleven missed doses in the
-  live database were fabricated that way, and each would have been a
-  notification on a family member's phone. Sweeps run on every foreground, so
-  in practice almost nothing is lost, and silence beats a false alarm. The
-  cost is that *any* edit resets this, including a cosmetic one (a spelling
-  fix) that never changed what alarms actually fired. **Fix tracked in #96:**
-  split a new `timingDefinedAt` from `updatedAt` so only a timing-relevant
-  edit resets the anchor.
+  Fixed for [issue #96a](https://github.com/sagnikdas/medicyn/issues/96):
+  `Schedules.timingDefinedAt` now splits off `updatedAt` (Drift v11→v12 +
+  a Supabase migration), and `MissedDoseDetector.wasArmed` bounds every
+  occurrence on it instead. Only a timing-relevant edit (`frequencyType`,
+  `times`, `daysOfWeek`, `intervalHours`, `startDate`, `endDate`) moves the
+  anchor forward — a cosmetic edit (a name spelling fix, a dosage note)
+  leaves it alone. Backfilled to the existing `updatedAt` value for rows
+  that predate the column, so no existing schedule's behavior changed.
+  Covered by unit and sweep-level tests, not yet independently verified on
+  a real device across a multi-day gap.
 - **Every-X-hours doses share one lattice** between the alarm scheduler and
-  missed-dose detection (`intervalDoseSequence`). The origin is the calendar
-  day of `updatedAt`, so the same `wasArmed` rule applies, and the same #96
-  fix covers it.
-- **A missed dose is only noticed while the parent's app runs.** The sweep is
-  device-side, on foreground. A parent who does not open the app for two days
-  generates no missed doses and therefore no alerts. A `device_silent` alert
-  path already exists end-to-end (client heartbeat, RPC, push copy) but
-  nothing ever calls it — no scheduler exists in the repo. **Fix tracked in
-  #96:** an hourly GitHub Actions workflow to invoke it.
+  missed-dose detection (`intervalDoseSequence`). Same fix as above — the
+  origin now bounds on `timingDefinedAt` too.
+- **A missed dose is only noticed while the parent's app runs.** Fixed for
+  [issue #96b](https://github.com/sagnikdas/medicyn/issues/96): the
+  server-side `device_silent` path (the `isCron` branch in `notify-care`,
+  the `silent_devices_due()` RPC, `verify_jwt = false` set specifically for
+  this) already existed end-to-end but nothing ever called it.
+  `.github/workflows/device-silent-check.yml` now does so hourly. **Still
+  needs the `CRON_SECRET` GitHub repository secret set** before a scheduled
+  run will actually succeed — until then every run fails fast with a clear
+  `::error::` on the missing secret, which is safe but means this is not yet
+  live.
 - **A caregiver's edit re-arms the parent's alarms** via the silent
   `data_changed` push, but the parent's phone still has to be reachable by
   FCM. Offline or force-stopped, the change sits until the next foreground
@@ -440,10 +462,16 @@ here was deliberately kept as-is.
 - **An alert is only offered for 24 hours** (`CareNotifier.announceWindow`).
   A dose missed longer ago is in the feed but will never ring a phone.
   Reviewed and kept as-is.
-- **The parent is told nothing when an alert fires.** Resolved: a gentle
-  in-app banner on the Today screen when one of the parent's own doses is
-  logged missed, worded as a supportive nudge rather than a report that the
-  caregiver was told. **Fix tracked in #96.**
+- **The parent is told nothing when an alert fires.** Actually shipped now
+  for [issue #96c](https://github.com/sagnikdas/medicyn/issues/96) — a
+  prior note claiming this was "Resolved" was itself stale (that commit only
+  ever changed this doc's text, confirmed by re-auditing the code and git
+  history). `MissedDoseNudgeCard` on the Today screen now shows a
+  dismissible, supportive nudge ("Looks like you missed a dose earlier — no
+  worries...") whenever one of the parent's own doses is logged missed —
+  never phrased as a report that a caregiver was told, and never shown for
+  someone else's dose. Dismissal is tracked per-occurrence. Not yet verified
+  on a real device.
 - **Sibling sharing is impossible** by design. Nobody can be both a parent
   and a caregiver in different pairs.
 - **Voice input is not on-device.** `SpeechListenOptions.onDevice` is false,

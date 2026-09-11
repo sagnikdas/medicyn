@@ -175,80 +175,109 @@ Worth fixing regardless of when the underlying work happens:
 
 ---
 
-## Execution status — 11 September 2026
+## Execution status — 11 September 2026 (updated after this session's merges)
 
-Nothing on this checklist has been executed yet (this status was taken
-minutes after the plan itself was written). Re-check this section as work
-lands rather than trusting it stays current.
+All engineering-track items scoped for this session are now merged to
+`main` (PRs #122–#130) and, except where noted, verified on two physical
+Android devices. Re-check this section as further work lands.
 
 ### Track 0
 | # | Item | Status |
 |---|---|---|
-| 0.1 | Verify Android OAuth survived the package rename | ❌ Not verified |
-| 0.2 | Fix `GoogleAuthConfig.isConfigured` ignoring iOS client ID | ❌ Not fixed |
-| 0.3 | Fix stale `pages.yml` reference in Play Data Safety doc | ❌ Not fixed |
+| 0.1 | Verify Android OAuth survived the package rename | ✅ Verified 2026-09-11 — real Google Sign-In completed on two physical devices, care link formed end to end |
+| 0.2 | Fix `GoogleAuthConfig.isConfigured` ignoring iOS client ID | ✅ Fixed, merged (#123) |
+| 0.3 | Fix stale `pages.yml` reference in Play Data Safety doc | ✅ Fixed, merged (#122) |
 
 ### Track A — Android
 | # | Item | Status |
 |---|---|---|
-| A1 | Release keystore + `key.properties` | ❌ Not done (template ready) |
+| A1 | Release keystore + `key.properties` | ❌ Not done (template ready) — operator action |
 | A2 | `flutter build appbundle --release` succeeds | ⏸ Blocked on A1 |
-| A3 | Register Android OAuth client per SHA-1 | ❌ Not done (depends on 0.1) |
-| A4 | Play Console Data Safety form | ✅ Answers ready, ❌ not submitted |
-| A5 | `SCHEDULE_EXACT_ALARM` Play declaration | ✅ Justification ready, ❌ not submitted |
-| A6 | Upload signed bundle to internal testing | ❌ Not done |
-| A7 | Start closed testing | ❌ Not started — runbook + store copy fully written |
-| A8 | Galaxy M33 overlay-install check | ❌ Not done, zero evidence it ran |
+| A3 | Register Android OAuth client per SHA-1 | ❌ Not done — operator action; debug sign-in itself is now confirmed working (0.1) |
+| A4 | Play Console Data Safety form | ✅ Answers ready, ❌ not submitted — operator action |
+| A5 | `SCHEDULE_EXACT_ALARM` Play declaration | ✅ Justification ready, ❌ not submitted — operator action |
+| A6 | Upload signed bundle to internal testing | ❌ Not done — operator action |
+| A7 | Start closed testing | ❌ Not started — runbook + store copy fully written, operator action |
+| A8 | Galaxy M33 overlay-install check | ✅ Verified 2026-09-11 — reinstalled over an existing install on the physical M33, clean |
 
-Android: 0 of 8 executed, but A4/A5/A7 have zero remaining prep — pure
-execution once someone sits down to do it.
+Android: 2 of 8 done (both engineering-adjacent verifications this session
+could actually run). The rest are Play Console/keystore operator actions —
+nothing left blocking them technically.
 
 ### Track B — iOS
 | # | Item | Status |
 |---|---|---|
-| B1 | Apple Developer Program enrollment | ❌ Not done |
-| B2 | Restore GitHub Actions billing | ❌ Not done — CI still fails in ~9s |
+| B1 | Apple Developer Program enrollment | ❌ Not done — operator action |
+| B2 | Restore GitHub Actions billing | ❌ Not done — CI still fails in ~9s — operator action |
 | B3 | Physical iPhone access | ❌ None available in any session |
-| B4 | Wire iOS Google OAuth client | ❌ Not done (code ready, needs real client ID) |
+| B4 | Wire iOS Google OAuth client | ❌ Not done (code ready, needs real client ID) — operator action |
 | B5 | Apple Portal: Push Notifications capability + cert/profile | ⏸ Blocked on B1 |
-| B6 | Firebase: upload APNs key | ❌ Not done |
-| B7 | Replace AppIcon artwork | ❌ Not done — currently stock Flutter logo |
-| B8 | Fix `MedicynBrandMark` asset path | ❌ Not done |
+| B6 | Firebase: upload APNs key | ❌ Not done — operator action |
+| B7 | Replace AppIcon artwork | ✅ Fixed, merged (#123) — all 15 sizes regenerated from the brand icon; ⚠️ source is only 192×192, so the 1024×1024 marketing slot is a soft upscale, still needs a real master before submission |
+| B8 | Fix `MedicynBrandMark` asset path | ✅ Fixed, merged (#123) |
 | B9 | Real-device validation pass | ⏸ Blocked on B3, 0 of ~15 checks done |
 | B10 | App Store Connect app record | ⏸ Blocked on B1 |
 | B11 | App Store screenshots + copy | ❌ Not done |
 | B12 | ASC API key for TestFlight | ⏸ Blocked on B10 |
 | B13 | TestFlight upload | ⏸ Blocked on B5/B12 |
 
-iOS: 0 of 13 done. B1/B2/B3 gate almost everything else in this track.
+iOS: 2 of 13 done (both code-side fixes; verified via `flutter analyze` +
+visual inspection of the regenerated icon, not on real hardware — B1/B2/B3
+still gate everything requiring an actual device or store submission).
 
 ### Track C — Compliance
 | # | Item | Status |
 |---|---|---|
-| C1 | Accept Supabase DPA | ❌ Not done (Google Cloud DPA already accepted) |
-| C2 | Anthropic DPA + zero-retention | ❌ Not done |
+| C1 | Accept Supabase DPA | ❌ Not done (Google Cloud DPA already accepted) — operator action |
+| C2 | Anthropic DPA + zero-retention | ❌ Not done — operator action |
 | C3 | Decide EU/UK data-region strategy | ❌ Not decided |
-| C4 | Appoint Art. 27 EU rep (or restrict EEA) | ❌ Not done |
+| C4 | Appoint Art. 27 EU rep (or restrict EEA) | ❌ Not done — operator action |
 | C5 | Re-do the DPIA | ❌ Not done |
 | C6 | Refresh the ROPA | ❌ Stale since 2026-08-20 |
 | C7 | Build App Store Privacy Nutrition Label | ❌ Doesn't exist yet |
-| C8 | Same `pages.yml` fix as 0.3 | ❌ Not fixed |
+| C8 | Same `pages.yml` fix as 0.3 | ✅ Fixed, merged (#122) |
 
-Compliance: 0 of 8 done.
+Compliance: 1 of 8 done. Everything else here is a business/legal decision
+or an operator portal action, not engineering.
 
 ### Track D — Pre-launch product gaps
 | # | Item | Status |
 |---|---|---|
-| D1 | Family-delivery status (#98) | ❌ Not built |
-| D2 | As-needed/PRN manual logging (#99) | ❌ Not built |
-| D3 | Locale-aware dates (#100) | ❌ Not built |
-| D4 | Split `timingDefinedAt` from `updatedAt` (#96a) | ❌ Not built |
-| D5 | Hourly `device_silent` scheduler workflow (#96b) | ❌ Not built |
-| D6 | Verify/build missed-dose nudge banner (#96c) | ⚠️ Marked done in `MEDICYN.md`, unconfirmed in code |
+| D1 | Family-delivery status (#98) | ✅ Built, merged (#124), **verified on-device** 2026-09-11 — Pending → Delivered confirmed across two physical phones after a real sync |
+| D2 | As-needed/PRN manual logging (#99) | ✅ Built, merged (#125), **verified on-device** — Log now button confirmed present only on PRN medicines, logs correctly |
+| D3 | Locale-aware dates (#100) | ✅ Built, merged (#126), **verified on-device** — confirmed date order and weekday/month names actually change under a non-US-English locale |
+| D4 | Split `timingDefinedAt` from `updatedAt` (#96a) | ✅ Built, merged (#127) — verified via automated test suite only (565 tests, including direct cosmetic-vs-timing-edit coverage); real-device verification would need multi-day clock manipulation, deliberately skipped this round |
+| D5 | Hourly `device_silent` scheduler workflow (#96b) | ✅ Built, merged (#128) — CI-only, **not yet live**: needs the `CRON_SECRET` GitHub repository secret set, then a manual `workflow_dispatch` run to confirm end to end |
+| D6 | Verify/build missed-dose nudge banner (#96c) | ✅ Built, merged (#129) — code confirmed present and correct (verified the compiled build contains it); **on-device trigger test still outstanding** |
 
-Product gaps: 0 of 6 resolved.
+Product gaps: 6 of 6 built and merged; 4 of 6 fully verified on real
+devices (D1–D3, D8 n/a); D4 relies on automated coverage by deliberate
+choice; D5 needs an operator secret before its schedule actually fires;
+D6's banner still needs its on-device missed-dose trigger confirmed.
 
-**Overall:** nothing executed yet. Android has the least remaining prep
-(most answers/copy already drafted — mostly execution plus the one
-unverified OAuth risk). iOS has the most external blockers stacked before
-any engineering can even be tested (B1/B2/B3 gate almost everything else).
+### Cross-cutting fixes found and resolved this session
+- **Two Supabase migrations (#124, #127) were merged to `main` but never
+  applied to the live hosted database** — found when real device testing
+  broke with a sync failure ("Could not load your day", broken care link).
+  Fixed by running `supabase db push`; this is now a standing gap in the
+  PR-merge process worth automating or checklisting (a merged migration
+  file is not the same as a deployed one).
+- **Migration timestamp collision**: #124 and #127 independently created
+  migrations both stamped `20260911120000`. Renamed one to `...120001`
+  before pushing — harmless in content (different tables) but real
+  migration-ordering hygiene.
+- **`main` was left broken between merges**: #127 (adds required
+  `Schedule.timingDefinedAt`) and #129 (a test fixture predating that field)
+  merged cleanly at the git level with no text conflict, but broke
+  `flutter analyze`. Fixed in a follow-up PR (#130). Parallel-branch
+  subagent work needs a final `flutter analyze`/`flutter test` pass on
+  `main` itself after each merge, not just on each PR in isolation.
+
+### Overall
+Engineering is essentially caught up for this weekend's scope: every Track
+D item is built and merged, the two Track 0 code fixes are merged, and
+both AppIcon/brand-mark iOS fixes are merged. What remains is almost
+entirely **operator action** (Apple Developer account, GitHub Actions
+billing, Play Console steps, keystore generation, DPA signatures) plus a
+handful of still-outstanding on-device confirmations (D6's banner trigger,
+D5's `CRON_SECRET`, all of iOS's B9 real-device pass once a device exists).
