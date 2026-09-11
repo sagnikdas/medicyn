@@ -28,7 +28,7 @@ class MedicynBrandMark extends StatelessWidget {
         ClipRRect(
           borderRadius: BorderRadius.circular(compact ? 8 : 10),
           child: Image.asset(
-            'android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png',
+            'assets/branding/app_icon.png',
             width: compact ? 34 : 40,
             height: compact ? 34 : 40,
             filterQuality: FilterQuality.high,
