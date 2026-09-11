@@ -30,6 +30,7 @@ void main() {
     bool active = true,
     bool deleted = false,
     DateTime? updatedAt,
+    DateTime? timingDefinedAt,
   }) => Schedule(
     id: id,
     medicineId: medicineId,
@@ -40,9 +41,11 @@ void main() {
     active: active,
     createdAt: DateTime(2026, 8, 1),
     updatedAt: updatedAt ?? longEstablished,
-    // Mirrors updatedAt, same as these tests treated the two before this
-    // column existed — see expected_doses.dart's everyXHours branch.
-    timingDefinedAt: updatedAt ?? longEstablished,
+    // Mirrors updatedAt by default, same as these tests treated the two
+    // before this column existed — see expected_doses.dart's everyXHours
+    // branch. A caller that wants to exercise a cosmetic edit (updatedAt
+    // moves, timingDefinedAt does not) passes timingDefinedAt explicitly.
+    timingDefinedAt: timingDefinedAt ?? updatedAt ?? longEstablished,
     updatedBy: null,
     pendingSync: false,
     deleted: deleted,
@@ -216,6 +219,55 @@ void main() {
         ],
       );
       expect(occs.single.status, DayDoseStatus.upcoming);
+    },
+  );
+
+  test(
+    'a cosmetic-only edit (updatedAt moves, timingDefinedAt does not) does '
+    'not invalidate a live snooze',
+    () {
+      // Regression test for issue #96: a cosmetic edit — e.g. fixing a typo
+      // in the medicine's name or notes — bumps Schedules.updatedAt but must
+      // not touch Schedules.timingDefinedAt (see
+      // scheduleTimingChanged/review_edit_screen.dart). Before this fix,
+      // day_occurrences.dart's stale-snooze guard compared against
+      // updatedAt, so any edit at all — cosmetic or not — after a snooze was
+      // logged would wrongly invalidate that still-live snooze.
+      final due = DateTime(2026, 8, 21, 8, 0);
+      final loggedAt = DateTime(2026, 8, 21, 11, 55);
+      // The cosmetic edit lands after the snooze was logged but before the
+      // check, at 11:58 — advancing updatedAt while leaving the
+      // long-established timingDefinedAt alone.
+      final cosmeticEditAt = DateTime(2026, 8, 21, 11, 58);
+
+      final occs = onDay(
+        day: now,
+        at: DateTime(2026, 8, 21, 12, 0),
+        items: [
+          item(
+            s: schedule(
+              updatedAt: cosmeticEditAt,
+              timingDefinedAt: longEstablished,
+            ),
+          ),
+        ],
+        logs: [
+          record(
+            scheduledAt: due,
+            loggedAt: loggedAt,
+            action: DoseAction.snoozed,
+          ),
+        ],
+      );
+
+      expect(
+        occs[0].status,
+        DayDoseStatus.snoozed,
+        reason:
+            'the snooze is still within its ten-minute window and the edit '
+            'that happened after it was purely cosmetic, so it must still '
+            'be recognized as live',
+      );
     },
   );
 

@@ -714,7 +714,7 @@ class NotificationService {
             ? times.first
             : (label: '08:00', clock: (hour: 8, minute: 0));
         final now = tz.TZDateTime.now(tz.local);
-        final defined = schedule.updatedAt.toLocal();
+        final defined = schedule.timingDefinedAt.toLocal();
         final origin = DateTime(
           defined.year,
           defined.month,

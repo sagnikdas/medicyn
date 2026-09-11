@@ -215,7 +215,7 @@ List<DayOccurrence> occurrencesOnDay({
             .where(
               (due) => MissedDoseDetector.wasArmed(
                 due,
-                definedAt: schedule.updatedAt,
+                definedAt: schedule.timingDefinedAt,
               ),
             )
             .toList();
@@ -227,7 +227,7 @@ List<DayOccurrence> occurrencesOnDay({
         .where(
           (log) =>
               log.action != DoseAction.snoozed ||
-              !log.loggedAt.isBefore(schedule.updatedAt),
+              !log.loggedAt.isBefore(schedule.timingDefinedAt),
         )
         .toList();
     for (var i = 0; i < dues.length; i++) {

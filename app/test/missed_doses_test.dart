@@ -438,6 +438,104 @@ void main() {
     );
   });
 
+  group('pausing and resuming across due times', () {
+    /// Mirrors the write [AppDatabase._setScheduleLifecycle] now performs on
+    /// pause/resume/complete (and [AppDatabase.deactivateSchedule]): both
+    /// `updatedAt` and `timingDefinedAt` move to the moment of the
+    /// transition. Written directly (rather than calling
+    /// `db.pauseSchedule`/`resumeSchedule`, which stamp the real wall clock)
+    /// so each transition can be pinned to a moment inside this test's
+    /// simulated timeline.
+    Future<void> setLifecycleAt({
+      required ReminderStatus status,
+      required bool active,
+      DateTime? pauseUntil,
+      required DateTime at,
+      bool bumpAnchor = true,
+    }) => db.upsertSchedule(SchedulesCompanion.insert(
+      id: scheduleId,
+      medicineId: medicineId,
+      frequencyType: FrequencyType.daily.name,
+      times: const ['08:00'],
+      status: Value(status.name),
+      active: Value(active),
+      pauseUntil: Value(pauseUntil),
+      updatedAt: Value(at),
+      timingDefinedAt: bumpAnchor ? Value(at) : const Value.absent(),
+    ));
+
+    test(
+      'a schedule paused across some due times and then resumed does not '
+      'fabricate missed doses for the paused period',
+      () async {
+        await givenSchedule(times: ['08:00'], definedAt: longEstablished);
+
+        // Paused the evening of the 16th, before the 17th's and 18th's
+        // 08:00 ever rang.
+        await setLifecycleAt(
+          status: ReminderStatus.paused,
+          active: false,
+          at: DateTime(2026, 8, 16, 20, 0),
+        );
+
+        // Resumed this morning at 07:00, before today's 08:00 — the only
+        // occurrence that actually rang since the resume.
+        await setLifecycleAt(
+          status: ReminderStatus.active,
+          active: true,
+          at: DateTime(2026, 8, 19, 7, 0),
+        );
+
+        final count = await sweep();
+
+        expect(
+          count,
+          1,
+          reason:
+              "only the 19th's 08:00 was ever armed; the 17th's and 18th's "
+              'were paused and no alarm ever rang for them',
+        );
+        final missed = await missedLogs();
+        expect(missed.single.scheduledAt, DateTime(2026, 8, 19, 8, 0));
+      },
+    );
+
+    test(
+      'without re-anchoring at resume, the paused days would be wrongly '
+      'reported as missed',
+      () async {
+        // The same timeline as above, but only pause bumps the anchor and
+        // resume does not — the exact bug this fix closes. Kept as a named
+        // failure-mode test rather than only asserting the fixed behavior's
+        // absence.
+        await givenSchedule(times: ['08:00'], definedAt: longEstablished);
+
+        await setLifecycleAt(
+          status: ReminderStatus.paused,
+          active: false,
+          at: DateTime(2026, 8, 16, 20, 0),
+        );
+        await setLifecycleAt(
+          status: ReminderStatus.active,
+          active: true,
+          at: DateTime(2026, 8, 19, 7, 0),
+          bumpAnchor: false,
+        );
+
+        final count = await sweep();
+
+        expect(
+          count,
+          3,
+          reason:
+              'the stale pause-time anchor (16th 20:00) lets the whole '
+              "window through as 'armed', including the 17th's and 18th's "
+              'paused 08:00s that nothing ever rang for',
+        );
+      },
+    );
+  });
+
   group('wasArmed', () {
     final definedAt = DateTime(2026, 8, 19, 8, 0);
 
