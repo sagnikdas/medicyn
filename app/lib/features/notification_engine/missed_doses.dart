@@ -64,7 +64,7 @@ class MissedDoseDetector {
   }
 
   /// Whether an occurrence at [due] was ever actually armed as an alarm, given
-  /// a schedule last defined at [definedAt] ([Schedules.updatedAt]).
+  /// a schedule last defined at [definedAt] ([Schedules.timingDefinedAt]).
   ///
   /// This is the guard against inventing history. [expectedDoses] answers "when
   /// would this schedule have fired", with no idea when the schedule started
@@ -74,19 +74,28 @@ class MissedDoseDetector {
   /// list; since push landed it is a notification on a family member's phone
   /// telling them their mother stopped taking her medication.
   ///
-  /// It bounds on `updatedAt` rather than `createdAt`, which is the stronger
-  /// claim of the two. `createdAt` would fix the case above and still leave its
-  /// twin: edit a reminder from 08:00 to 09:00 and the previous days get judged
-  /// at 09:00, a time no alarm was ever set for. The alarms actually armed on
-  /// the device always reflect the schedule's *current* definition — `reconcile`
-  /// re-arms them from scratch on every foreground — so the last time that
-  /// definition changed is the honest earliest point we can speak about.
+  /// It bounds on `timingDefinedAt` rather than `createdAt`, which is the
+  /// stronger claim of the two. `createdAt` would fix the case above and still
+  /// leave its twin: edit a reminder from 08:00 to 09:00 and the previous days
+  /// get judged at 09:00, a time no alarm was ever set for. The alarms actually
+  /// armed on the device always reflect the schedule's *current* definition —
+  /// `reconcile` re-arms them from scratch on every foreground — so the last
+  /// time that definition changed is the honest earliest point we can speak
+  /// about.
   ///
-  /// The cost is that an edit forfeits any not-yet-recorded backfill before it.
-  /// That is a small and bounded loss: sweeps run on every foreground, so past
-  /// occurrences have usually been judged already, and anything recorded stays
-  /// recorded. It also sits the right way round with this file's rule that
-  /// silence beats a false alarm.
+  /// `timingDefinedAt` — not `updatedAt` — because not every edit changes a
+  /// definition an alarm cares about. `updatedAt` also moves for a cosmetic
+  /// edit, like fixing a typo in the medicine's name, that never changed what
+  /// time anything actually rings; bounding on it would forfeit backfill for a
+  /// reason unrelated to the alarms themselves. `timingDefinedAt` only moves
+  /// when a timing-relevant field actually changes — see
+  /// `scheduleTimingChanged`.
+  ///
+  /// The cost is that a genuine timing edit forfeits any not-yet-recorded
+  /// backfill before it. That is a small and bounded loss: sweeps run on every
+  /// foreground, so past occurrences have usually been judged already, and
+  /// anything recorded stays recorded. It also sits the right way round with
+  /// this file's rule that silence beats a false alarm.
   ///
   /// Strictly after, mirroring `_nextInstanceOfTime`'s own `isAfter(now)`: a
   /// dose due at the very instant a schedule was saved is not armed for today,
@@ -142,7 +151,7 @@ class MissedDoseDetector {
         final due = occurrences[i];
         // Never happened as far as this device is concerned — the schedule did
         // not exist yet, or not in this shape. See [wasArmed].
-        if (!wasArmed(due, definedAt: schedule.updatedAt)) continue;
+        if (!wasArmed(due, definedAt: schedule.timingDefinedAt)) continue;
         if (!due.isBefore(windowEnd)) continue; // still within grace
         // A response counts for this dose if it landed between this dose and
         // the next one. Matching on the log's own `scheduledAt` would be

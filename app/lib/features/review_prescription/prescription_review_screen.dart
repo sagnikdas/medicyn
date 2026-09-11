@@ -446,6 +446,9 @@ class _PrescriptionReviewScreenState extends State<PrescriptionReviewScreen> {
         pendingSync: const Value(true),
         createdAt: Value(savedAt),
         updatedAt: Value(savedAt),
+        // A brand-new schedule: its timing is defined right now, same as
+        // updatedAt. See [Schedules.timingDefinedAt].
+        timingDefinedAt: Value(savedAt),
         updatedBy: Value(savedBy),
       ),
     );

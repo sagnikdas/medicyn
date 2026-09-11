@@ -80,6 +80,7 @@ void main() {
       active: false,
       createdAt: DateTime(2026, 8, 1),
       updatedAt: DateTime(2026, 8, 1),
+      timingDefinedAt: DateTime(2026, 8, 1),
       pendingSync: false,
       deleted: false,
     );
@@ -97,6 +98,7 @@ void main() {
       active: true,
       createdAt: DateTime(2026, 8, 1),
       updatedAt: DateTime(2026, 8, 1),
+      timingDefinedAt: DateTime(2026, 8, 1),
       pendingSync: false,
       deleted: false,
     );

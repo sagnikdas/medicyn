@@ -27,6 +27,10 @@ void main() {
         active: active,
         createdAt: DateTime(2026, 8, 1),
         updatedAt: updatedAt ?? DateTime(2026, 8, 1),
+        // These tests predate the updatedAt/timingDefinedAt split and treat
+        // them as one value, same as production code did before this
+        // column existed. See expected_doses.dart's everyXHours branch.
+        timingDefinedAt: updatedAt ?? DateTime(2026, 8, 1),
         updatedBy: null,
         pendingSync: false,
         deleted: false,
@@ -48,6 +52,7 @@ void main() {
         active: true,
         createdAt: DateTime(2026, 8, 1),
         updatedAt: DateTime(2026, 8, 1),
+        timingDefinedAt: DateTime(2026, 8, 1),
         updatedBy: null,
         pendingSync: false,
         deleted: false,

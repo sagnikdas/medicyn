@@ -111,6 +111,16 @@ class Schedules extends Table {
   BoolColumn get active => boolean().withDefault(const Constant(true))();
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
   DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+  // When a timing-relevant field (frequencyType, times, daysOfWeek,
+  // intervalHours, startDate, endDate) was last changed -- a strict subset
+  // of [updatedAt], which also moves for a cosmetic edit like a medicine
+  // name correction. MissedDoseDetector.wasArmed and expectedDoses' every-
+  // X-hours origin bound on this instead of updatedAt, so a typo fix no
+  // longer forfeits days of not-yet-recorded missed-dose backfill the way an
+  // edit to updatedAt alone would. See the schedule_timing_defined_at
+  // migration for the backfill this column needed on upgrade.
+  DateTimeColumn get timingDefinedAt =>
+      dateTime().withDefault(currentDateAndTime)();
   TextColumn get updatedBy => text().nullable()();
   BoolColumn get pendingSync => boolean().withDefault(const Constant(true))();
   BoolColumn get deleted => boolean().withDefault(const Constant(false))();

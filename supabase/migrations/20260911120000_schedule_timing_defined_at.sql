@@ -1,0 +1,24 @@
+-- Splits `timing_defined_at` off `updated_at` on schedules.
+--
+-- The missed-dose sweep (MissedDoseDetector.wasArmed, app-side) bounds every
+-- occurrence it is willing to backfill on the schedule's last-defined
+-- moment, because the alarms actually armed on a device only ever reflect
+-- the schedule's *current* definition -- without that bound, adding a 9am
+-- reminder would report days of old 8am doses as skipped. Until now that
+-- bound was `updated_at`, which also moves on a purely cosmetic edit (a
+-- medicine name spelling fix, a dosage note) that never changed what alarm
+-- actually fires. This column is the timing-only subset of `updated_at`, so
+-- a cosmetic edit no longer forfeits days of not-yet-recorded backfill.
+--
+-- `updated_at` is unaffected and keeps moving on every edit -- sync's
+-- last-write-wins still needs that. The app decides which edits are
+-- timing-relevant (frequency_type, times, days_of_week, interval_hours,
+-- start_date, end_date) and only then re-stamps this column; nothing here
+-- enforces that split.
+--
+-- Backfilled to `updated_at` rather than `created_at`: that is exactly the
+-- value `wasArmed` already bounded on before this column existed, so this
+-- preserves today's behavior for every row that already exists rather than
+-- silently forgiving history for schedules nobody has touched yet.
+alter table schedules add column timing_defined_at timestamptz not null default now();
+update schedules set timing_defined_at = updated_at;

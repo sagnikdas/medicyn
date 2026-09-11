@@ -18,6 +18,32 @@ import 'package:medicyn/data/local/database.dart';
 /// v10 columns still missing, and opens it through the real `AppDatabase`
 /// migration path.
 void main() {
+  // Every fixture below jumps from v9 or v10 straight to the current schema,
+  // which now also runs the v12 `schedules.timing_defined_at` migration step
+  // (see AppDatabase.migration) -- so `schedules` has to exist here too, even
+  // though these tests only exercise emergency_info. Shaped like the table
+  // actually looked at v9/v10, before this feature's column existed.
+  const createSchedulesTableAtV9 = '''
+    CREATE TABLE schedules (
+      id TEXT NOT NULL PRIMARY KEY,
+      medicine_id TEXT NOT NULL,
+      frequency_type TEXT NOT NULL,
+      times TEXT NOT NULL DEFAULT '[]',
+      days_of_week TEXT NOT NULL DEFAULT '[]',
+      interval_hours INTEGER,
+      status TEXT,
+      start_date TEXT,
+      end_date TEXT,
+      pause_until TEXT,
+      active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      updated_by TEXT,
+      pending_sync INTEGER NOT NULL DEFAULT 1,
+      deleted INTEGER NOT NULL DEFAULT 0
+    );
+  ''';
+
   QueryExecutor seedPartiallyMigratedV9Database() {
     return NativeDatabase.memory(
       setup: (rawDb) {
@@ -30,6 +56,7 @@ void main() {
             updated_at TEXT NOT NULL
           );
         ''');
+        rawDb.execute(createSchedulesTableAtV9);
         // The column a previous, racing migration attempt already added --
         // the other four v10 columns are deliberately left missing, so this
         // also covers the migration correctly finishing the rest of the set.
@@ -94,6 +121,7 @@ void main() {
                 updated_at TEXT NOT NULL
               );
             ''');
+            rawDb.execute(createSchedulesTableAtV9);
             rawDb.execute('PRAGMA user_version = 9');
           },
         ),
@@ -128,6 +156,7 @@ void main() {
               INSERT INTO emergency_info (id, blood_group, allergies, conditions, updated_at)
               VALUES ('self', 'O+', 'Penicillin', '', '2026-08-01T09:00:00.000Z');
             ''');
+            rawDb.execute(createSchedulesTableAtV9);
             rawDb.execute('PRAGMA user_version = 10');
           },
         ),

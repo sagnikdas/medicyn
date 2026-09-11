@@ -1,6 +1,7 @@
 import 'package:medicyn/data/local/database.dart';
 import 'package:medicyn/data/local/tables.dart';
 import 'package:medicyn/features/notification_engine/missed_doses.dart';
+import 'package:medicyn/features/notification_engine/schedule_validation.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -44,7 +45,37 @@ void main() {
       medicineId: medicineId,
       frequencyType: frequency.name,
       times: times,
+      // updatedAt and timingDefinedAt coincide for every test in this file
+      // except the "distinguishing an edit" group below, which sets them
+      // independently to exercise the split directly.
       updatedAt: Value(definedAt ?? longEstablished),
+      timingDefinedAt: Value(definedAt ?? longEstablished),
+    ));
+  }
+
+  /// Re-saves the schedule as a later edit would, at [editedAt]. Mirrors the
+  /// write path in ReviewEditScreen: `timingDefinedAt` only moves when
+  /// [scheduleTimingChanged] would actually report a change; otherwise it is
+  /// left absent, which — like insertOnConflictUpdate in production — leaves
+  /// the column untouched rather than resetting it.
+  Future<void> editSchedule({
+    List<String> times = const ['08:00'],
+    required DateTime editedAt,
+  }) async {
+    final changed = scheduleTimingChanged(
+      previous: (await db.scheduleById(scheduleId))!,
+      frequencyType: FrequencyType.daily.name,
+      times: times,
+      daysOfWeek: const [],
+      intervalHours: null,
+    );
+    await db.upsertSchedule(SchedulesCompanion.insert(
+      id: scheduleId,
+      medicineId: medicineId,
+      frequencyType: FrequencyType.daily.name,
+      times: times,
+      updatedAt: Value(editedAt),
+      timingDefinedAt: changed ? Value(editedAt) : const Value.absent(),
     ));
   }
 
@@ -298,6 +329,113 @@ void main() {
 
       expect(await sweep(lookback: const Duration(days: 3)), 3);
     });
+  });
+
+  group('distinguishing a cosmetic edit from a timing edit', () {
+    test('a cosmetic edit does not reset the anchor', () async {
+      // Long established, so an unbounded three-day backfill is all there
+      // is to see if nothing narrows it.
+      await givenSchedule(times: ['08:00'], definedAt: longEstablished);
+
+      // Saved again this morning with the same time of day — a name fix or
+      // a dosage note, the kind of edit that touches updatedAt but nothing
+      // wasArmed cares about. editSchedule computes the same
+      // scheduleTimingChanged verdict the real write path does, and here
+      // it is "unchanged", so timingDefinedAt is left alone.
+      await editSchedule(times: ['08:00'], editedAt: DateTime(2026, 8, 19, 9, 0));
+
+      // Still 3: the anchor is still longEstablished, so the sweep backfills
+      // exactly as it would have if this schedule had never been touched.
+      expect(await sweep(), 3);
+    });
+
+    test('a timing-relevant edit resets the anchor', () async {
+      await givenSchedule(times: ['08:00'], definedAt: longEstablished);
+
+      // Changed from 08:00 to 09:00 at 07:00 this morning — a real timing
+      // edit, so editSchedule (like the production write path) moves
+      // timingDefinedAt to the moment of the edit.
+      final editedAt = DateTime(2026, 8, 19, 7, 0);
+      await editSchedule(times: ['09:00'], editedAt: editedAt);
+
+      // Only today's 09:00: the 17th's and 18th's 09:00 occurrences are
+      // before the new anchor, so wasArmed forfeits them — the cost the
+      // class-level doc comment describes, and the whole reason this column
+      // exists rather than resetting on every edit indiscriminately.
+      final count = await sweep();
+
+      expect(count, 1);
+      expect(
+        (await missedLogs()).single.scheduledAt,
+        DateTime(2026, 8, 19, 9, 0),
+      );
+    });
+
+    test(
+      'a cosmetic edit and a timing edit at the same moment diverge only in what they forfeit',
+      () async {
+        // Two schedules, identically established, edited at the same instant
+        // — one cosmetically, one with a real timing change — to isolate the
+        // anchor as the only thing that differs.
+        const cosmeticId = 'cccccccc-1111-2222-3333-444444444444';
+        const timingId = 'dddddddd-1111-2222-3333-444444444444';
+        final editedAt = DateTime(2026, 8, 19, 9, 0);
+
+        Future<void> seed(String id) => db.upsertSchedule(
+          SchedulesCompanion.insert(
+            id: id,
+            medicineId: medicineId,
+            frequencyType: FrequencyType.daily.name,
+            times: const ['08:00'],
+            updatedAt: Value(longEstablished),
+            timingDefinedAt: Value(longEstablished),
+          ),
+        );
+        await seed(cosmeticId);
+        await seed(timingId);
+
+        // Cosmetic: same time of day, so scheduleTimingChanged says no.
+        await db.upsertSchedule(SchedulesCompanion.insert(
+          id: cosmeticId,
+          medicineId: medicineId,
+          frequencyType: FrequencyType.daily.name,
+          times: const ['08:00'],
+          updatedAt: Value(editedAt),
+        ));
+        // Timing: the time of day itself changed.
+        await db.upsertSchedule(SchedulesCompanion.insert(
+          id: timingId,
+          medicineId: medicineId,
+          frequencyType: FrequencyType.daily.name,
+          times: const ['10:00'],
+          updatedAt: Value(editedAt),
+          timingDefinedAt: Value(editedAt),
+        ));
+
+        final missed = await const MissedDoseDetector().sweep(db, now: now);
+        final byScheduleId = <String, int>{};
+        final rows = await db.doseLogsSince(DateTime(2026, 8, 1));
+        for (final l in rows.where((l) => l.action == DoseAction.missed.name)) {
+          byScheduleId[l.scheduleId] = (byScheduleId[l.scheduleId] ?? 0) + 1;
+        }
+
+        expect(
+          missed,
+          4,
+          reason: '3 backfilled for the cosmetic edit, 1 for the timing edit',
+        );
+        expect(
+          byScheduleId[cosmeticId],
+          3,
+          reason: 'cosmetic edit kept the long-established anchor',
+        );
+        expect(
+          byScheduleId[timingId],
+          1,
+          reason: 'timing edit reset the anchor to editedAt',
+        );
+      },
+    );
   });
 
   group('wasArmed', () {

@@ -45,7 +45,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 11;
+  int get schemaVersion => 12;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -152,6 +152,20 @@ class AppDatabase extends _$AppDatabase {
           m,
           emergencyInfo,
           emergencyInfo.emergencyContactPhone,
+        );
+      }
+      if (from < 12) {
+        // See [Schedules.timingDefinedAt]'s doc comment. Existing rows have
+        // never distinguished a timing edit from a cosmetic one, so the
+        // honest backfill is the same value `wasArmed` already bounded on
+        // before this column existed -- updatedAt -- which keeps every
+        // schedule's missed-dose backfill behaving exactly as it did before
+        // this migration. Uses the isolate-safe helper for the same reason
+        // as the emergencyInfo columns above: two isolates can race this on
+        // the same cold start.
+        await _addColumnIfMissing(m, schedules, schedules.timingDefinedAt);
+        await customStatement(
+          'UPDATE schedules SET timing_defined_at = updated_at',
         );
       }
     },

@@ -594,6 +594,13 @@ class CareService {
     DateTime? endDate,
     DateTime? pauseUntil,
     required DateTime savedAt,
+    // Null means this save is cosmetic-only for timing purposes (no change
+    // to frequencyType/times/daysOfWeek/intervalHours/startDate/endDate) and
+    // the column is left out of the upsert entirely, so Postgres leaves the
+    // schedule's existing value alone rather than resetting the patient
+    // device's missed-dose backfill anchor. Non-null on a create or a
+    // genuine timing edit. See ReviewEditScreen._timingChanged.
+    DateTime? timingDefinedAt,
     DateTime? medicineCreatedAt,
     DateTime? scheduleCreatedAt,
   }) async {
@@ -636,6 +643,8 @@ class CareService {
         'created_at': scheduleCreated,
         'updated_at': stamp,
         'updated_by': caller,
+        if (timingDefinedAt != null)
+          'timing_defined_at': _isoUtc(timingDefinedAt),
       });
     } catch (e) {
       debugPrint('[medicyn] savePatientReminder failed: $e');
@@ -738,6 +747,13 @@ class CareService {
       active: row['active'] as bool? ?? true,
       createdAt: scheduleCreated,
       updatedAt: scheduleUpdated,
+      // This row is only ever used for display on the caregiver's own
+      // device (see savePatientReminder's doc comment) — never fed into
+      // MissedDoseDetector, which only ever runs against the patient's own
+      // local database. Falling back to scheduleUpdated when the column is
+      // absent (an old cached row, or a schedule pulled before the backfill
+      // reached it) is a display-only approximation, not a sweep input.
+      timingDefinedAt: _asDate(row['timing_defined_at']) ?? scheduleUpdated,
       updatedBy: row['updated_by'] as String? ?? medicine.updatedBy,
       pendingSync: false,
       deleted: false,

@@ -10,10 +10,13 @@
 /// dose that was never asked for.
 ///
 /// Origin is the first parseable dose time on the calendar day the current
-/// schedule definition started (`updatedAt`). From there the sequence is
+/// timing definition started (`timingDefinedAt` — the subset of `updatedAt`
+/// that only moves for an edit that actually changes when an alarm fires;
+/// see [Schedules.timingDefinedAt]). From there the sequence is
 /// `origin + k * intervalHours` forever. [MissedDoseDetector.wasArmed] still
-/// drops anything at or before `updatedAt`, so a reminder saved at 15:32
-/// with an 08:00 origin does not invent a 13:00 miss for that same afternoon.
+/// drops anything at or before `timingDefinedAt`, so a reminder saved at
+/// 15:32 with an 08:00 origin does not invent a 13:00 miss for that same
+/// afternoon.
 library;
 
 /// Occurrences in `[from, to)` (or `(from, to)` when [includeFrom] is false).
