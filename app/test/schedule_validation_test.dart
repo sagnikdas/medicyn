@@ -1,3 +1,4 @@
+import 'package:medicyn/data/local/database.dart';
 import 'package:medicyn/data/local/tables.dart';
 import 'package:medicyn/features/notification_engine/schedule_validation.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -205,6 +206,189 @@ void main() {
       expect(frequencyTypeFromName('hourly'), isNull);
       expect(frequencyTypeFromName(''), isNull);
       expect(frequencyTypeFromName(null), isNull);
+    });
+  });
+
+  group('scheduleTimingChanged', () {
+    // A minimal, otherwise-valid schedule to edit in each case below. Only
+    // the fields scheduleTimingChanged actually looks at vary between tests.
+    Schedule previous({
+      String frequencyType = 'daily',
+      List<String> times = const ['08:00'],
+      List<int> daysOfWeek = const [],
+      int? intervalHours,
+      DateTime? startDate,
+      DateTime? endDate,
+    }) => Schedule(
+      id: 's1',
+      medicineId: 'm1',
+      frequencyType: frequencyType,
+      times: times,
+      daysOfWeek: daysOfWeek,
+      intervalHours: intervalHours,
+      startDate: startDate,
+      endDate: endDate,
+      active: true,
+      createdAt: DateTime(2026, 8, 1),
+      updatedAt: DateTime(2026, 8, 1),
+      timingDefinedAt: DateTime(2026, 8, 1),
+      updatedBy: null,
+      pendingSync: false,
+      deleted: false,
+    );
+
+    test('a brand new schedule (no previous) always counts as changed', () {
+      expect(
+        scheduleTimingChanged(
+          previous: null,
+          frequencyType: 'daily',
+          times: const ['08:00'],
+          daysOfWeek: const [],
+          intervalHours: null,
+        ),
+        isTrue,
+      );
+    });
+
+    test('saving the same values back is not a change', () {
+      // This is the cosmetic-edit case: a medicine name fix, a dosage note,
+      // a strength correction all go through the same save without ever
+      // touching these fields.
+      expect(
+        scheduleTimingChanged(
+          previous: previous(),
+          frequencyType: 'daily',
+          times: const ['08:00'],
+          daysOfWeek: const [],
+          intervalHours: null,
+        ),
+        isFalse,
+      );
+    });
+
+    test('a different frequency type is a change', () {
+      expect(
+        scheduleTimingChanged(
+          previous: previous(),
+          frequencyType: 'specificDays',
+          times: const ['08:00'],
+          daysOfWeek: const [1, 3, 5],
+          intervalHours: null,
+        ),
+        isTrue,
+      );
+    });
+
+    test('a different time of day is a change', () {
+      expect(
+        scheduleTimingChanged(
+          previous: previous(),
+          frequencyType: 'daily',
+          times: const ['09:00'],
+          daysOfWeek: const [],
+          intervalHours: null,
+        ),
+        isTrue,
+      );
+    });
+
+    test('an added time of day is a change', () {
+      expect(
+        scheduleTimingChanged(
+          previous: previous(),
+          frequencyType: 'daily',
+          times: const ['08:00', '20:00'],
+          daysOfWeek: const [],
+          intervalHours: null,
+        ),
+        isTrue,
+      );
+    });
+
+    test('reordered times is still a change', () {
+      // Order feeds the notification id (see schedulableTimes), so this is
+      // not purely cosmetic even though the set of times is the same.
+      expect(
+        scheduleTimingChanged(
+          previous: previous(times: const ['08:00', '20:00']),
+          frequencyType: 'daily',
+          times: const ['20:00', '08:00'],
+          daysOfWeek: const [],
+          intervalHours: null,
+        ),
+        isTrue,
+      );
+    });
+
+    test('a different set of days of week is a change', () {
+      expect(
+        scheduleTimingChanged(
+          previous: previous(
+            frequencyType: 'specificDays',
+            daysOfWeek: const [1, 3, 5],
+          ),
+          frequencyType: 'specificDays',
+          times: const ['08:00'],
+          daysOfWeek: const [2, 4],
+          intervalHours: null,
+        ),
+        isTrue,
+      );
+    });
+
+    test('a different interval is a change', () {
+      expect(
+        scheduleTimingChanged(
+          previous: previous(frequencyType: 'everyXHours', intervalHours: 8),
+          frequencyType: 'everyXHours',
+          times: const ['08:00'],
+          daysOfWeek: const [],
+          intervalHours: 6,
+        ),
+        isTrue,
+      );
+    });
+
+    test('a different start or end date is a change', () {
+      expect(
+        scheduleTimingChanged(
+          previous: previous(startDate: DateTime(2026, 8, 1)),
+          frequencyType: 'daily',
+          times: const ['08:00'],
+          daysOfWeek: const [],
+          intervalHours: null,
+          startDate: DateTime(2026, 9, 1),
+        ),
+        isTrue,
+      );
+      expect(
+        scheduleTimingChanged(
+          previous: previous(endDate: DateTime(2026, 12, 1)),
+          frequencyType: 'daily',
+          times: const ['08:00'],
+          daysOfWeek: const [],
+          intervalHours: null,
+          endDate: null,
+        ),
+        isTrue,
+      );
+    });
+
+    test('a cosmetic-only save is unaffected by fields it never carries', () {
+      // scheduleTimingChanged has no medicine name/notes/dosage parameter at
+      // all — the caller only ever feeds it the timing columns, which is
+      // itself the guarantee that a cosmetic edit cannot reach this
+      // function's "changed" branch.
+      expect(
+        scheduleTimingChanged(
+          previous: previous(times: const ['08:00', '20:00']),
+          frequencyType: 'daily',
+          times: const ['08:00', '20:00'],
+          daysOfWeek: const [],
+          intervalHours: null,
+        ),
+        isFalse,
+      );
     });
   });
 }

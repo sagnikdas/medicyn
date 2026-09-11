@@ -522,11 +522,36 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
     );
   }
 
+  /// Days-of-week/interval-hours a save would write, given the current form
+  /// state — computed once here so [_timingChanged] and both save paths
+  /// agree on exactly what "the new schedule" means.
+  List<int> get _pendingDaysOfWeek => _frequency == FrequencyType.specificDays
+      ? (_daysOfWeek.toList()..sort())
+      : const [];
+
+  int? get _pendingIntervalHours =>
+      _frequency == FrequencyType.everyXHours ? _enteredIntervalHours : null;
+
+  /// Whether this save would change when an alarm actually fires, versus
+  /// [widget.existing]. Both save paths use this to decide whether to move
+  /// [Schedules.timingDefinedAt] forward — see [scheduleTimingChanged] for
+  /// why a cosmetic edit (a name typo, a dosage note) must not.
+  bool get _timingChanged => scheduleTimingChanged(
+    previous: widget.existing?.schedule,
+    frequencyType: _frequency.name,
+    times: _times,
+    daysOfWeek: _pendingDaysOfWeek,
+    intervalHours: _pendingIntervalHours,
+    startDate: widget.existing?.schedule.startDate,
+    endDate: widget.existing?.schedule.endDate,
+  );
+
   Future<void> _saveRemote() async {
     final patientId = widget.forPatientId!;
     final medicineId = _isEditing ? widget.existing!.medicine.id : newUuid();
     final scheduleId = _isEditing ? widget.existing!.schedule.id : newUuid();
     final savedAt = DateTime.now();
+    final timingChanged = _timingChanged;
     await CareService.instance.savePatientReminder(
       patientId: patientId,
       medicineId: medicineId,
@@ -540,17 +565,17 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
       notes: _notesController.text.trim(),
       frequencyType: _frequency.name,
       times: _times,
-      daysOfWeek: _frequency == FrequencyType.specificDays
-          ? (_daysOfWeek.toList()..sort())
-          : const [],
-      intervalHours: _frequency == FrequencyType.everyXHours
-          ? _enteredIntervalHours
-          : null,
+      daysOfWeek: _pendingDaysOfWeek,
+      intervalHours: _pendingIntervalHours,
       status: _effectiveStatus.name,
       startDate: widget.existing?.schedule.startDate,
       endDate: widget.existing?.schedule.endDate,
       pauseUntil: widget.existing?.schedule.pauseUntil,
       savedAt: savedAt,
+      // Only stamped when this save actually changes when an alarm fires —
+      // omitting it on a cosmetic-only edit leaves the patient device's own
+      // anchor alone. See CareService.savePatientReminder.
+      timingDefinedAt: timingChanged ? savedAt : null,
       medicineCreatedAt: widget.existing?.medicine.createdAt,
       scheduleCreatedAt: widget.existing?.schedule.createdAt,
     );
@@ -567,6 +592,13 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
     // together can never end up on opposite sides of a version comparison.
     final savedAt = DateTime.now();
     final savedBy = AuthService.instance.currentUser?.id;
+    final timingChanged = _timingChanged;
+    // Preserves the existing anchor on a cosmetic-only edit; a brand new
+    // schedule (or a genuine timing edit) is anchored to this save. See
+    // [Schedules.timingDefinedAt] and [scheduleTimingChanged].
+    final timingDefinedAt = timingChanged
+        ? savedAt
+        : (widget.existing?.schedule.timingDefinedAt ?? savedAt);
 
     await widget.db.upsertMedicine(
       MedicinesCompanion.insert(
@@ -618,6 +650,7 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
           : true,
       createdAt: DateTime.now(),
       updatedAt: savedAt,
+      timingDefinedAt: timingDefinedAt,
       updatedBy: savedBy,
       pendingSync: true,
       deleted: false,
@@ -630,6 +663,12 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
         times: _times,
         daysOfWeek: Value(schedule.daysOfWeek),
         intervalHours: Value(schedule.intervalHours),
+        // Absent when a cosmetic-only edit leaves timing unchanged, so
+        // insertOnConflictUpdate does not touch the column and the existing
+        // anchor survives. Explicit on a create or a genuine timing edit.
+        timingDefinedAt: (_isEditing && !timingChanged)
+            ? const Value.absent()
+            : Value(timingDefinedAt),
         status: Value(schedule.status),
         startDate: Value(schedule.startDate),
         endDate: Value(schedule.endDate),

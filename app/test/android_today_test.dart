@@ -32,6 +32,7 @@ DayOccurrence _dose({
       active: true,
       createdAt: DateTime(2026, 8),
       updatedAt: DateTime(2026, 8),
+      timingDefinedAt: DateTime(2026, 8),
       pendingSync: false,
       deleted: false,
     ),

@@ -194,6 +194,7 @@ void main() {
         times: const <String>['08:00'],
         daysOfWeek: const Value(<int>[]),
         updatedAt: Value(defined),
+        timingDefinedAt: Value(defined),
       ));
     });
     tearDown(() => db.close());

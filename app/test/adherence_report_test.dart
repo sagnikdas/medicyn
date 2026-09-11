@@ -29,6 +29,7 @@ void main() {
         active: true,
         createdAt: definedAt,
         updatedAt: definedAt,
+        timingDefinedAt: definedAt,
         updatedBy: null,
         pendingSync: false,
         deleted: false,

@@ -40,6 +40,9 @@ void main() {
     active: active,
     createdAt: DateTime(2026, 8, 1),
     updatedAt: updatedAt ?? longEstablished,
+    // Mirrors updatedAt, same as these tests treated the two before this
+    // column existed — see expected_doses.dart's everyXHours branch.
+    timingDefinedAt: updatedAt ?? longEstablished,
     updatedBy: null,
     pendingSync: false,
     deleted: deleted,

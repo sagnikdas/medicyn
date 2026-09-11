@@ -24,8 +24,10 @@ DateTime _localWallClock(int year, int month, int day, int hour, int minute) =>
 ///
 /// Every-X-hours shares [intervalDoseSequence] with the alarm scheduler,
 /// originating at the first parseable time on the calendar day the current
-/// definition started (`updatedAt`). As-needed still yields nothing: there
-/// is nothing to miss.
+/// timing definition started (`timingDefinedAt`, not `updatedAt` — a
+/// cosmetic edit, like a medicine name fix, must not shift this origin; see
+/// [Schedules.timingDefinedAt]). As-needed still yields nothing: there is
+/// nothing to miss.
 List<DateTime> expectedDoses(
   Schedule schedule, {
   required DateTime from,
@@ -68,7 +70,7 @@ List<DateTime> expectedDoses(
       if (interval == null) return const [];
       final times = schedulableTimes(schedule.times);
       if (times.isEmpty) return const [];
-      final defined = schedule.updatedAt;
+      final defined = schedule.timingDefinedAt;
       final first = times.first.clock;
       final origin = clock(
         defined.year,

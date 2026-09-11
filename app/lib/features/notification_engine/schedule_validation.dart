@@ -27,6 +27,7 @@
 /// it.
 library;
 
+import '../../data/local/database.dart' show Schedule;
 import '../../data/local/tables.dart';
 
 /// A wall-clock time of day, already range-checked.
@@ -201,4 +202,47 @@ ScheduleFields? sanitiseScheduleFields({
     intervalHours: cleanInterval,
     changed: changed,
   );
+}
+
+/// Whether saving these values over [previous] changes when an alarm
+/// actually fires — the line between a timing-relevant edit and a cosmetic
+/// one for [Schedules.timingDefinedAt].
+///
+/// Only the fields that determine an occurrence's due time count:
+/// [frequencyType], [times], [daysOfWeek], [intervalHours], [startDate], and
+/// [endDate]. Everything else a save can touch — the medicine's name,
+/// strength, dosage note, tablet count, or the schedule's own lifecycle
+/// [status]/`active`/`pauseUntil` — never changes what time an already-armed
+/// alarm rings at, only whether/what it currently says, so none of it
+/// belongs here. See MissedDoseDetector.wasArmed for why the distinction
+/// matters: resetting the anchor on every edit, cosmetic or not, forfeits
+/// any not-yet-recorded backfill for no reason tied to the alarms
+/// themselves.
+///
+/// `null` [previous] means there is nothing to compare against — a brand
+/// new schedule — which always counts as a fresh definition.
+bool scheduleTimingChanged({
+  required Schedule? previous,
+  required String frequencyType,
+  required List<String> times,
+  required List<int> daysOfWeek,
+  required int? intervalHours,
+  DateTime? startDate,
+  DateTime? endDate,
+}) {
+  if (previous == null) return true;
+  return previous.frequencyType != frequencyType ||
+      !_sameOrder(previous.times, times) ||
+      !_sameOrder(previous.daysOfWeek, daysOfWeek) ||
+      previous.intervalHours != intervalHours ||
+      previous.startDate != startDate ||
+      previous.endDate != endDate;
+}
+
+bool _sameOrder<T>(List<T> a, List<T> b) {
+  if (a.length != b.length) return false;
+  for (var i = 0; i < a.length; i++) {
+    if (a[i] != b[i]) return false;
+  }
+  return true;
 }

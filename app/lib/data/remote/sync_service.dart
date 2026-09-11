@@ -354,6 +354,7 @@ class SyncService {
       'active': s.active,
       'created_at': isoUtc(s.createdAt),
       'updated_at': isoUtc(s.updatedAt),
+      'timing_defined_at': isoUtc(s.timingDefinedAt),
       'updated_by': s.updatedBy,
     };
     await _pushBatchOrFallback<Schedule>(
@@ -545,6 +546,13 @@ class SyncService {
               active: Value(r['active'] as bool),
               createdAt: Value(DateTime.parse(r['created_at'] as String)),
               updatedAt: Value(remoteStamp),
+              // Falls back to the row's own updatedAt for a schedule pulled
+              // before the backfill migration reached the server, or from a
+              // caregiver's client old enough not to send the column yet —
+              // same fallback the migration itself backfilled existing rows
+              // with, so this device's sweep behaves exactly as if the
+              // column had always been there. See [Schedules.timingDefinedAt].
+              timingDefinedAt: Value(_asDate(r['timing_defined_at']) ?? remoteStamp),
               updatedBy: Value(r['updated_by'] as String?),
               pendingSync: const Value(false),
             ),
