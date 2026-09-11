@@ -32,6 +32,7 @@ class AndroidTodayScreen extends StatefulWidget {
     required this.onSnooze,
     required this.onHistory,
     this.healthNotice,
+    this.missedDoseNudge,
   });
 
   final AppDatabase db;
@@ -44,6 +45,9 @@ class AndroidTodayScreen extends StatefulWidget {
   final Future<void> Function(DayOccurrence) onSnooze;
   final ValueChanged<DayOccurrence> onHistory;
   final Widget? healthNotice;
+  /// The gentle "you missed a dose" nudge computed by Home, shown for this
+  /// user's own doses only — never the caregiver's separate care alert.
+  final Widget? missedDoseNudge;
 
   @override
   State<AndroidTodayScreen> createState() => _AndroidTodayScreenState();
@@ -321,6 +325,7 @@ class _AndroidTodayScreenState extends State<AndroidTodayScreen>
         onEditCare: (reminder) => _edit(existing: reminder),
         onCompleteCare: _done,
         healthNotice: widget.healthNotice,
+        missedDoseNudge: widget.missedDoseNudge,
         careSyncNotice:
             _syncing ||
                 _syncFailed ||
@@ -378,6 +383,7 @@ class TodayAgenda extends StatelessWidget {
     this.earlier = const [],
     this.scrollController,
     this.healthNotice,
+    this.missedDoseNudge,
     this.careLoading = false,
     this.careError = false,
     this.careSyncNotice,
@@ -397,6 +403,9 @@ class TodayAgenda extends StatelessWidget {
   final Future<void> Function(TodayCareReminder) onCompleteCare;
   final ScrollController? scrollController;
   final Widget? healthNotice;
+  /// The gentle "you missed a dose" nudge computed by Home, shown for this
+  /// user's own doses only — never the caregiver's separate care alert.
+  final Widget? missedDoseNudge;
   final bool careLoading;
   final bool careError;
   final Widget? careSyncNotice;
@@ -570,9 +579,16 @@ class TodayAgenda extends StatelessWidget {
                         ),
                       ),
                     ],
-                    if (healthNotice != null)
+                    if (missedDoseNudge != null)
                       Padding(
                         padding: const EdgeInsets.only(top: 24),
+                        child: missedDoseNudge!,
+                      ),
+                    if (healthNotice != null)
+                      Padding(
+                        padding: EdgeInsets.only(
+                          top: missedDoseNudge != null ? 16 : 24,
+                        ),
                         child: healthNotice!,
                       ),
                     if (careSyncNotice != null)

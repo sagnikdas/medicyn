@@ -80,6 +80,7 @@ TodayAgenda _agenda({
   Future<void> Function(DayOccurrence)? onSnooze,
   Future<void> Function(TodayCareReminder)? onDone,
   ValueChanged<TodayCareReminder>? onEdit,
+  Widget? missedDoseNudge,
 }) => TodayAgenda(
   now: _now,
   occurrences: doses ?? [_dose()],
@@ -90,6 +91,7 @@ TodayAgenda _agenda({
   onHistory: (_) {},
   onEditCare: onEdit ?? (_) {},
   onCompleteCare: onDone ?? (_) async {},
+  missedDoseNudge: missedDoseNudge,
 );
 
 void main() {
@@ -160,6 +162,27 @@ void main() {
       expect(find.byType(Dismissible), findsNothing);
       expect(find.byType(DoseCalendar), findsNothing);
       expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'the missed-dose nudge renders above the agenda when Home supplies one, '
+    'and is absent otherwise',
+    (tester) async {
+      await pump(tester, _agenda());
+      expect(find.text('Looks like you missed a dose earlier'), findsNothing);
+
+      await pump(
+        tester,
+        _agenda(
+          missedDoseNudge: const Text('Looks like you missed a dose earlier'),
+        ),
+      );
+      expect(find.text('Looks like you missed a dose earlier'), findsOneWidget);
+      expect(
+        tester.getTopLeft(find.text('Looks like you missed a dose earlier')).dy,
+        lessThan(tester.getTopLeft(find.text('Metformin 500 mg')).dy),
+      );
     },
   );
 

@@ -442,6 +442,26 @@ List<DayOccurrence> attentionDoses({
   return out;
 }
 
+/// A stable per-occurrence key: the caregiver-facing `care_alerts` flow has
+/// its own dismissal state elsewhere, so this only ever needs to identify
+/// one of *this* user's own scheduled doses.
+String dayOccurrenceKey(DayOccurrence occurrence) =>
+    '${occurrence.item.schedule.id}|${occurrence.scheduledAt.toUtc().toIso8601String()}';
+
+/// Today's own doses already logged missed, and not yet dismissed for that
+/// specific occurrence. This drives the gentle Today-screen nudge — a
+/// supportive reminder to the person themself, not the caregiver alert
+/// already sent separately (see `notification_actions.dart`).
+List<DayOccurrence> missedDoseNudgeOccurrences({
+  required List<DayOccurrence> today,
+  required Set<String> dismissedKeys,
+}) => [
+  for (final o in today)
+    if (o.status == DayDoseStatus.missed &&
+        !dismissedKeys.contains(dayOccurrenceKey(o)))
+      o,
+];
+
 bool doseCanSnooze(DayDoseStatus status) {
   switch (status) {
     case DayDoseStatus.pending:
