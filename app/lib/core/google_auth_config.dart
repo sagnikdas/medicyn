@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+
 /// The Google Cloud OAuth client IDs this app signs in with.
 ///
 /// None of these are secrets — an OAuth *client ID* is public by design and
@@ -37,5 +39,11 @@ class GoogleAuthConfig {
   /// Whether sign-in can be attempted at all. False means the console step
   /// hasn't been done (or the build didn't pass the defines), and the UI
   /// says so plainly rather than letting the native SDK fail obscurely.
-  static bool get isConfigured => serverClientId.isNotEmpty;
+  ///
+  /// Checks the platform-appropriate client id: iOS needs [iosClientId]
+  /// (it's what `GoogleSignIn.initialize`'s `clientId` uses there — see
+  /// `auth_service.dart`), while every other platform only needs
+  /// [serverClientId].
+  static bool get isConfigured =>
+      Platform.isIOS ? iosClientId.isNotEmpty : serverClientId.isNotEmpty;
 }
