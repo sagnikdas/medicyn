@@ -102,7 +102,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/PRIVACY.md
-    - android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+    - assets/branding/app_icon.png
   fonts:
     - family: Public Sans
       fonts:
