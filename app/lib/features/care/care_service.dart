@@ -215,6 +215,7 @@ class DoseEvent {
     this.scheduleId,
     this.source,
     this.recordedBy,
+    this.frequencyType,
   });
 
   final String id;
@@ -245,6 +246,23 @@ class DoseEvent {
   /// Who Postgres stamped as the writer (`dose_logs.recorded_by`). Null on
   /// rows from before that column existed, or on a malformed response.
   final String? recordedBy;
+
+  /// The owning schedule's `frequency_type` (`schedules.frequency_type`),
+  /// e.g. `FrequencyType.asNeeded.name`. Null when the embedded schedule row
+  /// is missing, same as the other embedded fields.
+  final String? frequencyType;
+
+  /// A manually logged "as needed" (PRN) dose — the "Log now" button on an
+  /// as-needed medicine's card (see `recordAsNeededDoseTaken`) — rather than
+  /// a response to a scheduled reminder.
+  ///
+  /// `source == 'manual'` alone isn't a safe enough signal: today only PRN
+  /// logging writes it, but nothing stops a future manual correction to a
+  /// *scheduled* dose from reusing the same string. Requiring the schedule
+  /// itself to be as-needed is what keeps this label from ever being pinned
+  /// on an ordinary scheduled dose.
+  bool get isAsNeededLog =>
+      source == 'manual' && frequencyType == FrequencyType.asNeeded.name;
 
   /// How late the response was. Negative when answered early, which happens
   /// often and legitimately — people take a tablet when they remember it.
@@ -311,6 +329,7 @@ class DoseEvent {
       doseAmount: (medicine?['dose_amount'] as String?) ?? '',
       source: row['source'] as String?,
       recordedBy: row['recorded_by'] as String?,
+      frequencyType: schedule?['frequency_type'] as String?,
     );
   }
 }
@@ -411,7 +430,7 @@ class CareService {
           .from('dose_logs')
           .select(
             'id, schedule_id, scheduled_at, logged_at, action, source, recorded_by, '
-            'schedules!inner(id, medicines!inner(drug_name, strength, dose_amount))',
+            'schedules!inner(id, frequency_type, medicines!inner(drug_name, strength, dose_amount))',
           )
           .eq('user_id', userId)
           .order('scheduled_at', ascending: false)

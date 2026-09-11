@@ -30,29 +30,41 @@ class DoseHistoryScreen extends StatelessWidget {
       appBar: AppBar(title: const Text('Dose history')),
       body: SafeArea(
         child: MedicynContent(
-          child: StreamBuilder<List<DoseLogWithContest>>(
-            stream: db.watchDoseLogsWithContests(scheduleId),
-            builder: (context, snapshot) {
-              if (!snapshot.hasData) {
-                return const Center(child: CircularProgressIndicator());
-              }
-              final rows = List.of(
-                snapshot.data!,
-              )..sort((a, b) => b.log.scheduledAt.compareTo(a.log.scheduledAt));
-              if (rows.isEmpty) {
-                return MedicynFadeIn(child: _EmptyState());
-              }
-              return MedicynFadeIn(
-                child: ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-                  itemCount: rows.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 12),
-                  itemBuilder: (context, i) => _DoseLogCard(
-                    log: rows[i].log,
-                    contest: rows[i].contest,
-                    db: db,
-                  ),
-                ),
+          child: FutureBuilder<Schedule?>(
+            // Loaded once for the whole screen — every log here belongs to
+            // this one schedule, so its frequency type doesn't vary row to
+            // row the way `log.source` does.
+            future: db.scheduleById(scheduleId),
+            builder: (context, scheduleSnapshot) {
+              final isAsNeededSchedule =
+                  scheduleSnapshot.data?.frequencyType ==
+                  FrequencyType.asNeeded.name;
+              return StreamBuilder<List<DoseLogWithContest>>(
+                stream: db.watchDoseLogsWithContests(scheduleId),
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  final rows = List.of(snapshot.data!)..sort(
+                    (a, b) => b.log.scheduledAt.compareTo(a.log.scheduledAt),
+                  );
+                  if (rows.isEmpty) {
+                    return MedicynFadeIn(child: _EmptyState());
+                  }
+                  return MedicynFadeIn(
+                    child: ListView.separated(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+                      itemCount: rows.length,
+                      separatorBuilder: (_, _) => const SizedBox(height: 12),
+                      itemBuilder: (context, i) => _DoseLogCard(
+                        log: rows[i].log,
+                        contest: rows[i].contest,
+                        db: db,
+                        isAsNeededSchedule: isAsNeededSchedule,
+                      ),
+                    ),
+                  );
+                },
               );
             },
           ),
@@ -100,12 +112,28 @@ class _DoseLogCard extends StatelessWidget {
     required this.log,
     required this.contest,
     required this.db,
+    required this.isAsNeededSchedule,
   });
   final DoseLog log;
   final DoseLogContest? contest;
   final AppDatabase db;
 
+  /// Whether the schedule this log belongs to is an as-needed (PRN) one —
+  /// see [_isPrnLog].
+  final bool isAsNeededSchedule;
+
   DoseAction get _action => DoseAction.values.byName(log.action);
+
+  /// A manually logged PRN dose — the "Log now" button (see
+  /// `recordAsNeededDoseTaken`) — rather than a response to a scheduled
+  /// reminder.
+  ///
+  /// `log.source == 'manual'` alone isn't a safe enough signal: today only
+  /// PRN logging writes it, but nothing stops a future manual correction to
+  /// a *scheduled* dose from reusing the same string. Requiring the
+  /// schedule itself to be as-needed is what keeps this label from ever
+  /// being pinned on an ordinary scheduled dose.
+  bool get _isPrnLog => isAsNeededSchedule && log.source == 'manual';
 
   ({IconData icon, Color color, String label}) _actionVisuals(
     BuildContext context,
@@ -168,12 +196,25 @@ class _DoseLogCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    visuals.label,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: visuals.color,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          visuals.label,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(
+                            context,
+                          ).textTheme.titleMedium?.copyWith(
+                            color: visuals.color,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      if (_isPrnLog) ...[
+                        const SizedBox(width: 8),
+                        const _PrnBadge(),
+                      ],
+                    ],
                   ),
                   const SizedBox(height: 4),
                   Text(
@@ -259,6 +300,35 @@ class _ContestNoteDialogState extends State<_ContestNoteDialog> {
           child: const Text('Save'),
         ),
       ],
+    );
+  }
+}
+
+/// A compact "As needed" tag for a PRN dose log — see
+/// [_DoseLogCard._isPrnLog] — so history reads distinguishably from an
+/// on-time scheduled dose at a glance, without requiring the reader to
+/// compare `scheduledAt` and `loggedAt` themselves (both equal "now" for a
+/// PRN log, which otherwise looks exactly like a dose answered right on
+/// time).
+class _PrnBadge extends StatelessWidget {
+  const _PrnBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: scheme.secondaryContainer,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        'As needed',
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: scheme.onSecondaryContainer,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
     );
   }
 }
