@@ -400,4 +400,59 @@ void main() {
       expect((await db.doseLogById('log-1'))!.action, 'snoozed');
     });
   });
+
+  // Family-delivery status (#98) stamps `profiles.last_synced_at` only when
+  // the caller already knows the pull genuinely succeeded — home_screen.dart
+  // gates that write on this return value. A pull that silently swallowed a
+  // network error (the existing per-table try/catch above) must be
+  // distinguishable from one that actually reached the server, or the
+  // indicator would tell a caregiver an edit was delivered when it wasn't.
+  group('pullAll / pullEditableTables report success', () {
+    test('pullAll returns true when every table pulls cleanly', () async {
+      expect(await SyncService(db).pullAll(), isTrue);
+    });
+
+    test('pullEditableTables returns true when every table pulls cleanly',
+        () async {
+      expect(await SyncService(db).pullEditableTables(), isTrue);
+    });
+
+    test('pullAll returns false when a table fails, even though others '
+        'still apply', () async {
+      await seedLocalSchedule(pendingSync: false);
+      // See "pull of dose logs" above: an unset 'schedules' response reads
+      // as every local schedule having been deleted remotely, which would
+      // tombstone it and make applyRemoteDoseLogs skip the log below for an
+      // unrelated reason.
+      backend.tables['schedules'] = [remoteSchedule()];
+      backend.tables['medicines'] = [remoteMedicine()];
+      backend.tables['dose_logs'] = [remoteDoseLog()];
+      backend.failing.add('medicines');
+
+      final ok = await SyncService(db).pullAll();
+
+      expect(ok, isFalse);
+      expect((await db.doseLogById('log-1'))!.action, 'taken',
+          reason:
+              'one table failing must not stop the others from applying');
+    });
+
+    test('pullEditableTables returns false when a table fails', () async {
+      backend.failing.add('schedules');
+
+      expect(await SyncService(db).pullEditableTables(), isFalse);
+    });
+
+    test('returns false rather than true when there is nothing to pull '
+        '(consent off)', () async {
+      SharedPreferences.setMockInitialValues({'consent_cloud_backup': false});
+      AppSettings.instance.resetForTest();
+      await AppSettings.instance.init();
+      await AppSettings.instance.setConsentCloudBackup(false);
+
+      expect(await SyncService(db).pullAll(), isFalse,
+          reason:
+              'a caller must never stamp last_synced_at for a pull that never ran');
+    });
+  });
 }

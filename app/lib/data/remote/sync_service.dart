@@ -77,19 +77,25 @@ class SyncService {
   /// Contest notes are the exception: they are an editable row keyed by
   /// the log, resolved by last-write-wins on `updatedAt` like medicines
   /// and schedules.
-  Future<void> pullAll() async {
-    if (!AppSettings.instance.consentCloudBackup) return;
+  /// Returns whether every table pulled cleanly — see [_pullFailed]. Callers
+  /// that only care about applying what came down (the historical use) can
+  /// simply ignore the return value.
+  Future<bool> pullAll() async {
+    if (!AppSettings.instance.consentCloudBackup) return false;
     final user = _client.auth.currentUser;
-    if (user == null) return;
+    if (user == null) return false;
     _schedulesChanged = false;
     _rejectedScheduleIds.clear();
+    _pullFailed = false;
     // Medicines before schedules before dose logs — each references the
     // one before it (medicine_id, schedule_id), so parents must land first.
     await _pullMedicines(user.id);
     await _pullSchedules(user.id);
     await _pullDoseLogs(user.id);
     await _pullDoseLogContests(user.id);
+    // Not folded into the return value — see [_pullFailed].
     await TodayCareSyncService(_db).pull();
+    return !_pullFailed;
   }
 
   /// The subset of [pullAll] cheap enough to run before every push, not just
@@ -102,16 +108,21 @@ class SyncService {
   /// Dose logs are left out on purpose: they are insert-only, so a push can
   /// never clobber one, and the table is the one that only grows — which is
   /// why a full [pullAll] stays reserved for first run / a new device.
-  Future<void> pullEditableTables() async {
-    if (!AppSettings.instance.consentCloudBackup) return;
+  ///
+  /// Returns whether every table pulled cleanly — see [pullAll].
+  Future<bool> pullEditableTables() async {
+    if (!AppSettings.instance.consentCloudBackup) return false;
     final user = _client.auth.currentUser;
-    if (user == null) return;
+    if (user == null) return false;
     _schedulesChanged = false;
     _rejectedScheduleIds.clear();
+    _pullFailed = false;
     await _pullMedicines(user.id);
     await _pullSchedules(user.id);
     await _pullDoseLogContests(user.id);
+    // Not folded into the return value — see [_pullFailed].
     await TodayCareSyncService(_db).pull();
+    return !_pullFailed;
   }
 
   // Every network call below is bounded with a timeout. Without one, a
@@ -133,6 +144,24 @@ class SyncService {
   /// take; nothing surfaces it yet.
   final Set<String> _rejectedScheduleIds = <String>{};
   Set<String> get rejectedScheduleIds => Set.unmodifiable(_rejectedScheduleIds);
+
+  /// Set when medicines, schedules, dose logs, or contest notes hit their
+  /// outer try/catch below instead of completing — a network failure, not a
+  /// single bad row (those are already skipped and don't count).
+  /// [pullAll] and [pullEditableTables] fold this into the bool they return,
+  /// which is what lets a caller tell "this pull genuinely reached the
+  /// server" apart from "this pull silently gave up" — the distinction
+  /// family-delivery status (#98) needs before it stamps
+  /// `profiles.last_synced_at`. A pull that never runs because backup is off
+  /// or nobody is signed in is not a failure either; those paths return
+  /// `false` directly rather than through this flag.
+  ///
+  /// [TodayCareSyncService]'s own pull is deliberately not folded in here:
+  /// it is a separate feed (today's care reminders), not one of the editable
+  /// tables a caregiver's change-history view is about, and coupling this
+  /// signal to it would make a medicine edit read as "pending" for a reason
+  /// that has nothing to do with medicines or schedules.
+  bool _pullFailed = false;
 
   /// Set when [syncAll] pushed a medicine or schedule edit — i.e. a change to
   /// *what* is meant to fire, as opposed to a record of what happened. The
@@ -448,6 +477,7 @@ class SyncService {
       await _db.tombstoneMedicinesMissingRemotely(gone);
     } catch (_) {
       // Best-effort — retried on the next pullAll() call.
+      _pullFailed = true;
     }
   }
 
@@ -538,6 +568,7 @@ class SyncService {
       if (winners.isNotEmpty || gone.isNotEmpty) _schedulesChanged = true;
     } catch (_) {
       // Best-effort — retried on the next pullAll() call.
+      _pullFailed = true;
     }
   }
 
@@ -574,6 +605,7 @@ class SyncService {
       await _db.applyRemoteDoseLogs(incoming);
     } catch (_) {
       // Best-effort — retried on the next pullAll() call.
+      _pullFailed = true;
     }
   }
 
@@ -613,6 +645,7 @@ class SyncService {
       await _db.applyRemoteDoseLogContests(winners);
     } catch (_) {
       // Best-effort — retried on the next pullAll() call.
+      _pullFailed = true;
     }
   }
 }

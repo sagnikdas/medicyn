@@ -229,10 +229,16 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     // arms their alarms in this same pass instead of waiting for the next
     // resume.
     if (sync != null) {
-      if (firstLoad) {
-        await sync.pullAll();
-      } else {
-        await sync.pullEditableTables();
+      final pulled = firstLoad
+          ? await sync.pullAll()
+          : await sync.pullEditableTables();
+      // Family-delivery status (#98) needs a timestamp the *other* side can
+      // read to tell whether an edit has reached this phone yet. Stamp it
+      // only when the pull itself reported success — a pull that silently
+      // failed must not make a caregiver's change-history view claim an
+      // edit was delivered when it wasn't.
+      if (pulled && syncOwner != null) {
+        unawaited(CareService.instance.recordSyncSuccess());
       }
     }
     // Stop a looping alarm that is already on screen. Opening the app is

@@ -81,3 +81,24 @@ String describeHealthFlag(bool? value) {
   if (value == null) return 'Not reported yet';
   return value ? 'Yes' : 'No';
 }
+
+/// Family-delivery status (#98): whether an edit has actually reached and
+/// been applied on the recipient's phone, not just the server.
+///
+/// A snapshot, not a guarantee — [recipientLastSyncedAt] is stamped only
+/// when the recipient's own device last completed a pull without a network
+/// error (see `CareService.recordSyncSuccess`), so this reads "delivered"
+/// once that pull happened *at or after* the edit was written, and "pending"
+/// otherwise, including when the recipient has never confirmed a sync yet.
+bool editDelivered({
+  required DateTime editCreatedAt,
+  required DateTime? recipientLastSyncedAt,
+}) {
+  if (recipientLastSyncedAt == null) return false;
+  return !editCreatedAt.isAfter(recipientLastSyncedAt);
+}
+
+/// Label for the indicator shown next to a change-history entry.
+String describeDeliveryStatus(bool delivered) => delivered
+    ? 'Delivered as of last sync'
+    : 'Pending — not yet synced everywhere';

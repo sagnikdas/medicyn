@@ -252,9 +252,18 @@ Device script: [`testing/REAL-DEVICE-VALIDATION-TEST-PLAN.md`](testing/REAL-DEVI
 - [x] Device↔cloud sync status — already shipped: `SyncStatusStore` /
       `_BackupStatusCard` on Settings covers syncing, error, pending-count,
       and last-success states.
-- [ ] Family-delivery status (did an edit reach the other side's phone) —
-      split out as its own item, not shipped. Tracked in
-      [issue #98](https://github.com/sagnikdas/medicyn/issues/98).
+- [x] Family-delivery status (did an edit reach the other side's phone) —
+      shipped for [issue #98](https://github.com/sagnikdas/medicyn/issues/98):
+      `profiles.last_synced_at` is stamped only when a device's own pull of
+      medicines/schedules/contest notes genuinely completes without a network
+      error (`SyncService.pullAll`/`pullEditableTables` now return that as a
+      bool; `CareService.recordSyncSuccess`), and `change_history_screen.dart`
+      compares each `medicine_edits.created_at` against it to show
+      "Delivered" or "Pending" — a last-sync snapshot, not a live read
+      receipt. Deliberately not built on the pre-existing `last_seen_at`
+      (stamped on every health check-in regardless of whether the pull
+      succeeded) or `SyncStatusStore` (accurate, but device-local only, never
+      written to Supabase).
 - [x] Pause/completion — shipped: `pauseSchedule`/`resumeSchedule`/`completeSchedule`
       wired to UI in `review_edit_screen.dart`, with status shown on the
       reminder card.
