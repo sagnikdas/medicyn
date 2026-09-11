@@ -95,4 +95,78 @@ void main() {
       expect(localeWeekdayName(DateTime(2026, 8, 18)), 'Tuesday');
     });
   });
+
+  group('localeRelativeAge', () {
+    // Fixed reference clock so these tests don't depend on the real time.
+    final now = DateTime(2026, 8, 21, 12, 0, 0);
+
+    test('is "just now" for anything under a minute old', () {
+      Intl.defaultLocale = 'en_US';
+      expect(
+        localeRelativeAge(now.subtract(const Duration(seconds: 30)), now: now),
+        'just now',
+      );
+    });
+
+    test('pluralizes minutes correctly in English', () {
+      Intl.defaultLocale = 'en_US';
+      expect(
+        localeRelativeAge(now.subtract(const Duration(minutes: 1)), now: now),
+        '1 minute ago',
+      );
+      expect(
+        localeRelativeAge(now.subtract(const Duration(minutes: 5)), now: now),
+        '5 minutes ago',
+      );
+    });
+
+    test('pluralizes hours correctly in English', () {
+      Intl.defaultLocale = 'en_US';
+      expect(
+        localeRelativeAge(now.subtract(const Duration(hours: 1)), now: now),
+        '1 hour ago',
+      );
+      expect(
+        localeRelativeAge(now.subtract(const Duration(hours: 3)), now: now),
+        '3 hours ago',
+      );
+    });
+
+    test('pluralizes days correctly in English', () {
+      Intl.defaultLocale = 'en_US';
+      expect(
+        localeRelativeAge(now.subtract(const Duration(days: 1)), now: now),
+        '1 day ago',
+      );
+      expect(
+        localeRelativeAge(now.subtract(const Duration(days: 2)), now: now),
+        '2 days ago',
+      );
+    });
+
+    test('renders the numeral using the locale\'s own digit system', () {
+      // Persian ("fa") renders digits in Extended Arabic-Indic numerals,
+      // distinct from the Latin "5" -- proof the numeral itself, not just
+      // the surrounding words, is locale-aware. Plain "ar" is *not* a
+      // counterexample here: `intl`'s own symbol table renders Modern
+      // Standard Arabic with plain Latin digits (ZERO_DIGIT '0'); only
+      // country-specific variants like "ar_EG" use Arabic-Indic digits.
+      Intl.defaultLocale = 'fa';
+      expect(
+        localeRelativeAge(now.subtract(const Duration(hours: 5)), now: now),
+        '۵ hours ago',
+      );
+    });
+
+    test(
+      'falls back to English digits for an unrecognised locale string',
+      () {
+        Intl.defaultLocale = 'not-a-real-locale';
+        expect(
+          localeRelativeAge(now.subtract(const Duration(minutes: 5)), now: now),
+          '5 minutes ago',
+        );
+      },
+    );
+  });
 }
