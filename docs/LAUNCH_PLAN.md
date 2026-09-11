@@ -172,3 +172,83 @@ Worth fixing regardless of when the underlying work happens:
 - `compliance/pack/PLAY-DATA-SAFETY.md` still references the removed `pages.yml` deploy workflow (§0.3/C8).
 - `docs/MEDICYN.md`'s Android checklist reads as if store listing copy is unstarted prose work; it's actually finished and sitting in `docs/play-store/closed-testing.md`.
 - The #96c missed-dose banner may be stale (§D6) — flagged, not fixed, pending your confirmation.
+
+---
+
+## Execution status — 11 September 2026
+
+Nothing on this checklist has been executed yet (this status was taken
+minutes after the plan itself was written). Re-check this section as work
+lands rather than trusting it stays current.
+
+### Track 0
+| # | Item | Status |
+|---|---|---|
+| 0.1 | Verify Android OAuth survived the package rename | ❌ Not verified |
+| 0.2 | Fix `GoogleAuthConfig.isConfigured` ignoring iOS client ID | ❌ Not fixed |
+| 0.3 | Fix stale `pages.yml` reference in Play Data Safety doc | ❌ Not fixed |
+
+### Track A — Android
+| # | Item | Status |
+|---|---|---|
+| A1 | Release keystore + `key.properties` | ❌ Not done (template ready) |
+| A2 | `flutter build appbundle --release` succeeds | ⏸ Blocked on A1 |
+| A3 | Register Android OAuth client per SHA-1 | ❌ Not done (depends on 0.1) |
+| A4 | Play Console Data Safety form | ✅ Answers ready, ❌ not submitted |
+| A5 | `SCHEDULE_EXACT_ALARM` Play declaration | ✅ Justification ready, ❌ not submitted |
+| A6 | Upload signed bundle to internal testing | ❌ Not done |
+| A7 | Start closed testing | ❌ Not started — runbook + store copy fully written |
+| A8 | Galaxy M33 overlay-install check | ❌ Not done, zero evidence it ran |
+
+Android: 0 of 8 executed, but A4/A5/A7 have zero remaining prep — pure
+execution once someone sits down to do it.
+
+### Track B — iOS
+| # | Item | Status |
+|---|---|---|
+| B1 | Apple Developer Program enrollment | ❌ Not done |
+| B2 | Restore GitHub Actions billing | ❌ Not done — CI still fails in ~9s |
+| B3 | Physical iPhone access | ❌ None available in any session |
+| B4 | Wire iOS Google OAuth client | ❌ Not done (code ready, needs real client ID) |
+| B5 | Apple Portal: Push Notifications capability + cert/profile | ⏸ Blocked on B1 |
+| B6 | Firebase: upload APNs key | ❌ Not done |
+| B7 | Replace AppIcon artwork | ❌ Not done — currently stock Flutter logo |
+| B8 | Fix `MedicynBrandMark` asset path | ❌ Not done |
+| B9 | Real-device validation pass | ⏸ Blocked on B3, 0 of ~15 checks done |
+| B10 | App Store Connect app record | ⏸ Blocked on B1 |
+| B11 | App Store screenshots + copy | ❌ Not done |
+| B12 | ASC API key for TestFlight | ⏸ Blocked on B10 |
+| B13 | TestFlight upload | ⏸ Blocked on B5/B12 |
+
+iOS: 0 of 13 done. B1/B2/B3 gate almost everything else in this track.
+
+### Track C — Compliance
+| # | Item | Status |
+|---|---|---|
+| C1 | Accept Supabase DPA | ❌ Not done (Google Cloud DPA already accepted) |
+| C2 | Anthropic DPA + zero-retention | ❌ Not done |
+| C3 | Decide EU/UK data-region strategy | ❌ Not decided |
+| C4 | Appoint Art. 27 EU rep (or restrict EEA) | ❌ Not done |
+| C5 | Re-do the DPIA | ❌ Not done |
+| C6 | Refresh the ROPA | ❌ Stale since 2026-08-20 |
+| C7 | Build App Store Privacy Nutrition Label | ❌ Doesn't exist yet |
+| C8 | Same `pages.yml` fix as 0.3 | ❌ Not fixed |
+
+Compliance: 0 of 8 done.
+
+### Track D — Pre-launch product gaps
+| # | Item | Status |
+|---|---|---|
+| D1 | Family-delivery status (#98) | ❌ Not built |
+| D2 | As-needed/PRN manual logging (#99) | ❌ Not built |
+| D3 | Locale-aware dates (#100) | ❌ Not built |
+| D4 | Split `timingDefinedAt` from `updatedAt` (#96a) | ❌ Not built |
+| D5 | Hourly `device_silent` scheduler workflow (#96b) | ❌ Not built |
+| D6 | Verify/build missed-dose nudge banner (#96c) | ⚠️ Marked done in `MEDICYN.md`, unconfirmed in code |
+
+Product gaps: 0 of 6 resolved.
+
+**Overall:** nothing executed yet. Android has the least remaining prep
+(most answers/copy already drafted — mostly execution plus the one
+unverified OAuth risk). iOS has the most external blockers stacked before
+any engineering can even be tested (B1/B2/B3 gate almost everything else).
