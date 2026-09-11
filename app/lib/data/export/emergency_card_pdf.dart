@@ -1,6 +1,7 @@
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
+import '../../core/locale_dates.dart';
 import 'emergency_card_data.dart';
 
 // Same tokens as adherence_pdf.dart's palette. Duplicated rather than
@@ -17,24 +18,11 @@ const _stripe = PdfColor.fromInt(0xFFF6F0E1);
 const _alert = PdfColor.fromInt(0xFFBA1A1A);
 const _alertBg = PdfColor.fromInt(0xFFFFDAD6);
 
-const _months = [
-  'January',
-  'February',
-  'March',
-  'April',
-  'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December',
-];
-
 /// Builds a single printable A4 page: the facts a first responder or a new
 /// clinician needs at a glance. Helvetica, same reasoning as the adherence
 /// report -- a printed or faxed copy must not depend on an embedded font.
+/// See `adherence_pdf.dart`'s doc comment for the same locale-formatted-
+/// dates / Latin-1-only-font tradeoff that applies here too.
 Future<List<int>> buildEmergencyCardPdf(EmergencyCardData data) async {
   final doc = pw.Document(title: 'Medicyn emergency card', author: 'Medicyn');
   doc.addPage(
@@ -293,7 +281,4 @@ pw.Widget _table({
   );
 }
 
-String _shortDate(DateTime value) {
-  final local = value.toLocal();
-  return '${local.day} ${_months[local.month - 1]} ${local.year}';
-}
+String _shortDate(DateTime value) => localeShortDate(value.toLocal());

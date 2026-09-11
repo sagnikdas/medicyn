@@ -1,3 +1,4 @@
+import 'package:intl/intl.dart';
 import 'package:medicyn/core/theme.dart';
 import 'package:medicyn/features/reminders_home/dose_calendar.dart';
 import 'package:flutter/material.dart';
@@ -6,6 +7,14 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   final clock = DateTime(2026, 8, 21, 15, 30);
   final selected = DateTime(2026, 8, 21);
+
+  // Pins day-before-month formatting (the semantics-label assertion below
+  // reads "21 August") regardless of the machine running the suite --
+  // DoseCalendar's date text now comes from `core/locale_dates.dart`,
+  // which otherwise follows the host's own locale (en_US orders it
+  // "August 21" instead).
+  setUp(() => Intl.defaultLocale = 'en_GB');
+  tearDown(() => Intl.defaultLocale = null);
 
   Widget harness({
     DateTime? selectedDay,

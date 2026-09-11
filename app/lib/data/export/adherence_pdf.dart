@@ -1,6 +1,7 @@
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
+import '../../core/locale_dates.dart';
 import 'adherence_report.dart';
 
 const _teal = PdfColor.fromInt(0xFF00685F);
@@ -19,24 +20,17 @@ const _stripe = PdfColor.fromInt(0xFFF6F0E1);
 const _missed = PdfColor.fromInt(0xFFBA1A1A);
 const _notRecorded = PdfColor.fromInt(0xFF8A7A5E);
 
-const _months = [
-  'January',
-  'February',
-  'March',
-  'April',
-  'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December',
-];
-
 /// Builds an A4 PDF a clinic can print. Helvetica on purpose: a faxed chart
 /// must survive without embedding a variable font, and it must not look
 /// like a screenshot of the app.
+///
+/// Dates below are locale-formatted (see `core/locale_dates.dart`) so the
+/// weekday/month names and their order match the device's locale rather
+/// than always being English. Helvetica only covers Latin-1, though: on a
+/// device whose locale uses a non-Latin script (Devanagari, CJK, Arabic,
+/// ...) those characters won't render in this PDF -- a pre-existing
+/// limitation of this file's fixed base font that free-text fields
+/// (medicine names, notes) already have, not something new here.
 Future<List<int>> buildAdherencePdf(AdherenceReport report) async {
   final doc = pw.Document(title: 'Medicyn adherence report', author: 'Medicyn');
   doc.addPage(
@@ -383,10 +377,7 @@ String _pct(int taken, int expected) {
   return '${((taken / expected) * 100).round()}%';
 }
 
-String _shortDate(DateTime value) {
-  final local = value.toLocal();
-  return '${local.day} ${_months[local.month - 1]} ${local.year}';
-}
+String _shortDate(DateTime value) => localeShortDate(value.toLocal());
 
 String _dateTime(DateTime value) {
   final local = value.toLocal();

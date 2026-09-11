@@ -1,3 +1,4 @@
+import '../../core/locale_dates.dart';
 import '../../data/local/database.dart';
 import '../../data/local/tables.dart';
 import '../notification_engine/schedule_validation.dart';
@@ -14,9 +15,11 @@ String describeSchedule(Schedule schedule) {
     case FrequencyType.daily:
       return 'Daily at ${schedule.times.join(', ')}';
     case FrequencyType.specificDays:
-      const labels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-      // Same reason: labels[9] is a RangeError, not a missing label.
-      final days = schedulableDays(schedule.daysOfWeek).map((d) => labels[d]).join(', ');
+      // Same reason as before: an out-of-range day is a RangeError, not a
+      // missing label -- schedulableDays already only yields 0-6.
+      final days = schedulableDays(
+        schedule.daysOfWeek,
+      ).map(localeShortWeekdayForSundayIndex).join(', ');
       return '$days at ${schedule.times.join(', ')}';
     case FrequencyType.everyXHours:
       return 'Every ${schedule.intervalHours ?? '?'} hours';

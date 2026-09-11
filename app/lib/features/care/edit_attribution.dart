@@ -2,30 +2,7 @@
 /// safe to show a family rather than a version number.
 library;
 
-const _weekdays = [
-  'Monday',
-  'Tuesday',
-  'Wednesday',
-  'Thursday',
-  'Friday',
-  'Saturday',
-  'Sunday',
-];
-
-const _months = [
-  'January',
-  'February',
-  'March',
-  'April',
-  'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December',
-];
+import '../../core/locale_dates.dart';
 
 /// One line under a reminder, or null when there is nothing honest to say
 /// (a row that predates `updated_by`, or an unknown actor with no name).
@@ -71,8 +48,8 @@ String describeRelativeDay(DateTime at, {DateTime? now}) {
   final diff = today.difference(day).inDays;
   if (diff == 0) return 'today';
   if (diff == 1) return 'yesterday';
-  if (diff > 1 && diff < 7) return _weekdays[local.weekday - 1];
-  return '${local.day} ${_months[local.month - 1]} ${local.year}';
+  if (diff > 1 && diff < 7) return localeWeekdayName(local);
+  return localeDayMonthYear(local);
 }
 
 /// Last check-in for the setup-health panel.
