@@ -5,9 +5,13 @@
 **Status:** Answers for the operator to paste. Nothing in this file submits
 the form. Do not submit until it still matches the policy.
 
-The public-page source is deployed by `.github/workflows/pages.yml`. The
-operator must enable GitHub Pages for the repository and verify the URLs before
-submitting the Play listing.
+The public policy pages are served from the `sagnikdas/doezly` landing-site
+repo at `medicyn.doezly.com/privacy`, `/delete-account`, `/support`, and
+`/mhmd` (the old `.github/workflows/pages.yml` GitHub Pages deploy has been
+removed — this repo is private and Pages on a private repo needs a paid
+plan). `app/lib/core/privacy_policy.dart` and `account_deletion.dart` point
+at these URLs; all four are verified live before submitting the Play
+listing.
 
 ## Data Safety — collected
 
