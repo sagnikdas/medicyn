@@ -1,0 +1,75 @@
+name: Device-silent check
+
+# The missed-dose sweep is device-side and runs on foreground, so a parent
+# who never opens the app generates no alert at all. `device_silent` is the
+# other half of that: notify-care's `isCron` branch (gated by `x-cron-secret`,
+# see supabase/functions/notify-care/index.ts) reads
+# `silent_devices_due()` and pings the caregiver for any active care link
+# whose patient hasn't checked in for 24 hours. Nothing in the repo ever
+# called it — this is that caller.
+#
+# `verify_jwt = false` for notify-care (supabase/config.toml) exists
+# specifically so this can reach the function with no Supabase session, just
+# the shared secret.
+
+on:
+  schedule:
+    # Roughly hourly. Off the top of the hour, per GitHub's guidance, since
+    # every other scheduled workflow on GitHub also asks for :00.
+    - cron: '7 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: device-silent-check
+  cancel-in-progress: false
+
+jobs:
+  ping:
+    name: Trigger silent-device sweep
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Call notify-care's cron path
+        shell: bash
+        env:
+          # Same project the app is built against (app/lib/core/supabase_config.dart).
+          # Not secret — it is already public in the client binary — but
+          # CRON_SECRET below is, and is the only thing standing between
+          # this endpoint and anyone who can guess the URL.
+          FUNCTION_URL: https://twybepxnqayypzljhcnx.supabase.co/functions/v1/notify-care
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::CRON_SECRET repository secret is not set; cannot call notify-care"
+            exit 1
+          fi
+
+          response_file="$(mktemp)"
+          http_status=$(curl -sS -o "$response_file" -w '%{http_code}' \
+            -X POST "$FUNCTION_URL" \
+            -H "x-cron-secret: $CRON_SECRET" \
+            -H 'Content-Length: 0')
+
+          echo "HTTP status: $http_status"
+          echo "Response body:"
+          cat "$response_file"
+          echo
+
+          if [ "$http_status" -lt 200 ] || [ "$http_status" -ge 300 ]; then
+            echo "::error::device-silent sweep call failed with HTTP $http_status"
+            exit 1
+          fi
+
+          # A 2xx with an error payload is still a failure — notify-care
+          # returns 200 for the "nothing to do" cases (sent: 0, ...) and a
+          # non-2xx for the ones above, but check for a stray {"error": ...}
+          # body defensively rather than trusting status codes alone.
+          if jq -e 'has("error")' "$response_file" >/dev/null 2>&1; then
+            echo "::error::device-silent sweep returned an error payload"
+            exit 1
+          fi
