@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/app_settings.dart';
+import '../../core/locale_dates.dart';
 import '../local/database.dart';
 
 /// Local, non-health diagnostics for cloud backup. It records only whether a
@@ -35,7 +36,7 @@ class SyncStatusStore extends ChangeNotifier {
       return '$_pendingWork item${_pendingWork == 1 ? '' : 's'} waiting to sync';
     }
     if (_lastSuccessfulAt == null) return 'Backup has not run yet';
-    return 'Backed up ${_formatAge(_lastSuccessfulAt!)}';
+    return 'Backed up ${localeRelativeAge(_lastSuccessfulAt!)}';
   }
 
   Future<void> loadForOwner(String ownerId) async {
@@ -92,12 +93,4 @@ class SyncStatusStore extends ChangeNotifier {
 
   static String _key(String ownerId) =>
       '$_keyPrefix.${Uri.encodeComponent(ownerId)}.last_success';
-
-  static String _formatAge(DateTime value) {
-    final age = DateTime.now().difference(value);
-    if (age.inMinutes < 1) return 'just now';
-    if (age.inHours < 1) return '${age.inMinutes}m ago';
-    if (age.inDays < 1) return '${age.inHours}h ago';
-    return '${age.inDays}d ago';
-  }
 }
