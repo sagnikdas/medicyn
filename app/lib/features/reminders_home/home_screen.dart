@@ -91,6 +91,12 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   bool _calendarMonth = false;
   List<DayOccurrence> _ringIfLeft = const [];
   final _dismissedAttentionUntil = <String, DateTime>{};
+  // Once a specific missed dose's gentle Today nudge is dismissed, it stays
+  // dismissed for that occurrence — no timeout, unlike snooze above. Pruned
+  // to whatever is still actually missed today on every build, so it never
+  // grows unbounded and a later, genuinely new missed dose still gets its
+  // own nudge.
+  final _dismissedMissedNudgeKeys = <String>{};
   final _attentionScheduleVersions = <String, DateTime>{};
   var _attentionWasPresent = false;
   // Which occurrences have already had their automatic Taken/Snooze dialog
@@ -867,6 +873,28 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final expectedCount = occurrences.length;
     final month = _calendarMonth;
 
+    // This user's own doses only — the caregiver's separate "someone you
+    // help missed a dose" alert (push_service.dart) is never surfaced here.
+    _dismissedMissedNudgeKeys.removeWhere(
+      (key) => !todayOccs.any(
+        (o) => o.status == DayDoseStatus.missed && _attentionKey(o) == key,
+      ),
+    );
+    final missedNudgeOccurrences = missedDoseNudgeOccurrences(
+      today: todayOccs,
+      dismissedKeys: _dismissedMissedNudgeKeys,
+    );
+    final missedDoseNudge = missedNudgeOccurrences.isEmpty
+        ? null
+        : MissedDoseNudgeCard(
+            count: missedNudgeOccurrences.length,
+            onDismiss: () => setState(
+              () => _dismissedMissedNudgeKeys.addAll(
+                missedNudgeOccurrences.map(_attentionKey),
+              ),
+            ),
+          );
+
     if (android) {
       return AndroidTodayScreen(
         db: widget.db,
@@ -887,6 +915,7 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 ),
               )
             : null,
+        missedDoseNudge: missedDoseNudge,
       );
     }
 
@@ -946,6 +975,13 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   ),
                 ),
               ),
+            ),
+          ),
+        if (missedDoseNudge != null)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+              child: missedDoseNudge,
             ),
           ),
         HomeCalendarSliver(
@@ -1282,6 +1318,81 @@ class _ReminderHealthCard extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A gentle nudge for the parent themself when one of their own doses is
+/// logged missed — not a report that a caregiver was told (that alert is
+/// separate, see `push_service.dart`/`notification_actions.dart`, and is
+/// never shown here). Public so it can be pumped directly in widget tests,
+/// the same way [DoseAttentionPanel] is.
+class MissedDoseNudgeCard extends StatelessWidget {
+  const MissedDoseNudgeCard({
+    super.key,
+    required this.count,
+    required this.onDismiss,
+  });
+
+  /// How many of today's own doses are currently missed and undismissed.
+  final int count;
+  final VoidCallback onDismiss;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    // Same one-shot entrance as _ReminderHealthCard right above: this only
+    // exists in the tree while an undismissed missed dose does, so every
+    // mount is a genuine new thing to notice.
+    return MedicynFadeIn(
+      child: Semantics(
+        container: true,
+        child: Container(
+          decoration: BoxDecoration(
+            color: scheme.secondaryContainer,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          padding: const EdgeInsets.fromLTRB(16, 12, 8, 16),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.favorite_outline, color: scheme.onSecondaryContainer),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      count == 1
+                          ? 'Looks like you missed a dose earlier'
+                          : 'Looks like you missed $count doses earlier',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: scheme.onSecondaryContainer,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'No worries — log it if you still can, or just carry '
+                      'on with what is next.',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: scheme.onSecondaryContainer,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                onPressed: onDismiss,
+                icon: Icon(Icons.close, color: scheme.onSecondaryContainer),
+                tooltip: 'Dismiss',
+                visualDensity: VisualDensity.compact,
+                constraints: const BoxConstraints(),
+                padding: const EdgeInsets.all(8),
+              ),
+            ],
+          ),
         ),
       ),
     );
