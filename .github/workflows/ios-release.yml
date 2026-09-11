@@ -135,6 +135,28 @@ jobs:
             echo "IOS_SIGNING_IDENTITY=$signing_identity"
           } >> "$GITHUB_ENV"
 
+      - name: Match aps-environment to the distribution profile
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Runner.entitlements is checked in with aps-environment=development
+          # for local/simulator Xcode runs. A distribution provisioning
+          # profile only ever grants "production" for that key, and manual
+          # code signing (used below) fails the archive outright if the
+          # entitlements file asks for anything the profile doesn't list —
+          # "doesn't support the Push Notifications capability" — so this
+          # rewrites the checked-out file to whatever the actual profile
+          # grants rather than hardcoding "production" here.
+          profile_plist="$RUNNER_TEMP/ios-distribution-profile.plist"
+          entitlements_path="app/ios/Runner/Runner.entitlements"
+          aps_environment="$(/usr/libexec/PlistBuddy -c 'Print:Entitlements:aps-environment' "$profile_plist" 2>/dev/null || true)"
+          if [[ -z "$aps_environment" ]]; then
+            echo "::error::The distribution provisioning profile has no aps-environment entitlement — enable Push Notifications for com.sagnikdas.medicyn in the Apple Developer portal and regenerate the profile."
+            exit 1
+          fi
+          /usr/libexec/PlistBuddy -c "Set :aps-environment $aps_environment" "$entitlements_path"
+          echo "aps-environment set to $aps_environment for this archive."
+
       - name: Archive and export signed IPA
         shell: bash
         env:

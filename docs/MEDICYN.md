@@ -173,7 +173,7 @@ product today. Full analysis: [`compliance/COMPLIANCE.md`](compliance/COMPLIANCE
 
 ### Live infrastructure
 - [x] **Supabase** (`twybepxnqayypzljhcnx`): migrations applied, edge functions deployed, Google provider configured with Web and Android client IDs, email sign-in and custom SMTP disabled
-- [x] **Firebase** (`decent-digit-135023`): Android app registered, service account stored as `FCM_SERVICE_ACCOUNT` secret
+- [x] **Firebase** (`decent-digit-135023`): Android app registered, service account stored as `FCM_SERVICE_ACCOUNT` secret. An iOS app is registered too (`GoogleService-Info.plist`, bundle id `com.sagnikdas.medicyn`) — confirmed present locally (git-ignored, not committed); no APNs key is uploaded for it yet, so iOS push has no delivery path even though the app-side registration exists.
 
 ### Compliance
 - [x] Phase 1 and 2 closed on `main`
@@ -298,19 +298,64 @@ not built, nothing stale to correct.
       [PR #102](https://github.com/sagnikdas/medicyn/pull/102).
 
 ### iOS
-Scoped, none of it built. iOS ships to the same bar Android already meets —
-reminders that fire with no network and no live app process.
+Not shipped — but not "none of it built" either; that was stale. Re-audited
+from the code on 2026-09-10, not from comments: an adaptive Cupertino/
+Material layer already covers the app shell, navigation, dialogs, and time
+pickers; `notification_service.dart` has iOS-specific scheduling logic (a
+60-slot pending-notification budget, a rolling window for every-X-hours
+schedules, reminder-category actions); `flutter build ios --release
+--no-codesign` succeeds locally; and the app runs correctly on an iOS
+Simulator (Supabase initializes, onboarding renders correctly, screenshotted).
+Full parity audit, task-by-task plan, and a real-device QA script:
+[`docs/ios/FEATURE_PARITY.md`](ios/FEATURE_PARITY.md),
+[`docs/ios/IMPLEMENTATION_PLAN.md`](ios/IMPLEMENTATION_PLAN.md),
+[`docs/ios/REAL_DEVICE_QA.md`](ios/REAL_DEVICE_QA.md). iOS still ships to the
+same bar Android already meets — reminders that fire with no network and no
+live app process — and that specific claim remains unverified on real
+hardware (see below).
 
-- [ ] **Toolchain blocker:** the vendored Google ML Kit framework has an
-      x86_64 simulator slice and an arm64 device slice but no arm64 simulator
-      slice — an Apple-Silicon simulator can't link it
+- [x] Push notifications, code side — found and fixed in
+      [PR #119](https://github.com/sagnikdas/medicyn/pull/119): no
+      `Runner.entitlements` existed at all (APNs registration would fail
+      silently on a real device), `Info.plist` had no background mode to
+      wake for a silent push, and the `notify-care` edge function's FCM
+      payload had no `apns` block — a data-only `data_changed` re-arm ping
+      would never have woken the app, and a visible missed-dose/refill alert
+      would have arrived silent. All three fixed and tested (16/16 Deno
+      tests). Delivery itself is still blocked on the Apple Developer Push
+      Notifications capability + an APNs key uploaded to Firebase — both
+      operator actions, not code.
+- [ ] **Toolchain:** the vendored Google ML Kit framework has an x86_64
+      simulator slice and an arm64 device slice but no arm64 simulator slice
+      — a Google-side upstream limitation (confirmed still current, not a
+      version pin this repo controls). The Podfile's existing x86_64-only
+      simulator workaround still compiles, but no longer *installs* on this
+      machine's iOS 26.3 Simulator runtime (Apple has since dropped x86_64
+      Simulator support there); it installs and runs correctly on an iOS
+      18.3 runtime. A real device is unaffected either way — the exclusion
+      only touches the simulator SDK.
 - [ ] Validate on a signed physical iPhone: camera/OCR, speech, local
       notifications and action buttons, permission prompts, Dynamic Type,
-      dark mode, VoiceOver, encrypted database at runtime (`PRAGMA key`)
-- [ ] Move the brand mark from the Android resource path to a shared Flutter branding asset
+      dark mode, VoiceOver, encrypted database at runtime (`PRAGMA key`).
+      None of this has run on real hardware yet — no iPhone has been
+      available in any session so far. Script ready at
+      [`docs/ios/REAL_DEVICE_QA.md`](ios/REAL_DEVICE_QA.md).
+- [ ] Move the brand mark off the Android resource path — `MedicynBrandMark`
+      (`medicyn_chrome.dart`) still points `Image.asset` at
+      `android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png`. Renders
+      correctly on iOS today regardless (Flutter bundles it as a plain
+      asset; confirmed on Simulator) — this is a path-hygiene cleanup, not a
+      functional gap.
 - [ ] Apple Developer / App Store Connect account, team, certificates, profiles, app record, export-compliance classification
-- [ ] iOS Google OAuth client and Firebase/APNs configuration
-- [ ] Final branded AppIcon artwork
+- [ ] iOS Google OAuth client — code side is ready
+      (`GoogleAuthConfig.iosClientId`, and `Info.plist`'s `GIDClientID`/
+      URL-scheme block is pre-written as a comment) and just needs a real
+      client id from Google Cloud Console
+- [ ] APNs key uploaded to Firebase (Firebase's iOS app registration and the
+      Crashlytics dSYM upload phase are already done — see Live
+      infrastructure, above)
+- [ ] Final branded AppIcon artwork — the asset slot is populated, but with
+      Flutter's default logo, not Medicyn's (confirmed by opening the file)
 - [ ] Final App Store screenshots and copy
 
 ### Compliance operator actions
