@@ -51,7 +51,7 @@ paired with `.impeccable/design.json` and cited by name from
 - [x] Device-health panel
 - [x] Change history
 - [ ] Caregiver-side trends
-- [ ] Multi-person view (blocked — care link is locked 1:1)
+- [ ] Multi-person view — direction accepted (one caregiver, up to two parents), not started; needs the schema change described under "Care link cardinality" in Locked decisions
 - [ ] Weekly digest
 
 ### F8 — Refill reminders → pharmacy referral
@@ -65,8 +65,9 @@ paired with `.impeccable/design.json` and cited by name from
       your pharmacist." Incremental trigger (new/changed medicine vs. active
       list only). Its own visible push, never folded into silent sync. Never
       names a drug in a notification payload.
-- [ ] **F9 — Family plan pricing on care links.** Needs multi-link schema,
-      which the 1:1 lock forbids today.
+- [ ] **F9 — Family plan pricing on care links.** Needs the multi-link schema
+      now planned under "Care link cardinality" (one caregiver, up to two
+      parents) — not built yet, but no longer blocked by the old 1:1 lock.
 - [ ] **F10 — Premium caregiver dashboard.** Foundation only.
 - [ ] **F11 — "Ask about my meds" assistant.** Same Claude pipe, new prompt.
 
@@ -127,7 +128,7 @@ dose engine to non-pill daily tasks.
 |---|---|
 | Reminder firing | On-device exact alarms. Drift/SQLite is the source of truth for *when*. Cloud never arms or gates a reminder. |
 | Auth | Google Sign-In only — native picker, ID-token exchange. No browser, no email/OTP. |
-| Care link cardinality | One caregiver per parent. |
+| Care link cardinality | **Changed 2026-09-11.** Target: one caregiver, up to two parents (e.g. both parents of the same caregiver). A parent still has exactly one caregiver. Not built yet — schema and app still enforce strict 1:1 both ways via `care_links_one_live_per_caregiver` (`supabase/migrations/20260818161500_care_links.sql:72-73`) and `CareService.currentLink()` (`app/lib/features/care/care_service.dart:417`), which returns a single link. Engineering work: relax the caregiver-side unique index to allow up to 2 live rows, and change `currentLink()` into a plural accessor plus a dashboard parent-switcher. |
 | Dual roles | Nobody can be both a parent and a caregiver in different pairs. |
 | Delete rights | The caregiver can add and edit, never delete. |
 | Conflict resolution | Last-write-wins on a client-stamped `updated_at`, shown to both sides. |
@@ -282,8 +283,9 @@ Device script: [`testing/REAL-DEVICE-VALIDATION-TEST-PLAN.md`](testing/REAL-DEVI
 ### Product gaps — after a successful launch
 Reviewed on 2026-09-08. The first five are confirmed accurate — genuinely
 not built, nothing stale to correct.
-- [ ] Multiple caregivers / multiple patients, and escalation — still
-      blocked by the locked 1:1 care-link decision
+- [ ] Multiple caregivers / multiple patients, and escalation — one caregiver
+      to two parents is now the accepted direction (see Locked decisions); a
+      parent still has exactly one caregiver, and escalation is unscoped
 - [ ] PDF clinician report (F6's missing half)
 - [ ] Travel assistant; home-screen widget
 - [ ] Billing tiers, if retention supports them
@@ -384,7 +386,7 @@ hardware (see below).
 - [ ] Whether refill tracking stays free (default: yes)
 - [ ] Refill basket (N1) monetization — resolve before building: neutral transparency, sorted by price alone, affiliate status disclosed on the row, revenue never reorders the list
 - [ ] F5 interaction checking — needs an explicit go/no-go: Claude-based screening with disclosure, vs. blocked pending a licensed clinical source and legal review
-- [ ] F7's multi-person view and F9's family pricing both require reversing the 1:1 care-link lock
+- [x] ~~F7's multi-person view and F9's family pricing both require reversing the 1:1 care-link lock~~ — resolved 2026-09-11: direction accepted as one caregiver, up to two parents (see Locked decisions); building it is still open work, tracked under F7/F9
 
 ---
 
