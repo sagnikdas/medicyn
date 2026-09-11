@@ -27,6 +27,7 @@ void main() {
           active: true,
           createdAt: DateTime(2026, 8, 1),
           updatedAt: DateTime(2026, 8, 1),
+          timingDefinedAt: DateTime(2026, 8, 1),
           updatedBy: null,
           pendingSync: false,
           deleted: false,
