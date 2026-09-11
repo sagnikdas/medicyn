@@ -105,4 +105,61 @@ void main() {
       expect(health.remindersMayNotFire, isTrue);
     });
   });
+
+  group('editDelivered', () {
+    final editCreatedAt = DateTime.utc(2026, 9, 10, 12);
+
+    test('is pending when the recipient has never confirmed a sync', () {
+      expect(
+        editDelivered(
+          editCreatedAt: editCreatedAt,
+          recipientLastSyncedAt: null,
+        ),
+        isFalse,
+      );
+    });
+
+    test('is pending when the last confirmed sync predates the edit', () {
+      expect(
+        editDelivered(
+          editCreatedAt: editCreatedAt,
+          recipientLastSyncedAt: editCreatedAt.subtract(
+            const Duration(minutes: 1),
+          ),
+        ),
+        isFalse,
+      );
+    });
+
+    test('is delivered once a confirmed sync happened at the edit\'s moment',
+        () {
+      expect(
+        editDelivered(
+          editCreatedAt: editCreatedAt,
+          recipientLastSyncedAt: editCreatedAt,
+        ),
+        isTrue,
+      );
+    });
+
+    test('is delivered once a confirmed sync happened after the edit', () {
+      expect(
+        editDelivered(
+          editCreatedAt: editCreatedAt,
+          recipientLastSyncedAt: editCreatedAt.add(const Duration(hours: 1)),
+        ),
+        isTrue,
+      );
+    });
+  });
+
+  group('describeDeliveryStatus', () {
+    test('names the two states honestly', () {
+      expect(describeDeliveryStatus(true), 'Delivered as of last sync');
+      expect(
+        describeDeliveryStatus(false),
+        'Pending — not yet synced everywhere',
+      );
+    });
+  });
 }

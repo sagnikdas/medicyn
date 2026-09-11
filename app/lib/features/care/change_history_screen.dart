@@ -22,6 +22,12 @@ class _ChangeHistoryScreenState extends State<ChangeHistoryScreen> {
   Map<String, String> _names = {};
   String? _error;
 
+  // Family-delivery status (#98): the medicine owner's (the patient's) last
+  // confirmed-synced timestamp, fetched once per load and compared against
+  // each edit's `createdAt`. Null means either the profile hasn't loaded yet
+  // or that device has never confirmed a sync — both read as "pending".
+  DateTime? _ownerLastSyncedAt;
+
   String? get _me => AuthService.instance.currentUser?.id;
 
   @override
@@ -43,10 +49,18 @@ class _ChangeHistoryScreenState extends State<ChangeHistoryScreen> {
         final name = await CareService.instance.displayName(id);
         if (name != null) names[id] = name;
       }
+      // Every row shares one ownerId (they're all edits to the same
+      // medicine), so one profile fetch covers the whole list.
+      DateTime? lastSyncedAt;
+      if (edits.isNotEmpty) {
+        final owner = await CareService.instance.profile(edits.first.ownerId);
+        lastSyncedAt = owner?.lastSyncedAt;
+      }
       if (!mounted) return;
       setState(() {
         _edits = edits;
         _names = names;
+        _ownerLastSyncedAt = lastSyncedAt;
         _error = null;
       });
     } on CareLinkFailure catch (e) {
@@ -105,6 +119,11 @@ class _ChangeHistoryScreenState extends State<ChangeHistoryScreen> {
               : edit.actorId == _me
               ? 'You'
               : (_names[edit.actorId] ?? 'Someone');
+          final delivered = editDelivered(
+            editCreatedAt: edit.createdAt,
+            recipientLastSyncedAt: _ownerLastSyncedAt,
+          );
+          final scheme = Theme.of(context).colorScheme;
           return Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -123,6 +142,34 @@ class _ChangeHistoryScreenState extends State<ChangeHistoryScreen> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        delivered
+                            ? Icons.check_circle_outline
+                            : Icons.schedule_outlined,
+                        size: 14,
+                        color: delivered
+                            ? scheme.primary
+                            : scheme.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        // "as of last sync" is the honest framing: this is a
+                        // snapshot from the recipient's last confirmed pull,
+                        // not a live read-receipt.
+                        describeDeliveryStatus(delivered),
+                        style: Theme.of(context).textTheme.labelSmall
+                            ?.copyWith(
+                              color: delivered
+                                  ? scheme.primary
+                                  : scheme.onSurfaceVariant,
+                            ),
+                      ),
+                    ],
                   ),
                 ],
               ),

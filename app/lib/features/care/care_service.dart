@@ -135,6 +135,7 @@ class CareProfile {
     this.batteryExemption,
     this.armedAlarmCount,
     this.healthCheckedAt,
+    this.lastSyncedAt,
   });
 
   final String userId;
@@ -153,6 +154,14 @@ class CareProfile {
   final bool? batteryExemption;
   final int? armedAlarmCount;
   final DateTime? healthCheckedAt;
+
+  /// When this account's device last completed a pull of its editable
+  /// tables (medicines/schedules/contest notes) without a network error —
+  /// see [CareService.recordSyncSuccess]. Null if this device has never
+  /// confirmed a sync, in which case every edit reads as pending. Unlike
+  /// [lastSeenAt], this is specifically about the pull that applies a
+  /// caregiver's edit locally, not a general check-in.
+  final DateTime? lastSyncedAt;
 
   /// True when any of the things that actually make a reminder fire is off.
   bool get remindersMayNotFire {
@@ -366,7 +375,7 @@ class CareService {
           .select(
             'user_id, display_name, timezone, last_seen_at, '
             'notifications_allowed, exact_alarms_allowed, battery_exemption, '
-            'armed_alarm_count, health_checked_at',
+            'armed_alarm_count, health_checked_at, last_synced_at',
           )
           .eq('user_id', userId)
           .limit(1);
@@ -382,6 +391,7 @@ class CareService {
         batteryExemption: row['battery_exemption'] as bool?,
         armedAlarmCount: _asInt(row['armed_alarm_count']),
         healthCheckedAt: _asDate(row['health_checked_at']),
+        lastSyncedAt: _asDate(row['last_synced_at']),
       );
     } catch (_) {
       return null;
@@ -680,6 +690,35 @@ class CareService {
           .eq('user_id', user.id);
     } catch (_) {
       // Same as upsertOwnProfile: never block a foreground on this.
+    }
+  }
+
+  /// Stamps this account's profile with the moment its own pull of editable
+  /// tables last completed without a network error — see
+  /// [SyncService.pullAll] / [SyncService.pullEditableTables]. This is the
+  /// building block for family-delivery status (#98): a linked caregiver
+  /// compares a `medicine_edits.created_at` against the patient's
+  /// `last_synced_at` to show "delivered" or "pending" on the change-history
+  /// screen.
+  ///
+  /// Deliberately its own column rather than reusing `last_seen_at`: that one
+  /// is stamped by [reportOwnDeviceHealth] on every foreground regardless of
+  /// whether the pull itself succeeded, so treating it as a delivery signal
+  /// would sometimes claim an edit arrived when the pull that would have
+  /// applied it actually failed. Call this only when the caller already knows
+  /// the pull succeeded.
+  Future<void> recordSyncSuccess({DateTime? at}) async {
+    final user = _client.auth.currentUser;
+    if (user == null) return;
+    try {
+      await _client
+          .from('profiles')
+          .update({'last_synced_at': _isoUtc(at ?? DateTime.now())})
+          .eq('user_id', user.id);
+    } catch (_) {
+      // Best-effort, same as reportOwnDeviceHealth: a missed stamp only
+      // means the indicator lags by one foreground, not a wrong answer — the
+      // next successful pull corrects it.
     }
   }
 
