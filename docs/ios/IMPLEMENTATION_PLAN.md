@@ -189,11 +189,12 @@ only §3/§4 above need a real device.
 
 ## 6. App Store Connect listing
 
-1. Branded App Icon artwork — `MEDICYN.md`'s own pending list already flags
-   "Final branded AppIcon artwork" as outstanding; the current
-   `Assets.xcassets/AppIcon.appiconset` is populated (not empty — confirmed
-   by listing it), so this is a content/branding task, not a missing-slot
-   task.
+1. Branded App Icon artwork — updated 2026-09-11: the stock Flutter logo
+   that was here is gone. All 15 `AppIcon.appiconset` sizes are regenerated
+   from Medicyn's actual brand icon. Remaining gap: the source is only
+   192×192, so the 1024×1024 App Store marketing slot is a ~5.3x upscale
+   and will look soft at full size — still needs a properly produced
+   1024×1024 master before actual submission.
 2. Screenshots for required device sizes, App Store copy — outstanding per
    `MEDICYN.md`.
 3. Privacy nutrition label (App Store's equivalent of Play's Data Safety
