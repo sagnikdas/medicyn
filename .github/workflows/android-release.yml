@@ -9,6 +9,13 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    # GitHub Actions rejects `secrets.X` referenced directly inside an `if:`
+    # conditional at workflow-parse time ("Unrecognized named-value:
+    # 'secrets'") — this fails even a workflow_dispatch attempt, before any
+    # job runs. Routing the optional secret through a job-level env var
+    # lets the "Materialize Firebase config" step's `if:` check it safely.
+    env:
+      GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
@@ -43,10 +50,8 @@ jobs:
             echo "keyPassword=$KEY_PASSWORD"
           } > key.properties
       - name: Materialize Firebase config (optional)
-        if: ${{ secrets.GOOGLE_SERVICES_JSON_BASE64 != '' }}
+        if: ${{ env.GOOGLE_SERVICES_JSON_BASE64 != '' }}
         working-directory: app/android/app
-        env:
-          GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}
         run: |
           echo "$GOOGLE_SERVICES_JSON_BASE64" | base64 --decode > google-services.json
       - name: Build signed AAB
