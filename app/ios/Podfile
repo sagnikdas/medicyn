@@ -41,6 +41,17 @@ post_install do |installer|
     flutter_additional_ios_build_settings(target)
   end
 
+  # flutter_additional_ios_build_settings pins every pod target's deployment
+  # target below this Podfile's declared floor (observed: 15.0), which then
+  # fails to compile against pods whose own podspec requires 15.5 (e.g.
+  # PromisesObjC/PromisesSwift, a GoogleSignIn dependency). Re-assert the
+  # floor from line 2 after Flutter's own pass.
+  installer.pods_project.targets.each do |target|
+    target.build_configurations.each do |config|
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.5'
+    end
+  end
+
   # Xcode's implicit-dependency resolution for the workspace sometimes fails
   # to schedule the Pods-Runner aggregate target before linking Runner,
   # producing "Framework 'Pods_Runner' not found". Make the dependency

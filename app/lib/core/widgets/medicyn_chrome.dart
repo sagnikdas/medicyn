@@ -1,3 +1,5 @@
+import 'dart:ui' show ImageFilter;
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
@@ -144,11 +146,11 @@ class MedicynPageHeading extends StatelessWidget {
   }
 }
 
-/// The system's signature container — a "page" resting on the chart's
-/// linen ground. When tappable, it visibly lifts (a deeper, wider shadow)
-/// the instant a finger touches it, on top of the existing 2% press-scale,
-/// so touch reads as physically picking the page up before the tap
-/// registers — not just a color/ripple response.
+/// The system's signature container — a pane of frosted glass resting on
+/// the "Premium Wellness" gradient ground. When tappable, it visibly lifts
+/// (a deeper, wider shadow) the instant a finger touches it, on top of the
+/// existing 2% press-scale, so touch reads as physically picking the page
+/// up before the tap registers — not just a color/ripple response.
 class AmbientCard extends StatefulWidget {
   const AmbientCard({
     super.key,
@@ -157,13 +159,28 @@ class AmbientCard extends StatefulWidget {
     this.onTap,
     this.borderColor,
     this.color,
+    this.glow = false,
+    this.frosted = false,
   });
 
   final Widget child;
   final EdgeInsetsGeometry padding;
   final VoidCallback? onTap;
+
+  /// A status/accent color for the card's edge. Also doubles as the glow
+  /// color when [glow] is true; defaults to `colorScheme.primary`.
   final Color? borderColor;
   final Color? color;
+
+  /// Adds a soft colored halo (see `MedicynTheme.glow`) behind the card, on
+  /// top of the existing ambient/lifted shadow — never a replacement.
+  final bool glow;
+
+  /// Turns on real backdrop blur (`BackdropFilter`) for genuine glass depth.
+  /// Reserved for hero cards — at most one or two per screen — never for
+  /// repeating list rows, where a blur layer per row risks real jank on
+  /// older phones.
+  final bool frosted;
 
   @override
   State<AmbientCard> createState() => _AmbientCardState();
@@ -181,21 +198,49 @@ class _AmbientCardState extends State<AmbientCard> {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final reduceMotion = MedicynMotion.reduce(context);
-    final card = AnimatedContainer(
+    final accent = widget.borderColor ?? scheme.primary;
+    const radius = BorderRadius.all(Radius.circular(16));
+    Widget card = AnimatedContainer(
       duration: MedicynMotion.duration(context, MedicynMotion.fast),
       curve: MedicynMotion.decelerate,
       decoration: BoxDecoration(
-        color: widget.color ?? scheme.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: _lifted
-            ? MedicynTheme.liftedShadow
-            : MedicynTheme.ambientShadow,
-        border: widget.borderColor == null
-            ? null
-            : Border.all(color: widget.borderColor!),
+        // Frosted, not flat opaque — a pane of glass over the gradient
+        // ground rather than a paper page sitting on linen.
+        color:
+            widget.color ??
+            scheme.surfaceContainerLowest.withValues(alpha: 0.86),
+        borderRadius: radius,
+        border: Border.all(
+          color:
+              widget.borderColor?.withValues(alpha: 0.55) ??
+              Colors.white.withValues(alpha: 0.30),
+          width: widget.borderColor == null ? 1 : 1.5,
+        ),
+        boxShadow: [
+          ...(_lifted ? MedicynTheme.liftedShadow : MedicynTheme.ambientShadow),
+          if (widget.glow) ...MedicynTheme.glow(accent),
+        ],
       ),
-      child: Padding(padding: widget.padding, child: widget.child),
+      // A Material ancestor, always — not only on the onTap branch below.
+      // A ListTile-family descendant (SwitchListTile, etc.) paints its own
+      // background/ink splashes on its nearest Material, and this
+      // decoration's own opaque-ish fill sitting between it and that
+      // Material trips Flutter's own "background color or ink splashes may
+      // be invisible" assertion otherwise.
+      child: Material(
+        color: Colors.transparent,
+        child: Padding(padding: widget.padding, child: widget.child),
+      ),
     );
+    if (widget.frosted) {
+      card = ClipRRect(
+        borderRadius: radius,
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+          child: card,
+        ),
+      );
+    }
     if (widget.onTap == null) return card;
     return Listener(
       onPointerDown: reduceMotion ? null : (_) => _setLifted(true),
@@ -206,7 +251,7 @@ class _AmbientCardState extends State<AmbientCard> {
           color: Colors.transparent,
           child: InkWell(
             onTap: widget.onTap,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: radius,
             child: card,
           ),
         ),
@@ -423,11 +468,11 @@ class MedicynBottomNav extends StatelessWidget {
         decoration: BoxDecoration(
           color: scheme.surfaceContainer,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-          boxShadow: const [
+          boxShadow: [
             BoxShadow(
-              color: Color(0x1A2B2318),
+              color: MedicynTheme.ambientShadow.first.color,
               blurRadius: 16,
-              offset: Offset(0, -6),
+              offset: const Offset(0, -6),
             ),
           ],
         ),
@@ -588,6 +633,9 @@ class _NavItem extends StatelessWidget {
             decoration: BoxDecoration(
               color: selected ? scheme.secondaryContainer : Colors.transparent,
               borderRadius: BorderRadius.circular(16),
+              boxShadow: selected
+                  ? MedicynTheme.glow(scheme.primary, opacity: 0.25, blur: 12)
+                  : null,
             ),
             child: child,
           ),

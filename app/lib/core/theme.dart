@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart' show CupertinoPageTransitionsBuilder;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
@@ -13,8 +14,9 @@ import 'widgets/medicyn_motion.dart';
 /// `DayDoseStyle` in `features/reminders_home/day_dose_style.dart`) so
 /// state never depends on hue alone.
 ///
-/// Dark mode keeps the same seed so Settings → Theme still works; the
-/// light scheme is the designed one.
+/// Dark mode is hand-tuned to the same gradient/glass "Premium Wellness"
+/// treatment as light (see `_darkScheme`), not a `ColorScheme.fromSeed`
+/// placeholder.
 class MedicynTheme {
   MedicynTheme._();
 
@@ -61,6 +63,50 @@ class MedicynTheme {
     BoxShadow(color: Color(0x262B2318), blurRadius: 24, offset: Offset(0, 10)),
   ];
 
+  // --- Vibrant gradient ground (teal → warm amber) ------------------------
+  // Brand teal stays the one anchor, unchanged; the ground now reads as a
+  // warm wellness wash instead of flat linen. The muted mid-stop keeps the
+  // teal→amber transition from muddying into brown.
+  static const gradientTeal = primary;
+  static const gradientTealSoft = Color(0xFF3D8C7D);
+  static const gradientAmber = Color(0xFFF2A65A);
+  static const gradientAmberDeep = Color(0xFFE8874A);
+
+  static const gradientTealDark = Color(0xFF04211D);
+  static const gradientTealSoftDark = Color(0xFF16453C);
+  // Deep umber rather than bright amber in dark mode — avoids night glare.
+  static const gradientAmberDark = Color(0xFF4A2E1A);
+
+  /// The fixed, full-bleed wash painted behind every screen's cards by
+  /// [MedicynGradientBackground]. Dark mode gets its own tuned stops, not a
+  /// dimmed copy of the light ones, so near-opaque glass cards stay legible.
+  static LinearGradient backgroundGradient(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      stops: const [0, 0.55, 1],
+      colors: dark
+          ? const [gradientTealDark, gradientTealSoftDark, gradientAmberDark]
+          : const [gradientTeal, gradientTealSoft, gradientAmber],
+    );
+  }
+
+  /// A soft colored halo, additive on top of [ambientShadow]/[liftedShadow]
+  /// — never a replacement. Used behind primary icons, the active/"taken"
+  /// status avatar, and opted-in hero cards.
+  static List<BoxShadow> glow(
+    Color color, {
+    double opacity = 0.38,
+    double blur = 22,
+  }) => [
+    BoxShadow(
+      color: color.withValues(alpha: opacity),
+      blurRadius: blur,
+      spreadRadius: 1,
+    ),
+  ];
+
   static const _lightScheme = ColorScheme(
     brightness: Brightness.light,
     primary: primary,
@@ -97,15 +143,50 @@ class MedicynTheme {
     surfaceTint: Color(0xFF006A61),
   );
 
+  // Hand-tuned, mirroring `_lightScheme`'s field list — replaces the old
+  // `ColorScheme.fromSeed` placeholder now that dark mode gets the same
+  // gradient/glass treatment as light. `primary` here is the seafoam tone
+  // (`primaryFixedDim`) rather than the deep teal: standard Material 3
+  // practice puts a light tone of the brand hue in a dark scheme, since deep
+  // teal has too little contrast as icon/text color on a dark ground.
+  static const _darkScheme = ColorScheme(
+    brightness: Brightness.dark,
+    primary: primaryFixedDim,
+    onPrimary: Color(0xFF00382F),
+    primaryContainer: Color(0xFF00504A),
+    onPrimaryContainer: Color(0xFFB6F5E9),
+    secondary: Color(0xFFB9C8C4),
+    onSecondary: Color(0xFF243330),
+    secondaryContainer: Color(0xFF3B4A47),
+    onSecondaryContainer: Color(0xFFD8E5E2),
+    tertiary: Color(0xFFC2C1FF),
+    onTertiary: Color(0xFF2224A0),
+    tertiaryContainer: Color(0xFF3335BD),
+    onTertiaryContainer: Color(0xFFE3E2FF),
+    error: Color(0xFFFFB4AB),
+    onError: Color(0xFF690005),
+    errorContainer: Color(0xFF93000A),
+    onErrorContainer: Color(0xFFFFDAD6),
+    // Deep teal-charcoal rather than pure black, so the brand still reads.
+    surface: Color(0xFF14201D),
+    onSurface: Color(0xFFE6E1D6),
+    onSurfaceVariant: Color(0xFFC4C7C3),
+    outline: Color(0xFF8D9490),
+    outlineVariant: Color(0xFF3F4844),
+    surfaceContainerLowest: Color(0xFF0D1614),
+    surfaceContainerLow: Color(0xFF17211E),
+    surfaceContainer: Color(0xFF1C2825),
+    surfaceContainerHigh: Color(0xFF27332F),
+    surfaceContainerHighest: Color(0xFF323E3A),
+    inverseSurface: Color(0xFFE6E1D6),
+    onInverseSurface: Color(0xFF14201D),
+    inversePrimary: primary,
+    surfaceTint: primaryFixedDim,
+  );
+
   static ThemeData light() => _build(_lightScheme);
 
-  static ThemeData dark() {
-    final scheme = ColorScheme.fromSeed(
-      seedColor: primary,
-      brightness: Brightness.dark,
-    );
-    return _build(scheme);
-  }
+  static ThemeData dark() => _build(_darkScheme);
 
   static ThemeData _build(ColorScheme scheme) {
     final text = _textTheme(scheme);
@@ -147,8 +228,10 @@ class MedicynTheme {
       ),
       cardTheme: CardThemeData(
         elevation: 0,
-        color: scheme.surfaceContainerLowest,
-        shape: const RoundedRectangleBorder(borderRadius: radius12),
+        // Frosted, not flat opaque — cards now read as glass sitting over
+        // the gradient ground rather than paper pages.
+        color: scheme.surfaceContainerLowest.withValues(alpha: 0.86),
+        shape: const RoundedRectangleBorder(borderRadius: radius16),
         margin: EdgeInsets.zero,
         shadowColor: const Color(0x1A2B2318),
       ),

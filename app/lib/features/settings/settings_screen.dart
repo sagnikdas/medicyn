@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import '../../core/account_deletion.dart';
 import '../../core/app_settings.dart';
 import '../../core/privacy_policy.dart';
+import '../../core/theme.dart';
+import '../../core/widgets/medicyn_background.dart';
 import '../../core/widgets/medicyn_chrome.dart';
 import '../../core/widgets/medicyn_layout.dart';
 import '../../core/widgets/medicyn_motion.dart';
@@ -104,30 +106,35 @@ class _SettingsScreenState extends State<SettingsScreen> {
   /// Settings entry point, and the Profile tab's avatar hero (embedded),
   /// which shows the hero first and this button underneath it.
   Widget _signInButton() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        OutlinedButton(
-          onPressed: _signingIn ? null : _signInWithGoogle,
-          child: MedicynSwitcher(
-            child: _signingIn
-                ? const SizedBox(
-                    key: ValueKey(true),
-                    height: 20,
-                    width: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Text('Sign in with Google', key: ValueKey(false)),
+    // AmbientCard, not a bare button: an OutlinedButton's transparent fill
+    // and teal-on-teal label otherwise sit directly on the gradient ground
+    // with too little contrast in places.
+    return AmbientCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          OutlinedButton(
+            onPressed: _signingIn ? null : _signInWithGoogle,
+            child: MedicynSwitcher(
+              child: _signingIn
+                  ? const SizedBox(
+                      key: ValueKey(true),
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('Sign in with Google', key: ValueKey(false)),
+            ),
           ),
-        ),
-        if (_signInError != null) ...[
-          const SizedBox(height: 12),
-          Text(
-            _signInError!,
-            style: TextStyle(color: Theme.of(context).colorScheme.error),
-          ),
+          if (_signInError != null) ...[
+            const SizedBox(height: 12),
+            Text(
+              _signInError!,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+          ],
         ],
-      ],
+      ),
     );
   }
 
@@ -137,405 +144,451 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final name = email.contains('@') ? email.split('@').first : email;
     return Scaffold(
       appBar: widget.embedded ? null : AppBar(title: const Text('Settings')),
-      body: SafeArea(
-        child: MedicynContent(
-          child: ListView(
-            controller: _scrollController,
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
-            children: [
-              if (widget.embedded) ...[
-                const SizedBox(height: 8),
-                MedicynFadeIn(
-                  child: Center(
-                    child: Column(
-                      children: [
-                        CircleAvatar(
-                          radius: 48,
-                          backgroundColor: Theme.of(
-                            context,
-                          ).colorScheme.secondaryContainer,
-                          foregroundColor: Theme.of(
-                            context,
-                          ).colorScheme.onSecondaryContainer,
-                          // No foregroundImage: a third-party account photo
-                          // (Google's default is a saturated, uncontrolled
-                          // color) would break the single-accent rule on the
-                          // one screen meant to be its home. The initial
-                          // below is the only avatar treatment.
-                          child: Text(
-                            (name.isEmpty ? 'D' : name.substring(0, 1))
-                                .toUpperCase(),
-                            style: Theme.of(context).textTheme.titleLarge,
+      body: MedicynGradientBackground(
+        child: SafeArea(
+          child: MedicynContent(
+            child: ListView(
+              controller: _scrollController,
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+              children: [
+                if (widget.embedded) ...[
+                  const SizedBox(height: 8),
+                  MedicynFadeIn(
+                    child: Center(
+                      child: Column(
+                        children: [
+                          Container(
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              boxShadow: MedicynTheme.glow(
+                                Theme.of(context).colorScheme.secondary,
+                                opacity: 0.3,
+                                blur: 20,
+                              ),
+                            ),
+                            child: CircleAvatar(
+                              radius: 48,
+                              backgroundColor: Theme.of(
+                                context,
+                              ).colorScheme.secondaryContainer,
+                              foregroundColor: Theme.of(
+                                context,
+                              ).colorScheme.onSecondaryContainer,
+                              // No foregroundImage: a third-party account photo
+                              // (Google's default is a saturated, uncontrolled
+                              // color) would break the single-accent rule on the
+                              // one screen meant to be its home. The initial
+                              // below is the only avatar treatment.
+                              child: Text(
+                                (name.isEmpty ? 'D' : name.substring(0, 1))
+                                    .toUpperCase(),
+                                style: Theme.of(context).textTheme.titleLarge,
+                              ),
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 16),
+                          const SizedBox(height: 16),
+                          MedicynGlassHeader(
+                            child: Column(
+                              children: [
+                                Text(
+                                  _signedIn
+                                      ? (name.isEmpty ? email : name)
+                                      : 'On this phone',
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  textAlign: TextAlign.center,
+                                  style: Theme.of(context).textTheme.titleLarge,
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  _signedIn
+                                      ? email
+                                      : 'Reminders stay on this device until you sign in.',
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context).textTheme.bodyMedium
+                                      ?.copyWith(
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.onSurfaceVariant,
+                                      ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 28),
+                ] else if (_signedIn) ...[
+                  MedicynFadeIn(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                         Text(
-                          _signedIn
-                              ? (name.isEmpty ? email : name)
-                              : 'On this phone',
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          textAlign: TextAlign.center,
-                          style: Theme.of(context).textTheme.titleLarge,
+                          'Signed in as',
+                          style: Theme.of(context).textTheme.bodySmall,
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          _signedIn
-                              ? email
-                              : 'Reminders stay on this device until you sign in.',
+                          email,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.bodyMedium
-                              ?.copyWith(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onSurfaceVariant,
-                              ),
-                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.titleMedium,
                         ),
                       ],
                     ),
                   ),
-                ),
-                const SizedBox(height: 28),
-              ] else if (_signedIn) ...[
+                  const SizedBox(height: 24),
+                ] else ...[
+                  _signInButton(),
+                  const SizedBox(height: 24),
+                ],
+                if (widget.embedded && !_signedIn) ...[
+                  _signInButton(),
+                  const SizedBox(height: 24),
+                ],
                 MedicynFadeIn(
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Text(
-                        'Signed in as',
-                        style: Theme.of(context).textTheme.bodySmall,
+                      const _SectionHeader('Emergency card'),
+                      const SizedBox(height: 8),
+                      ProfileMenuRow(
+                        icon: Icons.local_hospital,
+                        // The app's one "needs attention" red (same as
+                        // DayDoseStyle's Missed mark), not the usual teal —
+                        // this is the one row on the screen meant to read as
+                        // urgent rather than routine.
+                        iconBackgroundColor: Theme.of(
+                          context,
+                        ).colorScheme.error,
+                        iconColor: Theme.of(context).colorScheme.onError,
+                        title: 'Emergency card',
+                        subtitle:
+                            'Blood group, allergies, conditions, and your medicines — for a first responder or new clinician.',
+                        onTap: () {
+                          // A second tap can land before the first push's
+                          // transition covers this row -- without this guard
+                          // it queues a second push that races the first
+                          // route's still-in-flight animation (visible
+                          // ghosting, and a hit-test crash on a render object
+                          // that hasn't been laid out yet).
+                          final route = ModalRoute.of(context);
+                          if (route != null && !route.isCurrent) return;
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  EmergencyCardScreen(db: widget.db),
+                            ),
+                          );
+                        },
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        email,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.titleMedium,
+                      const SizedBox(height: 24),
+                      const _SectionHeader('Family'),
+                      const SizedBox(height: 8),
+                      IgnorePointer(
+                        ignoring: !_signedIn,
+                        child: Opacity(
+                          opacity: _signedIn ? 1 : 0.6,
+                          child: ProfileMenuRow(
+                            icon: Icons.people_outline,
+                            title: 'Connect with family',
+                            subtitle: _signedIn
+                                ? 'Let one person help you keep track of your medicines — or help someone else with theirs.'
+                                : 'Family sharing needs a Google account.',
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => CareScreen(db: widget.db),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const _FamilyFeedLink(),
+                      const SizedBox(height: 24),
+                      const _SectionHeader('Reminders'),
+                      const SizedBox(height: 8),
+                      ProfileMenuRow(
+                        icon: Icons.notifications_active_outlined,
+                        title: 'Check reminder access',
+                        subtitle:
+                            'See whether notifications and timing are ready, then send a test reminder.',
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                ReminderReliabilityScreen(db: widget.db),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      ListenableBuilder(
+                        listenable: AppSettings.instance,
+                        builder: (context, _) => DropdownButtonFormField<int>(
+                          initialValue: AppSettings.instance.snoozeMinutes,
+                          decoration: const InputDecoration(
+                            labelText: 'Snooze duration',
+                          ),
+                          items: [
+                            for (final minutes in AppSettings.snoozeOptions)
+                              DropdownMenuItem(
+                                value: minutes,
+                                child: Text('$minutes minutes'),
+                              ),
+                          ],
+                          onChanged: (value) {
+                            if (value != null) {
+                              unawaited(_setSnoozeMinutes(value));
+                            }
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      const _SectionHeader(
+                        'Appearance',
+                        subtitle:
+                            '100% is the default size. Drag right to make text and buttons larger.',
+                      ),
+                      const SizedBox(height: 8),
+                      // Nothing previews the setting better than the screen you're on:
+                      // the slider rescales the whole app live as it's dragged, this
+                      // row included.
+                      ListenableBuilder(
+                        listenable: AppSettings.instance,
+                        builder: (context, _) {
+                          final scale = AppSettings.instance.textScale;
+                          return Row(
+                            children: [
+                              Expanded(
+                                child: Slider.adaptive(
+                                  value: scale,
+                                  min: AppSettings.minTextScale,
+                                  max: AppSettings.maxTextScale,
+                                  divisions: AppSettings.textScaleDivisions,
+                                  label: AppSettings.textScaleLabel(scale),
+                                  semanticFormatterCallback: (v) =>
+                                      'Text size ${AppSettings.textScaleLabel(v)}',
+                                  onChanged: (v) =>
+                                      AppSettings.instance.setTextScale(v),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                AppSettings.textScaleLabel(scale),
+                                style: Theme.of(context).textTheme.titleSmall,
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 20),
+                      AmbientCard(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Semantics(
+                              header: true,
+                              child: Text(
+                                'Theme',
+                                style: Theme.of(context).textTheme.titleSmall,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Follows your device by default. Choose Light or Dark to keep '
+                              'the app on one of them.',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                            const SizedBox(height: 12),
+                            ListenableBuilder(
+                              listenable: AppSettings.instance,
+                              builder: (context, _) => SizedBox(
+                                width: double.infinity,
+                                child: SegmentedButton<ThemeMode>(
+                                  segments: [
+                                    for (final mode in ThemeMode.values)
+                                      ButtonSegment(
+                                        value: mode,
+                                        label: Text(mode.label, maxLines: 1),
+                                      ),
+                                  ],
+                                  selected: {AppSettings.instance.themeMode},
+                                  onSelectionChanged: (s) => AppSettings
+                                      .instance
+                                      .setThemeMode(s.first),
+                                  showSelectedIcon: false,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            ListenableBuilder(
+                              listenable: AppSettings.instance,
+                              builder: (context, _) => SwitchListTile.adaptive(
+                                contentPadding: EdgeInsets.zero,
+                                title: const Text(
+                                  'Show medicine names on the lock screen',
+                                ),
+                                subtitle: const Text(
+                                  'Off by default. When off, a locked phone only says a dose is due — not which medicine.',
+                                ),
+                                value: AppSettings
+                                    .instance
+                                    .showMedicineOnLockScreen,
+                                onChanged: _setShowMedicineOnLockScreen,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 28),
+                      const _SectionHeader('Data & privacy'),
+                      const SizedBox(height: 8),
+                      // The status card and the switch that actually turns
+                      // Cloud backup on live in the same section on purpose —
+                      // the card's "below" copy used to mean a full screen's
+                      // worth of scrolling past Reminders and Appearance to
+                      // reach the toggle it was describing.
+                      ListenableBuilder(
+                        listenable: SyncStatusStore.instance,
+                        builder: (context, _) => _BackupStatusCard(
+                          signedIn: _signedIn,
+                          onRetry: _retrySync,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      AmbientCard(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Turning any of these off takes effect straight away, the same as turning them on.',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                            const SizedBox(height: 4),
+                            ListenableBuilder(
+                              listenable: AppSettings.instance,
+                              builder: (context, _) {
+                                return Column(
+                                  children: [
+                                    for (final purpose in ConsentPurpose.values)
+                                      SwitchListTile.adaptive(
+                                        contentPadding: EdgeInsets.zero,
+                                        title: Text(purpose.title),
+                                        subtitle: Text(purpose.sentence),
+                                        value: ConsentService.instance
+                                            .isGranted(purpose),
+                                        onChanged: (v) => _onConsentChanged(
+                                          context,
+                                          purpose,
+                                          v,
+                                        ),
+                                      ),
+                                  ],
+                                );
+                              },
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'This is a copy of the data Medicyn holds about you (Art. 15/20). '
+                              'Other requests are answered within one month (Art. 12(3)) by email '
+                              'contact@doezly.com.',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                            const SizedBox(height: 12),
+                            OutlinedButton.icon(
+                              onPressed: _exportBusy ? null : _downloadMyData,
+                              icon: MedicynSwitcher(
+                                child: _exporting
+                                    ? const SizedBox(
+                                        key: ValueKey('json-busy'),
+                                        height: 20,
+                                        width: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : const Icon(
+                                        Icons.download_outlined,
+                                        key: ValueKey('json'),
+                                      ),
+                              ),
+                              label: Text(
+                                _exporting ? 'Preparing…' : 'Download my data',
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'A four-week PDF of medicines and what was marked taken — '
+                              'for a clinic visit, not a full copy of your account.',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                            const SizedBox(height: 12),
+                            OutlinedButton.icon(
+                              onPressed: _exportBusy
+                                  ? null
+                                  : _shareDoctorReport,
+                              icon: MedicynSwitcher(
+                                child: _sharingReport
+                                    ? const SizedBox(
+                                        key: ValueKey('pdf-busy'),
+                                        height: 20,
+                                        width: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : const Icon(
+                                        Icons.picture_as_pdf_outlined,
+                                        key: ValueKey('pdf'),
+                                      ),
+                              ),
+                              label: Text(
+                                _sharingReport
+                                    ? 'Preparing…'
+                                    : 'Share with my doctor',
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (_signedIn) ...[
+                        const SizedBox(height: 28),
+                        const _SectionHeader('Account'),
+                        const SizedBox(height: 8),
+                        OutlinedButton(
+                          onPressed: () => _confirmSignOut(context),
+                          child: const Text('Sign out'),
+                        ),
+                        const SizedBox(height: 12),
+                        OutlinedButton(
+                          onPressed: () => _confirmDeleteAccount(context),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Theme.of(
+                              context,
+                            ).colorScheme.error,
+                          ),
+                          child: const Text('Delete account'),
+                        ),
+                      ],
+                      const SizedBox(height: 12),
+                      TextButton(
+                        onPressed: () => openPrivacyPolicy(context),
+                        child: Text(
+                          'Privacy policy',
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(
+                                color: Theme.of(context).colorScheme.primary,
+                                decoration: TextDecoration.underline,
+                              ),
+                        ),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 24),
-              ] else ...[
-                _signInButton(),
-                const SizedBox(height: 24),
               ],
-              if (widget.embedded && !_signedIn) ...[
-                _signInButton(),
-                const SizedBox(height: 24),
-              ],
-              MedicynFadeIn(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const _SectionHeader('Emergency card'),
-                    const SizedBox(height: 8),
-                    ProfileMenuRow(
-                      icon: Icons.local_hospital,
-                      // The app's one "needs attention" red (same as
-                      // DayDoseStyle's Missed mark), not the usual teal —
-                      // this is the one row on the screen meant to read as
-                      // urgent rather than routine.
-                      iconBackgroundColor: Theme.of(context).colorScheme.error,
-                      iconColor: Theme.of(context).colorScheme.onError,
-                      title: 'Emergency card',
-                      subtitle:
-                          'Blood group, allergies, conditions, and your medicines — for a first responder or new clinician.',
-                      onTap: () {
-                        // A second tap can land before the first push's
-                        // transition covers this row -- without this guard
-                        // it queues a second push that races the first
-                        // route's still-in-flight animation (visible
-                        // ghosting, and a hit-test crash on a render object
-                        // that hasn't been laid out yet).
-                        final route = ModalRoute.of(context);
-                        if (route != null && !route.isCurrent) return;
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => EmergencyCardScreen(db: widget.db),
-                          ),
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 24),
-                    const _SectionHeader('Family'),
-                    const SizedBox(height: 8),
-                    IgnorePointer(
-                      ignoring: !_signedIn,
-                      child: Opacity(
-                        opacity: _signedIn ? 1 : 0.6,
-                        child: ProfileMenuRow(
-                          icon: Icons.people_outline,
-                          title: 'Connect with family',
-                          subtitle: _signedIn
-                              ? 'Let one person help you keep track of your medicines — or help someone else with theirs.'
-                              : 'Family sharing needs a Google account.',
-                          onTap: () => Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => CareScreen(db: widget.db),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const _FamilyFeedLink(),
-                    const SizedBox(height: 24),
-                    const _SectionHeader('Reminders'),
-                    const SizedBox(height: 8),
-                    ProfileMenuRow(
-                      icon: Icons.notifications_active_outlined,
-                      title: 'Check reminder access',
-                      subtitle:
-                          'See whether notifications and timing are ready, then send a test reminder.',
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              ReminderReliabilityScreen(db: widget.db),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    ListenableBuilder(
-                      listenable: AppSettings.instance,
-                      builder: (context, _) => DropdownButtonFormField<int>(
-                        initialValue: AppSettings.instance.snoozeMinutes,
-                        decoration: const InputDecoration(
-                          labelText: 'Snooze duration',
-                        ),
-                        items: [
-                          for (final minutes in AppSettings.snoozeOptions)
-                            DropdownMenuItem(
-                              value: minutes,
-                              child: Text('$minutes minutes'),
-                            ),
-                        ],
-                        onChanged: (value) {
-                          if (value != null) {
-                            unawaited(_setSnoozeMinutes(value));
-                          }
-                        },
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    const _SectionHeader(
-                      'Appearance',
-                      subtitle:
-                          '100% is the default size. Drag right to make text and buttons larger.',
-                    ),
-                    const SizedBox(height: 8),
-                    // Nothing previews the setting better than the screen you're on:
-                    // the slider rescales the whole app live as it's dragged, this
-                    // row included.
-                    ListenableBuilder(
-                      listenable: AppSettings.instance,
-                      builder: (context, _) {
-                        final scale = AppSettings.instance.textScale;
-                        return Row(
-                          children: [
-                            Expanded(
-                              child: Slider.adaptive(
-                                value: scale,
-                                min: AppSettings.minTextScale,
-                                max: AppSettings.maxTextScale,
-                                divisions: AppSettings.textScaleDivisions,
-                                label: AppSettings.textScaleLabel(scale),
-                                semanticFormatterCallback: (v) =>
-                                    'Text size ${AppSettings.textScaleLabel(v)}',
-                                onChanged: (v) =>
-                                    AppSettings.instance.setTextScale(v),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              AppSettings.textScaleLabel(scale),
-                              style: Theme.of(context).textTheme.titleSmall,
-                            ),
-                          ],
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 20),
-                    Semantics(
-                      header: true,
-                      child: Text(
-                        'Theme',
-                        style: Theme.of(context).textTheme.titleSmall,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Follows your device by default. Choose Light or Dark to keep '
-                      'the app on one of them.',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                    const SizedBox(height: 12),
-                    ListenableBuilder(
-                      listenable: AppSettings.instance,
-                      builder: (context, _) => SizedBox(
-                        width: double.infinity,
-                        child: SegmentedButton<ThemeMode>(
-                          segments: [
-                            for (final mode in ThemeMode.values)
-                              ButtonSegment(
-                                value: mode,
-                                label: Text(mode.label, maxLines: 1),
-                              ),
-                          ],
-                          selected: {AppSettings.instance.themeMode},
-                          onSelectionChanged: (s) =>
-                              AppSettings.instance.setThemeMode(s.first),
-                          showSelectedIcon: false,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    ListenableBuilder(
-                      listenable: AppSettings.instance,
-                      builder: (context, _) => SwitchListTile.adaptive(
-                        contentPadding: EdgeInsets.zero,
-                        title: const Text(
-                          'Show medicine names on the lock screen',
-                        ),
-                        subtitle: const Text(
-                          'Off by default. When off, a locked phone only says a dose is due — not which medicine.',
-                        ),
-                        value: AppSettings.instance.showMedicineOnLockScreen,
-                        onChanged: _setShowMedicineOnLockScreen,
-                      ),
-                    ),
-                    const SizedBox(height: 28),
-                    const _SectionHeader('Data & privacy'),
-                    const SizedBox(height: 8),
-                    // The status card and the switch that actually turns
-                    // Cloud backup on live in the same section on purpose —
-                    // the card's "below" copy used to mean a full screen's
-                    // worth of scrolling past Reminders and Appearance to
-                    // reach the toggle it was describing.
-                    ListenableBuilder(
-                      listenable: SyncStatusStore.instance,
-                      builder: (context, _) => _BackupStatusCard(
-                        signedIn: _signedIn,
-                        onRetry: _retrySync,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    Text(
-                      'Turning any of these off takes effect straight away, the same as turning them on.',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                    const SizedBox(height: 8),
-                    ListenableBuilder(
-                      listenable: AppSettings.instance,
-                      builder: (context, _) {
-                        return Column(
-                          children: [
-                            for (final purpose in ConsentPurpose.values)
-                              SwitchListTile.adaptive(
-                                contentPadding: EdgeInsets.zero,
-                                title: Text(purpose.title),
-                                subtitle: Text(purpose.sentence),
-                                value: ConsentService.instance.isGranted(
-                                  purpose,
-                                ),
-                                onChanged: (v) =>
-                                    _onConsentChanged(context, purpose, v),
-                              ),
-                          ],
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 20),
-                    Text(
-                      'This is a copy of the data Medicyn holds about you (Art. 15/20). '
-                      'Other requests are answered within one month (Art. 12(3)) by email '
-                      'contact@doezly.com.',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                    const SizedBox(height: 12),
-                    OutlinedButton.icon(
-                      onPressed: _exportBusy ? null : _downloadMyData,
-                      icon: MedicynSwitcher(
-                        child: _exporting
-                            ? const SizedBox(
-                                key: ValueKey('json-busy'),
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Icon(
-                                Icons.download_outlined,
-                                key: ValueKey('json'),
-                              ),
-                      ),
-                      label: Text(
-                        _exporting ? 'Preparing…' : 'Download my data',
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'A four-week PDF of medicines and what was marked taken — '
-                      'for a clinic visit, not a full copy of your account.',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                    const SizedBox(height: 12),
-                    OutlinedButton.icon(
-                      onPressed: _exportBusy ? null : _shareDoctorReport,
-                      icon: MedicynSwitcher(
-                        child: _sharingReport
-                            ? const SizedBox(
-                                key: ValueKey('pdf-busy'),
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Icon(
-                                Icons.picture_as_pdf_outlined,
-                                key: ValueKey('pdf'),
-                              ),
-                      ),
-                      label: Text(
-                        _sharingReport ? 'Preparing…' : 'Share with my doctor',
-                      ),
-                    ),
-                    if (_signedIn) ...[
-                      const SizedBox(height: 28),
-                      const _SectionHeader('Account'),
-                      const SizedBox(height: 8),
-                      OutlinedButton(
-                        onPressed: () => _confirmSignOut(context),
-                        child: const Text('Sign out'),
-                      ),
-                      const SizedBox(height: 12),
-                      OutlinedButton(
-                        onPressed: () => _confirmDeleteAccount(context),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Theme.of(context).colorScheme.error,
-                        ),
-                        child: const Text('Delete account'),
-                      ),
-                    ],
-                    const SizedBox(height: 12),
-                    TextButton(
-                      onPressed: () => openPrivacyPolicy(context),
-                      child: Text(
-                        'Privacy policy',
-                        style: Theme.of(context).textTheme.titleMedium
-                            ?.copyWith(
-                              color: Theme.of(context).colorScheme.primary,
-                              decoration: TextDecoration.underline,
-                            ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -906,23 +959,29 @@ class _SectionHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Semantics(
-          header: true,
-          child: Text(
-            title,
-            style: theme.textTheme.titleSmall?.copyWith(
-              color: theme.colorScheme.primary,
+    // Wrapped in MedicynGlassHeader: this is bare text sitting directly in
+    // the settings ListView, over the gradient ground — never safe without
+    // a frosted backing behind it.
+    return MedicynGlassHeader(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Semantics(
+            header: true,
+            child: Text(
+              title,
+              style: theme.textTheme.titleSmall?.copyWith(
+                color: theme.colorScheme.primary,
+              ),
             ),
           ),
-        ),
-        if (subtitle != null) ...[
-          const SizedBox(height: 4),
-          Text(subtitle!, style: theme.textTheme.bodySmall),
+          if (subtitle != null) ...[
+            const SizedBox(height: 4),
+            Text(subtitle!, style: theme.textTheme.bodySmall),
+          ],
         ],
-      ],
+      ),
     );
   }
 }

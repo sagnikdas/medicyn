@@ -351,7 +351,7 @@ SPEC CHECKSUMS:
   FirebaseMessaging: 422bb80cbf8ff83e69e50bea4d4984fc4704f665
   FirebaseRemoteConfigInterop: 3cbd659033c3129ea81a756a52e4bf1cfc20c3a7
   FirebaseSessions: 3eaac5fd8077513b95f9723efd940438e3e35fb2
-  Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
+  Flutter: 71a624a5bc0c04062bf19101d501e466baf2fb47
   flutter_local_notifications: 643a3eda1ce1c0599413ca31672536d423dee214
   flutter_secure_storage: 1ed9476fba7e7a782b22888f956cce43e2c62f13
   flutter_timezone: 7c838e17ffd4645d261e87037e5bebf6d38fe544
@@ -371,7 +371,7 @@ SPEC CHECKSUMS:
   MLKitTextRecognitionCommon: 234ceb1cfdfb5fceb4fd664943046609a2961cc2
   MLKitVision: 39a5a812db83c4a0794445088e567f3631c11961
   nanopb: fad817b59e0457d11a5dfbde799381cd727c1275
-  pdfium_flutter: e5a6e881af0b182d5b0465ebad23a8a20caa28d4
+  pdfium_flutter: f29beeb612293cc42df95beee223a4925ce2458e
   permission_handler_apple: 92d754bbaa7361d436db2d6c3c1c2a0fdcec462e
   PromisesObjC: 752c3227f599e3467650e47ea36f433eeb10c273
   PromisesSwift: 217dea0fd5d2ad65222a109c48698add13cc1c5b
@@ -383,6 +383,6 @@ SPEC CHECKSUMS:
   SwiftyGif: 706c60cf65fa2bc5ee0313beece843c8eb8194d4
   url_launcher_ios: 7a95fa5b60cc718a708b8f2966718e93db0cef1b
 
-PODFILE CHECKSUM: 409e68c7f232346e8fec419ef09e2d6563488b31
+PODFILE CHECKSUM: b4401e01abf773b08bcb8521c4db192090144f85
 
 COCOAPODS: 1.16.2

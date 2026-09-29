@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import '../../core/ids.dart';
 import '../../core/motion.dart';
 import '../../core/telemetry.dart';
+import '../../core/widgets/medicyn_background.dart';
 import '../../core/widgets/medicyn_layout.dart';
 import '../../core/widgets/medicyn_motion.dart';
 import '../../core/widgets/medicyn_platform.dart';
@@ -739,7 +740,9 @@ class _ReviewEditScreenState extends State<ReviewEditScreen> {
               : 'Review reminder',
         ),
       ),
-      body: SafeArea(child: MedicynContent(child: _body())),
+      body: MedicynGradientBackground(
+        child: SafeArea(child: MedicynContent(child: _body())),
+      ),
     );
   }
 

@@ -4,6 +4,7 @@ import '../../core/locale_dates.dart';
 import '../../core/motion.dart';
 import '../../core/theme.dart';
 import '../../core/widgets/chart_grid.dart';
+import '../../core/widgets/medicyn_background.dart';
 import '../../core/widgets/medicyn_motion.dart';
 import 'day_dose_style.dart';
 import 'day_occurrences.dart';
@@ -151,11 +152,14 @@ class _DayDoseColumn extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (showHeading) ...[
-          ChartHandLetteredText(
-            _dayHeading(day, now),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.titleLarge,
+          MedicynGlassHeader(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: ChartHandLetteredText(
+              _dayHeading(day, now),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
           ),
           const SizedBox(height: 16),
         ],
@@ -311,7 +315,9 @@ class _DayDoseRowState extends State<_DayDoseRow> {
             borderRadius: BorderRadius.circular(12),
             child: Ink(
               decoration: BoxDecoration(
-                color: scheme.surfaceContainerLowest,
+                // Frosted, not flat opaque — matches AmbientCard's glass
+                // treatment over the gradient ground.
+                color: scheme.surfaceContainerLowest.withValues(alpha: 0.86),
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: MedicynTheme.ambientShadow,
                 // A soft full outline while the row still needs a response.
@@ -323,10 +329,13 @@ class _DayDoseRowState extends State<_DayDoseRow> {
                 // done safely instead.
                 border: highlight
                     ? Border.all(
-                        color: statusColor.withValues(alpha: 0.25),
+                        color: statusColor.withValues(alpha: 0.35),
                         width: 1.5,
                       )
-                    : null,
+                    : Border.all(
+                        color: Colors.white.withValues(alpha: 0.24),
+                        width: 1,
+                      ),
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(12),
@@ -578,6 +587,11 @@ class _StatusAvatarState extends State<_StatusAvatar>
         border: filled
             ? null
             : Border.all(color: color.withValues(alpha: 0.6), width: 2),
+        // Only the "taken" state glows — a halo on every status would dilute
+        // the read into noise instead of marking "this one's done".
+        boxShadow: filled
+            ? MedicynTheme.glow(color, opacity: 0.45, blur: 16)
+            : null,
       ),
       child: AnimatedBuilder(
         animation: _scale,

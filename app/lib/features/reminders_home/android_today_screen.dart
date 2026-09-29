@@ -6,6 +6,7 @@ import '../../core/app_settings.dart';
 import '../../core/locale_dates.dart';
 import '../../core/motion.dart';
 import '../../core/theme.dart';
+import '../../core/widgets/medicyn_background.dart';
 import '../../data/local/database.dart';
 import '../../data/remote/today_care_sync_service.dart';
 import '../auth/auth_service.dart';
@@ -45,6 +46,7 @@ class AndroidTodayScreen extends StatefulWidget {
   final Future<void> Function(DayOccurrence) onSnooze;
   final ValueChanged<DayOccurrence> onHistory;
   final Widget? healthNotice;
+
   /// The gentle "you missed a dose" nudge computed by Home, shown for this
   /// user's own doses only — never the caregiver's separate care alert.
   final Widget? missedDoseNudge;
@@ -403,6 +405,7 @@ class TodayAgenda extends StatelessWidget {
   final Future<void> Function(TodayCareReminder) onCompleteCare;
   final ScrollController? scrollController;
   final Widget? healthNotice;
+
   /// The gentle "you missed a dose" nudge computed by Home, shown for this
   /// user's own doses only — never the caregiver's separate care alert.
   final Widget? missedDoseNudge;
@@ -485,236 +488,250 @@ class TodayAgenda extends StatelessWidget {
       // the theme's own scheme.surface (scaffoldBackgroundColor). This
       // screen previously flattened it to a near-white FAFAF6 in light
       // mode, which read as cold and out of step with the rest of the app.
-      body: SafeArea(
-        bottom: false,
-        child: CustomScrollView(
-          controller: scrollController,
-          slivers: [
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(24, 24, 24, 36),
-              sliver: SliverToBoxAdapter(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      _dateLabel(now).toUpperCase(),
-                      style: theme.textTheme.labelMedium?.copyWith(
-                        color: scheme.primary,
-                        letterSpacing: 1.1,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            'Today',
-                            style: theme.textTheme.headlineLarge?.copyWith(
-                              fontSize: 38,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: -1.4,
-                              color: scheme.primary,
+      body: MedicynGradientBackground(
+        child: SafeArea(
+          bottom: false,
+          child: CustomScrollView(
+            controller: scrollController,
+            slivers: [
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(24, 24, 24, 36),
+                sliver: SliverToBoxAdapter(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      MedicynGlassHeader(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Text(
+                              _dateLabel(now).toUpperCase(),
+                              style: theme.textTheme.labelMedium?.copyWith(
+                                color: scheme.primary,
+                                letterSpacing: 1.1,
+                              ),
                             ),
-                          ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    'Today',
+                                    style: theme.textTheme.headlineLarge
+                                        ?.copyWith(
+                                          fontSize: 38,
+                                          fontWeight: FontWeight.w600,
+                                          letterSpacing: -1.4,
+                                          color: scheme.primary,
+                                        ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                TextButton.icon(
+                                  onPressed: onAdd,
+                                  icon: const Icon(Icons.add, size: 20),
+                                  label: const Text('Add'),
+                                  style: TextButton.styleFrom(
+                                    backgroundColor: scheme.primary.withValues(
+                                      alpha: 0.07,
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 18,
+                                      vertical: 12,
+                                    ),
+                                    shape: const StadiumBorder(),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'A little care, one thing at a time.',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: scheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 12),
-                        TextButton.icon(
-                          onPressed: onAdd,
-                          icon: const Icon(Icons.add, size: 20),
-                          label: const Text('Add'),
-                          style: TextButton.styleFrom(
+                      ),
+                      if (total > 0) ...[
+                        const SizedBox(height: 24),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                '${entries.length} remaining',
+                                style: theme.textTheme.bodyMedium,
+                              ),
+                            ),
+                            Text(
+                              '$completed of $total done',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: scheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        TweenAnimationBuilder<double>(
+                          tween: Tween(end: completed / total),
+                          duration: MedicynMotion.duration(
+                            context,
+                            MedicynMotion.medium,
+                          ),
+                          builder: (_, value, _) => LinearProgressIndicator(
+                            value: value,
+                            minHeight: 3,
+                            borderRadius: BorderRadius.circular(4),
                             backgroundColor: scheme.primary.withValues(
-                              alpha: 0.07,
+                              alpha: 0.08,
                             ),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 18,
-                              vertical: 12,
-                            ),
-                            shape: const StadiumBorder(),
+                            semanticsLabel:
+                                '$completed of $total reminders completed',
                           ),
                         ),
                       ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'A little care, one thing at a time.',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                      ),
-                    ),
-                    if (total > 0) ...[
-                      const SizedBox(height: 24),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              '${entries.length} remaining',
-                              style: theme.textTheme.bodyMedium,
-                            ),
+                      if (missedDoseNudge != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 24),
+                          child: missedDoseNudge!,
+                        ),
+                      if (healthNotice != null)
+                        Padding(
+                          padding: EdgeInsets.only(
+                            top: missedDoseNudge != null ? 16 : 24,
                           ),
-                          Text(
-                            '$completed of $total done',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: scheme.onSurfaceVariant,
+                          child: healthNotice!,
+                        ),
+                      if (careSyncNotice != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 16),
+                          child: careSyncNotice!,
+                        ),
+                      if (alertIssue &&
+                          care.any(
+                            (r) => !r.completed && r.reminderMinutes != null,
+                          ))
+                        Padding(
+                          padding: const EdgeInsets.only(top: 16),
+                          child: ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            leading: const Icon(
+                              Icons.notifications_off_outlined,
                             ),
+                            title: const Text('Care alerts need attention'),
+                            subtitle: const Text(
+                              'Your plans are saved. Check notification access.',
+                            ),
+                            onTap: onRetryAlerts,
+                            trailing: const Icon(Icons.refresh),
                           ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      TweenAnimationBuilder<double>(
-                        tween: Tween(end: completed / total),
+                        ),
+                      const SizedBox(height: 32),
+                      const _SectionLabel('YOUR DAY'),
+                      const SizedBox(height: 12),
+                      AnimatedSize(
                         duration: MedicynMotion.duration(
                           context,
                           MedicynMotion.medium,
                         ),
-                        builder: (_, value, _) => LinearProgressIndicator(
-                          value: value,
-                          minHeight: 3,
-                          borderRadius: BorderRadius.circular(4),
-                          backgroundColor: scheme.primary.withValues(
-                            alpha: 0.08,
-                          ),
-                          semanticsLabel:
-                              '$completed of $total reminders completed',
-                        ),
-                      ),
-                    ],
-                    if (missedDoseNudge != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 24),
-                        child: missedDoseNudge!,
-                      ),
-                    if (healthNotice != null)
-                      Padding(
-                        padding: EdgeInsets.only(
-                          top: missedDoseNudge != null ? 16 : 24,
-                        ),
-                        child: healthNotice!,
-                      ),
-                    if (careSyncNotice != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 16),
-                        child: careSyncNotice!,
-                      ),
-                    if (alertIssue &&
-                        care.any(
-                          (r) => !r.completed && r.reminderMinutes != null,
-                        ))
-                      Padding(
-                        padding: const EdgeInsets.only(top: 16),
-                        child: ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          leading: const Icon(Icons.notifications_off_outlined),
-                          title: const Text('Care alerts need attention'),
-                          subtitle: const Text(
-                            'Your plans are saved. Check notification access.',
-                          ),
-                          onTap: onRetryAlerts,
-                          trailing: const Icon(Icons.refresh),
-                        ),
-                      ),
-                    const SizedBox(height: 32),
-                    const _SectionLabel('YOUR DAY'),
-                    const SizedBox(height: 12),
-                    AnimatedSize(
-                      duration: MedicynMotion.duration(
-                        context,
-                        MedicynMotion.medium,
-                      ),
-                      curve: MedicynMotion.standard,
-                      alignment: Alignment.topCenter,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          if (entries.isEmpty)
-                            _QuietDay(
-                              now: now,
-                              completed: completed > 0,
-                              loading: careLoading,
-                              error: careError,
-                            )
-                          else ...[
-                            for (final entry in entries) entry.child,
-                            if (careLoading)
-                              const LinearProgressIndicator(minHeight: 2),
-                            if (careError)
-                              const Text(
-                                'Care reminders could not be loaded. Reopen Today to try again.',
-                              ),
-                          ],
-                        ],
-                      ),
-                    ),
-                    if (pastDoses.isNotEmpty || pastCare.isNotEmpty) ...[
-                      const SizedBox(height: 16),
-                      Theme(
-                        data: theme.copyWith(dividerColor: Colors.transparent),
-                        child: ExpansionTile(
-                          tilePadding: EdgeInsets.zero,
-                          childrenPadding: EdgeInsets.zero,
-                          title: Text(
-                            'Earlier · ${pastDoses.length + pastCare.length} unanswered',
-                            style: theme.textTheme.bodyMedium,
-                          ),
+                        curve: MedicynMotion.standard,
+                        alignment: Alignment.topCenter,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            for (final dose in pastDoses)
-                              _TodayDoseRow(
-                                key: ValueKey(
-                                  'earlier-${dose.item.schedule.id}-${dose.scheduledAt}',
+                            if (entries.isEmpty)
+                              _QuietDay(
+                                now: now,
+                                completed: completed > 0,
+                                loading: careLoading,
+                                error: careError,
+                              )
+                            else ...[
+                              for (final entry in entries) entry.child,
+                              if (careLoading)
+                                const LinearProgressIndicator(minHeight: 2),
+                              if (careError)
+                                const Text(
+                                  'Care reminders could not be loaded. Reopen Today to try again.',
                                 ),
-                                occurrence: dose,
-                                now: now,
-                                onTaken: onTaken,
-                                onSnooze: onSnooze,
-                                onHistory: onHistory,
-                              ),
-                            for (final reminder in pastCare)
-                              _TodayCareRow(
-                                key: ValueKey(reminder.id),
-                                reminder: reminder,
-                                now: now,
-                                onEdit: () => onEditCare(reminder),
-                                onDone: () => onCompleteCare(reminder),
-                              ),
+                            ],
                           ],
                         ),
                       ),
-                    ],
-                    const SizedBox(height: 28),
-                    if (futureCare.isNotEmpty) ...[
-                      const _SectionLabel('COMING UP'),
-                      const SizedBox(height: 12),
-                      for (final reminder in futureCare.take(3))
-                        _TodayCareRow(
-                          key: ValueKey(reminder.id),
-                          reminder: reminder,
-                          now: now,
-                          onEdit: () => onEditCare(reminder),
-                        ),
-                      if (futureCare.length > 3)
-                        ExpansionTile(
-                          tilePadding: EdgeInsets.zero,
-                          title: Text(
-                            'View ${futureCare.length - 3} more',
-                            style: theme.textTheme.bodyMedium,
+                      if (pastDoses.isNotEmpty || pastCare.isNotEmpty) ...[
+                        const SizedBox(height: 16),
+                        Theme(
+                          data: theme.copyWith(
+                            dividerColor: Colors.transparent,
                           ),
-                          children: [
-                            for (final reminder in futureCare.skip(3))
-                              _TodayCareRow(
-                                key: ValueKey(reminder.id),
-                                reminder: reminder,
-                                now: now,
-                                onEdit: () => onEditCare(reminder),
-                              ),
-                          ],
+                          child: ExpansionTile(
+                            tilePadding: EdgeInsets.zero,
+                            childrenPadding: EdgeInsets.zero,
+                            title: Text(
+                              'Earlier · ${pastDoses.length + pastCare.length} unanswered',
+                              style: theme.textTheme.bodyMedium,
+                            ),
+                            children: [
+                              for (final dose in pastDoses)
+                                _TodayDoseRow(
+                                  key: ValueKey(
+                                    'earlier-${dose.item.schedule.id}-${dose.scheduledAt}',
+                                  ),
+                                  occurrence: dose,
+                                  now: now,
+                                  onTaken: onTaken,
+                                  onSnooze: onSnooze,
+                                  onHistory: onHistory,
+                                ),
+                              for (final reminder in pastCare)
+                                _TodayCareRow(
+                                  key: ValueKey(reminder.id),
+                                  reminder: reminder,
+                                  now: now,
+                                  onEdit: () => onEditCare(reminder),
+                                  onDone: () => onCompleteCare(reminder),
+                                ),
+                            ],
+                          ),
                         ),
-                      const SizedBox(height: 24),
+                      ],
+                      const SizedBox(height: 28),
+                      if (futureCare.isNotEmpty) ...[
+                        const _SectionLabel('COMING UP'),
+                        const SizedBox(height: 12),
+                        for (final reminder in futureCare.take(3))
+                          _TodayCareRow(
+                            key: ValueKey(reminder.id),
+                            reminder: reminder,
+                            now: now,
+                            onEdit: () => onEditCare(reminder),
+                          ),
+                        if (futureCare.length > 3)
+                          ExpansionTile(
+                            tilePadding: EdgeInsets.zero,
+                            title: Text(
+                              'View ${futureCare.length - 3} more',
+                              style: theme.textTheme.bodyMedium,
+                            ),
+                            children: [
+                              for (final reminder in futureCare.skip(3))
+                                _TodayCareRow(
+                                  key: ValueKey(reminder.id),
+                                  reminder: reminder,
+                                  now: now,
+                                  onEdit: () => onEditCare(reminder),
+                                ),
+                            ],
+                          ),
+                        const SizedBox(height: 24),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -991,6 +1008,9 @@ class _AgendaAvatarState extends State<_AgendaAvatar>
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           color: scheme.primary.withValues(alpha: widget.active ? 0.12 : 0.08),
+          boxShadow: widget.active
+              ? MedicynTheme.glow(scheme.primary, opacity: 0.3, blur: 14)
+              : null,
         ),
         child: Icon(
           widget.icon,
@@ -1016,6 +1036,9 @@ class _AgendaAvatarState extends State<_AgendaAvatar>
         border: filled
             ? null
             : Border.all(color: color.withValues(alpha: 0.6), width: 2),
+        boxShadow: filled
+            ? MedicynTheme.glow(color, opacity: 0.45, blur: 16)
+            : null,
       ),
       child: AnimatedBuilder(
         animation: _scale,
@@ -1107,12 +1130,17 @@ class _AgendaRowState extends State<_AgendaRow> {
       padding: const EdgeInsets.only(bottom: 12),
       child: Container(
         decoration: BoxDecoration(
-          color: scheme.surfaceContainerLowest,
+          // Frosted, not flat opaque — matches AmbientCard's glass treatment
+          // over the gradient ground.
+          color: scheme.surfaceContainerLowest.withValues(alpha: 0.86),
           borderRadius: BorderRadius.circular(16),
           boxShadow: MedicynTheme.ambientShadow,
           border: widget.active
-              ? Border.all(color: scheme.primary.withValues(alpha: 0.28))
-              : null,
+              ? Border.all(
+                  color: scheme.primary.withValues(alpha: 0.4),
+                  width: 1.5,
+                )
+              : Border.all(color: Colors.white.withValues(alpha: 0.24)),
         ),
         padding: const EdgeInsets.all(16),
         child: Row(

@@ -40,9 +40,14 @@ class ReminderCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
           child: Ink(
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surfaceContainerLowest,
+              // Frosted, not flat opaque — matches AmbientCard's glass
+              // treatment over the gradient ground.
+              color: Theme.of(
+                context,
+              ).colorScheme.surfaceContainerLowest.withValues(alpha: 0.86),
               borderRadius: BorderRadius.circular(12),
               boxShadow: MedicynTheme.ambientShadow,
+              border: Border.all(color: Colors.white.withValues(alpha: 0.24)),
             ),
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 16, 8, 16),
@@ -56,6 +61,11 @@ class ReminderCard extends StatelessWidget {
                       color: Theme.of(
                         context,
                       ).colorScheme.primary.withValues(alpha: 0.1),
+                      boxShadow: MedicynTheme.glow(
+                        Theme.of(context).colorScheme.primary,
+                        opacity: 0.2,
+                        blur: 12,
+                      ),
                     ),
                     child: Icon(
                       Icons.medication,
@@ -188,9 +198,9 @@ class _LogNowActionState extends State<_LogNowAction> {
       if (mounted) setState(() => _busy = false);
     }
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Logged as taken')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Logged as taken')));
   }
 
   @override
