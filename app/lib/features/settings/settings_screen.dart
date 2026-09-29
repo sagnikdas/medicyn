@@ -35,6 +35,12 @@ import '../notification_engine/reminder_reliability_screen.dart';
 /// their text — theme, which stays on the device's own light/dark setting
 /// unless the user overrides it here, and whether a locked phone may show
 /// which medicine is due.
+///
+/// Laid out as grouped sections (one rounded card per section, rows
+/// separated by hairlines, an optional header above and footer below) —
+/// iOS's own Settings.app idiom — rather than a mix of floating per-row
+/// cards, bare controls, and one oversized card holding several unrelated
+/// concerns.
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({
     super.key,
@@ -64,10 +70,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _sharingReport = false;
   late final ScrollController _scrollController = ScrollController();
 
+  /// The active care link, for the Family group's conditional feed-link
+  /// row. Loaded once and refreshed whenever the tab becomes active again,
+  /// mirroring [_refreshSyncStatus] below.
+  CareLink? _familyLink;
+
   @override
   void initState() {
     super.initState();
     unawaited(_refreshSyncStatus());
+    unawaited(_loadFamilyLink());
   }
 
   @override
@@ -100,6 +112,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _signInError = error;
       _signingIn = false;
     });
+    unawaited(_loadFamilyLink());
   }
 
   /// Shared by the two places a sign-in prompt can appear: the standalone
@@ -142,6 +155,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget build(BuildContext context) {
     final email = AuthService.instance.currentUser?.email ?? '';
     final name = email.contains('@') ? email.split('@').first : email;
+    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: widget.embedded ? null : AppBar(title: const Text('Settings')),
       body: MedicynGradientBackground(
@@ -161,19 +175,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
                               boxShadow: MedicynTheme.glow(
-                                Theme.of(context).colorScheme.secondary,
+                                scheme.secondary,
                                 opacity: 0.3,
                                 blur: 20,
                               ),
                             ),
                             child: CircleAvatar(
                               radius: 48,
-                              backgroundColor: Theme.of(
-                                context,
-                              ).colorScheme.secondaryContainer,
-                              foregroundColor: Theme.of(
-                                context,
-                              ).colorScheme.onSecondaryContainer,
+                              backgroundColor: scheme.secondaryContainer,
+                              foregroundColor: scheme.onSecondaryContainer,
                               // No foregroundImage: a third-party account photo
                               // (Google's default is a saturated, uncontrolled
                               // color) would break the single-accent rule on the
@@ -208,9 +218,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   overflow: TextOverflow.ellipsis,
                                   style: Theme.of(context).textTheme.bodyMedium
                                       ?.copyWith(
-                                        color: Theme.of(
-                                          context,
-                                        ).colorScheme.onSurfaceVariant,
+                                        color: scheme.onSurfaceVariant,
                                       ),
                                   textAlign: TextAlign.center,
                                 ),
@@ -221,61 +229,67 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 8),
                 ] else if (_signedIn) ...[
                   MedicynFadeIn(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Signed in as',
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          email,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                      ],
+                    child: MedicynGlassHeader(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Signed in as',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            email,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 8),
                 ] else ...[
                   _signInButton(),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 8),
                 ],
                 if (widget.embedded && !_signedIn) ...[
                   _signInButton(),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 8),
                 ],
+                const SizedBox(height: 24),
+
+                // --- Health & Safety ---
+                MedicynFadeIn(child: const _SectionHeader('Health & Safety')),
+                const SizedBox(height: 8),
                 MedicynFadeIn(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                  child: _SettingsGroup(
                     children: [
-                      const _SectionHeader('Emergency card'),
-                      const SizedBox(height: 8),
-                      ProfileMenuRow(
+                      _SettingsRow(
                         icon: Icons.local_hospital,
                         // The app's one "needs attention" red (same as
                         // DayDoseStyle's Missed mark), not the usual teal —
-                        // this is the one row on the screen meant to read as
-                        // urgent rather than routine.
-                        iconBackgroundColor: Theme.of(
-                          context,
-                        ).colorScheme.error,
-                        iconColor: Theme.of(context).colorScheme.onError,
+                        // this is the one row on the screen meant to read
+                        // as urgent rather than routine.
+                        iconBackgroundColor: scheme.error,
+                        iconColor: scheme.onError,
                         title: 'Emergency card',
                         subtitle:
                             'Blood group, allergies, conditions, and your medicines — for a first responder or new clinician.',
                         onTap: () {
                           // A second tap can land before the first push's
-                          // transition covers this row -- without this guard
-                          // it queues a second push that races the first
-                          // route's still-in-flight animation (visible
-                          // ghosting, and a hit-test crash on a render object
-                          // that hasn't been laid out yet).
+                          // transition covers this row -- without this
+                          // guard it queues a second push that races the
+                          // first route's still-in-flight animation
+                          // (visible ghosting, and a hit-test crash on a
+                          // render object that hasn't been laid out yet).
                           final route = ModalRoute.of(context);
                           if (route != null && !route.isCurrent) return;
                           Navigator.of(context).push(
@@ -286,14 +300,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           );
                         },
                       ),
-                      const SizedBox(height: 24),
-                      const _SectionHeader('Family'),
-                      const SizedBox(height: 8),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 32),
+
+                // --- Family ---
+                MedicynFadeIn(child: const _SectionHeader('Family')),
+                const SizedBox(height: 8),
+                MedicynFadeIn(
+                  child: _SettingsGroup(
+                    children: [
                       IgnorePointer(
                         ignoring: !_signedIn,
                         child: Opacity(
                           opacity: _signedIn ? 1 : 0.6,
-                          child: ProfileMenuRow(
+                          child: _SettingsRow(
                             icon: Icons.people_outline,
                             title: 'Connect with family',
                             subtitle: _signedIn
@@ -307,11 +329,35 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ),
                         ),
                       ),
-                      const _FamilyFeedLink(),
-                      const SizedBox(height: 24),
-                      const _SectionHeader('Reminders'),
-                      const SizedBox(height: 8),
-                      ProfileMenuRow(
+                      if (_familyFeedRowVisible)
+                        _SettingsRow(
+                          icon: Icons.query_stats_outlined,
+                          title: _familyAmPatient
+                              ? 'What they see'
+                              : "Their week's doses",
+                          subtitle:
+                              'The same feed both sides of a care link share.',
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => DoseFeedScreen(
+                                patientId: _familyLink!.patientId,
+                                viewingOwnData: _familyAmPatient,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 32),
+
+                // --- Reminders ---
+                MedicynFadeIn(child: const _SectionHeader('Reminders')),
+                const SizedBox(height: 8),
+                MedicynFadeIn(
+                  child: _SettingsGroup(
+                    children: [
+                      _SettingsRow(
                         icon: Icons.notifications_active_outlined,
                         title: 'Check reminder access',
                         subtitle:
@@ -323,270 +369,282 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ),
                         ),
                       ),
-                      const SizedBox(height: 16),
                       ListenableBuilder(
                         listenable: AppSettings.instance,
-                        builder: (context, _) => DropdownButtonFormField<int>(
-                          initialValue: AppSettings.instance.snoozeMinutes,
-                          decoration: const InputDecoration(
-                            labelText: 'Snooze duration',
-                          ),
-                          items: [
-                            for (final minutes in AppSettings.snoozeOptions)
-                              DropdownMenuItem(
-                                value: minutes,
-                                child: Text('$minutes minutes'),
-                              ),
-                          ],
-                          onChanged: (value) {
-                            if (value != null) {
-                              unawaited(_setSnoozeMinutes(value));
-                            }
-                          },
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      const _SectionHeader(
-                        'Appearance',
-                        subtitle:
-                            '100% is the default size. Drag right to make text and buttons larger.',
-                      ),
-                      const SizedBox(height: 8),
-                      // Nothing previews the setting better than the screen you're on:
-                      // the slider rescales the whole app live as it's dragged, this
-                      // row included.
-                      ListenableBuilder(
-                        listenable: AppSettings.instance,
-                        builder: (context, _) {
-                          final scale = AppSettings.instance.textScale;
-                          return Row(
-                            children: [
-                              Expanded(
-                                child: Slider.adaptive(
-                                  value: scale,
-                                  min: AppSettings.minTextScale,
-                                  max: AppSettings.maxTextScale,
-                                  divisions: AppSettings.textScaleDivisions,
-                                  label: AppSettings.textScaleLabel(scale),
-                                  semanticFormatterCallback: (v) =>
-                                      'Text size ${AppSettings.textScaleLabel(v)}',
-                                  onChanged: (v) =>
-                                      AppSettings.instance.setTextScale(v),
+                        builder: (context, _) => _SettingsRow(
+                          icon: Icons.snooze,
+                          title: 'Snooze duration',
+                          trailing: DropdownButton<int>(
+                            value: AppSettings.instance.snoozeMinutes,
+                            underline: const SizedBox.shrink(),
+                            items: [
+                              for (final minutes in AppSettings.snoozeOptions)
+                                DropdownMenuItem(
+                                  value: minutes,
+                                  child: Text('$minutes min'),
                                 ),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                AppSettings.textScaleLabel(scale),
-                                style: Theme.of(context).textTheme.titleSmall,
-                              ),
                             ],
-                          );
-                        },
-                      ),
-                      const SizedBox(height: 20),
-                      AmbientCard(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Semantics(
-                              header: true,
-                              child: Text(
-                                'Theme',
-                                style: Theme.of(context).textTheme.titleSmall,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Follows your device by default. Choose Light or Dark to keep '
-                              'the app on one of them.',
-                              style: Theme.of(context).textTheme.bodySmall,
-                            ),
-                            const SizedBox(height: 12),
-                            ListenableBuilder(
-                              listenable: AppSettings.instance,
-                              builder: (context, _) => SizedBox(
-                                width: double.infinity,
-                                child: SegmentedButton<ThemeMode>(
-                                  segments: [
-                                    for (final mode in ThemeMode.values)
-                                      ButtonSegment(
-                                        value: mode,
-                                        label: Text(mode.label, maxLines: 1),
-                                      ),
-                                  ],
-                                  selected: {AppSettings.instance.themeMode},
-                                  onSelectionChanged: (s) => AppSettings
-                                      .instance
-                                      .setThemeMode(s.first),
-                                  showSelectedIcon: false,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            ListenableBuilder(
-                              listenable: AppSettings.instance,
-                              builder: (context, _) => SwitchListTile.adaptive(
-                                contentPadding: EdgeInsets.zero,
-                                title: const Text(
-                                  'Show medicine names on the lock screen',
-                                ),
-                                subtitle: const Text(
-                                  'Off by default. When off, a locked phone only says a dose is due — not which medicine.',
-                                ),
-                                value: AppSettings
-                                    .instance
-                                    .showMedicineOnLockScreen,
-                                onChanged: _setShowMedicineOnLockScreen,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 28),
-                      const _SectionHeader('Data & privacy'),
-                      const SizedBox(height: 8),
-                      // The status card and the switch that actually turns
-                      // Cloud backup on live in the same section on purpose —
-                      // the card's "below" copy used to mean a full screen's
-                      // worth of scrolling past Reminders and Appearance to
-                      // reach the toggle it was describing.
-                      ListenableBuilder(
-                        listenable: SyncStatusStore.instance,
-                        builder: (context, _) => _BackupStatusCard(
-                          signedIn: _signedIn,
-                          onRetry: _retrySync,
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      AmbientCard(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Turning any of these off takes effect straight away, the same as turning them on.',
-                              style: Theme.of(context).textTheme.bodySmall,
-                            ),
-                            const SizedBox(height: 4),
-                            ListenableBuilder(
-                              listenable: AppSettings.instance,
-                              builder: (context, _) {
-                                return Column(
-                                  children: [
-                                    for (final purpose in ConsentPurpose.values)
-                                      SwitchListTile.adaptive(
-                                        contentPadding: EdgeInsets.zero,
-                                        title: Text(purpose.title),
-                                        subtitle: Text(purpose.sentence),
-                                        value: ConsentService.instance
-                                            .isGranted(purpose),
-                                        onChanged: (v) => _onConsentChanged(
-                                          context,
-                                          purpose,
-                                          v,
-                                        ),
-                                      ),
-                                  ],
-                                );
-                              },
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'This is a copy of the data Medicyn holds about you (Art. 15/20). '
-                              'Other requests are answered within one month (Art. 12(3)) by email '
-                              'contact@doezly.com.',
-                              style: Theme.of(context).textTheme.bodySmall,
-                            ),
-                            const SizedBox(height: 12),
-                            OutlinedButton.icon(
-                              onPressed: _exportBusy ? null : _downloadMyData,
-                              icon: MedicynSwitcher(
-                                child: _exporting
-                                    ? const SizedBox(
-                                        key: ValueKey('json-busy'),
-                                        height: 20,
-                                        width: 20,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                        ),
-                                      )
-                                    : const Icon(
-                                        Icons.download_outlined,
-                                        key: ValueKey('json'),
-                                      ),
-                              ),
-                              label: Text(
-                                _exporting ? 'Preparing…' : 'Download my data',
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'A four-week PDF of medicines and what was marked taken — '
-                              'for a clinic visit, not a full copy of your account.',
-                              style: Theme.of(context).textTheme.bodySmall,
-                            ),
-                            const SizedBox(height: 12),
-                            OutlinedButton.icon(
-                              onPressed: _exportBusy
-                                  ? null
-                                  : _shareDoctorReport,
-                              icon: MedicynSwitcher(
-                                child: _sharingReport
-                                    ? const SizedBox(
-                                        key: ValueKey('pdf-busy'),
-                                        height: 20,
-                                        width: 20,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                        ),
-                                      )
-                                    : const Icon(
-                                        Icons.picture_as_pdf_outlined,
-                                        key: ValueKey('pdf'),
-                                      ),
-                              ),
-                              label: Text(
-                                _sharingReport
-                                    ? 'Preparing…'
-                                    : 'Share with my doctor',
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (_signedIn) ...[
-                        const SizedBox(height: 28),
-                        const _SectionHeader('Account'),
-                        const SizedBox(height: 8),
-                        OutlinedButton(
-                          onPressed: () => _confirmSignOut(context),
-                          child: const Text('Sign out'),
-                        ),
-                        const SizedBox(height: 12),
-                        OutlinedButton(
-                          onPressed: () => _confirmDeleteAccount(context),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: Theme.of(
-                              context,
-                            ).colorScheme.error,
+                            onChanged: (value) {
+                              if (value != null) {
+                                unawaited(_setSnoozeMinutes(value));
+                              }
+                            },
                           ),
-                          child: const Text('Delete account'),
-                        ),
-                      ],
-                      const SizedBox(height: 12),
-                      TextButton(
-                        onPressed: () => openPrivacyPolicy(context),
-                        child: Text(
-                          'Privacy policy',
-                          style: Theme.of(context).textTheme.titleMedium
-                              ?.copyWith(
-                                color: Theme.of(context).colorScheme.primary,
-                                decoration: TextDecoration.underline,
-                              ),
                         ),
                       ),
                     ],
                   ),
                 ),
+                const SizedBox(height: 32),
+
+                // --- Appearance ---
+                MedicynFadeIn(child: const _SectionHeader('Appearance')),
+                const SizedBox(height: 8),
+                MedicynFadeIn(
+                  child: _SettingsGroup(
+                    children: [
+                      // Nothing previews the setting better than the screen
+                      // you're on: the slider rescales the whole app live
+                      // as it's dragged, this row included.
+                      ListenableBuilder(
+                        listenable: AppSettings.instance,
+                        builder: (context, _) {
+                          final scale = AppSettings.instance.textScale;
+                          return _SettingsControlRow(
+                            icon: Icons.text_fields,
+                            title: 'Text size',
+                            subtitle:
+                                '100% is the default size. Drag right to make text and buttons larger.',
+                            control: Row(
+                              children: [
+                                Expanded(
+                                  child: Slider.adaptive(
+                                    value: scale,
+                                    min: AppSettings.minTextScale,
+                                    max: AppSettings.maxTextScale,
+                                    divisions: AppSettings.textScaleDivisions,
+                                    label: AppSettings.textScaleLabel(scale),
+                                    semanticFormatterCallback: (v) =>
+                                        'Text size ${AppSettings.textScaleLabel(v)}',
+                                    onChanged: (v) =>
+                                        AppSettings.instance.setTextScale(v),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  AppSettings.textScaleLabel(scale),
+                                  style: Theme.of(context).textTheme.titleSmall,
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                      Divider(
+                        height: 1,
+                        thickness: 1,
+                        indent: 16,
+                        color: scheme.outlineVariant.withValues(alpha: 0.5),
+                      ),
+                      ListenableBuilder(
+                        listenable: AppSettings.instance,
+                        builder: (context, _) => _SettingsControlRow(
+                          icon: Icons.dark_mode_outlined,
+                          title: 'Theme',
+                          subtitle:
+                              'Follows your device by default. Choose Light or Dark to keep the app on one of them.',
+                          control: SizedBox(
+                            width: double.infinity,
+                            child: SegmentedButton<ThemeMode>(
+                              segments: [
+                                for (final mode in ThemeMode.values)
+                                  ButtonSegment(
+                                    value: mode,
+                                    label: Text(mode.label, maxLines: 1),
+                                  ),
+                              ],
+                              selected: {AppSettings.instance.themeMode},
+                              onSelectionChanged: (s) =>
+                                  AppSettings.instance.setThemeMode(s.first),
+                              showSelectedIcon: false,
+                            ),
+                          ),
+                        ),
+                      ),
+                      ListenableBuilder(
+                        listenable: AppSettings.instance,
+                        builder: (context, _) => _SettingsRow(
+                          icon: Icons.lock_outline,
+                          title: 'Lock screen medicine names',
+                          subtitle:
+                              'Off by default. When off, a locked phone only says a dose is due — not which medicine.',
+                          onTap: () => _setShowMedicineOnLockScreen(
+                            !AppSettings.instance.showMedicineOnLockScreen,
+                          ),
+                          trailing: Switch.adaptive(
+                            value:
+                                AppSettings.instance.showMedicineOnLockScreen,
+                            onChanged: _setShowMedicineOnLockScreen,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 32),
+
+                // --- Data & privacy ---
+                MedicynFadeIn(child: const _SectionHeader('Data & privacy')),
+                const SizedBox(height: 8),
+                MedicynFadeIn(
+                  child: _SettingsGroup(
+                    children: [
+                      ListenableBuilder(
+                        listenable: SyncStatusStore.instance,
+                        builder: (context, _) => _BackupStatusRow(
+                          signedIn: _signedIn,
+                          onRetry: _retrySync,
+                        ),
+                      ),
+                      ListenableBuilder(
+                        listenable: AppSettings.instance,
+                        builder: (context, _) => Column(
+                          children: [
+                            for (final purpose in ConsentPurpose.values) ...[
+                              Divider(
+                                height: 1,
+                                thickness: 1,
+                                indent: 16,
+                                color: scheme.outlineVariant.withValues(
+                                  alpha: 0.5,
+                                ),
+                              ),
+                              _SettingsRow(
+                                icon: _consentIcon(purpose),
+                                title: purpose.title,
+                                subtitle: purpose.sentence,
+                                onTap: () => _onConsentChanged(
+                                  context,
+                                  purpose,
+                                  !ConsentService.instance.isGranted(purpose),
+                                ),
+                                trailing: Switch.adaptive(
+                                  value: ConsentService.instance.isGranted(
+                                    purpose,
+                                  ),
+                                  onChanged: (v) =>
+                                      _onConsentChanged(context, purpose, v),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const _SettingsFooter(
+                  'Turning any of these off takes effect straight away, the same as turning them on.',
+                ),
+                const SizedBox(height: 32),
+
+                // --- Export ---
+                MedicynFadeIn(child: const _SectionHeader('Export')),
+                const SizedBox(height: 8),
+                MedicynFadeIn(
+                  child: _SettingsGroup(
+                    children: [
+                      _SettingsRow(
+                        icon: Icons.download_outlined,
+                        title: 'Download my data',
+                        subtitle:
+                            'A copy of everything Medicyn holds about you (Art. 15/20).',
+                        onTap: _exportBusy ? null : _downloadMyData,
+                        trailing: _exporting
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : null,
+                      ),
+                      Divider(
+                        height: 1,
+                        thickness: 1,
+                        indent: 16,
+                        color: scheme.outlineVariant.withValues(alpha: 0.5),
+                      ),
+                      _SettingsRow(
+                        icon: Icons.picture_as_pdf_outlined,
+                        title: 'Share with my doctor',
+                        subtitle:
+                            'A four-week PDF of medicines and what was marked taken — for a clinic visit, not a full copy of your account.',
+                        onTap: _exportBusy ? null : _shareDoctorReport,
+                        trailing: _sharingReport
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : null,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const _SettingsFooter(
+                  'Other requests are answered within one month (Art. 12(3)) by email contact@doezly.com.',
+                ),
+                const SizedBox(height: 32),
+
+                // --- About ---
+                MedicynFadeIn(child: const _SectionHeader('About')),
+                const SizedBox(height: 8),
+                MedicynFadeIn(
+                  child: _SettingsGroup(
+                    children: [
+                      _SettingsRow(
+                        icon: Icons.privacy_tip_outlined,
+                        title: 'Privacy policy',
+                        onTap: () => openPrivacyPolicy(context),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // --- Account (danger zone, signed-in only) ---
+                if (_signedIn) ...[
+                  const SizedBox(height: 32),
+                  MedicynFadeIn(child: const _SectionHeader('Account')),
+                  const SizedBox(height: 8),
+                  MedicynFadeIn(
+                    child: _SettingsGroup(
+                      children: [
+                        _SettingsRow(
+                          title: 'Sign out',
+                          centered: true,
+                          onTap: () => _confirmSignOut(context),
+                        ),
+                        Divider(
+                          height: 1,
+                          thickness: 1,
+                          color: scheme.outlineVariant.withValues(alpha: 0.5),
+                        ),
+                        _SettingsRow(
+                          title: 'Delete account',
+                          centered: true,
+                          iconColor: scheme.error,
+                          onTap: () => _confirmDeleteAccount(context),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -595,7 +653,40 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  bool get _familyAmPatient {
+    final me = AuthService.instance.currentUser;
+    final link = _familyLink;
+    if (me == null || link == null) return false;
+    return link.isPatient(me.id);
+  }
+
+  bool get _familyFeedRowVisible {
+    final me = AuthService.instance.currentUser;
+    final link = _familyLink;
+    return me != null && link != null && link.status == CareLinkStatus.active;
+  }
+
+  static IconData _consentIcon(ConsentPurpose purpose) => switch (purpose) {
+    ConsentPurpose.cloudBackup => Icons.cloud_outlined,
+    ConsentPurpose.anthropicParse => Icons.auto_awesome,
+    ConsentPurpose.googleSpeech => Icons.mic_outlined,
+    ConsentPurpose.careShare => Icons.groups_outlined,
+  };
+
   bool get _exportBusy => _exporting || _sharingReport;
+
+  /// Mirrors the old `_FamilyFeedLinkState._load`: the rest of Settings
+  /// still works without a care link, so a failure here is silent.
+  Future<void> _loadFamilyLink() async {
+    if (AuthService.instance.currentUser == null) return;
+    try {
+      final link = await CareService.instance.currentLink();
+      if (!mounted) return;
+      setState(() => _familyLink = link);
+    } catch (_) {
+      // The rest of Settings still works without a care link.
+    }
+  }
 
   Future<void> _downloadMyData() async {
     if (_exportBusy) return;
@@ -947,14 +1038,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
 /// One consistent look for every top-level section title on this screen —
 /// same primary-tinted style, and marked as a heading so TalkBack/VoiceOver
 /// users can jump between sections instead of swiping through every row.
-/// Previously each section wrote this out by hand, and a few (Your data,
-/// Manage what Medicyn can do) had drifted to the unstyled default color
-/// with no heading semantics at all.
 class _SectionHeader extends StatelessWidget {
-  const _SectionHeader(this.title, {this.subtitle});
+  const _SectionHeader(this.title);
 
   final String title;
-  final String? subtitle;
 
   @override
   Widget build(BuildContext context) {
@@ -964,30 +1051,230 @@ class _SectionHeader extends StatelessWidget {
     // a frosted backing behind it.
     return MedicynGlassHeader(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: Semantics(
+        header: true,
+        child: Text(
+          title,
+          style: theme.textTheme.titleSmall?.copyWith(
+            color: theme.colorScheme.primary,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// One grouped section card: rows separated by hairlines, no per-row card
+/// chrome of its own — the group provides the single rounded boundary,
+/// matching iOS's grouped-table-view idiom instead of a stack of floating
+/// singleton cards.
+class _SettingsGroup extends StatelessWidget {
+  const _SettingsGroup({required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return AmbientCard(
+      padding: EdgeInsets.zero,
+      // AmbientCard's own decoration doesn't clip its child to its rounded
+      // corners, so without this a first/last row's ink splash would
+      // square off past the card's curve.
+      child: ClipRRect(
+        borderRadius: const BorderRadius.all(Radius.circular(16)),
+        child: Column(children: children),
+      ),
+    );
+  }
+}
+
+/// Small explanatory text below a group — same frosted treatment as
+/// [_SectionHeader]; bare text still isn't safe directly on the gradient.
+class _SettingsFooter extends StatelessWidget {
+  const _SettingsFooter(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return MedicynGlassHeader(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: Text(text, style: Theme.of(context).textTheme.bodySmall),
+    );
+  }
+}
+
+/// One row inside a [_SettingsGroup]. No card chrome of its own — the
+/// group's single AmbientCard already provides that.
+class _SettingsRow extends StatelessWidget {
+  const _SettingsRow({
+    this.icon,
+    this.iconBackgroundColor,
+    this.iconColor,
+    required this.title,
+    this.subtitle,
+    this.trailing,
+    this.onTap,
+    this.centered = false,
+  });
+
+  final IconData? icon;
+  final Color? iconBackgroundColor;
+  final Color? iconColor;
+  final String title;
+  final String? subtitle;
+  final Widget? trailing;
+  final VoidCallback? onTap;
+
+  /// Icon-less, chevron-less, centered text — the Account section's
+  /// "Sign out"/"Delete account" style, matching iOS's own destructive-row
+  /// convention rather than a generic pill button. [iconColor], if set,
+  /// becomes the centered text's color (used for the red Delete row).
+  final bool centered;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    final content = Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      child: centered
+          ? Center(
+              child: Text(
+                title,
+                style: textTheme.titleMedium?.copyWith(
+                  color: iconColor ?? scheme.primary,
+                ),
+              ),
+            )
+          : Row(
+              children: [
+                if (icon != null) ...[
+                  Container(
+                    width: 40,
+                    height: 40,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: iconBackgroundColor ?? scheme.secondaryContainer,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      icon,
+                      color: iconColor ?? scheme.onSecondaryContainer,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                ],
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: textTheme.labelLarge,
+                      ),
+                      if (subtitle != null) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          subtitle!,
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          style: textTheme.bodySmall,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                if (trailing != null) ...[
+                  const SizedBox(width: 8),
+                  trailing!,
+                ] else if (onTap != null)
+                  Icon(Icons.chevron_right, color: scheme.outline),
+              ],
+            ),
+    );
+
+    if (onTap == null) return content;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(onTap: onTap, child: content),
+    );
+  }
+}
+
+/// A row whose control needs the full row width below its label — the
+/// text-size slider and theme picker, neither of which fit on one line
+/// alongside a title. Not tappable itself; the control underneath handles
+/// its own interaction.
+class _SettingsControlRow extends StatelessWidget {
+  const _SettingsControlRow({
+    required this.icon,
+    required this.title,
+    this.subtitle,
+    required this.control,
+  });
+
+  final IconData icon;
+  final String title;
+  final String? subtitle;
+  final Widget control;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Semantics(
-            header: true,
-            child: Text(
-              title,
-              style: theme.textTheme.titleSmall?.copyWith(
-                color: theme.colorScheme.primary,
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: scheme.secondaryContainer,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: scheme.onSecondaryContainer),
               ),
-            ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: textTheme.labelLarge),
+                    if (subtitle != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle!,
+                        style: textTheme.bodySmall,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
           ),
-          if (subtitle != null) ...[
-            const SizedBox(height: 4),
-            Text(subtitle!, style: theme.textTheme.bodySmall),
-          ],
+          const SizedBox(height: 8),
+          control,
         ],
       ),
     );
   }
 }
 
-class _BackupStatusCard extends StatelessWidget {
-  const _BackupStatusCard({required this.signedIn, required this.onRetry});
+/// The Data & privacy group's first row: backup status, dynamic icon, and
+/// a Retry action when a backup is enabled but the caller isn't signed in.
+class _BackupStatusRow extends StatelessWidget {
+  const _BackupStatusRow({required this.signedIn, required this.onRetry});
 
   final bool signedIn;
   final VoidCallback onRetry;
@@ -998,111 +1285,24 @@ class _BackupStatusCard extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final enabled = status.backupEnabled;
     final waiting = status.pendingWork > 0;
-    // AmbientCard, not a bare Material Card: every other card-like element
-    // on this screen (each ProfileMenuRow) already uses it, and a plain
-    // Card has a different corner radius and elevation model that made this
-    // one row look like it belonged to a different screen.
-    return AmbientCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                enabled
-                    ? (waiting
-                          ? Icons.cloud_upload_outlined
-                          : Icons.cloud_done_outlined)
-                    : Icons.cloud_off_outlined,
-                color: enabled ? scheme.primary : scheme.onSurfaceVariant,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  'Backup',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-              ),
-              if (signedIn && enabled)
-                TextButton(
-                  onPressed: status.syncing ? null : onRetry,
-                  child: const Text('Retry'),
-                ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(status.summary, style: Theme.of(context).textTheme.bodyMedium),
-          const SizedBox(height: 4),
-          Text(
-            enabled
-                ? 'Your local reminders keep working even while backup is waiting.'
-                : signedIn
-                ? 'Turn on Cloud backup below when you want another device to restore this data.'
-                : 'Sign in when you want to enable backup on another device.',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Link to the shared care-link feed, moved here from Insights: this is
-/// about the family relationship itself, not personal adherence analytics,
-/// so it belongs next to "Connect with family" rather than at the foot of
-/// a stats page. Renders nothing until signed in with an active link —
-/// including the plain not-signed-in case — so callers can place it
-/// unconditionally.
-class _FamilyFeedLink extends StatefulWidget {
-  const _FamilyFeedLink();
-
-  @override
-  State<_FamilyFeedLink> createState() => _FamilyFeedLinkState();
-}
-
-class _FamilyFeedLinkState extends State<_FamilyFeedLink> {
-  CareLink? _link;
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    if (AuthService.instance.currentUser == null) return;
-    try {
-      final link = await CareService.instance.currentLink();
-      if (!mounted) return;
-      setState(() => _link = link);
-    } catch (_) {
-      // The rest of Settings still works without a care link.
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final me = AuthService.instance.currentUser;
-    final link = _link;
-    if (me == null || link == null || link.status != CareLinkStatus.active) {
-      return const SizedBox.shrink();
-    }
-    final amPatient = link.isPatient(me.id);
-    return Padding(
-      padding: const EdgeInsets.only(top: 8),
-      child: ProfileMenuRow(
-        icon: Icons.query_stats_outlined,
-        title: amPatient ? 'What they see' : "Their week's doses",
-        subtitle: 'The same feed both sides of a care link share.',
-        onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => DoseFeedScreen(
-              patientId: link.patientId,
-              viewingOwnData: amPatient,
-            ),
-          ),
-        ),
-      ),
+    final explanation = enabled
+        ? 'Your local reminders keep working even while backup is waiting.'
+        : signedIn
+        ? 'Turn on Cloud backup below when you want another device to restore this data.'
+        : 'Sign in when you want to enable backup on another device.';
+    return _SettingsRow(
+      icon: enabled
+          ? (waiting ? Icons.cloud_upload_outlined : Icons.cloud_done_outlined)
+          : Icons.cloud_off_outlined,
+      iconColor: enabled ? scheme.primary : scheme.onSurfaceVariant,
+      title: 'Backup',
+      subtitle: '${status.summary}\n$explanation',
+      trailing: (signedIn && enabled)
+          ? TextButton(
+              onPressed: status.syncing ? null : onRetry,
+              child: const Text('Retry'),
+            )
+          : null,
     );
   }
 }
