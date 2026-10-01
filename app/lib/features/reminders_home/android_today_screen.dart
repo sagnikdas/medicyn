@@ -743,11 +743,19 @@ class _SectionLabel extends StatelessWidget {
   final String text;
 
   @override
-  Widget build(BuildContext context) => Text(
-    text,
-    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-      letterSpacing: 1.4,
-      color: Theme.of(context).colorScheme.onSurfaceVariant,
+  // Bare text here would sit directly on the gradient ground (see
+  // MedicynGlassHeader), so give it a frosted backing for contrast.
+  Widget build(BuildContext context) => Align(
+    alignment: Alignment.centerLeft,
+    child: MedicynGlassHeader(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      child: Text(
+        text,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+          letterSpacing: 1.4,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
+      ),
     ),
   );
 }
