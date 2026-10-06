@@ -56,9 +56,7 @@ jobs:
           printf '%s' "$IOS_GOOGLE_SERVICE_INFO_PLIST_BASE64" | base64 -D > ios/Runner/GoogleService-Info.plist
 
       - name: Compile unsigned iOS app
-        # Flutter's short failure summary can mask the underlying Xcode error
-        # (including when it suggests signing for an explicitly unsigned build).
-        run: flutter build ios --release --no-codesign -v
+        run: flutter build ios --release --no-codesign
 
       # Flutter's no-codesign build produces a real device .app, not an
       # installable IPA. Package that compiled app as an explicitly unsigned

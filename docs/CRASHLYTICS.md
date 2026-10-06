@@ -93,28 +93,17 @@ Xcode-authored change I can't make blind from the CLI.
 
 ## Part C — iOS dSYM upload build phase (Xcode)
 
-Without this, iOS crashes still reach Crashlytics but show raw memory
-addresses instead of symbolicated stack traces — file names and line
-numbers.
+The Runner target already contains **Upload Crashlytics dSYMs**. Its checked-in
+helper, `app/ios/Runner/upload_crashlytics_dsyms.sh`, skips unsigned CI and
+debug builds. For signed release builds, it uses the Crashlytics uploader from
+Swift Package Manager or CocoaPods, whichever installed the Firebase SDK.
+This matters because Flutter 3.44+ can install Crashlytics via Swift Package
+Manager even when other plugins still use CocoaPods; a hard-coded
+`$PODS_ROOT/FirebaseCrashlytics/run` path fails in that configuration.
 
-1. In the same Xcode workspace, select the **Runner** project → **Runner**
-   target → **Build Phases** tab.
-2. Click **+** (top left of the phase list) → **New Run Script Phase**.
-3. Drag the new phase so it runs **after** "Embed Pods Frameworks" (last
-   phase, or close to it).
-4. Rename it (double-click the title) to something like "Upload Crashlytics
-   dSYMs."
-5. Paste into the script box:
-   ```
-   "${PODS_ROOT}/FirebaseCrashlytics/run"
-   ```
-6. Expand **Input Files** and add two entries:
-   ```
-   ${DWARF_DSYM_FOLDER_PATH}/${DWARF_DSYM_FILE_NAME}
-   $(SRCROOT)/$(BUILT_PRODUCTS_DIR)/$(INFOPLIST_PATH)
-   ```
-7. Save. This is also a `project.pbxproj` change — commit it alongside (or
-   in the same PR as) Part B's file reference.
+After the first signed iOS archive, verify that the build phase completed and
+that its dSYMs appear in Firebase Crashlytics. This cannot be confirmed by the
+unsigned compile-health workflow.
 
 ---
 
