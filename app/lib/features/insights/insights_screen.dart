@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/app_settings.dart';
 import '../../core/motion.dart';
 import '../../core/theme.dart';
+import '../../core/widgets/medicyn_background.dart';
 import '../../core/widgets/medicyn_chrome.dart';
 import '../../core/widgets/medicyn_motion.dart';
 import '../../data/export/adherence_export_service.dart';
@@ -61,33 +62,36 @@ class _InsightsScreenState extends State<InsightsScreen> {
     // No app bar, no repeated "Medicyn" wordmark: the page announces itself
     // with its own large heading in the body, matching Today and Plan.
     return Scaffold(
-      body: SafeArea(
-        child: StreamBuilder<List<ScheduleWithMedicine>>(
-          stream: _schedulesStream,
-          builder: (context, scheduleSnap) {
-            return StreamBuilder<List<DoseLog>>(
-              stream: _doseLogsStream,
-              builder: (context, logSnap) {
-                // See the matching guard in HomeScreen: without it this tab
-                // shows "Nothing due this week yet" / all-zero stats for the
-                // moment before the database's first watch() emission, then
-                // jumps to the real numbers.
-                if ((scheduleSnap.connectionState == ConnectionState.waiting &&
-                        !scheduleSnap.hasData) ||
-                    (logSnap.connectionState == ConnectionState.waiting &&
-                        !logSnap.hasData)) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                return _InsightsBody(
-                  schedules: scheduleSnap.data ?? const [],
-                  logs: logSnap.data ?? const [],
-                  scrollController: _scrollController,
-                  sharing: _sharing,
-                  onShare: _shareDoctorReport,
-                );
-              },
-            );
-          },
+      body: MedicynGradientBackground(
+        child: SafeArea(
+          child: StreamBuilder<List<ScheduleWithMedicine>>(
+            stream: _schedulesStream,
+            builder: (context, scheduleSnap) {
+              return StreamBuilder<List<DoseLog>>(
+                stream: _doseLogsStream,
+                builder: (context, logSnap) {
+                  // See the matching guard in HomeScreen: without it this tab
+                  // shows "Nothing due this week yet" / all-zero stats for the
+                  // moment before the database's first watch() emission, then
+                  // jumps to the real numbers.
+                  if ((scheduleSnap.connectionState ==
+                              ConnectionState.waiting &&
+                          !scheduleSnap.hasData) ||
+                      (logSnap.connectionState == ConnectionState.waiting &&
+                          !logSnap.hasData)) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  return _InsightsBody(
+                    schedules: scheduleSnap.data ?? const [],
+                    logs: logSnap.data ?? const [],
+                    scrollController: _scrollController,
+                    sharing: _sharing,
+                    onShare: _shareDoctorReport,
+                  );
+                },
+              );
+            },
+          ),
         ),
       ),
     );
@@ -203,9 +207,11 @@ class _InsightsBody extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
       children: [
         const MedicynFadeIn(
-          child: MedicynPageHeading(
-            title: 'Insights',
-            subtitle: 'What actually happened with your medicines this week.',
+          child: MedicynGlassHeader(
+            child: MedicynPageHeading(
+              title: 'Insights',
+              subtitle: 'What actually happened with your medicines this week.',
+            ),
           ),
         ),
         const SizedBox(height: 24),
@@ -470,12 +476,12 @@ class _InsightsBody extends StatelessWidget {
               FilledButton.icon(
                 onPressed: sharing ? null : onShare,
                 icon: sharing
-                    ? const SizedBox(
+                    ? SizedBox(
                         height: 20,
                         width: 20,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          color: Colors.white,
+                          color: Theme.of(context).colorScheme.onPrimary,
                         ),
                       )
                     : const Icon(Icons.picture_as_pdf_outlined),
@@ -659,6 +665,8 @@ class InsightsMostConsistentCard extends StatelessWidget {
       width: double.infinity,
       child: AmbientCard(
         padding: const EdgeInsets.all(16),
+        frosted: true,
+        glow: true,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -741,8 +749,13 @@ class _StatHero extends StatelessWidget {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: scheme.primary,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: MedicynTheme.ambientShadow,
+        borderRadius: BorderRadius.circular(16),
+        // A solid brand-teal hero card doesn't need the frosted treatment —
+        // it's already opaque — but it earns the glow every other hero gets.
+        boxShadow: [
+          ...MedicynTheme.ambientShadow,
+          ...MedicynTheme.glow(scheme.primary, opacity: 0.4, blur: 26),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

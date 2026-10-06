@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/motion.dart';
+import '../../core/theme.dart';
 
 /// Home calendar as a floating sliver: it takes its child's real height
 /// (so large text cannot overflow a guessed header), scrolls away when
@@ -15,7 +16,6 @@ class HomeCalendarSliver extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     return SliverFloatingHeader(
       snapMode: FloatingHeaderSnapMode.scroll,
       animationStyle: AnimationStyle(
@@ -24,10 +24,20 @@ class HomeCalendarSliver extends StatelessWidget {
         reverseDuration: MedicynMotion.medium,
         reverseCurve: MedicynMotion.standard,
       ),
-      child: Material(
-        key: const ValueKey('collapsing-calendar-header'),
-        color: scheme.surface,
-        child: child,
+      // Stays opaque (never transparency) for the doc comment's reason
+      // above — it has to paint over dose cards during the float/snap —
+      // but paints the page's own gradient rather than a flat scheme.surface
+      // fill, so the calendar card's translucency actually shows the
+      // gradient it's floating over instead of a flat cream slab.
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: MedicynTheme.backgroundGradient(context),
+        ),
+        child: Material(
+          key: const ValueKey('collapsing-calendar-header'),
+          color: Colors.transparent,
+          child: child,
+        ),
       ),
     );
   }

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../core/motion.dart';
+import '../../core/widgets/medicyn_background.dart';
 import '../../core/widgets/medicyn_chrome.dart';
 import '../../core/widgets/medicyn_layout.dart';
 import '../../core/widgets/medicyn_motion.dart';
@@ -239,7 +240,9 @@ class _MedicinesListScreenState extends State<MedicinesListScreen> {
         icon: const Icon(Icons.add),
         label: const Text('Add medicine'),
       ),
-      body: SafeArea(child: MedicynContent(child: _body())),
+      body: MedicynGradientBackground(
+        child: SafeArea(child: MedicynContent(child: _body())),
+      ),
     );
   }
 
@@ -249,16 +252,18 @@ class _MedicinesListScreenState extends State<MedicinesListScreen> {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.cloud_off_outlined, size: 48),
-              const SizedBox(height: 12),
-              const Text(
-                'Could not load your reminders. Your saved data is still on this phone.',
-                textAlign: TextAlign.center,
-              ),
-            ],
+          child: AmbientCard(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.cloud_off_outlined, size: 48),
+                const SizedBox(height: 12),
+                const Text(
+                  'Could not load your reminders. Your saved data is still on this phone.',
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
           ),
         ),
       );
@@ -276,9 +281,11 @@ class _MedicinesListScreenState extends State<MedicinesListScreen> {
             const SliverPadding(
               padding: EdgeInsets.fromLTRB(20, 24, 20, 12),
               sliver: SliverToBoxAdapter(
-                child: MedicynPageHeading(
-                  title: 'Plan',
-                  subtitle: 'Everything you take, and when.',
+                child: MedicynGlassHeader(
+                  child: MedicynPageHeading(
+                    title: 'Plan',
+                    subtitle: 'Everything you take, and when.',
+                  ),
                 ),
               ),
             ),
@@ -305,27 +312,30 @@ class _EmptyState extends StatelessWidget {
   Widget build(BuildContext context) {
     final message = Padding(
       padding: const EdgeInsets.fromLTRB(32, 32, 32, 96),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Icons.medication_outlined,
-            size: 64,
-            color: Theme.of(context).colorScheme.primary,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'No reminders yet',
-            style: Theme.of(context).textTheme.titleLarge,
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Scan a label or speak the details.',
-            style: Theme.of(context).textTheme.bodyMedium,
-            textAlign: TextAlign.center,
-          ),
-        ],
+      child: AmbientCard(
+        glow: true,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.medication_outlined,
+              size: 64,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'No reminders yet',
+              style: Theme.of(context).textTheme.titleLarge,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Scan a label or speak the details.',
+              style: Theme.of(context).textTheme.bodyMedium,
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
       ),
     );
     if (!embedded) return Center(child: message);
@@ -337,9 +347,11 @@ class _EmptyState extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const MedicynPageHeading(
-            title: 'Plan',
-            subtitle: 'Everything you take, and when.',
+          const MedicynGlassHeader(
+            child: MedicynPageHeading(
+              title: 'Plan',
+              subtitle: 'Everything you take, and when.',
+            ),
           ),
           Expanded(child: Center(child: message)),
         ],

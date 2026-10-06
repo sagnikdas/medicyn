@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/motion.dart';
-import '../../core/widgets/chart_grid.dart';
+import '../../core/widgets/medicyn_background.dart';
 import '../../core/widgets/medicyn_layout.dart';
 import '../../core/widgets/medicyn_motion.dart';
 import '../../data/local/database.dart';
@@ -213,52 +213,48 @@ class _CareScreenState extends State<CareScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Family')),
-      body: ChartPaperTexture(
-        child: ChartRuleLines(
-          child: SafeArea(
-            child: MedicynContent(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const SizedBox(height: 12),
-                    MedicynSwitcher(
-                      alignment: Alignment.topCenter,
-                      duration: MedicynMotion.medium,
-                      child: KeyedSubtree(
-                        key: ValueKey(_loading ? 'loading' : _link?.status),
-                        child: _loading
-                            ? const Padding(
-                                padding: EdgeInsets.symmetric(vertical: 48),
-                                child: Center(
-                                  child: CircularProgressIndicator(),
-                                ),
-                              )
-                            : _body(),
-                      ),
+      body: MedicynGradientBackground(
+        child: SafeArea(
+          child: MedicynContent(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const SizedBox(height: 12),
+                  MedicynSwitcher(
+                    alignment: Alignment.topCenter,
+                    duration: MedicynMotion.medium,
+                    child: KeyedSubtree(
+                      key: ValueKey(_loading ? 'loading' : _link?.status),
+                      child: _loading
+                          ? const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 48),
+                              child: Center(child: CircularProgressIndicator()),
+                            )
+                          : _body(),
                     ),
-                    AnimatedSize(
-                      duration: MedicynMotion.duration(
-                        context,
-                        MedicynMotion.fast,
-                      ),
-                      curve: MedicynMotion.decelerate,
-                      alignment: Alignment.topCenter,
-                      child: _error == null
-                          ? const SizedBox(width: double.infinity)
-                          : Padding(
-                              padding: const EdgeInsets.only(top: 20),
-                              child: Text(
-                                _error!,
-                                style: TextStyle(
-                                  color: Theme.of(context).colorScheme.error,
-                                ),
+                  ),
+                  AnimatedSize(
+                    duration: MedicynMotion.duration(
+                      context,
+                      MedicynMotion.fast,
+                    ),
+                    curve: MedicynMotion.decelerate,
+                    alignment: Alignment.topCenter,
+                    child: _error == null
+                        ? const SizedBox(width: double.infinity)
+                        : Padding(
+                            padding: const EdgeInsets.only(top: 20),
+                            child: Text(
+                              _error!,
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.error,
                               ),
                             ),
-                    ),
-                  ],
-                ),
+                          ),
+                  ),
+                ],
               ),
             ),
           ),

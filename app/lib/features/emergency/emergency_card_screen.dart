@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/locale_dates.dart';
+import '../../core/widgets/medicyn_background.dart';
 import '../../core/widgets/medicyn_layout.dart';
 import '../../data/export/emergency_card_export_service.dart';
 import '../../data/local/database.dart';
@@ -163,150 +164,169 @@ class _EmergencyCardScreenState extends State<EmergencyCardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(title: const Text('Emergency card')),
-      body: SafeArea(
-        child: MedicynContent(
-          child: StreamBuilder<EmergencyInfoData?>(
-            stream: widget.db.watchEmergencyInfo(),
-            builder: (context, infoSnapshot) {
-              final info = infoSnapshot.data;
-              return ListView(
-                padding: const EdgeInsets.all(20),
-                children: [
-                  _line(
-                    context,
-                    'Blood group',
-                    (info?.bloodGroup.trim().isNotEmpty ?? false)
-                        ? info!.bloodGroup
-                        : 'Not set',
+      body: MedicynGradientBackground(
+        child: SafeArea(
+          child: MedicynContent(
+            child: StreamBuilder<EmergencyInfoData?>(
+              stream: widget.db.watchEmergencyInfo(),
+              builder: (context, infoSnapshot) {
+                final info = infoSnapshot.data;
+                // A static DecoratedBox, not AmbientCard: this screen's own
+                // doc above is explicit that a styled/animated wrapper here
+                // once rendered corrupted once the caregiver's name arrived
+                // after first paint. A plain, non-animated fill behind the
+                // whole list — present identically on every rebuild,
+                // regardless of when async data lands — keeps the contrast
+                // this gradient ground now needs without reintroducing that
+                // risk.
+                return DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: scheme.surfaceContainerLowest.withValues(alpha: 0.9),
+                    borderRadius: const BorderRadius.all(Radius.circular(16)),
                   ),
-                  _line(
-                    context,
-                    'Allergies',
-                    (info?.allergies.trim().isNotEmpty ?? false)
-                        ? info!.allergies
-                        : 'Not set',
-                  ),
-                  _line(
-                    context,
-                    'Allergies severe',
-                    (info?.allergiesSevere ?? false) ? 'Yes' : 'No',
-                  ),
-                  _line(
-                    context,
-                    'Conditions',
-                    (info?.conditions.trim().isNotEmpty ?? false)
-                        ? info!.conditions
-                        : 'Not set',
-                  ),
-                  _line(
-                    context,
-                    'Notes',
-                    (info?.notes.trim().isNotEmpty ?? false)
-                        ? info!.notes
-                        : 'Not set',
-                  ),
-                  _line(
-                    context,
-                    'Insurance number',
-                    (info?.insuranceNumber.trim().isNotEmpty ?? false)
-                        ? info!.insuranceNumber
-                        : 'Not set',
-                  ),
-                  _line(
-                    context,
-                    'National ID (Aadhaar / SSN / etc.)',
-                    (info?.nationalId.trim().isNotEmpty ?? false)
-                        ? info!.nationalId
-                        : 'Not set',
-                  ),
-                  _line(
-                    context,
-                    'Health card no.',
-                    (info?.healthCardNumber.trim().isNotEmpty ?? false)
-                        ? info!.healthCardNumber
-                        : 'Not set',
-                  ),
-                  _line(
-                    context,
-                    'Emergency contact name',
-                    (info?.emergencyContactName.trim().isNotEmpty ?? false)
-                        ? info!.emergencyContactName
-                        : 'Not set',
-                  ),
-                  _line(
-                    context,
-                    'Emergency contact number',
-                    (info?.emergencyContactPhone.trim().isNotEmpty ?? false)
-                        ? info!.emergencyContactPhone
-                        : 'Not set',
-                  ),
-                  if (info?.emergencyContactPhone.trim().isNotEmpty ??
-                      false) ...[
-                    OutlinedButton(
-                      onPressed: () =>
-                          openDialer(info!.emergencyContactPhone.trim()),
-                      child: const Text('Call emergency contact'),
-                    ),
-                    const SizedBox(height: 16),
-                  ],
-                  _line(
-                    context,
-                    'Updated',
-                    info?.updatedAt != null
-                        ? _shortDate(info!.updatedAt)
-                        : 'Not set up yet',
-                  ),
-                  const SizedBox(height: 12),
-                  OutlinedButton(
-                    onPressed: () => _edit(info),
-                    child: const Text('Edit'),
-                  ),
-                  const SizedBox(height: 20),
-                  _line(
-                    context,
-                    "Caregiver's number",
-                    _loadingPhone
-                        ? 'Loading…'
-                        : (_caregiverPhone ?? 'No number on file.'),
-                  ),
-                  if (_caregiverName != null)
-                    _line(context, 'Caregiver name', _caregiverName!),
-                  if (_caregiverPhone != null)
-                    OutlinedButton(
-                      onPressed: () => openDialer(_caregiverPhone!),
-                      child: const Text('Call'),
-                    ),
-                  const SizedBox(height: 20),
-                  StreamBuilder<List<ScheduleWithMedicine>>(
-                    stream: widget.db.watchActiveSchedules(),
-                    builder: (context, medsSnapshot) {
-                      final items = medsSnapshot.data ?? const [];
-                      return _line(
+                  child: ListView(
+                    padding: const EdgeInsets.all(20),
+                    children: [
+                      _line(
                         context,
-                        'Current medicines',
-                        items.isEmpty
-                            ? 'No medicines on this device.'
-                            : items
-                                  .map(
-                                    (item) =>
-                                        item.medicine.doseAmount.trim().isEmpty
-                                        ? medicineTitle(item.medicine)
-                                        : '${medicineTitle(item.medicine)} - ${item.medicine.doseAmount}',
-                                  )
-                                  .join('\n'),
-                      );
-                    },
+                        'Blood group',
+                        (info?.bloodGroup.trim().isNotEmpty ?? false)
+                            ? info!.bloodGroup
+                            : 'Not set',
+                      ),
+                      _line(
+                        context,
+                        'Allergies',
+                        (info?.allergies.trim().isNotEmpty ?? false)
+                            ? info!.allergies
+                            : 'Not set',
+                      ),
+                      _line(
+                        context,
+                        'Allergies severe',
+                        (info?.allergiesSevere ?? false) ? 'Yes' : 'No',
+                      ),
+                      _line(
+                        context,
+                        'Conditions',
+                        (info?.conditions.trim().isNotEmpty ?? false)
+                            ? info!.conditions
+                            : 'Not set',
+                      ),
+                      _line(
+                        context,
+                        'Notes',
+                        (info?.notes.trim().isNotEmpty ?? false)
+                            ? info!.notes
+                            : 'Not set',
+                      ),
+                      _line(
+                        context,
+                        'Insurance number',
+                        (info?.insuranceNumber.trim().isNotEmpty ?? false)
+                            ? info!.insuranceNumber
+                            : 'Not set',
+                      ),
+                      _line(
+                        context,
+                        'National ID (Aadhaar / SSN / etc.)',
+                        (info?.nationalId.trim().isNotEmpty ?? false)
+                            ? info!.nationalId
+                            : 'Not set',
+                      ),
+                      _line(
+                        context,
+                        'Health card no.',
+                        (info?.healthCardNumber.trim().isNotEmpty ?? false)
+                            ? info!.healthCardNumber
+                            : 'Not set',
+                      ),
+                      _line(
+                        context,
+                        'Emergency contact name',
+                        (info?.emergencyContactName.trim().isNotEmpty ?? false)
+                            ? info!.emergencyContactName
+                            : 'Not set',
+                      ),
+                      _line(
+                        context,
+                        'Emergency contact number',
+                        (info?.emergencyContactPhone.trim().isNotEmpty ?? false)
+                            ? info!.emergencyContactPhone
+                            : 'Not set',
+                      ),
+                      if (info?.emergencyContactPhone.trim().isNotEmpty ??
+                          false) ...[
+                        OutlinedButton(
+                          onPressed: () =>
+                              openDialer(info!.emergencyContactPhone.trim()),
+                          child: const Text('Call emergency contact'),
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+                      _line(
+                        context,
+                        'Updated',
+                        info?.updatedAt != null
+                            ? _shortDate(info!.updatedAt)
+                            : 'Not set up yet',
+                      ),
+                      const SizedBox(height: 12),
+                      OutlinedButton(
+                        onPressed: () => _edit(info),
+                        child: const Text('Edit'),
+                      ),
+                      const SizedBox(height: 20),
+                      _line(
+                        context,
+                        "Caregiver's number",
+                        _loadingPhone
+                            ? 'Loading…'
+                            : (_caregiverPhone ?? 'No number on file.'),
+                      ),
+                      if (_caregiverName != null)
+                        _line(context, 'Caregiver name', _caregiverName!),
+                      if (_caregiverPhone != null)
+                        OutlinedButton(
+                          onPressed: () => openDialer(_caregiverPhone!),
+                          child: const Text('Call'),
+                        ),
+                      const SizedBox(height: 20),
+                      StreamBuilder<List<ScheduleWithMedicine>>(
+                        stream: widget.db.watchActiveSchedules(),
+                        builder: (context, medsSnapshot) {
+                          final items = medsSnapshot.data ?? const [];
+                          return _line(
+                            context,
+                            'Current medicines',
+                            items.isEmpty
+                                ? 'No medicines on this device.'
+                                : items
+                                      .map(
+                                        (item) =>
+                                            item.medicine.doseAmount
+                                                .trim()
+                                                .isEmpty
+                                            ? medicineTitle(item.medicine)
+                                            : '${medicineTitle(item.medicine)} - ${item.medicine.doseAmount}',
+                                      )
+                                      .join('\n'),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 20),
+                      OutlinedButton(
+                        onPressed: _sharing ? null : _share,
+                        child: Text(_sharing ? 'Preparing…' : 'Print or share'),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 20),
-                  OutlinedButton(
-                    onPressed: _sharing ? null : _share,
-                    child: Text(_sharing ? 'Preparing…' : 'Print or share'),
-                  ),
-                ],
-              );
-            },
+                );
+              },
+            ),
           ),
         ),
       ),

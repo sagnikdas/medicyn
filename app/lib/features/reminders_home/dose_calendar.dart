@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/locale_dates.dart';
 import '../../core/motion.dart';
+import '../../core/widgets/medicyn_chrome.dart';
 import 'day_dose_style.dart';
 import 'day_occurrences.dart';
 
@@ -41,6 +42,12 @@ class DoseCalendarMetrics {
   static const _weekdayFont = 12.0;
   static const _weekdayHeight = 16 / 12;
 
+  // The whole calendar is wrapped in an AmbientCard (default 16px padding
+  // + its 1px border, both top and bottom — Container/AnimatedContainer
+  // merges a BoxDecoration border's own implicit padding with any explicit
+  // padding given). Keep this in lockstep with AmbientCard's defaults.
+  static const _cardChrome = 2 * (16.0 + 1.0);
+
   /// Comfortable density, matching [MedicynTheme]. Callers with another
   /// density should pass [densityDy] from `visualDensity.baseSizeAdjustment`.
   static const _comfortableDensityDy = -4.0;
@@ -58,7 +65,7 @@ class DoseCalendarMetrics {
   }) {
     final iconRow = 48.0 + densityDy;
     final weekday = textScaler.scale(_weekdayFont) * _weekdayHeight;
-    return iconRow + _actionRow + _gaps + weekday;
+    return iconRow + _actionRow + _gaps + weekday + _cardChrome;
   }
 
   static int weekCount({required bool month, required DateTime anchor}) {
@@ -242,58 +249,60 @@ class _DoseCalendarState extends State<DoseCalendar> {
     final todayWeekday = today.weekday % 7;
     final weekdayLetters = localeNarrowWeekdays();
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _Header(
-          title: localeMonthYear(_anchor),
-          week: week,
-          showMonthToggle: !weekOnly,
-          monthExpanded: _monthExpanded,
-          onPrevious: () => _shift(-1, week),
-          onNext: () => _shift(1, week),
-          onToday: _goToday,
-          onToggleMonth: () => _setMonthExpanded(!_monthExpanded),
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            for (var i = 0; i < 7; i++)
-              Expanded(
-                child: Text(
-                  weekdayLetters[i],
-                  textAlign: TextAlign.center,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: text.bodySmall?.copyWith(
-                    color: i == todayWeekday
-                        ? scheme.primary
-                        : scheme.onSurfaceVariant,
+    return AmbientCard(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _Header(
+            title: localeMonthYear(_anchor),
+            week: week,
+            showMonthToggle: !weekOnly,
+            monthExpanded: _monthExpanded,
+            onPrevious: () => _shift(-1, week),
+            onNext: () => _shift(1, week),
+            onToday: _goToday,
+            onToggleMonth: () => _setMonthExpanded(!_monthExpanded),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              for (var i = 0; i < 7; i++)
+                Expanded(
+                  child: Text(
+                    weekdayLetters[i],
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: text.bodySmall?.copyWith(
+                      color: i == todayWeekday
+                          ? scheme.primary
+                          : scheme.onSurfaceVariant,
+                    ),
                   ),
                 ),
-              ),
-          ],
-        ),
-        const SizedBox(height: 4),
-        AnimatedSize(
-          duration: MedicynMotion.duration(context, MedicynMotion.medium),
-          curve: MedicynMotion.decelerate,
-          alignment: Alignment.topCenter,
-          clipBehavior: Clip.hardEdge,
-          child: _WeekGrid(
-            days: days,
-            week: week,
-            selected: selected,
-            today: today,
-            visibleMonth: visibleMonth,
-            marks: marks,
-            onSelect: widget.onSelectDay,
-            collapseProgress: week
-                ? 0
-                : widget.collapseProgress.clamp(0.0, 1.0),
+            ],
           ),
-        ),
-      ],
+          const SizedBox(height: 4),
+          AnimatedSize(
+            duration: MedicynMotion.duration(context, MedicynMotion.medium),
+            curve: MedicynMotion.decelerate,
+            alignment: Alignment.topCenter,
+            clipBehavior: Clip.hardEdge,
+            child: _WeekGrid(
+              days: days,
+              week: week,
+              selected: selected,
+              today: today,
+              visibleMonth: visibleMonth,
+              marks: marks,
+              onSelect: widget.onSelectDay,
+              collapseProgress: week
+                  ? 0
+                  : widget.collapseProgress.clamp(0.0, 1.0),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -503,7 +512,10 @@ class _DayCell extends StatelessWidget {
                 SizedBox.square(
                   dimension: circle,
                   child: AnimatedContainer(
-                    duration: MedicynMotion.duration(context, MedicynMotion.fast),
+                    duration: MedicynMotion.duration(
+                      context,
+                      MedicynMotion.fast,
+                    ),
                     curve: MedicynMotion.decelerate,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,

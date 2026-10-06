@@ -1619,7 +1619,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "\"${PODS_ROOT}/FirebaseCrashlytics/run\"\n";
+			shellScript = "/bin/sh \"${SRCROOT}/Runner/upload_crashlytics_dsyms.sh\"\n";
 		};
 		D1C1E576A05FD0C978ECD7AB /* [CP] Check Pods Manifest.lock */ = {
 			isa = PBXShellScriptBuildPhase;

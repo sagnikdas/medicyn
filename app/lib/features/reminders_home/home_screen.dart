@@ -5,7 +5,8 @@ import 'package:flutter/material.dart';
 
 import '../../core/app_settings.dart';
 import '../../core/motion.dart';
-import '../../core/widgets/chart_grid.dart';
+import '../../core/theme.dart';
+import '../../core/widgets/medicyn_background.dart';
 import '../../core/widgets/medicyn_chrome.dart';
 import '../../core/widgets/medicyn_motion.dart';
 import '../../core/widgets/medicyn_platform.dart';
@@ -382,6 +383,70 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Future<void> delete(ScheduleWithMedicine item) => _delete(item);
 
+  /// One row in the add-medicine chooser: a pill-shaped tappable row with a
+  /// glow-ringed leading icon, matching the button/status-avatar language
+  /// used elsewhere rather than a flat ListTile.
+  Widget _captureOptionRow(
+    BuildContext sheetContext, {
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    final scheme = Theme.of(sheetContext).colorScheme;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          decoration: BoxDecoration(
+            color: scheme.surfaceContainer.withValues(alpha: 0.6),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: scheme.primary.withValues(alpha: 0.12),
+                  boxShadow: MedicynTheme.glow(
+                    scheme.primary,
+                    opacity: 0.25,
+                    blur: 14,
+                  ),
+                ),
+                child: Icon(icon, color: scheme.primary),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: Theme.of(sheetContext).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: Theme.of(sheetContext).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right, color: scheme.outline),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _startCapture() async {
     // Selecting a method is intentionally separate from opening the capture
     // screen: camera and microphone permissions are requested only after the
@@ -450,79 +515,114 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             // pattern already used by showTodayAddMenu in
             // today_care_editor.dart.
             isScrollControlled: true,
-            builder: (sheetContext) => SafeArea(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      'How do you want to add it?',
-                      style: Theme.of(sheetContext).textTheme.titleLarge,
+            backgroundColor: Colors.transparent,
+            builder: (sheetContext) {
+              final scheme = Theme.of(sheetContext).colorScheme;
+              return SafeArea(
+                child: Container(
+                  margin: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+                  decoration: BoxDecoration(
+                    // Near-opaque, not translucent — the sheet already sits
+                    // over a dim scrim rather than the raw gradient, so this
+                    // stays a solid frosted panel for contrast safety.
+                    color: scheme.surfaceContainerLowest.withValues(
+                      alpha: 0.92,
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Choose one. You can check every detail before saving.',
-                      style: Theme.of(sheetContext).textTheme.bodyMedium,
+                    borderRadius: const BorderRadius.all(Radius.circular(24)),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.30),
                     ),
-                    const SizedBox(height: 12),
-                    ListTile(
-                      minTileHeight: 56,
-                      leading: const Icon(Icons.document_scanner_outlined),
-                      title: const Text('Scan label'),
-                      subtitle: const Text('Use your camera to read the label'),
-                      onTap: () =>
-                          Navigator.pop(sheetContext, _CaptureMethod.scan),
+                    boxShadow: MedicynTheme.liftedShadow,
+                  ),
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Center(
+                          child: Container(
+                            width: 36,
+                            height: 4,
+                            margin: const EdgeInsets.only(bottom: 16),
+                            decoration: BoxDecoration(
+                              color: scheme.outlineVariant,
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                        ),
+                        Text(
+                          'How do you want to add it?',
+                          style: Theme.of(sheetContext).textTheme.titleLarge,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Choose one. You can check every detail before saving.',
+                          style: Theme.of(sheetContext).textTheme.bodyMedium,
+                        ),
+                        const SizedBox(height: 16),
+                        _captureOptionRow(
+                          sheetContext,
+                          icon: Icons.document_scanner_outlined,
+                          title: 'Scan label',
+                          subtitle: 'Use your camera to read the label',
+                          onTap: () =>
+                              Navigator.pop(sheetContext, _CaptureMethod.scan),
+                        ),
+                        const SizedBox(height: 10),
+                        _captureOptionRow(
+                          sheetContext,
+                          icon: Icons.mic_outlined,
+                          title: 'Speak details',
+                          subtitle: 'Say the medicine and schedule',
+                          onTap: () =>
+                              Navigator.pop(sheetContext, _CaptureMethod.speak),
+                        ),
+                        const SizedBox(height: 10),
+                        _captureOptionRow(
+                          sheetContext,
+                          icon: Icons.edit_outlined,
+                          title: 'Enter manually',
+                          subtitle: 'Type the details yourself',
+                          onTap: () => Navigator.pop(
+                            sheetContext,
+                            _CaptureMethod.manual,
+                          ),
+                        ),
+                        const Divider(height: 28),
+                        Text(
+                          'PRESCRIPTION',
+                          style: Theme.of(sheetContext).textTheme.labelSmall,
+                        ),
+                        const SizedBox(height: 10),
+                        _captureOptionRow(
+                          sheetContext,
+                          icon: Icons.receipt_long_outlined,
+                          title: 'Scan a prescription',
+                          subtitle:
+                              'Medicines, scans and therapy in one document',
+                          onTap: () => Navigator.pop(
+                            sheetContext,
+                            _CaptureMethod.prescriptionPhoto,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        _captureOptionRow(
+                          sheetContext,
+                          icon: Icons.picture_as_pdf_outlined,
+                          title: 'Upload a prescription PDF',
+                          subtitle: 'For a multi-page document',
+                          onTap: () => Navigator.pop(
+                            sheetContext,
+                            _CaptureMethod.prescriptionPdf,
+                          ),
+                        ),
+                      ],
                     ),
-                    ListTile(
-                      minTileHeight: 56,
-                      leading: const Icon(Icons.mic_outlined),
-                      title: const Text('Speak details'),
-                      subtitle: const Text('Say the medicine and schedule'),
-                      onTap: () =>
-                          Navigator.pop(sheetContext, _CaptureMethod.speak),
-                    ),
-                    ListTile(
-                      minTileHeight: 56,
-                      leading: const Icon(Icons.edit_outlined),
-                      title: const Text('Enter manually'),
-                      subtitle: const Text('Type the details yourself'),
-                      onTap: () =>
-                          Navigator.pop(sheetContext, _CaptureMethod.manual),
-                    ),
-                    const Divider(height: 24),
-                    Text(
-                      'PRESCRIPTION',
-                      style: Theme.of(sheetContext).textTheme.labelSmall,
-                    ),
-                    const SizedBox(height: 8),
-                    ListTile(
-                      minTileHeight: 56,
-                      leading: const Icon(Icons.receipt_long_outlined),
-                      title: const Text('Scan a prescription'),
-                      subtitle: const Text(
-                        'Medicines, scans and therapy in one document',
-                      ),
-                      onTap: () => Navigator.pop(
-                        sheetContext,
-                        _CaptureMethod.prescriptionPhoto,
-                      ),
-                    ),
-                    ListTile(
-                      minTileHeight: 56,
-                      leading: const Icon(Icons.picture_as_pdf_outlined),
-                      title: const Text('Upload a prescription PDF'),
-                      subtitle: const Text('For a multi-page document'),
-                      onTap: () => Navigator.pop(
-                        sheetContext,
-                        _CaptureMethod.prescriptionPdf,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
-            ),
+              );
+            },
           );
     if (!mounted || method == null) return;
 
@@ -560,9 +660,7 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         );
       case _CaptureMethod.prescriptionPhoto:
         final ocrText = await navigator.push<String>(
-          MaterialPageRoute(
-            builder: (_) => const OcrCaptureScreen(),
-          ),
+          MaterialPageRoute(builder: (_) => const OcrCaptureScreen()),
         );
         if (ocrText == null || !mounted) return;
         // '' is OcrCaptureScreen's "Skip -- enter manually" -- the same
@@ -704,40 +802,38 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 titleSpacing: 20,
                 title: const MedicynBrandMark(compact: true),
               ),
-              body: ChartPaperTexture(
-                child: ChartRuleLines(
-                  child: StreamBuilder<List<ScheduleWithMedicine>>(
-                    stream: _schedulesStream,
-                    builder: (context, scheduleSnap) {
-                      return StreamBuilder<List<DoseLog>>(
-                        stream: _doseLogsStream,
-                        builder: (context, logSnap) {
-                          // Neither stream emits until the encrypted database has
-                          // actually opened (Keystore reads, background-isolate
-                          // spawn — not instant). Falling straight into
-                          // _calendarBody with `?? const []` before that first
-                          // emission drew the real "No reminders yet" empty state
-                          // for a user who already has medicines, which then
-                          // flashed to the true list the moment it arrived. See
-                          // the matching guard in MedicinesListScreen.
-                          if ((scheduleSnap.connectionState ==
-                                      ConnectionState.waiting &&
-                                  !scheduleSnap.hasData) ||
-                              (logSnap.connectionState ==
-                                      ConnectionState.waiting &&
-                                  !logSnap.hasData)) {
-                            return const Center(
-                              child: CircularProgressIndicator(),
-                            );
-                          }
-                          return _calendarBody(
-                            schedules: scheduleSnap.data ?? const [],
-                            logs: logSnap.data ?? const [],
+              body: MedicynGradientBackground(
+                child: StreamBuilder<List<ScheduleWithMedicine>>(
+                  stream: _schedulesStream,
+                  builder: (context, scheduleSnap) {
+                    return StreamBuilder<List<DoseLog>>(
+                      stream: _doseLogsStream,
+                      builder: (context, logSnap) {
+                        // Neither stream emits until the encrypted database has
+                        // actually opened (Keystore reads, background-isolate
+                        // spawn — not instant). Falling straight into
+                        // _calendarBody with `?? const []` before that first
+                        // emission drew the real "No reminders yet" empty state
+                        // for a user who already has medicines, which then
+                        // flashed to the true list the moment it arrived. See
+                        // the matching guard in MedicinesListScreen.
+                        if ((scheduleSnap.connectionState ==
+                                    ConnectionState.waiting &&
+                                !scheduleSnap.hasData) ||
+                            (logSnap.connectionState ==
+                                    ConnectionState.waiting &&
+                                !logSnap.hasData)) {
+                          return const Center(
+                            child: CircularProgressIndicator(),
                           );
-                        },
-                      );
-                    },
-                  ),
+                        }
+                        return _calendarBody(
+                          schedules: scheduleSnap.data ?? const [],
+                          logs: logSnap.data ?? const [],
+                        );
+                      },
+                    );
+                  },
                 ),
               ),
             ),
@@ -935,23 +1031,29 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
             child: MedicynFadeIn(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    greetingFor(now),
-                    style: Theme.of(context).textTheme.headlineSmall,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    isSameCalendarDay(_selectedDay, now)
-                        ? 'Your health schedule for today.'
-                        : 'Your health schedule for this day.',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+              child: MedicynGlassHeader(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      greetingFor(now),
+                      style: Theme.of(context).textTheme.headlineSmall,
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 4),
+                    Text(
+                      isSameCalendarDay(_selectedDay, now)
+                          ? 'Your health schedule for today.'
+                          : 'Your health schedule for this day.',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -992,7 +1094,13 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ),
         HomeCalendarSliver(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+            // 20px horizontal, matching the greeting header above and the
+            // dose rows below (day_dose_list.dart) — now that the calendar
+            // is its own AmbientCard, its edges need to line up with theirs.
+            // 16px top, matching the gap this screen already uses between
+            // its other stacked cards (the attention/health/nudge slivers
+            // above).
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
             child: DoseCalendar(
               selectedDay: _selectedDay,
               now: now,
@@ -1056,7 +1164,10 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   /// current below — an active camera scan, say — retry on the next
   /// rebuild instead of being marked as already prompted and never asked
   /// again.
-  Future<void> _autoPromptAttention(DayOccurrence occurrence, String key) async {
+  Future<void> _autoPromptAttention(
+    DayOccurrence occurrence,
+    String key,
+  ) async {
     _autoPromptInFlightKey = null;
     if (!mounted) return;
     // Don't interrupt something already on top of Home — a capture flow, a
@@ -1104,8 +1215,10 @@ class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             // "Snooze" plus its icon can still outgrow half the dialog's
             // width, and an ellipsis there reads as broken rather than
             // adaptive. This scales the label down to whatever fits.
-            Widget fitted(String text) =>
-                FittedBox(fit: BoxFit.scaleDown, child: Text(text, maxLines: 1));
+            Widget fitted(String text) => FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(text, maxLines: 1),
+            );
             final takenButton = FilledButton.icon(
               onPressed: () => Navigator.pop(dialogContext, true),
               style: FilledButton.styleFrom(
@@ -1427,44 +1540,61 @@ class _EmptyState extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(32, 48, 32, 24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 160,
-            height: 160,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: scheme.primaryContainer.withValues(alpha: 0.12),
+      // 20px horizontal, matching every other card on this screen (the
+      // greeting header, the calendar, dose rows). 16px top, the same gap
+      // this screen uses between all its other stacked cards. This is also
+      // the last sliver, with the bottom nav bar fixed below it — sized to
+      // actually fit above the bar at rest (no scroll needed) on a typical
+      // phone, not just to look good in isolation. AmbientCard's own
+      // padding+border already add ~34pt versus the old bare Column, so
+      // everything inside is trimmed to make room for that.
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+      child: AmbientCard(
+        glow: true,
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: scheme.primaryContainer.withValues(alpha: 0.12),
+                boxShadow: MedicynTheme.glow(
+                  scheme.primary,
+                  opacity: 0.3,
+                  blur: 20,
+                ),
+              ),
+              child: Icon(Icons.medication, size: 56, color: scheme.primary),
             ),
-            child: Icon(Icons.medication, size: 72, color: scheme.primary),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            'No reminders yet',
-            style: Theme.of(context).textTheme.titleLarge,
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Scan a label or speak the details to add your first one.',
-            style: Theme.of(
-              context,
-            ).textTheme.bodyLarge?.copyWith(color: scheme.onSurfaceVariant),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 24),
-          FilledButton.icon(
-            onPressed: onAdd,
-            icon: const Icon(Icons.add),
-            label: const Text(
-              'Add medicine',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+            const SizedBox(height: 16),
+            Text(
+              'No reminders yet',
+              style: Theme.of(context).textTheme.titleLarge,
+              textAlign: TextAlign.center,
             ),
-          ),
-        ],
+            const SizedBox(height: 8),
+            Text(
+              'Scan a label or speak the details to add your first one.',
+              style: Theme.of(
+                context,
+              ).textTheme.bodyLarge?.copyWith(color: scheme.onSurfaceVariant),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              onPressed: onAdd,
+              icon: const Icon(Icons.add),
+              label: const Text(
+                'Add medicine',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
