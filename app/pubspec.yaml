@@ -15,12 +15,14 @@ dependencies:
   # drawn while the app is dead, and that configuration comes from
   # android/app/google-services.json (git-ignored — see README's Push section).
   # Without the file the app still builds and runs, just without push.
-  firebase_core: ^4.13.0
+  # Keep these three FlutterFire releases on the same Firebase iOS SDK pin.
+  # SPM requires an exact match (12.18.0 for this set).
+  firebase_core: 4.14.0
   # Crash reporting. Gated by the same google-services.json /
   # GoogleService-Info.plist as push above — absent by default, so a fresh
   # checkout builds with Crashlytics off rather than failing.
-  firebase_crashlytics: ^5.3.0
-  firebase_messaging: ^16.5.0
+  firebase_crashlytics: 5.3.0
+  firebase_messaging: 16.6.0
   flutter:
     sdk: flutter
   flutter_local_notifications: ^22.3.0
